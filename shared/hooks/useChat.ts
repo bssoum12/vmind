@@ -42,6 +42,7 @@ export function useChat(): UseChatReturn {
 
   const executeToolCall = async (msg: string) => {
     const text = msg.toLowerCase();
+    const isDetailed = text.includes('détail') || text.includes('detail') || text.includes('complet') || text.includes('tout') || text.includes('lignes');
     let result: any;
     let agent = 'VDATA';
     let toolName = '';
@@ -54,8 +55,8 @@ export function useChat(): UseChatReturn {
 
     // 2. Extraction améliorée de la référence
     const keywords = ['facture', 'dossier', 'client', 'tiers', 'statut', 'demo', 'smti', 'local', 'sur', 'donne', 'moi', 'les', 'details', 'detail', 'détails', 'détail', 'avec', 'référence', 'reference'];
-    // On exige au moins un chiffre (?=.*\d) pour les codes génériques afin d'éviter de capturer des mots de 6+ lettres
-    const allMatches = msg.match(/([A-Z]{2,4}[- ]?[0-9]{4}[- ][0-9]+|[A-Z]{2,4}[- ][0-9]+|[A-Z]{2,4}-[0-9]+|(?=.*\d)[A-Z0-9-]{6,})/gi) || [];
+    // RegEx mise à jour pour supporter : FP 26-XXXXX, FC 2026-XXXXX, etc.
+    const allMatches = msg.match(/([A-Z]{2,4}[- ]?[0-9]{2,4}[- ][0-9]+|[A-Z]{2,4}[- ]?[0-9]{2,10}|(?=.*\d)[A-Z0-9-]{6,})/gi) || [];
     const validMatches = allMatches.filter(m => !keywords.includes(m.toLowerCase()));
     const extractedRef = validMatches.length > 0 ? validMatches[0].trim() : '';
 
@@ -128,11 +129,45 @@ export function useChat(): UseChatReturn {
         responseText += `Statut : <span style="color:var(--cyan)">${inv.statut || inv.StatusDesignation || 'N/A'}</span><br>`;
         responseText += `Dossier : ${inv.dossier_ref || inv.DossierReference || 'N/A'}<br><br>`;
         
-        responseText += `<div style="background:var(--navy4); padding:10px; border-radius:8px; border:1px solid var(--border)">`;
-        responseText += `Total HT : ${inv.total_ht || inv.TotalHT || '0'} ${inv.devise || inv.ID_DEVISE || ''}<br>`;
-        responseText += `TVA : ${inv.total_tva || inv.TotalTVA || '0'}<br>`;
-        responseText += `<strong>TOTAL TTC : ${inv.total_ttc || inv.TotalTTC || '0'} ${inv.devise || inv.ID_DEVISE || ''}</strong>`;
+        responseText += `<div style="background:var(--navy4); padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:10px">`;
+        responseText += `Total HT : ${inv.total_ht || '0'} ${inv.devise || ''}<br>`;
+        responseText += `TVA : ${inv.total_tva || '0'}<br>`;
+        responseText += `<strong>TOTAL TTC : ${inv.total_ttc || '0'} ${inv.devise || ''}</strong><br>`;
+        
+        if (data.summary?.solde_du_tnd) {
+          responseText += `<div style="margin-top:5px; padding-top:5px; border-top:1px dashed var(--border2); color:var(--cyan)">`;
+          responseText += `<strong>Solde : ${data.summary.solde_du_tnd} TND</strong> (Taux: ${data.invoice?.taux || 'N/A'})`;
+          responseText += `</div>`;
+        }
         responseText += `</div>`;
+
+        // Affichage des lignes si demandé
+        if (isDetailed && data.lines && data.lines.length > 0) {
+          responseText += `<div style="font-size:11px; margin-top:10px; overflow-x:auto">`;
+          responseText += `<strong style="display:block; margin-bottom:5px">DÉTAIL DES ARTICLES :</strong>`;
+          responseText += `<table style="width:100%; border-collapse:collapse; border:1px solid var(--border2)">`;
+          responseText += `<tr style="background:var(--navy3)">`;
+          responseText += `<th style="padding:4px; text-align:left; border:1px solid var(--border2)">Code</th>`;
+          responseText += `<th style="padding:4px; text-align:left; border:1px solid var(--border2)">Désignation</th>`;
+          responseText += `<th style="padding:4px; text-align:right; border:1px solid var(--border2)">Qté</th>`;
+          responseText += `<th style="padding:4px; text-align:right; border:1px solid var(--border2)">TTC</th>`;
+          responseText += `</tr>`;
+          
+          data.lines.forEach((line: any) => {
+            responseText += `<tr>`;
+            responseText += `<td style="padding:4px; border:1px solid var(--border2)">${line.article_code || '-'}</td>`;
+            responseText += `<td style="padding:4px; border:1px solid var(--border2)">${line.article_nom || 'N/A'}</td>`;
+            responseText += `<td style="padding:4px; text-align:right; border:1px solid var(--border2)">${line.quantite}</td>`;
+            responseText += `<td style="padding:4px; text-align:right; border:1px solid var(--border2)">${line.montant_ttc}</td>`;
+            responseText += `</tr>`;
+          });
+          
+          responseText += `</table>`;
+          responseText += `<div style="margin-top:5px; color:var(--muted)">Total articles : ${data.summary?.nb_lignes || data.lines.length}</div>`;
+          responseText += `</div>`;
+        } else if (!isDetailed) {
+          responseText += `<div style="font-size:11px; color:var(--cyan); font-style:italic">Tapez "détail" pour voir les lignes d'articles.</div>`;
+        }
       } else if (toolName === 'getDossierDetail') {
         responseText += `Dossier : <strong>${data.Context?.DOS_LIB || data.reference || extractedRef}</strong><br>État : <span style="color:var(--green)">${data.Context?.DOS_ETAT || 'En cours'}</span>`;
       } else {
