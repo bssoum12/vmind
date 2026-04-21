@@ -6,25 +6,26 @@ import { AGENTS } from '../../shared/constants/data';
 
 interface SidebarProps {
   onInsertPrompt: (text: string) => void;
+  activeAgentId?: string;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId }) => {
   const [activeNav, setActiveNav] = useState('dashboard');
 
   return (
     <div className="sidebar">
       <div className="nav-section">Navigation</div>
-      
-      <div 
-        className={`nav-item ${activeNav === 'dashboard' ? 'active' : ''}`} 
+
+      <div
+        className={`nav-item ${activeNav === 'dashboard' ? 'active' : ''}`}
         onClick={() => setActiveNav('dashboard')}
       >
         <div className="nav-icon">🏠</div>
         <span>Dashboard</span>
       </div>
-      
-      <div 
-        className={`nav-item ${activeNav === 'history' ? 'active' : ''}`} 
+
+      <div
+        className={`nav-item ${activeNav === 'history' ? 'active' : ''}`}
         onClick={() => setActiveNav('history')}
       >
         <div className="nav-icon">💬</div>
@@ -33,21 +34,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt }) => {
       </div>
 
       <div className="nav-section">Agents IA</div>
-      
+
       {Object.values(AGENTS).map((agent) => (
-        <div 
+        <div
           key={agent.id}
-          className="nav-item" 
+          className={`nav-item ${activeAgentId === agent.id ? 'agent-card-active' : ''}`}
           onClick={() => {
             onInsertPrompt(`Analyse ${agent.name}`);
           }}
         >
-          <IconBox style={{ background: agent.bgColor }}>
-            <span style={{ 
-              fontFamily: 'var(--font-title)', 
-              fontSize: '9px', 
-              fontWeight: 700, 
-              color: agent.color 
+          <IconBox style={{
+            background: agent.bgColor,
+            border: activeAgentId === agent.id ? `1px solid ${agent.color}` : 'none',
+            boxShadow: activeAgentId === agent.id ? `0 0 10px ${agent.color}40` : 'none'
+          }}>
+            <span style={{
+              fontFamily: 'var(--font-title)',
+              fontSize: '9px',
+              fontWeight: 700,
+              color: agent.color
             }}>
               {agent.icon}
             </span>
@@ -56,12 +61,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt }) => {
             <div style={{ fontSize: '12px', color: 'var(--white)', fontWeight: 600 }}>{agent.name}</div>
             <div style={{ fontSize: '9px', color: 'var(--muted)' }}>{agent.desc}</div>
           </div>
-          <div style={{ 
-            width: '6px', 
-            height: '6px', 
-            borderRadius: '50%', 
-            background: agent.status === 'ACTIF' ? 'var(--green)' : 'var(--muted)',
-            boxShadow: agent.status === 'ACTIF' ? '0 0 6px var(--green)' : 'none'
+          <div style={{
+            width: '6px',
+            height: '6px',
+            borderRadius: '50%',
+            background: activeAgentId === agent.id ? 'var(--green)' : 'var(--muted)',
+            boxShadow: activeAgentId === agent.id ? '0 0 6px var(--green)' : 'none'
           }}></div>
         </div>
       ))}

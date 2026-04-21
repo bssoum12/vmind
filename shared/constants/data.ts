@@ -138,3 +138,17 @@ export const RESPONSES: Record<string, ResponseData> = {
     ]
   },
 };
+
+/**
+ * Mapping des outils backend vers les agents spécifiques du Frontend.
+ * Permet de spécialiser les conversations et les identités visuelles.
+ */
+export const TOOL_AGENT_MAPPING: Record<string, string> = {
+  getInvoiceDetail: 'VDATA', // Spécialisé Data pour les factures comme demandé
+  getDossierDetail: 'VMOVE',
+  getExpeditionStatus: 'VMOVE',
+  getCustomerProfile: 'VSELL',
+  searchCotations: 'VSELL',
+  getPurchaseInvoiceDetail: 'VBUY',
+  runReadonlyQuery: 'VDATA'
+};

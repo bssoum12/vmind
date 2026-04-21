@@ -1,17 +1,20 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Message, LogEntry } from '../types';
 import { tralisApi } from '../api/tralis-api';
+import { TOOL_AGENT_MAPPING } from '../constants/data';
 
 interface UseChatReturn {
   messages: Message[];
   addMessage: (text: string) => void;
   clearChat: () => void;
   logs: LogEntry[];
+  activeAgentId: string;
 }
 
 const DEFAULT_CLIENT_ID = process.env.NEXT_PUBLIC_CLIENT_ID || 'DEMO';
 
 export function useChat(): UseChatReturn {
+  const [activeAgentId, setActiveAgentId] = useState('VMIND');
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -63,28 +66,24 @@ export function useChat(): UseChatReturn {
     try {
       if (text.includes('facture') || text.includes('détail') || text.includes('#inv') || text.includes('fc-') || text.includes('av-')) {
         toolName = 'getInvoiceDetail';
-        agent = 'VFIN';
         result = await tralisApi.getInvoiceDetail({
           client_id: clientId,
           invoice_ref: extractedRef || 'INV-2026-001'
         });
       } else if (text.includes('dossier') || text.includes('#tun') || text.includes('tun-')) {
         toolName = 'getDossierDetail';
-        agent = 'VMOVE';
         result = await tralisApi.getDossierDetail({
           client_id: clientId,
           dossier_ref: extractedRef || 'TUN-2847'
         });
       } else if (text.includes('livraison') || text.includes('statut') || text.includes('expédition')) {
         toolName = 'getExpeditionStatus';
-        agent = 'VMOVE';
         result = await tralisApi.getExpeditionStatus({
           client_id: clientId,
           expedition_ref: extractedRef || 'EXP-2024-99'
         });
       } else if (text.includes('client') || text.includes('tiers')) {
         toolName = 'getCustomerProfile';
-        agent = 'VSELL';
         // Pour le client, on essaie de prendre les mots après "client"
         const clientMatch = text.match(/client (.*?)($| sur)/i);
         const clientSearch = clientMatch ? clientMatch[1].trim() : 'TUNISIE TELECOM';
@@ -94,8 +93,37 @@ export function useChat(): UseChatReturn {
         });
       } else if (text.includes('cotation') || text.includes('pipeline')) {
         toolName = 'searchCotations';
-        agent = 'VSELL';
         result = await tralisApi.searchCotations({ client_id: clientId });
+      }
+
+      // Assignation de l'agent spécialisé selon l'outil identifié
+      if (toolName && TOOL_AGENT_MAPPING[toolName]) {
+        const nextAgentId = TOOL_AGENT_MAPPING[toolName];
+
+        // Système de Handoff Dynamique
+        if (nextAgentId !== activeAgentId) {
+          const handoffMsg: Message = {
+            id: `handoff-${Date.now()}`,
+            sender: 'vm',
+            agent: activeAgentId, // C'est l'agent actuel qui passe la main
+            text: `Un instant, je sollicite l'agent **${nextAgentId}** pour l'analyse précise de votre demande...`,
+            time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+            meta: 'System Handoff'
+          };
+
+          setMessages(prev => [...prev, handoffMsg]);
+          setActiveAgentId(nextAgentId);
+
+          // Mise à jour de la bulle de réflexion pour l'agent entrant
+          setMessages(prev => prev.map(m =>
+            m.isThinking ? { ...m, agent: nextAgentId } : m
+          ));
+
+          // Petite pause pour simuler la réflexion de l'agent entrant
+          await new Promise(resolve => setTimeout(resolve, 800));
+        }
+
+        agent = nextAgentId;
       }
 
       if (!toolName) {
@@ -121,19 +149,19 @@ export function useChat(): UseChatReturn {
       if (toolName === 'getInvoiceDetail') {
         const inv = data.invoice || data.Header || data;
         const dateStr = inv.date_facture || inv.DateFacture ? new Date(inv.date_facture || inv.DateFacture).toLocaleDateString() : 'N/A';
-        
+
         responseText += `Facture : <strong>${inv.reference || inv.FAC_REF || extractedRef}</strong><br>`;
         responseText += `Client : <strong>${inv.client || inv.RaisonSociale || 'N/A'}</strong><br>`;
         responseText += `Date : ${dateStr}<br>`;
         responseText += `Type : ${inv.type || inv.TypeDesignation || 'Facture'}<br>`;
         responseText += `Statut : <span style="color:var(--cyan)">${inv.statut || inv.StatusDesignation || 'N/A'}</span><br>`;
         responseText += `Dossier : ${inv.dossier_ref || inv.DossierReference || 'N/A'}<br><br>`;
-        
+
         responseText += `<div style="background:var(--navy4); padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:10px">`;
         responseText += `Total HT : ${inv.total_ht || '0'} ${inv.devise || ''}<br>`;
         responseText += `TVA : ${inv.total_tva || '0'}<br>`;
         responseText += `<strong>TOTAL TTC : ${inv.total_ttc || '0'} ${inv.devise || ''}</strong><br>`;
-        
+
         if (data.summary?.solde_du_tnd) {
           responseText += `<div style="margin-top:5px; padding-top:5px; border-top:1px dashed var(--border2); color:var(--cyan)">`;
           responseText += `<strong>Solde : ${data.summary.solde_du_tnd} TND</strong> (Taux: ${data.invoice?.taux || 'N/A'})`;
@@ -152,7 +180,7 @@ export function useChat(): UseChatReturn {
           responseText += `<th style="padding:4px; text-align:right; border:1px solid var(--border2)">Qté</th>`;
           responseText += `<th style="padding:4px; text-align:right; border:1px solid var(--border2)">TTC</th>`;
           responseText += `</tr>`;
-          
+
           data.lines.forEach((line: any) => {
             responseText += `<tr>`;
             responseText += `<td style="padding:4px; border:1px solid var(--border2)">${line.article_code || '-'}</td>`;
@@ -161,7 +189,7 @@ export function useChat(): UseChatReturn {
             responseText += `<td style="padding:4px; text-align:right; border:1px solid var(--border2)">${line.montant_ttc}</td>`;
             responseText += `</tr>`;
           });
-          
+
           responseText += `</table>`;
           responseText += `<div style="margin-top:5px; color:var(--muted)">Total articles : ${data.summary?.nb_lignes || data.lines.length}</div>`;
           responseText += `</div>`;
@@ -229,5 +257,5 @@ export function useChat(): UseChatReturn {
     }]);
   }, []);
 
-  return { messages, addMessage, clearChat, logs };
+  return { messages, addMessage, clearChat, logs, activeAgentId };
 }

@@ -112,6 +112,39 @@ body {
   }
 }
 
+@keyframes premiumAgentPulse {
+  0% {
+    box-shadow: 0 0 0px var(--cyan4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 15px var(--cyan3);
+    transform: scale(1.02);
+  }
+  100% {
+    box-shadow: 0 0 0px var(--cyan4);
+    transform: scale(1);
+  }
+}
+
+.agent-card-active {
+  background: linear-gradient(90deg, var(--cyan4), transparent) !important;
+  border: 1px solid var(--border2) !important;
+  color: var(--cyan) !important;
+  animation: premiumAgentPulse 3s infinite ease-in-out;
+}
+
+.agent-card-active::after {
+  content: '';
+  position: absolute;
+  right: 12px;
+  width: 6px;
+  height: 6px;
+  background: var(--cyan);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--cyan);
+}
+
 .topbar-right {
   display: flex;
   align-items: center;

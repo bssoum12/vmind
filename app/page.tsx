@@ -10,7 +10,7 @@ import { useChat } from "@/shared/hooks/useChat";
 export default function Home() {
   const [voiceShow, setVoiceShow] = useState(false);
   const [insertPrompt, setInsertPrompt] = useState<string | undefined>(undefined);
-  const { logs, addMessage } = useChat();
+  const { logs, addMessage, activeAgentId } = useChat();
 
   const handleInsertPrompt = (text: string) => {
     // We pass this to ChatPanel which handles the actual input update
@@ -21,7 +21,7 @@ export default function Home() {
 
   return (
     <main className="main-container">
-      <Sidebar onInsertPrompt={handleInsertPrompt} />
+      <Sidebar onInsertPrompt={handleInsertPrompt} activeAgentId={activeAgentId} />
       
       <div className="content">
         <ChatPanel 
@@ -31,6 +31,7 @@ export default function Home() {
         <RightPanel 
           logs={logs} 
           onInsertPrompt={handleInsertPrompt} 
+          activeAgentId={activeAgentId}
         />
       </div>
 

@@ -8,9 +8,10 @@ import { LogEntry } from '../../shared/types';
 interface RightPanelProps {
   logs: LogEntry[];
   onInsertPrompt: (text: string) => void;
+  activeAgentId?: string;
 }
 
-export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt }) => {
+export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, activeAgentId }) => {
   return (
     <div className="right-panel">
       {/* KPIs Live */}
@@ -21,7 +22,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt }) 
         <MiniKpi label="Dossiers Ouverts" dotColor="var(--amber)" val="43" delta="⚠ 7 en retard" deltaType="warning" />
         <MiniKpi label="CA Mois" dotColor="var(--cyan)" val="1.847M" delta="▲ +12.3%" deltaType="up" />
         <MiniKpi label="BL Non Facturés" dotColor="var(--purple)" val="14" delta="▼ à traiter" deltaType="down" />
-        
+
         <div style={{ marginTop: '12px', fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>
           CA 6 DERNIERS MOIS (TND)
         </div>
@@ -43,8 +44,8 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt }) 
         <div className="rp-title">État des Agents</div>
         {Object.values(AGENTS).map((agent) => (
           <div key={agent.id} className="agent-row" onClick={() => onInsertPrompt(`Analyse situation ${agent.name}`)}>
-            <div className="agent-ico" style={{ 
-              background: agent.bgColor, 
+            <div className="agent-ico" style={{
+              background: agent.bgColor,
               color: agent.color,
               fontSize: '9px'
             }}>
@@ -54,8 +55,8 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt }) 
               <div className="agent-name-sm">{agent.name}</div>
               <div className="agent-desc">{agent.desc}</div>
             </div>
-            <div className={`agent-state ${agent.status === 'ACTIF' ? 'on' : 'idle'}`}>
-              {agent.status === 'ACTIF' ? '● ACTIF' : '◌ VEILLE'}
+            <div className={`agent-state ${activeAgentId === agent.id ? 'on' : 'idle'}`}>
+              {activeAgentId === agent.id ? '● ACTIF' : '◌ VEILLE'}
             </div>
           </div>
         ))}
