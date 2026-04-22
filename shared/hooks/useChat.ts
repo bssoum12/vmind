@@ -50,18 +50,19 @@ export function useChat(): UseChatReturn {
     let agent = 'VDATA';
     let toolName = '';
 
-    // 1. Détection dynamique du Tenant (client_id)
+    // 1. Détection dynamique du Tenant (ex: "sur DEMO", "sur SMTI")
     let clientId = DEFAULT_CLIENT_ID;
-    if (text.includes('sur demo')) clientId = 'DEMO';
-    else if (text.includes('sur smti')) clientId = 'SMTI';
-    else if (text.includes('sur local')) clientId = 'LOCAL';
+    const tenantMatch = text.match(/sur\s+([a-z0-9_-]+)/i);
+    if (tenantMatch) {
+      clientId = tenantMatch[1].toUpperCase();
+    }
 
     // 2. Extraction améliorée de la référence
     const keywords = [
-      'facture', 'dossier', 'client', 'tiers', 'statut', 'demo', 'smti', 'local', 'sur', 
-      'donne', 'moi', 'les', 'details', 'detail', 'détails', 'détail', 'avec', 
+      'facture', 'dossier', 'client', 'tiers', 'statut', 'demo', 'smti', 'local', 'sur',
+      'donne', 'moi', 'les', 'details', 'detail', 'détails', 'détail', 'avec',
       'référence', 'reference', 'retourner', 'affiche', 'montre', 'informations', 'livraison',
-      'quel', 'est', 'le', 'une', 'expédition', 'expedition', 'détaillé', 'detaille', 'dition'
+      'quel', 'est', 'le', 'la', 'les', 'une', 'du', 'de', 'des', 'expédition', 'expedition', 'détaillé', 'detaille', 'dition', 'profil'
     ];
     // Règle d'or : une référence DOIT contenir au moins un chiffre ou un tiret
     const allMatches = msg.match(/([A-Z0-9]{2,}-[A-Z0-9-]+|(?=.*\d)[A-Z0-9]{5,})/gi) || [];
@@ -83,6 +84,40 @@ export function useChat(): UseChatReturn {
         result = await tralisApi.getExpeditionStatus({
           client_id: clientId,
           expedition_ref: extractedRef
+        });
+      } else if (text.includes('client') || text.includes('tiers') || text.includes('profil')) {
+        toolName = 'getCustomerProfile';
+        let customerSearch = extractedRef;
+        if (!customerSearch) {
+          const words = msg.split(' ');
+          const idx = words.findIndex(w => {
+            const low = w.toLowerCase().replace(/[']/g, ''); // gère l'
+            return low === 'client' || low === 'tiers' || low === 'profil';
+          });
+          if (idx !== -1 && words.length > idx + 1) {
+            // On prend la suite et on nettoie dynamiquement tout ce qui suit "sur"
+            customerSearch = words.slice(idx + 1).join(' ')
+              .replace(/^[dD][eE][sS]?\s+/, '') // de, des
+              .replace(/^[dD][uU]\s+/, '')     // du
+              .replace(/^[lL][ae]?\s+/, '')    // le, la
+              .replace(/^[cC][lL][iI][eE][n][t]\s+/, '') // cas "profil du client ..."
+              .split(/\s+sur\s+/i)[0] // <--- DYNAMIQUE : On coupe avant le mot "sur"
+              .trim();
+          }
+        }
+
+        if (!customerSearch) {
+          return {
+            agent: 'VMIND',
+            text: "Pour quel client souhaitez-vous consulter le profil ?",
+            kpis: []
+          };
+        }
+
+        result = await tralisApi.getCustomerProfile({
+          client_id: clientId,
+          tiers_search: customerSearch,
+          include_balance: true
         });
       } else if (text.includes('facture') || text.includes('#inv') || text.includes('fc-') || text.includes('av-')) {
         toolName = 'getInvoiceDetail';
@@ -213,6 +248,54 @@ export function useChat(): UseChatReturn {
           responseText += `</div>`;
         } else if (!isDetailed) {
           responseText += `<div style="font-size:11px; color:var(--cyan); font-style:italic">Tapez "détail" pour voir les lignes d'articles.</div>`;
+        }
+      } else if (toolName === 'getCustomerProfile') {
+        const c = data;
+
+        // Cas 1 : Plusieurs clients trouvés (Désambiguïsation)
+        if (c.match_count > 1 && c.matches) {
+          responseText += `J'ai trouvé <strong>${c.match_count}</strong> clients correspondant à "<em>${c.tiers_search}</em>" :<br><br>`;
+          c.matches.forEach((m: any) => {
+            responseText += `• <strong>${m.raison_sociale}</strong> (Code: ${m.code_client || '---'}) - ${m.ville || ''}<br>`;
+          });
+          responseText += `<br><div style="font-size:11px; color:var(--cyan); font-style:italic">Veuillez préciser le nom exact ou le code client.</div>`;
+        }
+        // Cas 2 : Un seul client trouvé (Fiche complète)
+        else if (c.tiers) {
+          const tiers = c.tiers;
+          const bal = c.balance || null;
+
+          responseText += `Client : <strong>${tiers.raison_sociale || 'N/A'}</strong> (${tiers.code_client || 'Sans code'})<br>`;
+          responseText += `Ville : <strong>${tiers.ville || 'N/A'}</strong> (${tiers.pays || '---'})<br>`;
+          responseText += `Contact : <span style="color:var(--cyan)">${tiers.telephone || '---'}</span> | ${tiers.email || '---'}<br><br>`;
+
+          if (bal) {
+            const soldeColor = bal.solde_client > 0 ? 'var(--red)' : 'var(--green)';
+            responseText += `<div style="background:var(--navy4); padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:10px">`;
+            responseText += `<strong style="color:var(--cyan)">SITUATION COMPTABLE :</strong><br>`;
+            responseText += `Solde Actuel : <strong style="color:${soldeColor}">${bal.solde_client.toLocaleString()} TND</strong><br>`;
+            responseText += `Limite Crédit : ${bal.limite_credit?.toLocaleString() || 0} TND<br>`;
+            if (bal.alerte_credit) responseText += `<div style="margin-top:5px; color:var(--red); font-weight:700; font-size:10px">⚠ ${bal.alerte_credit}</div>`;
+            responseText += `</div>`;
+
+            responseText += `<div style="font-size:11px; margin-top:10px">`;
+            responseText += `<strong style="color:var(--purple)">DÉTAIL ENCOURS :</strong><br>`;
+            responseText += `• 0-30j : ${bal.encours_0_30j?.toLocaleString() || 0} TND<br>`;
+            responseText += `• 31-60j : ${bal.encours_31_60j?.toLocaleString() || 0} TND<br>`;
+            responseText += `• +90j : <span style="color:var(--red)">${bal.encours_plus_90j?.toLocaleString() || 0} TND</span><br>`;
+            responseText += `</div>`;
+          } else {
+            responseText += `<div style="font-size:11px; color:var(--muted); font-style:italic">Aucune donnée comptable trouvée.</div>`;
+          }
+
+          responseText += `<div style="font-size:11px; margin-top:10px; border-top:1px dashed var(--border2); padding-top:5px">`;
+          responseText += `<strong style="color:var(--amber)">INFOS PROFIL :</strong><br>`;
+          responseText += `• Commercial : ${tiers.commercial_assigne || 'Non assigné'}<br>`;
+          responseText += `• Règlement : ${tiers.delai_reglement || 0} jours<br>`;
+          responseText += `• MF : ${tiers.matricule_fiscal || 'N/A'}<br>`;
+          responseText += `</div>`;
+        } else {
+          responseText += `<span style="color:var(--red)">Erreur :</span> Client introuvable.`;
         }
       } else if (toolName === 'getExpeditionStatus') {
         const exp = data;

@@ -147,7 +147,7 @@ export const TOOL_AGENT_MAPPING: Record<string, string> = {
   getInvoiceDetail: 'VDATA',
   getDossierDetail: 'VDATA',
   getExpeditionStatus: 'VDATA',
-  getCustomerProfile: 'VSELL',
+  getCustomerProfile: 'VDATA',
   searchCotations: 'VSELL',
   getPurchaseInvoiceDetail: 'VBUY',
   runReadonlyQuery: 'VDATA'
