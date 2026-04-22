@@ -57,30 +57,48 @@ export function useChat(): UseChatReturn {
     else if (text.includes('sur local')) clientId = 'LOCAL';
 
     // 2. Extraction améliorée de la référence
-    const keywords = ['facture', 'dossier', 'client', 'tiers', 'statut', 'demo', 'smti', 'local', 'sur', 'donne', 'moi', 'les', 'details', 'detail', 'détails', 'détail', 'avec', 'référence', 'reference'];
-    // RegEx mise à jour pour supporter : FP 26-XXXXX, FC 2026-XXXXX, etc.
-    const allMatches = msg.match(/([A-Z]{2,4}[- ]?[0-9]{2,4}[- ][0-9]+|[A-Z]{2,4}[- ]?[0-9]{2,10}|(?=.*\d)[A-Z0-9-]{6,})/gi) || [];
+    const keywords = [
+      'facture', 'dossier', 'client', 'tiers', 'statut', 'demo', 'smti', 'local', 'sur', 
+      'donne', 'moi', 'les', 'details', 'detail', 'détails', 'détail', 'avec', 
+      'référence', 'reference', 'retourner', 'affiche', 'montre', 'informations', 'livraison',
+      'quel', 'est', 'le', 'une', 'expédition', 'expedition', 'détaillé', 'detaille', 'dition'
+    ];
+    // Règle d'or : une référence DOIT contenir au moins un chiffre ou un tiret
+    const allMatches = msg.match(/([A-Z0-9]{2,}-[A-Z0-9-]+|(?=.*\d)[A-Z0-9]{5,})/gi) || [];
     const validMatches = allMatches.filter(m => !keywords.includes(m.toLowerCase()));
     const extractedRef = validMatches.length > 0 ? validMatches[0].trim() : '';
 
+    // Vérification de référence manquante
+    if (!extractedRef && (text.includes('dossier') || text.includes('facture') || text.includes('expédition') || text.includes('livraison'))) {
+      return {
+        agent: 'VMIND',
+        text: "Je n'ai pas détecté de référence précise dans votre demande. Pourriez-vous me donner le numéro (ex: Dossier RI26... ou Expédition EXP...) ?",
+        kpis: []
+      };
+    }
+
     try {
-      if (text.includes('facture') || text.includes('détail') || text.includes('#inv') || text.includes('fc-') || text.includes('av-')) {
-        toolName = 'getInvoiceDetail';
-        result = await tralisApi.getInvoiceDetail({
-          client_id: clientId,
-          invoice_ref: extractedRef || 'INV-2026-001'
-        });
-      } else if (text.includes('dossier') || text.includes('#tun') || text.includes('tun-')) {
-        toolName = 'getDossierDetail';
-        result = await tralisApi.getDossierDetail({
-          client_id: clientId,
-          dossier_ref: extractedRef || 'TUN-2847'
-        });
-      } else if (text.includes('livraison') || text.includes('statut') || text.includes('expédition')) {
+      if (text.includes('expédition') || text.includes('livraison') || text.includes('statut')) {
         toolName = 'getExpeditionStatus';
         result = await tralisApi.getExpeditionStatus({
           client_id: clientId,
-          expedition_ref: extractedRef || 'EXP-2024-99'
+          expedition_ref: extractedRef
+        });
+      } else if (text.includes('facture') || text.includes('#inv') || text.includes('fc-') || text.includes('av-')) {
+        toolName = 'getInvoiceDetail';
+        result = await tralisApi.getInvoiceDetail({
+          client_id: clientId,
+          invoice_ref: extractedRef,
+          include_lines: true
+        });
+      } else if (text.includes('dossier') || text.includes('analyse')) {
+        toolName = 'getDossierDetail';
+        result = await tralisApi.getDossierDetail({
+          client_id: clientId,
+          dossier_ref: extractedRef,
+          include_expeditions: isDetailed,
+          include_invoices: isDetailed,
+          include_costs: isDetailed
         });
       } else if (text.includes('client') || text.includes('tiers')) {
         toolName = 'getCustomerProfile';
@@ -196,9 +214,77 @@ export function useChat(): UseChatReturn {
         } else if (!isDetailed) {
           responseText += `<div style="font-size:11px; color:var(--cyan); font-style:italic">Tapez "détail" pour voir les lignes d'articles.</div>`;
         }
+      } else if (toolName === 'getExpeditionStatus') {
+        const exp = data;
+        responseText += `Expédition : <strong>${exp.reference || extractedRef}</strong><br>`;
+        responseText += `Statut : <span style="color:var(--amber)">${exp.statut || 'N/A'}</span><br>`;
+        responseText += `Dossier lié : <strong>${exp.reference_dossier || 'N/A'}</strong><br><br>`;
+
+        // Section Dates clés
+        responseText += `<div style="background:var(--navy4); padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:10px">`;
+        responseText += `<strong style="color:var(--cyan)">DATES ET ÉTAPES :</strong><br>`;
+        responseText += `• Réception : ${exp.dates?.reception || '---'}<br>`;
+        responseText += `• Enlèvement : <span style="color:var(--green)">${exp.dates?.enlevement_reel || exp.dates?.enlevement_prevu || '---'}</span><br>`;
+        responseText += `• Livraison : <strong>${exp.dates?.livraison || '---'}</strong><br>`;
+        responseText += `</div>`;
+
+        // Section Transport / Chauffeur
+        responseText += `<div style="font-size:11px; margin-top:10px">`;
+        responseText += `<strong style="color:var(--purple)">LOGISTIQUE & TRANSPORT :</strong><br>`;
+        responseText += `• Moyen : ${exp.intervenants?.transporteur || 'N/A'}<br>`;
+        responseText += `• Véhicule : ${exp.transport?.vehicule || 'N/A'} (Chauffeur: ${exp.transport?.chauffeur || 'N/A'})<br>`;
+        responseText += `• Marchandise : ${exp.logistique?.nature || 'N/A'} (${exp.logistique?.poids || 0} kg / ${exp.logistique?.colis || 0} colis)<br>`;
+        responseText += `</div>`;
+
+        // Section Douane
+        if (exp.douane?.numero_declaration) {
+          responseText += `<div style="font-size:11px; margin-top:10px; border-top:1px dashed var(--border2); padding-top:5px">`;
+          responseText += `<strong style="color:var(--red)">INFORMATIONS DOUANE :</strong><br>`;
+          responseText += `• Décl. : ${exp.douane.numero_declaration} du ${exp.douane.date_declaration || 'N/A'}<br>`;
+          responseText += `• Bureau : ${exp.douane.bureau || 'N/A'}<br>`;
+          responseText += `</div>`;
+        }
       } else if (toolName === 'getDossierDetail') {
-        responseText += `Dossier : <strong>${data.Context?.DOS_LIB || data.reference || extractedRef}</strong><br>État : <span style="color:var(--green)">${data.Context?.DOS_ETAT || 'En cours'}</span>`;
-      } else {
+        const d = data;
+        const main = d.dossier || {};
+        responseText += `Dossier : <strong>${main.reference_dossier || extractedRef}</strong><br>`;
+        responseText += `Client : <strong>${main.client || 'N/A'}</strong><br>`;
+        responseText += `Statut : <span style="color:var(--green)">${main.statut_dossier || 'Ouvert'}</span><br>`;
+        responseText += `Type : ${main.nature_transport || 'N/A'} / ${main.type_fret || 'N/A'}<br>`;
+        responseText += `Date : ${main.date_creation ? new Date(main.date_creation).toLocaleDateString() : 'N/A'}<br><br>`;
+
+        // Section Marge (Toujours affichée en résumé)
+        if (d.marge) {
+          responseText += `<div style="background:var(--navy4); padding:10px; border-radius:8px; border:1px solid var(--border); margin-bottom:10px">`;
+          responseText += `<strong style="color:var(--cyan)">ANALYSE RENTABILITÉ :</strong><br>`;
+          responseText += `CA Client HT : <strong>${d.marge.ca_client || 0} TND</strong><br>`;
+          responseText += `Coûts Achats : <span style="color:var(--red)">-${d.marge.cout_achat || 0} TND</span><br>`;
+          responseText += `<div style="height:1px; background:var(--border2); margin:5px 0"></div>`;
+          responseText += `<strong>MARGE BRUTE : ${d.marge.marge_brute || 0} TND</strong> (${d.marge.taux_marge_pct || 0}%)`;
+          responseText += `</div>`;
+        }
+
+        // Détails si demandé
+        if (isDetailed) {
+          if (d.expeditions && d.expeditions.length > 0) {
+            responseText += `<div style="font-size:11px; margin-top:10px">`;
+            responseText += `<strong style="color:var(--green)">EXPÉDITIONS (${d.expeditions.length}) :</strong><br>`;
+            d.expeditions.forEach((e: any) => {
+              responseText += `• ${e.reference_expedition} (${e.statut_expedition}) - ${e.lieu_expedition || 'N/A'}<br>`;
+            });
+            responseText += `</div>`;
+          }
+          if (d.invoices && d.invoices.length > 0) {
+            responseText += `<div style="font-size:11px; margin-top:10px">`;
+            responseText += `<strong style="color:var(--cyan)">FACTURES VENTES (${d.invoices.length}) :</strong><br>`;
+            d.invoices.forEach((inv: any) => {
+              responseText += `• ${inv.reference_facture} : <strong>${inv.total_TTC} ${inv.devise}</strong> (${inv.date_facture ? new Date(inv.date_facture).toLocaleDateString() : 'N/A'})<br>`;
+            });
+            responseText += `</div>`;
+          }
+        } else {
+          responseText += `<div style="font-size:11px; color:var(--cyan); font-style:italic">Tapez "détail" pour voir les expéditions, factures et coûts liés.</div>`;
+        }
         responseText += `Requête traitée pour l'outil ${toolName}.`;
       }
 

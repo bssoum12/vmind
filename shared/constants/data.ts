@@ -144,9 +144,9 @@ export const RESPONSES: Record<string, ResponseData> = {
  * Permet de spécialiser les conversations et les identités visuelles.
  */
 export const TOOL_AGENT_MAPPING: Record<string, string> = {
-  getInvoiceDetail: 'VDATA', // Spécialisé Data pour les factures comme demandé
-  getDossierDetail: 'VMOVE',
-  getExpeditionStatus: 'VMOVE',
+  getInvoiceDetail: 'VDATA',
+  getDossierDetail: 'VDATA',
+  getExpeditionStatus: 'VDATA',
   getCustomerProfile: 'VSELL',
   searchCotations: 'VSELL',
   getPurchaseInvoiceDetail: 'VBUY',
