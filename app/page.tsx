@@ -10,27 +10,29 @@ import { useChat } from "@/shared/hooks/useChat";
 export default function Home() {
   const [voiceShow, setVoiceShow] = useState(false);
   const [insertPrompt, setInsertPrompt] = useState<string | undefined>(undefined);
-  const { logs, addMessage, activeAgentId } = useChat();
+
+  const { messages, logs, addMessage, activeAgentId } = useChat();
 
   const handleInsertPrompt = (text: string) => {
-    // We pass this to ChatPanel which handles the actual input update
     setInsertPrompt(text);
-    // Reset after a short delay so it can be re-triggered with the same prompt if needed
     setTimeout(() => setInsertPrompt(undefined), 100);
   };
 
   return (
     <main className="main-container">
       <Sidebar onInsertPrompt={handleInsertPrompt} activeAgentId={activeAgentId} />
-      
+
       <div className="content">
-        <ChatPanel 
-          initialPrompt={insertPrompt} 
-          onOpenVoice={() => setVoiceShow(true)} 
+        <ChatPanel
+          initialPrompt={insertPrompt}
+          onOpenVoice={() => setVoiceShow(true)}
+          messages={messages}
+          addMessage={addMessage}
         />
-        <RightPanel 
-          logs={logs} 
-          onInsertPrompt={handleInsertPrompt} 
+
+        <RightPanel
+          logs={logs}
+          onInsertPrompt={handleInsertPrompt}
           activeAgentId={activeAgentId}
         />
       </div>
