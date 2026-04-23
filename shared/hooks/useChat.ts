@@ -17,9 +17,40 @@ function detectTenant(text: string): string {
   return DEFAULT_CLIENT_ID;
 }
 
+/**
+ * Extrait intelligemment une référence TraLIS (FA, RI, DOS, etc.) depuis un texte.
+ */
+function findRefByPattern(text: string): string | null {
+  const t = text.toUpperCase();
+  // 1. Cherche les patterns compacts (A26-..., RI26-..., FA2026-...)
+  const patterns = /\b(FA|PI|FAC|FC|DOS|RI|MI|ME|RE|AE|AI|TE|TI|VI|VE|A|D|T|M|PA)\d{2}[-\s]?\d+[A-Z]?\b/g;
+  const match = t.match(patterns);
+  if (match) return match[0];
+
+  // 2. Cherche les patterns avec espace (FA 2026...)
+  const patternsSpace = /\b(FA|PI|FAC|FC|DOS|RI|MI|ME|RE|AE|AI|TE|TI|VI|VE)\s\d+[-\s]?\d*\b/g;
+  const matchSpace = t.match(patternsSpace);
+  if (matchSpace) return matchSpace[0];
+
+  return null;
+}
+
 function detectToolName(text: string): string | null {
   const t = text.toLowerCase();
+  const ref = findRefByPattern(text);
 
+  // 1. Factures d'achat (Priorité si pattern FA ou mots-clés achat)
+  if (
+    (ref && ref.startsWith('FA')) ||
+    t.includes('achat') ||
+    t.includes('dépense') ||
+    t.includes('payé') ||
+    (t.includes('facture') && t.includes('fournisseur'))
+  ) {
+    return 'getPurchaseInvoiceDetail';
+  }
+
+  // 2. Profils Tiers / Clients / Fournisseurs
   if (
     t.includes('client') ||
     t.includes('tiers') ||
@@ -35,18 +66,20 @@ function detectToolName(text: string): string | null {
   if (t.includes('dossier')) return 'getDossierDetail';
   if (t.includes('expédition') || t.includes('expedition') || t.includes('statut')) return 'getExpeditionStatus';
   if (t.includes('cotation') || t.includes('pipeline')) return 'searchCotations';
-  if (t.includes('achat')) return 'getPurchaseInvoiceDetail';
 
   return null;
 }
 
 function extractEntity(text: string): string {
-  const tenantRemoved = text.replace(/\bsur\s+[a-z0-9_-]+/i, '').trim();
+  // Priorité 1 : Si on trouve un pattern TraLIS pur, on ne prend que lui
+  const patternMatch = findRefByPattern(text);
+  if (patternMatch) return patternMatch;
 
+  const tenantRemoved = text.replace(/\bsur\s+[a-z0-9_-]+/i, '').trim();
   const keywords = [
-    'donne', 'moi', 'le', 'la', 'les', 'du', 'de', 'des',
-    'profil', 'client', 'tiers', 'fournisseur',
-    'facture', 'dossier', 'expédition', 'expedition',
+    'donne', 'moi', 'le', 'la', 'les', 'du', 'de', 'des', 'un', 'une',
+    'profil', 'client', 'tiers', 'fournisseur', 'je', 'veux', 'voir', 'avoir',
+    'facture', 'dossier', 'expédition', 'expedition', 'doit', 'dois',
     'statut', 'balance', 'solde', 'pipeline', 'cotation',
     'quel', 'quelle', 'est', 'situation', 'analyse', 'detail', 'détail'
   ];
@@ -339,21 +372,91 @@ export function useChat() {
       }
 
       if (toolName === 'getPurchaseInvoiceDetail') {
+        const val = (extractedValue || '').toUpperCase().trim();
+
+        // Patterns Dossiers TraLIS fournis : A26-004438I, RI26-004437I, T26-004415, D26-004411, M26-004402E, PA25-004343
+        // Structure : [Lettre(s)][Année (2 chiffres)]-[Numéro][Siffixe Optionnel]
+        const dossierRegex = /^([A-Z]{1,2})\d{2}-\d+[A-Z]?$/;
+
+        // Pour les dossiers classiques type DOS-2025...
+        const isLegacyDossier = /^(DOS|RI|MI|ME|RE|AE|AI|TE|TI|VI|VE)[-\s]?\d+/.test(val);
+        const isDossier = dossierRegex.test(val) || isLegacyDossier;
+
+        // Factures Achat : FA (uniquement selon l'utilisateur)
+        const isInvoice = /^FA[-\s]?\d+/.test(val);
         response = await tralisApi.getPurchaseInvoiceDetail({
           client_id: clientId,
-          supplier_ref: extractedValue || 'FOURNISSEUR',
+          invoice_ref: isInvoice ? extractedValue : undefined,
+          dossier_ref: isDossier ? extractedValue : undefined,
+          supplier_ref: (!isInvoice && !isDossier && extractedValue) ? extractedValue : undefined,
         });
 
         if (response.ok && response.data) {
-          const purchase = response.data.purchase_invoice || response.data;
-          responseText = `
-            <strong>Facture achat</strong><br/><br/>
-            • Réf interne : <strong>${purchase.reference_interne || 'N/A'}</strong><br/>
-            • Fournisseur : ${purchase.fournisseur || 'N/A'}<br/>
-            • Total TTC : <strong>${purchase.total_ttc ?? 'N/A'} ${purchase.devise || ''}</strong>
-          `;
+          const d = response.data;
+          const inv = d.purchase_invoice;
+          const dossiers = d.dossiers_lies || [];
+
+          responseText = `<div style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center">`;
+          responseText += `<strong>FACTURE ACHAT : ${inv.reference_interne || extractedValue}</strong>`;
+          if (inv.type_document) responseText += `<span style="font-size:10px; opacity:0.7">${inv.type_document}</span>`;
+          responseText += `</div>`;
+
+          responseText += `Fournisseur : <strong>${inv.fournisseur || 'N/A'}</strong><br>`;
+          if (inv.description) responseText += `Objet : <span style="font-style:italic; opacity:0.8">${inv.description}</span><br>`;
+
+          responseText += `<div style="margin-top:5px; font-size:12px">`;
+          responseText += `📅 Date : ${inv.date_facture || '---'} | `;
+          responseText += `<span style="color:var(--amber)">⌛ Échéance : ${inv.date_echeance || '---'}</span>`;
+          responseText += `</div>`;
+
+          responseText += `<div style="margin-top:8px; background:var(--navy3); padding:8px; border-radius:6px; border:1px solid var(--border2)">`;
+          responseText += `<div style="display:flex; justify-content:space-between"><span>Total HT :</span> <span>${inv.total_ht?.toLocaleString() || 0} ${inv.devise}</span></div>`;
+          if (inv.total_taxe > 0) responseText += `<div style="display:flex; justify-content:space-between; font-size:11px; opacity:0.7"><span>TVA :</span> <span>${inv.total_taxe?.toLocaleString() || 0}</span></div>`;
+          responseText += `<div style="display:flex; justify-content:space-between; margin-top:4px; font-weight:700; color:var(--cyan)"><span>TOTAL TTC :</span> <span>${inv.total_ttc?.toLocaleString() || 0} ${inv.devise}</span></div>`;
+          responseText += `</div>`;
+
+          // Statuts de paiement et Flags
+          responseText += `<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:5px">`;
+
+          const badgeStyle = "padding:2px 8px; border-radius:4px; font-size:10px; font-weight:600; text-transform:uppercase;";
+
+          if (inv.est_parvenue === 'OUI')
+            responseText += `<span style="${badgeStyle} background:var(--green); color:white">PARVENUE</span>`;
+          else
+            responseText += `<span style="${badgeStyle} background:var(--red); color:white">NON PARVENUE</span>`;
+
+          if (inv.est_comptabilisee === 'OUI')
+            responseText += `<span style="${badgeStyle} background:var(--cyan); color:black">COMPTABILISÉE</span>`;
+
+          if (inv.est_contestee === 'OUI')
+            responseText += `<span style="${badgeStyle} background:var(--red); color:white">⚠ CONTESTÉE</span>`;
+
+          if (inv.est_debours === 'OUI')
+            responseText += `<span style="${badgeStyle} background:var(--purple); color:white">DÉBOURS</span>`;
+
+          if (inv.est_caution === 'OUI')
+            responseText += `<span style="${badgeStyle} background:var(--amber); color:black">CAUTION</span>`;
+
+          responseText += `</div>`;
+
+          if (inv.jours_retard > 0) {
+            responseText += `<div style="color:var(--red); font-weight:700; font-size:11px; margin-top:8px; background:rgba(255,71,87,0.1); padding:5px; border-radius:4px; border-left:3px solid var(--red)">`;
+            responseText += `⚠ Retard de paiement détecté : ${inv.jours_retard} jours`;
+            responseText += `</div>`;
+          }
+
+          // Dossiers liés
+          if (dossiers.length > 0) {
+            responseText += `<div style="margin-top:12px; border-top:1px solid var(--border2); padding-top:8px">`;
+            responseText += `<div style="font-size:11px; color:var(--green); font-weight:700; margin-bottom:4px">DOSSIERS D'EXPLOITATION LIÉS :</div>`;
+            responseText += `<div style="display:flex; flex-wrap:wrap; gap:8px">`;
+            dossiers.forEach((ds: any) => {
+              responseText += `<div style="font-size:11px; background:var(--navy4); padding:2px 6px; border:1px solid var(--border2); border-radius:4px">${ds.dossier_ref}</div>`;
+            });
+            responseText += `</div></div>`;
+          }
         } else {
-          responseText = `Facture achat non trouvée.`;
+          responseText = `Facture achat non trouvée pour : <strong>${extractedValue || 'référence demandée'}</strong>`;
         }
       }
 
