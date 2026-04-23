@@ -79,7 +79,7 @@ function extractEntity(text: string): string {
   const keywords = [
     'donne', 'moi', 'le', 'la', 'les', 'du', 'de', 'des', 'un', 'une',
     'profil', 'client', 'tiers', 'fournisseur', 'je', 'veux', 'voir', 'avoir',
-    'facture', 'dossier', 'expédition', 'expedition', 'doit', 'dois', 'achat',
+    'facture', 'achat', 'dossier', 'expédition', 'expedition', 'doit', 'dois',
     'statut', 'balance', 'solde', 'pipeline', 'cotation',
     'quel', 'quelle', 'est', 'situation', 'analyse', 'detail', 'détail'
   ];
