@@ -80,8 +80,9 @@ function extractEntity(text: string): string {
     'donne', 'moi', 'le', 'la', 'les', 'du', 'de', 'des', 'un', 'une',
     'profil', 'client', 'tiers', 'fournisseur', 'je', 'veux', 'voir', 'avoir',
     'facture', 'achat', 'dossier', 'expédition', 'expedition', 'doit', 'dois',
-    'statut', 'balance', 'solde', 'pipeline', 'cotation',
-    'quel', 'quelle', 'est', 'situation', 'analyse', 'detail', 'détail'
+    'statut', 'balance', 'solde', 'pipeline', 'cotation', 'offre',
+    'quel', 'quelle', 'quelles', 'sont', 'est', 'situation', 'analyse', 'detail', 'détail',
+    'en cours', 'actif', 'actifs'
   ];
 
   const words = tenantRemoved.split(/\s+/).filter(Boolean);
@@ -352,22 +353,112 @@ export function useChat() {
       }
 
       if (toolName === 'searchCotations') {
+        // Détection basique des filtres via le texte
+        const t = text.toLowerCase();
+        let statut = undefined;
+        if (t.includes('gagn')) statut = 'ClotureeGagnee';
+        else if (t.includes('perdu')) statut = 'ClotureePerdue';
+        else if (t.includes('annul')) statut = 'Annulee';
+        else if (t.includes('valid')) statut = 'Validee';
+        else if (t.includes('brouillon')) statut = 'Brouillon';
+        else if (t.includes('envoy')) statut = 'Envoye';
+        // Si l'utilisateur demande "en cours", on laisse statut à undefined pour que le backend retourne tout le pipeline actif (Brouillon, Validee, Envoye)
+        else if (t.includes('en cours') || t.includes('actif')) statut = undefined;
+
+        let nature = undefined;
+        if (t.includes('routier')) nature = 'Routier';
+        else if (t.includes('maritime')) nature = 'Maritime';
+        else if (t.includes('aérien') || t.includes('aerien')) nature = 'Aérien';
+
+        const val = (extractedValue || '').toLowerCase();
+        const isStatusOrNature = ['gagn', 'perdu', 'annul', 'valid', 'brouillon', 'envoy', 'en cours', 'actif', 'routier', 'maritime', 'aérien', 'aerien'].some(w => val.includes(w));
+        
+        // Nettoyage des guillemets éventuels
+        const cleanCommercial = extractedValue ? extractedValue.replace(/['"]+/g, '').trim() : undefined;
+
         response = await tralisApi.searchCotations({
           client_id: clientId,
+          statut,
+          nature,
+          commercial: (cleanCommercial && cleanCommercial.length > 3 && !isStatusOrNature) ? cleanCommercial : undefined
         });
 
         if (response.ok && response.data) {
           const d = response.data;
           const summary = d.pipeline_summary || {};
-          responseText = `
-            <strong>Pipeline cotations</strong><br/><br/>
-            • Nombre en cours : <strong>${summary.nb_en_cours ?? 'N/A'}</strong><br/>
-            • CA potentiel : ${summary.ca_potentiel_total ?? 'N/A'}<br/>
-            • Marge potentielle : ${summary.marge_potentielle ?? 'N/A'}<br/>
-            • Nombre de cotations : ${d.cotations?.length || 0}
-          `;
+          const cots = d.cotations || [];
+
+          // 1. Dashboard de synthèse (KPIs Grille)
+          responseText = `<div style="margin-bottom:15px">`;
+          responseText += `<div style="font-size:11px; text-transform:uppercase; color:var(--cyan); font-weight:700; margin-bottom:10px; letter-spacing:1px; display:flex; align-items:center; gap:8px">📊 SYNTHÈSE DU PIPELINE</div>`;
+          
+          responseText += `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:8px; margin-bottom:8px">`;
+          responseText += `<div style="background:var(--navy3); padding:8px; border-radius:6px; border:1px solid var(--cyan); text-align:center"> <div style="font-size:16px; font-weight:800; color:var(--cyan)">${summary.nb_en_cours || 0}</div> <div style="font-size:8px; opacity:0.7">TOTAL</div> </div>`;
+          responseText += `<div style="background:var(--navy3); padding:8px; border-radius:6px; border:1px solid var(--border2); text-align:center"> <div style="font-size:16px; font-weight:800">${summary.nb_import || 0}</div> <div style="font-size:8px; opacity:0.7">IMPORT</div> </div>`;
+          responseText += `<div style="background:var(--navy3); padding:8px; border-radius:6px; border:1px solid var(--border2); text-align:center"> <div style="font-size:16px; font-weight:800">${summary.nb_export || 0}</div> <div style="font-size:8px; opacity:0.7">EXPORT</div> </div>`;
+          responseText += `</div>`;
+
+          responseText += `<div style="padding:10px; background:linear-gradient(90deg, var(--cyan)22, transparent); border-radius:6px; border-left:3px solid var(--cyan); display:flex; justify-content:space-between; align-items:center">`;
+          responseText += `<div style="font-size:10px; font-weight:600">POTENTIEL : <span style="font-size:14px; color:var(--cyan)">${summary.ca_potentiel_total?.toLocaleString()} TND</span></div>`;
+          responseText += `<div style="font-size:10px; font-weight:600">MARGE : <span style="font-size:14px; color:var(--purple)">${summary.marge_potentielle?.toLocaleString()} TND</span></div>`;
+          responseText += `</div>`;
+          
+          responseText += `</div>`;
+
+          // 2. Liste des cotations
+          if (cots.length > 0) {
+            responseText += `<div style="display:flex; flex-direction:column; gap:8px">`;
+            cots.slice(0, 10).forEach((c: any) => {
+              const st = c.statut || '';
+              const statusColor = st.includes('Gagnee') ? 'var(--green)' : (st.includes('Perdue') ? 'var(--red)' : 'var(--cyan)');
+              const natureIcon = c.nature_transport === 'Routier' ? '🚛' : (c.nature_transport === 'Maritime' ? '🚢' : '✈️');
+              const sensColor = String(c.sens_cotation).toLowerCase().includes('import') ? 'var(--purple)' : 'var(--orange)';
+              const vente = c.finances.total_vente_ttc;
+              const hasVente = vente && vente > 0;
+
+              responseText += `<div style="background:var(--navy3); padding:10px; border-radius:8px; border-left:4px solid ${statusColor}; font-size:12px; border:1px solid var(--border2); margin-bottom:6px">`;
+
+              responseText += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">`;
+              responseText += `<div style="display:flex; align-items:center; gap:6px">`;
+              responseText += `<strong style="color:var(--cyan)">${c.reference_cotation || 'RÉF. INCONNUE'}</strong>`;
+              responseText += `<span style="font-size:9px; background:${sensColor}22; color:${sensColor}; padding:1px 6px; border-radius:4px; border:1px solid ${sensColor}44; font-weight:700">${c.sens_cotation?.toUpperCase()}</span>`;
+              responseText += `</div>`;
+              responseText += `<span style="font-size:9px; background:${statusColor}22; color:${statusColor}; padding:2px 8px; border-radius:4px; border:1px solid ${statusColor}44; font-weight:700">${c.statut?.toUpperCase() || '---'}</span>`;
+              responseText += `</div>`;
+
+              responseText += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px">`;
+              responseText += `<span style="font-size:16px">${natureIcon}</span>`;
+              responseText += `<div>`;
+              responseText += `<div style="font-weight:600; opacity:0.9">${c.client_ordonnateur || 'Client non spécifié'}</div>`;
+              responseText += `<div style="font-size:10px; opacity:0.6">${c.type_operation || '---'}</div>`;
+              if (c.commercial_responsable) 
+                responseText += `<div style="font-size:10px; color:var(--purple); font-weight:700; margin-top:2px">👤 Resp: ${c.commercial_responsable}</div>`;
+              responseText += `</div>`;
+              responseText += `</div>`;
+
+              responseText += `<div style="display:flex; flex-direction:column; gap:4px; margin-bottom:10px; padding-left:24px; border-left:1px dashed var(--border2); margin-left:8px">`;
+              responseText += `<div style="font-size:11px; opacity:0.8">📍 ${c.trajet.ville_depart || 'Départ inconnu'} ➔ ${c.trajet.ville_arrivee || 'Arrivée inconnue'}</div>`;
+              if (c.dates.date_validite_offre) 
+                responseText += `<div style="font-size:10px; opacity:0.6">⌛ Valide jusqu'au : ${c.dates.date_validite_offre}</div>`;
+              responseText += `</div>`;
+
+              responseText += `<div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.3); padding:6px 10px; border-radius:6px; border:1px solid var(--border2)">`;
+              responseText += `<span style="font-weight:800; font-size:13px">${hasVente ? vente.toLocaleString() : '---'} <span style="font-size:10px; opacity:0.6">${c.all_in.devise_all_in || 'TND'}</span></span>`;
+              responseText += `<span style="color:var(--green); font-size:11px; font-weight:700">Marge: ${c.finances.taux_marge_pct || 0}%</span>`;
+              responseText += `</div>`;
+
+              responseText += `</div>`;
+            });
+
+            if (cots.length > 10) {
+              responseText += `<div style="text-align:center; font-size:10px; opacity:0.5; margin-top:5px">... (+${cots.length - 10} autres cotations)</div>`;
+            }
+            responseText += `</div>`;
+          } else {
+            responseText += `<div style="text-align:center; padding:20px; opacity:0.5">Aucune cotation ne correspond à ces critères.</div>`;
+          }
         } else {
-          responseText = `Aucune cotation disponible.`;
+          responseText = `Impossible de récupérer les cotations pour le moment.`;
         }
       }
 
