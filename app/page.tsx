@@ -5,13 +5,15 @@ import { Sidebar } from "@/features/sidebar/Sidebar";
 import { ChatPanel } from "@/features/chat/ChatPanel";
 import { RightPanel } from "@/features/right_panel/RightPanel";
 import { VoiceOverlay } from "@/features/voice/VoiceOverlay";
-import { useChat } from "@/shared/hooks/useChat";
+import { VmindChat } from "@/components/vmind/VmindChat";
 
 export default function Home() {
   const [voiceShow, setVoiceShow] = useState(false);
   const [insertPrompt, setInsertPrompt] = useState<string | undefined>(undefined);
 
-  const { messages, logs, addMessage, activeAgentId } = useChat();
+  // Valeurs par défaut factices pour les autres composants en attendant leur suppression complète ou refactorisation
+  const activeAgentId = "VMIND";
+  const logs: any[] = [];
 
   const handleInsertPrompt = (text: string) => {
     setInsertPrompt(text);
@@ -23,11 +25,9 @@ export default function Home() {
       <Sidebar onInsertPrompt={handleInsertPrompt} activeAgentId={activeAgentId} />
 
       <div className="content">
-        <ChatPanel
+        <VmindChat
           initialPrompt={insertPrompt}
           onOpenVoice={() => setVoiceShow(true)}
-          messages={messages}
-          addMessage={addMessage}
         />
 
         <RightPanel
