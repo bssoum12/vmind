@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   description: "Plateforme d'intelligence d'entreprise synchronisée avec TraLIS ERP",
 };
 
+import { ModeProvider } from "@/shared/contexts/ModeContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -16,8 +18,10 @@ export default function RootLayout({
   return (
     <html lang="fr" className={`${orbitron.variable} ${syne.variable} ${jetBrainsMono.variable}`}>
       <body className={syne.className}>
-        <TopBar />
-        {children}
+        <ModeProvider>
+          <TopBar />
+          {children}
+        </ModeProvider>
       </body>
     </html>
   );

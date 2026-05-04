@@ -25,9 +25,16 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       id: 'init-1',
       sender: 'vm',
       text: 'Bonjour. Je suis connecté via n8n. Que puis-je pour vous ?',
-      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+      time: '', 
     },
   ]);
+
+  useEffect(() => {
+    // Initialisation de l'heure du message de bienvenue uniquement côté client
+    setMessages(prev => prev.map(m => 
+      m.id === 'init-1' ? { ...m, time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) } : m
+    ));
+  }, []);
 
   useEffect(() => {
     if (initialPrompt) {
