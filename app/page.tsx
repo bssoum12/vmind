@@ -1,17 +1,30 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Sidebar } from "@/features/sidebar/Sidebar";
-import { ChatPanel } from "@/features/chat/ChatPanel";
+import { useMode } from '@/shared/contexts/ModeContext';
+
+// Assistant Mode Components
+import { Sidebar as AssistantSidebar } from "@/features/sidebar/Sidebar";
 import { RightPanel } from "@/features/right_panel/RightPanel";
 import { VoiceOverlay } from "@/features/voice/VoiceOverlay";
 import { VmindChat } from "@/components/vmind/VmindChat";
 
+// Management Mode Components
+import { ManagementSidebar } from "@/features/management/layout/ManagementSidebar";
+import { MarketplaceView } from '@/features/management/marketplace/MarketplaceView';
+import { AgentsView } from '@/features/management/agents/AgentsView';
+import { WizardView } from '@/features/management/wizard/WizardView';
+import { JournalView } from '@/features/management/journal/JournalView';
+import { ReportsView } from '@/features/management/reports/ReportsView';
+import { IntegrationsView } from '@/features/management/integrations/IntegrationsView';
+import { ProfileView } from '@/features/management/profile/ProfileView';
+
 export default function Home() {
+  const { mode } = useMode();
+  
+  // Assistant Mode State
   const [voiceShow, setVoiceShow] = useState(false);
   const [insertPrompt, setInsertPrompt] = useState<string | undefined>(undefined);
-
-  // Valeurs par défaut factices pour les autres composants en attendant leur suppression complète ou refactorisation
   const activeAgentId = "VMIND";
   const logs: any[] = [];
 
@@ -20,24 +33,99 @@ export default function Home() {
     setTimeout(() => setInsertPrompt(undefined), 100);
   };
 
+  // Management Mode State
+  const [currentView, setCurrentView] = useState('market'); 
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState('all');
+
+  const handleNavigate = (view: string) => {
+    setCurrentView(view);
+  };
+
+  const handleDeploy = (templateId: string) => {
+    setSelectedTemplate(templateId);
+    setCurrentView('wizard');
+  };
+
+  const handleCancelWizard = () => {
+    setCurrentView('market');
+    setSelectedTemplate(null);
+  };
+
+  const handleSelectCategory = (category: string) => {
+    setActiveCategory(category);
+  };
+
+  if (mode === 'ASSISTANT') {
+    return (
+      <main className="main-container anim">
+        <AssistantSidebar onInsertPrompt={handleInsertPrompt} activeAgentId={activeAgentId} />
+        <div className="content assistant-layout">
+          <VmindChat
+            initialPrompt={insertPrompt}
+            onOpenVoice={() => setVoiceShow(true)}
+          />
+          <RightPanel
+            logs={logs}
+            onInsertPrompt={handleInsertPrompt}
+            activeAgentId={activeAgentId}
+          />
+        </div>
+        <VoiceOverlay show={voiceShow} onClose={() => setVoiceShow(false)} />
+      </main>
+    );
+  }
+
+  // MANAGEMENT MODE
   return (
-    <main className="main-container">
-      <Sidebar onInsertPrompt={handleInsertPrompt} activeAgentId={activeAgentId} />
+    <main className="main-container anim">
+      <ManagementSidebar 
+        currentView={currentView} 
+        onNavigate={handleNavigate}
+        activeCategory={activeCategory}
+        onSelectCategory={handleSelectCategory}
+      />
+      <div className="content management-layout">
+        <div className="view-container">
+          {currentView === 'market' && (
+            <MarketplaceView 
+              onDeploy={handleDeploy} 
+              activeCategory={activeCategory}
+              onSelectCategory={handleSelectCategory}
+            />
+          )}
+          
+          {currentView === 'agents' && (
+            <AgentsView 
+              onNavigate={setCurrentView} 
+              onConfigure={handleDeploy} 
+            />
+          )}
 
-      <div className="content">
-        <VmindChat
-          initialPrompt={insertPrompt}
-          onOpenVoice={() => setVoiceShow(true)}
-        />
+          {currentView === 'journal' && (
+            <JournalView />
+          )}
 
-        <RightPanel
-          logs={logs}
-          onInsertPrompt={handleInsertPrompt}
-          activeAgentId={activeAgentId}
-        />
+          {currentView === 'reports' && (
+            <ReportsView />
+          )}
+
+          {currentView === 'integrations' && (
+            <IntegrationsView />
+          )}
+
+          {currentView === 'profile' && (
+            <ProfileView />
+          )}
+
+          {currentView === 'wizard' && selectedTemplate && (
+            <WizardView 
+              templateId={selectedTemplate} 
+              onCancel={handleCancelWizard} 
+            />
+          )}
+        </div>
       </div>
-
-      <VoiceOverlay show={voiceShow} onClose={() => setVoiceShow(false)} />
     </main>
   );
 }

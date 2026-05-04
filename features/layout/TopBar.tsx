@@ -4,8 +4,11 @@ import React from 'react';
 import { StatusDot } from '../../components/ui/StatusDot';
 import { useClock } from '../../shared/hooks/useClock';
 
+import { useMode } from '@/shared/contexts/ModeContext';
+
 export const TopBar: React.FC = () => {
   const clock = useClock();
+  const { mode, setMode } = useMode();
 
   return (
     <div className="topbar">
@@ -23,6 +26,21 @@ export const TopBar: React.FC = () => {
           <span>TraLIS v3.2</span>
           <span style={{ color: 'var(--border2)', margin: '0 6px' }}>|</span>
           <span>{clock}</span>
+        </div>
+
+        <div className="mode-switcher">
+          <button 
+            className={`mode-btn ${mode === 'ASSISTANT' ? 'active' : ''}`}
+            onClick={() => setMode('ASSISTANT')}
+          >
+            Assistant
+          </button>
+          <button 
+            className={`mode-btn ${mode === 'MANAGEMENT' ? 'active' : ''}`}
+            onClick={() => setMode('MANAGEMENT')}
+          >
+            Management
+          </button>
         </div>
       </div>
       <div className="topbar-right">
