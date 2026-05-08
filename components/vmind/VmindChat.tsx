@@ -25,13 +25,13 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       id: 'init-1',
       sender: 'vm',
       text: 'Bonjour. Je suis connecté via n8n. Que puis-je pour vous ?',
-      time: '', 
+      time: '',
     },
   ]);
 
   useEffect(() => {
     // Initialisation de l'heure du message de bienvenue uniquement côté client
-    setMessages(prev => prev.map(m => 
+    setMessages(prev => prev.map(m =>
       m.id === 'init-1' ? { ...m, time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) } : m
     ));
   }, []);
@@ -74,65 +74,36 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       let response = await sendVmindMessage(text, clientId);
       console.log("n8n Response Raw:", response);
 
-      // Si n8n renvoie un tableau (All Incoming Items), on prend le premier élément
-      if (Array.isArray(response) && response.length > 0) {
-        response = response[0];
-      }
-
       setMessages((prev) => prev.filter(m => !m.isThinking));
+      console.log("Response from API:", response);
 
-      // Vérification plus robuste : n8n peut renvoyer la chaîne "null" ou l'expression littérale si mal configuré
-      const isOk = (response.ok as any) === true || (response.ok as any) === "true";
-      const hasRealError = !isOk || (
-        response.error &&
-        response.error !== "null" &&
-        response.error !== null &&
-        response.error !== "-" &&
-        !String(response.error).includes("{{")
-      );
-
-      if (hasRealError) {
-        // Extraction propre du message d'erreur (si c'est un objet renvoyé par n8n)
-        let errorText = 'Erreur inconnue';
-        if (typeof response.error === 'string') {
-          errorText = response.error;
-        } else if (response.error && typeof response.error === 'object') {
-          errorText = response.error.message || response.error.error || JSON.stringify(response.error);
-        }
-
+      // On utilise maintenant le format standardisé
+      const isOk = response && (response.ok === true || (response.ok as any) === "true");
+      
+      if (!isOk) {
         setMessages((prev) => [...prev, {
           id: `err-${Date.now()}`,
           sender: 'vm',
-          text: `Impossible de récupérer les données : ${errorText}`,
+          text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
           time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
-          error: response.error,
+          error: response?.error || 'NO_RESPONSE',
+          response_type: 'error',
+          title: response?.title || 'Erreur n8n'
         }]);
       } else {
-        // Si tool est "null" en string (erreur fréquente n8n), on le remet à null
-        let cleanTool = ((response.tool as any) === "null" || !response.tool) ? null : response.tool;
-
-        // Fallback de sécurité : Si le tool est manquant mais que les données ressemblent à une facture
-        if (!cleanTool && (response.data?.invoice || response.data?.reference)) {
-          cleanTool = "get_invoice_detail";
-        }
-
-        // Sécurité : Si data est une chaîne JSON (suite à un JSON.stringify dans n8n)
-        let cleanData = response.data;
-        if (typeof cleanData === 'string' && cleanData.trim().startsWith('{')) {
-          try {
-            cleanData = JSON.parse(cleanData);
-          } catch (e) {
-            console.warn("Data n'est pas un JSON valide, conservation tel quel");
-          }
-        }
-
         setMessages((prev) => [...prev, {
           id: `vm-${Date.now()}`,
           sender: 'vm',
-          text: response.message || '',
+          text: response.message || 'Voici les informations demandées.', // Fallback message
           time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
-          tool: cleanTool as any,
-          data: cleanData === "null" ? null : cleanData,
+          tool_used: response.tool_used,
+          response_type: response.response_type || 'full',
+          title: response.title,
+          kpis: response.kpis,
+          table: response.table,
+          chart: response.chart,
+          details: response.details,
+          raw: response.raw
         }]);
       }
 

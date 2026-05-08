@@ -5,14 +5,45 @@ export type VmindTool =
   | "get_expedition_status"
   | "get_customer_profile"
   | "get_purchase_invoice_detail"
+  | "get_aged_balance"
+  | "get_overdue_alerts"
+  | string
   | null;
+
+export interface VmindKpi {
+  label: string;
+  value: number;
+  display: string;
+  unit: string;
+  status: 'success' | 'warning' | 'danger' | 'info';
+}
+
+export interface VmindTable {
+  columns: string[];
+  rows: any[];
+}
+
+export interface VmindChart {
+  type: 'bar' | 'line' | 'pie' | 'doughnut' | 'area' | null | string;
+  title: string;
+  description: string;
+  xKey: string;
+  yKey: string;
+  data: Array<{ label: string; value: number | string }>;
+}
 
 export type VmindN8nResponse = {
   ok: boolean;
-  tool: VmindTool;
-  message?: string | null;
-  data?: any;
-  error?: any;
+  tool_used: VmindTool;
+  response_type: string;
+  title: string;
+  message: string;
+  kpis: VmindKpi[];
+  table: VmindTable;
+  chart: VmindChart;
+  details: any;
+  raw: any;
+  error: any;
 };
 
 export interface VmindMessage {
@@ -20,8 +51,14 @@ export interface VmindMessage {
   sender: 'user' | 'vm';
   text: string;
   time: string;
-  tool?: VmindTool;
-  data?: any;
+  tool_used?: VmindTool;
+  response_type?: string;
+  title?: string;
+  kpis?: VmindKpi[];
+  table?: VmindTable;
+  chart?: VmindChart;
+  details?: any;
+  raw?: any;
   error?: any;
   isThinking?: boolean;
 }

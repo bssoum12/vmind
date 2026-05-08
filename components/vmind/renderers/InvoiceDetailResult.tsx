@@ -25,7 +25,7 @@ export const InvoiceDetailResult: React.FC<InvoiceDetailResultProps> = ({ data }
             {invoice.statut || 'N/A'}
           </span>
         </div>
-        
+
         <div className="grid grid-cols-2 gap-4 text-sm mt-2">
           <div>
             <div className="text-gray-400 text-xs uppercase mb-1">Client</div>
