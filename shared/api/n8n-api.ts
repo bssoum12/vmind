@@ -42,15 +42,18 @@ export async function sendVmindMessage(message: string, clientId = "DEMO"): Prom
 
     const data = await response.json();
 
-    // Si le proxy renvoie un tableau, on déballe l'item json
+    // n8n returns an array of items. We want the first one's JSON content or the item itself.
     let finalData = data;
-    if (Array.isArray(data) && data.length > 0) {
-      finalData = data[0].json || data[0];
+    if (Array.isArray(data)) {
+      if (data.length > 0) {
+        // If n8n structure is [{ json: { ... } }] or directly [{ ... }]
+        finalData = data[0].json || data[0];
+      } else {
+        throw new Error("n8n a renvoyé un tableau vide.");
+      }
     }
 
-    // DEBUG: On affiche le message pour vérifier qu'il n'est pas vide
-    alert("📩 Message reçu : " + (finalData.message || "MESSAGE_VIDE"));
-
+    console.log("📩 Données reçues (déballées):", finalData);
     return finalData;
   } catch (error: any) {
     console.error("Fetch Proxy Error:", error);
