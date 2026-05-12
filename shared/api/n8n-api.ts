@@ -20,7 +20,7 @@ export async function sendVmindMessage(message: string, clientId = "DEMO"): Prom
   // On appelle maintenant notre PROXY Backend au lieu de n8n directement
   const proxyUrl = "http://localhost:3001/api/n8n-proxy";
 
-  console.log("🚀 Envoi via Proxy Backend...", { message, clientId, sessionId });
+  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, session_id: sessionId });
 
   try {
     const response = await fetch(proxyUrl, {
@@ -41,6 +41,7 @@ export async function sendVmindMessage(message: string, clientId = "DEMO"): Prom
     }
 
     const data = await response.json();
+    console.log("📥 [n8n-api] RÉPONSE BRUTE PROXY:", data);
 
     // n8n returns an array of items. We want the first one's JSON content or the item itself.
     let finalData = data;
@@ -53,10 +54,10 @@ export async function sendVmindMessage(message: string, clientId = "DEMO"): Prom
       }
     }
 
-    console.log("📩 Données reçues (déballées):", finalData);
+    console.log("📩 [n8n-api] DONNÉES DÉBALLÉES (FINAL):", finalData);
     return finalData;
   } catch (error: any) {
-    console.error("Fetch Proxy Error:", error);
+    console.error("❌ [n8n-api] FETCH ERROR:", error);
     throw error;
   }
 }

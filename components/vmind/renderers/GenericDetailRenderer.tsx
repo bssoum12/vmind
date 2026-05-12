@@ -19,18 +19,18 @@ export const GenericDetailRenderer: React.FC<GenericDetailRendererProps> = ({ da
   // 2. Si c'est un simple objet plat ou une liste de clés/valeurs
   if (typeof data === 'object' && !Array.isArray(data)) {
     return (
-      <div className="bg-[#151b2b]/50 rounded-lg border border-[#2a3441] p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-[#111827] rounded-xl border border-[#2a3441] p-5 shadow-lg animate-in fade-in duration-500">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
           {Object.entries(data).map(([key, value]) => {
             if (value === null || value === undefined) return null;
             if (typeof value === 'object') return null; // On ignore les objets imbriqués pour la vue simplifiée
 
             return (
-              <div key={key} className="border-b border-[#1c2538] pb-2 last:border-0">
-                <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">
+              <div key={key} className="group border-b border-[#1c2538] pb-3 last:border-0 transition-colors hover:border-cyan-500/30">
+                <div className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-1 opacity-70 group-hover:opacity-100">
                   {key.replace(/_/g, ' ')}
                 </div>
-                <div className="text-sm text-gray-200 font-medium">
+                <div className="text-sm text-gray-200 font-medium break-words">
                   {String(value)}
                 </div>
               </div>

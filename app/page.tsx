@@ -25,7 +25,7 @@ export default function Home() {
   // Assistant Mode State
   const [voiceShow, setVoiceShow] = useState(false);
   const [insertPrompt, setInsertPrompt] = useState<string | undefined>(undefined);
-  const activeAgentId = "VMIND";
+  const [activeAgentId, setActiveAgentId] = useState<string>("VMIND");
   const logs: any[] = [];
 
   const handleInsertPrompt = (text: string) => {
@@ -64,6 +64,7 @@ export default function Home() {
           <VmindChat
             initialPrompt={insertPrompt}
             onOpenVoice={() => setVoiceShow(true)}
+            onAgentActive={setActiveAgentId}
           />
           <RightPanel
             logs={logs}

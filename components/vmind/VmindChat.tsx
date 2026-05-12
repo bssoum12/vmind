@@ -4,17 +4,30 @@ import React, { useEffect, useState, useRef } from 'react';
 import { VmindMessage } from '@/shared/types/vmind';
 import { sendVmindMessage } from '@/shared/api/n8n-api';
 import { ToolResultRenderer } from './renderers/ToolResultRenderer';
+import { resolveAgentFromTool, AGENTS } from '@/shared/constants/data';
 
 interface VmindChatProps {
   initialPrompt?: string;
   onOpenVoice: () => void;
   clientId?: string;
+  onAgentActive?: (agentId: string) => void;
 }
+
+// Mappage des tools snake_case vers les agents
+const TOOL_TO_AGENT: Record<string, string> = {
+  'get_invoice_detail': 'VDATA',
+  'get_dossier_detail': 'VDATA',
+  'get_expedition_status': 'VDATA',
+  'get_customer_profile': 'VDATA',
+  'get_purchase_invoice_detail': 'VDATA',
+  'search_cotations': 'VDATA',
+};
 
 export const VmindChat: React.FC<VmindChatProps> = ({
   initialPrompt,
   onOpenVoice,
-  clientId = "DEMO"
+  clientId = "DEMO",
+  onAgentActive
 }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -72,14 +85,18 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
     try {
       let response = await sendVmindMessage(text, clientId);
-      console.log("n8n Response Raw:", response);
+
+      console.log("✅ [VmindChat] Réponse reçue de l'API:", {
+        tool: response.tool_used,
+        type: response.response_type,
+        fullObject: response
+      });
 
       setMessages((prev) => prev.filter(m => !m.isThinking));
-      console.log("Response from API:", response);
 
       // On utilise maintenant le format standardisé
       const isOk = response && (response.ok === true || (response.ok as any) === "true");
-      
+
       if (!isOk) {
         setMessages((prev) => [...prev, {
           id: `err-${Date.now()}`,
@@ -91,10 +108,15 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           title: response?.title || 'Erreur n8n'
         }]);
       } else {
+        const toolUsed = response.tool_used as string;
+        const agentId = TOOL_TO_AGENT[toolUsed] || 'VMIND';
+
+        if (onAgentActive) onAgentActive(agentId);
+
         setMessages((prev) => [...prev, {
           id: `vm-${Date.now()}`,
           sender: 'vm',
-          text: response.message || 'Voici les informations demandées.', // Fallback message
+          text: response.message || 'Voici les informations demandées.',
           time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
           tool_used: response.tool_used,
           response_type: response.response_type || 'full',
@@ -142,42 +164,57 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         </div>
       </div>
 
-      <div className="messages flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`msg flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-            <div className={`msg-avatar flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${msg.sender === 'user' ? 'bg-indigo-600 text-white' : 'bg-cyan-900 text-cyan-400 border border-cyan-500'
-              }`}>
-              {msg.sender === 'user' ? 'U' : 'VM'}
-            </div>
+      <div className="messages flex-1 overflow-y-auto p-4 space-y-6">
+        {messages.map((msg) => {
+          const isUser = msg.sender === 'user';
+          const toolUsed = msg.tool_used as string;
+          const agentId = TOOL_TO_AGENT[toolUsed] || 'VMIND';
+          const agentData = agentId !== 'VMIND' ? (AGENTS as any)[agentId] : null;
 
-            <div className={`msg-body flex flex-col max-w-[85%] ${msg.sender === 'user' ? 'items-end' : 'items-start'
-              }`}>
-
-              {msg.tool && (
-                <div className="text-[9px] text-cyan-600 uppercase mb-1 tracking-wider">
-                  Tool exécuté : {msg.tool}
+          return (
+            <div key={msg.id} className={`flex w-full ${isUser ? 'justify-start' : 'justify-end'}`}>
+              <div className={`msg flex gap-3 max-w-[85%] ${isUser ? 'flex-row' : 'flex-row-reverse'}`}>
+                <div
+                  className={`msg-avatar flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${isUser
+                    ? 'bg-indigo-600 text-white shadow-[0_0_10px_rgba(79,70,229,0.3)]'
+                    : agentData
+                      ? 'bg-[#00E5C8]/20 text-[#00E5C8] border border-[#00E5C8]/50 shadow-[0_0_15px_rgba(0,229,200,0.2)]'
+                      : 'bg-cyan-900/50 text-cyan-400 border border-cyan-500/30'
+                    }`}
+                >
+                  {isUser ? 'U' : (agentData?.icon || 'VM')}
                 </div>
-              )}
 
-              <div className={`msg-content p-3 rounded-lg text-sm ${msg.sender === 'user'
-                ? 'bg-indigo-600/20 border border-indigo-500/30 text-indigo-100'
-                : msg.error
-                  ? 'bg-red-900/20 border border-red-500/30 text-red-200'
-                  : 'bg-[#151b2b] border border-[#2a3441] text-gray-200 w-full'
-                }`}>
-                {msg.sender === 'user' ? (
-                  <div className="whitespace-pre-wrap">{msg.text}</div>
-                ) : (
-                  <ToolResultRenderer message={msg} />
-                )}
-              </div>
+                <div className={`msg-body flex flex-col ${isUser ? 'items-start' : 'items-end'}`}>
+                  {msg.tool_used && (
+                    <div className={`text-[9px] uppercase mb-1 tracking-wider font-bold ${agentData ? 'text-[#00E5C8]' : 'text-cyan-600'}`}>
+                      AGENT ACTIF : {agentId} — {msg.tool_used}
+                    </div>
+                  )}
 
-              <div className="msg-meta text-[10px] text-gray-500 mt-1 px-1">
-                {msg.time}
+                  <div className={`msg-content p-4 rounded-2xl text-sm transition-all duration-500 ${isUser
+                    ? 'bg-[#1e293b]/90 border border-indigo-500/30 text-indigo-50 rounded-tl-none'
+                    : msg.error
+                      ? 'bg-red-900/40 border border-red-500/50 text-red-100'
+                      : agentData
+                        ? 'bg-[#0f172a] border border-[#00E5C8]/40 text-gray-100 rounded-tr-none shadow-[0_4px_20px_rgba(0,0,0,0.4)]'
+                        : 'bg-[#0f172a] border border-[#2a3441] text-gray-100 rounded-tr-none'
+                    }`}>
+                    {isUser ? (
+                      <div className="whitespace-pre-wrap">{msg.text}</div>
+                    ) : (
+                      <ToolResultRenderer message={msg} />
+                    )}
+                  </div>
+
+                  <div className={`msg-meta text-[9px] text-gray-500 mt-1.5 px-1 font-mono ${isUser ? 'text-left' : 'text-right'}`}>
+                    {msg.time}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 
