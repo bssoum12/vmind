@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useMode } from '@/shared/contexts/ModeContext';
 
 // Assistant Mode Components
@@ -21,6 +21,12 @@ import { ProfileView } from '@/features/management/profile/ProfileView';
 
 export default function Home() {
   const { mode } = useMode();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('vmind_session_id');
+    }
+  }, []);
   
   // Assistant Mode State
   const [voiceShow, setVoiceShow] = useState(false);

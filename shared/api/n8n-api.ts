@@ -1,11 +1,11 @@
 import { VmindN8nResponse } from '../types/vmind';
 
 function getVmindSessionId() {
-  let sessionId = localStorage.getItem("vmind_session_id");
+  let sessionId = sessionStorage.getItem("vmind_session_id");
 
   if (!sessionId) {
     sessionId = crypto.randomUUID();
-    localStorage.setItem("vmind_session_id", sessionId);
+    sessionStorage.setItem("vmind_session_id", sessionId);
   }
 
   return sessionId;

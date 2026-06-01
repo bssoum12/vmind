@@ -9,17 +9,71 @@ interface StandardResponseRendererProps {
   message: VmindMessage;
 }
 
+const GENERIC_TEXTS = new Set([
+  'Voici le resultat demande.',
+  'Voici le résultat demandé.',
+]);
+
+const normalizeText = (value?: string) =>
+  value
+    ?.trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
+
+const hasRows = (rows?: any[]) => Array.isArray(rows) && rows.length > 0;
+
+const hasChartData = (data?: any[]) => Array.isArray(data) && data.length > 0;
+
+const hasMeaningfulDetails = (details: any): boolean => {
+  if (!details || typeof details !== 'object' || Array.isArray(details)) return Boolean(details);
+
+  return Object.entries(details).some(([key, value]) => {
+    if (key === 'rows_count') return false;
+    if (value === null || value === undefined || value === '') return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'object') return Object.keys(value).length > 0;
+    return true;
+  });
+};
+
+const formatKpiLabel = (label: string) => {
+  const normalizedLabel = label.replace(/^@/, '').replace(/_/g, ' ').trim();
+
+  return normalizedLabel
+    .split(' ')
+    .map((part) => {
+      const lower = part.toLowerCase();
+      if (['ttc', 'ht', 'tva', 'tnd', 'usd', 'eur'].includes(lower)) return lower.toUpperCase();
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(' ');
+};
+
+const KpiSentence: React.FC<{ kpi: NonNullable<VmindMessage['kpis']>[number] }> = ({ kpi }) => {
+  const value = kpi.display || String(kpi.value);
+  const unit = kpi.unit ? ` ${kpi.unit}` : '';
+
+  return (
+    <div className="text-gray-100 text-sm leading-relaxed">
+      <span className="font-semibold text-cyan-300">{formatKpiLabel(kpi.label)}</span>
+      {' : '}
+      <span>{value}{unit}.</span>
+    </div>
+  );
+};
+
 export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> = ({ message }) => {
-  const { 
-    text, 
-    kpis, 
-    table, 
-    chart, 
-    details, 
-    response_type, 
+  const {
+    text,
+    kpis,
+    table,
+    chart,
+    details,
+    response_type,
     title,
     error,
-    isThinking 
+    isThinking,
   } = message;
 
   if (isThinking) {
@@ -36,7 +90,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
     return (
       <div className="text-rose-400 p-3 border border-rose-500/20 rounded-lg bg-rose-500/5">
         <div className="font-bold flex items-center gap-2 mb-2">
-          <span className="text-rose-500">⚠️</span> {title || 'Erreur Système'}
+          <span className="text-rose-500">!</span> {title || 'Erreur Systeme'}
         </div>
         <div className="text-sm opacity-90 leading-relaxed">{text || 'Une erreur inconnue est survenue.'}</div>
         {error && (
@@ -48,43 +102,48 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
     );
   }
 
-  // On affiche tout ce qui est présent, mais on peut filtrer selon response_type si nécessaire
-  // Ici on choisit d'afficher tout ce qui contient des données
+  const hasKpis = Boolean(kpis && kpis.length > 0);
+  const hasTable = Boolean(table && hasRows(table.rows));
+  const hasChart = Boolean(chart && hasChartData(chart.data));
+  const hasDetails = hasMeaningfulDetails(details);
+  const isGenericText = Boolean(text && GENERIC_TEXTS.has(normalizeText(text) || ''));
+  const shouldShowText = Boolean(text && (!isGenericText || (!hasKpis && !hasTable && !hasChart && !hasDetails)));
+  const shouldRenderSingleKpiSentence = Boolean(hasKpis && kpis?.length === 1 && !hasTable && !hasChart);
+  const shouldShowDetails = Boolean(
+    hasDetails && !shouldRenderSingleKpiSentence && (response_type === 'detail' || response_type === 'full')
+  );
+
   return (
     <div className="flex flex-col gap-2 w-full">
-      {/* 1. Message Texte principal */}
-      {text && (
+      {shouldShowText && (
         <div className="text-gray-200 text-sm whitespace-pre-wrap leading-relaxed">
           {text}
         </div>
       )}
 
-      {/* 2. KPIs (Indicateurs) */}
-      {kpis && kpis.length > 0 && (
+      {shouldRenderSingleKpiSentence && kpis ? (
+        <KpiSentence kpi={kpis[0]} />
+      ) : kpis && kpis.length > 0 ? (
         <KpiRenderer kpis={kpis} />
-      )}
+      ) : null}
 
-      {/* 3. Graphique */}
-      {chart && chart.data && chart.data.length > 0 && (
+      {hasChart && chart && (
         <ChartRenderer chart={chart} />
       )}
 
-      {/* 4. Tableau */}
-      {table && table.rows && table.rows.length > 0 && (
+      {hasTable && table && (
         <TableRenderer table={table} />
       )}
 
-      {/* 5. Détails (Générique) */}
-      {details && (response_type === 'detail' || response_type === 'full') && (
+      {shouldShowDetails && (
         <div className="mt-2 pt-2 border-t border-[#1c2538]/50">
           <GenericDetailRenderer data={details} responseType={response_type} />
         </div>
       )}
 
-      {/* 6. Clarification */}
       {response_type === 'clarification' && (
         <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded text-amber-200 text-xs italic">
-          💡 {text}
+          {text}
         </div>
       )}
     </div>

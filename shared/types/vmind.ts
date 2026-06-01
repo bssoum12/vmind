@@ -16,6 +16,7 @@ export interface VmindKpi {
   display: string;
   unit: string;
   status: 'success' | 'warning' | 'danger' | 'info';
+  trend?: 'up' | 'down' | 'neutral';
 }
 
 export interface VmindTable {
