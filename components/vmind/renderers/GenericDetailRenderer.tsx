@@ -7,43 +7,48 @@ interface GenericDetailRendererProps {
 }
 
 export const GenericDetailRenderer: React.FC<GenericDetailRendererProps> = ({ data, responseType }) => {
-  if (!data) return null;
+  if (!data || typeof data !== 'object') return null;
 
   // 1. Si c'est un format structuré connu (ex: Facture, Dossier avec header/lines/summary)
   const hasHeader = !!(data.header || data.invoice || data.facture || data.invoice_reference);
   
   if (hasHeader) {
-    return <DocumentDetailRenderer data={data} />;
+    return <DocumentDetailRenderer details={data.header || data.invoice || data} />;
   }
 
-  // 2. Si c'est un simple objet plat ou une liste de clés/valeurs
-  if (typeof data === 'object' && !Array.isArray(data)) {
+  // 2. Si c'est un tableau, on tente de le formater proprement
+  if (Array.isArray(data)) {
     return (
-      <div className="bg-[#111827] rounded-xl border border-[#2a3441] p-5 shadow-lg animate-in fade-in duration-500">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
-          {Object.entries(data).map(([key, value]) => {
-            if (value === null || value === undefined) return null;
-            if (typeof value === 'object') return null; // On ignore les objets imbriqués pour la vue simplifiée
-
-            return (
-              <div key={key} className="group border-b border-[#1c2538] pb-3 last:border-0 transition-colors hover:border-cyan-500/30">
-                <div className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-1 opacity-70 group-hover:opacity-100">
-                  {key.replace(/_/g, ' ')}
-                </div>
-                <div className="text-sm text-gray-200 font-medium break-words">
-                  {String(value)}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {data.map((item, i) => (
+          <div key={i} style={{ padding: '8px', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: '4px', border: '1px solid rgba(28,37,56,0.5)' }}>
+            <GenericDetailRenderer data={item} />
+          </div>
+        ))}
       </div>
     );
   }
 
-  // 3. Fallback : JSON stringify propre
+  // 3. Si c'est un objet simple (clé-valeur), on l'affiche en liste structurée
+  const entries = Object.entries(data).filter(([k, v]) => v !== null && v !== undefined && k !== 'rows_count');
+
+  if (entries.length > 0 && entries.every(([_, v]) => typeof v !== 'object')) {
+    return (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
+        {entries.map(([key, value]) => (
+          <div key={key} style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 'bold' }}>{key.replace(/_/g, ' ')}</span>
+            <span style={{ fontSize: '13px', color: 'var(--white)' }}>{String(value)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // 4. Fallback : JSON stringify propre
   return (
-    <pre className="text-[10px] text-gray-400 p-3 bg-black/30 rounded border border-[#1c2538] overflow-x-auto">
+    <pre className="premium-fallback-box" style={{ padding: '16px', borderRadius: '8px', overflowX: 'auto', fontSize: '10px', color: '#9ca3af' }}>
+      <div style={{ fontWeight: 'bold', color: 'var(--cyan)', marginBottom: '8px', borderBottom: '1px solid rgba(28,37,56,1)', paddingBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '9px' }}>Données brutes structurées</div>
       {JSON.stringify(data, null, 2)}
     </pre>
   );

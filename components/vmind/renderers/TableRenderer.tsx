@@ -1,45 +1,44 @@
 import React from 'react';
-import { VmindTable } from '@/shared/types/vmind';
+import { VmindMessage } from '@/shared/types/vmind';
 
 interface TableRendererProps {
-  table: VmindTable;
+  table: NonNullable<VmindMessage['table']>;
 }
 
 export const TableRenderer: React.FC<TableRendererProps> = ({ table }) => {
   if (!table || !table.rows || table.rows.length === 0) return null;
 
-  const columns = table.columns || (table.rows.length > 0 ? Object.keys(table.rows[0]) : []);
+  const extractColumns = (rows: any[]): string[] => {
+    const cols = new Set<string>();
+    rows.forEach((row) => {
+      if (typeof row === 'object' && row !== null) {
+        Object.keys(row).forEach((k) => cols.add(k));
+      }
+    });
+    return Array.from(cols);
+  };
 
-  // Fonction pour trouver une valeur que les données soient positionnelles (Tableau) ou nommées (Objet)
-  const findValue = (row: any, col: string, colIdx: number) => {
-    // Cas 1 : Données positionnelles (Array) -> On utilise l'index
-    if (Array.isArray(row)) {
-      return row[colIdx];
+  const columns = table.columns?.length ? table.columns : extractColumns(table.rows);
+
+  if (columns.length === 0) return null;
+
+  const findValue = (row: any, col: string, idx: number) => {
+    if (typeof row === 'object' && row !== null) {
+      if (col in row) return row[col];
+      const keys = Object.keys(row);
+      if (idx < keys.length) return row[keys[idx]];
     }
-
-    // Cas 2 : Données nommées (Object) -> Correspondance exacte
-    if (row && typeof row === 'object' && row[col] !== undefined) {
-      return row[col];
-    }
-
-    // Cas 3 : Données nommées -> Correspondance "Fuzzy" (insensible à la casse/espaces)
-    if (row && typeof row === 'object') {
-      const normalizedCol = String(col).toLowerCase().replace(/[\s_]/g, '');
-      const key = Object.keys(row).find(k => k.toLowerCase().replace(/[\s_]/g, '') === normalizedCol);
-      return key ? row[key] : undefined;
-    }
-
-    return undefined;
+    return '';
   };
 
   return (
-    <div className="my-4 overflow-hidden rounded-lg border border-[#1c2538] bg-[#0d121f]">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
+    <div className="premium-table-container" style={{ margin: '16px 0', overflow: 'hidden', borderRadius: '12px', borderStyle: 'solid', borderWidth: '1px' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', textAlign: 'left', fontSize: '12px', borderCollapse: 'collapse' }}>
           <thead>
-            <tr className="bg-[#151b2b] border-b border-[#1c2538]">
+            <tr className="premium-table-th" style={{ borderBottom: '1px solid var(--border)' }}>
               {columns.map((col, idx) => (
-                <th key={idx} className="p-3 font-bold text-cyan-500 uppercase tracking-wider">
+                <th key={idx} style={{ padding: '12px 16px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {String(col || '').replace(/_/g, ' ')}
                 </th>
               ))}
@@ -49,17 +48,23 @@ export const TableRenderer: React.FC<TableRendererProps> = ({ table }) => {
             {table.rows.map((row, rowIdx) => (
               <tr
                 key={rowIdx}
-                className="border-b border-[#1c2538]/50 hover:bg-cyan-900/10 transition-colors"
+                className="premium-table-tr"
+                style={{ borderBottom: '1px solid rgba(0,229,200,0.1)' }}
               >
                 {columns.map((col, colIdx) => {
                   const value = findValue(row, col, colIdx);
+                  const isNumber = !isNaN(Number(value)) && value !== '';
                   return (
-                    <td key={colIdx} className="p-3 text-gray-300">
-                      {Array.isArray(value)
-                        ? value.join(', ')
-                        : typeof value === 'object' && value !== null
-                          ? JSON.stringify(value)
-                          : String(value ?? '-')}
+                    <td 
+                      key={colIdx} 
+                      style={{ 
+                        padding: '12px 16px', 
+                        color: 'var(--white)',
+                        textAlign: isNumber ? 'right' : 'left',
+                        fontFamily: isNumber ? 'var(--font-mono)' : 'inherit'
+                      }}
+                    >
+                      {String(value ?? '')}
                     </td>
                   );
                 })}

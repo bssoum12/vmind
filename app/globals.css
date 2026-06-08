@@ -2360,3 +2360,77 @@ textarea.form-input {
 .info-box strong {
   color: var(--white);
 }
+
+/* ── VMIND PREMIUM RENDERERS ── */
+.premium-kpi-card {
+  background: linear-gradient(145deg, rgba(15, 32, 53, 0.7), rgba(6, 17, 31, 0.8));
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.premium-kpi-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px rgba(0, 229, 200, 0.15);
+  border-color: var(--cyan);
+}
+.premium-table-container {
+  background: var(--navy4);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+.premium-table-th {
+  background: var(--navy2);
+  color: var(--cyan);
+  font-family: var(--font-title);
+  letter-spacing: 1px;
+}
+.premium-table-tr {
+  transition: all 0.2s;
+}
+.premium-table-tr:hover {
+  background: var(--cyan4) !important;
+}
+.premium-header-card {
+  background: linear-gradient(135deg, var(--navy4), var(--navy2));
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  position: relative;
+  overflow: hidden;
+}
+.premium-header-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: linear-gradient(to bottom, var(--cyan), var(--purple));
+}
+.premium-fallback-box {
+  background: var(--navy3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+}
+.premium-badge {
+  background: var(--navy4);
+  border: 1px solid var(--cyan);
+  box-shadow: 0 0 10px rgba(0, 229, 200, 0.2);
+  color: var(--cyan);
+  font-family: var(--font-title);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.premium-badge-source {
+  border-color: var(--purple);
+  color: var(--purple);
+  box-shadow: 0 0 10px rgba(123, 97, 255, 0.2);
+}

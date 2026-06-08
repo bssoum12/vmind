@@ -114,9 +114,25 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
   );
 
   return (
-    <div className="flex flex-col gap-2 w-full">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', animation: 'fadeIn 0.5s' }}>
+      {(message.tool_used || message.source) && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+          {message.tool_used && (
+            <span className="premium-badge">
+              <span className="status-dot" style={{ display: 'inline-block', width: '6px', height: '6px', background: 'var(--cyan)', borderRadius: '50%', boxShadow: '0 0 8px var(--cyan)' }}></span>
+              {message.tool_used.replace(/_/g, ' ')}
+            </span>
+          )}
+          {message.source && message.source !== 'memory' && (
+            <span className="premium-badge premium-badge-source">
+              {message.source}
+            </span>
+          )}
+        </div>
+      )}
+      
       {shouldShowText && (
-        <div className="text-gray-200 text-sm whitespace-pre-wrap leading-relaxed">
+        <div style={{ color: '#e5e7eb', fontSize: '14px', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
           {text}
         </div>
       )}
@@ -136,13 +152,13 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
       )}
 
       {shouldShowDetails && (
-        <div className="mt-2 pt-2 border-t border-[#1c2538]/50">
+        <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(28, 37, 56, 0.5)' }}>
           <GenericDetailRenderer data={details} responseType={response_type} />
         </div>
       )}
 
       {response_type === 'clarification' && (
-        <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded text-amber-200 text-xs italic">
+        <div style={{ marginTop: '8px', padding: '12px', backgroundColor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '4px', color: '#fde68a', fontSize: '12px', fontStyle: 'italic' }}>
           {text}
         </div>
       )}
