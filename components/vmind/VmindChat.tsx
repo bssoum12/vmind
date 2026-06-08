@@ -21,6 +21,8 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_customer_profile': 'VDATA',
   'get_purchase_invoice_detail': 'VDATA',
   'search_cotations': 'VDATA',
+  'get_aged_balance': 'VDATA',
+  'get_overdue_alerts': 'VDATA',
 };
 
 export const VmindChat: React.FC<VmindChatProps> = ({
