@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Topbar } from './Topbar';
-import { Sidebar } from './Sidebar';
+import { ManagementSidebar } from './ManagementSidebar';
 
 interface ShellProps {
   children: React.ReactNode;
@@ -17,7 +17,7 @@ export const Shell: React.FC<ShellProps> = ({ children, currentView, onNavigate,
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Topbar currentView={currentView} onNavigate={onNavigate} />
       <div className="shell" style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        <Sidebar 
+        <ManagementSidebar 
           currentView={currentView} 
           onNavigate={onNavigate} 
           activeCategory={activeCategory}

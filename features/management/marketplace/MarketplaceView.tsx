@@ -13,7 +13,7 @@ interface MarketplaceViewProps {
 export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, activeCategory, onSelectCategory }) => {
   const [activeTab, setActiveTab] = React.useState('all');
   const [searchQuery, setSearchQuery] = React.useState('');
-  const allCategories = ['all', ...new Set(AGENT_TEMPLATES.flatMap(a => a.category.split(' · ')))].sort();
+  const allCategories = ['all', ...Array.from(new Set(AGENT_TEMPLATES.flatMap(a => a.category.split(' · '))))].sort();
 
   let filteredAgents = AGENT_TEMPLATES;
 

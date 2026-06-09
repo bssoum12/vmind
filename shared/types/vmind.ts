@@ -62,4 +62,6 @@ export interface VmindMessage {
   raw?: any;
   error?: any;
   isThinking?: boolean;
+  source?: string;
+  status?: string;
 }
