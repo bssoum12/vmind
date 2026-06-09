@@ -17,8 +17,9 @@ function getVmindSessionId() {
 export async function sendVmindMessage(message: string, clientId = "DEMO"): Promise<VmindN8nResponse> {
   const sessionId = getVmindSessionId();
 
-  // On appelle maintenant notre PROXY Backend au lieu de n8n directement
-  const proxyUrl = "http://localhost:3001/api/n8n-proxy";
+  // On utilise une variable d'environnement pour Vercel, ou localhost par défaut
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+  const proxyUrl = `${baseUrl}/api/n8n-proxy`;
 
   console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, session_id: sessionId });
 
@@ -71,7 +72,8 @@ export async function sendVmindMessage(message: string, clientId = "DEMO"): Prom
 }
 
 export async function deployAgent(config: any, clientId = "DEMO"): Promise<any> {
-  const webhookUrl = "http://localhost:3001/api/deploy-agent";
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+  const webhookUrl = `${baseUrl}/api/deploy-agent`;
   
   console.log("🚀 [n8n-api] DEPLOYING AGENT WITH PAYLOAD TO BACKEND SCHEDULER:", config);
 
@@ -108,7 +110,8 @@ export async function deployAgent(config: any, clientId = "DEMO"): Promise<any> 
  * Appelle le Backend pour réinitialiser les compteurs de relance des factures ignorées
  */
 export async function resetReminders(invoiceRefs: string[]): Promise<any> {
-  const url = "http://localhost:3001/api/recovery/reset-reminders";
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+  const url = `${baseUrl}/api/recovery/reset-reminders`;
   
   console.log("🔄 [n8n-api] RESETTING REMINDERS FOR:", invoiceRefs);
 
