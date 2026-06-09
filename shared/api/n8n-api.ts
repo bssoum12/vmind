@@ -55,9 +55,75 @@ export async function sendVmindMessage(message: string, clientId = "DEMO"): Prom
     }
 
     console.log("📩 [n8n-api] DONNÉES DÉBALLÉES (FINAL):", finalData);
+
+    const maxReachedInvoices = finalData?.details?.max_reached_invoices || [];
+    if (maxReachedInvoices && maxReachedInvoices.length > 0) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('vmind-max-reminders', { detail: maxReachedInvoices }));
+      }
+    }
+
     return finalData;
   } catch (error: any) {
     console.error("❌ [n8n-api] FETCH ERROR:", error);
     throw error;
   }
+}
+
+export async function deployAgent(config: any, clientId = "DEMO"): Promise<any> {
+  const webhookUrl = "http://localhost:3001/api/deploy-agent";
+  
+  console.log("🚀 [n8n-api] DEPLOYING AGENT WITH PAYLOAD TO BACKEND SCHEDULER:", config);
+
+  // Wrap in the array format expected by the backend
+  const payloadArray = [
+    {
+      ...config,
+      client_id: clientId,
+      user_id: clientId
+    }
+  ];
+
+  const response = await fetch(webhookUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payloadArray)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erreur lors du déploiement via le scheduler Vmind: ${response.statusText}`);
+  }
+
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return { status: "success", rawText: text };
+  }
+}
+
+/**
+ * Appelle le Backend pour réinitialiser les compteurs de relance des factures ignorées
+ */
+export async function resetReminders(invoiceRefs: string[]): Promise<any> {
+  const url = "http://localhost:3001/api/recovery/reset-reminders";
+  
+  console.log("🔄 [n8n-api] RESETTING REMINDERS FOR:", invoiceRefs);
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ invoice_refs: invoiceRefs })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur de réinitialisation (${response.status})`);
+  }
+
+  return response.json();
 }

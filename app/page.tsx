@@ -8,6 +8,7 @@ import { Sidebar as AssistantSidebar } from "@/features/sidebar/Sidebar";
 import { RightPanel } from "@/features/right_panel/RightPanel";
 import { VoiceOverlay } from "@/features/voice/VoiceOverlay";
 import { VmindChat } from "@/components/vmind/VmindChat";
+import { GlobalMaxRemindersPopup } from "@/components/vmind/GlobalMaxRemindersPopup";
 
 // Management Mode Components
 import { ManagementSidebar } from "@/features/management/layout/ManagementSidebar";
@@ -79,6 +80,7 @@ export default function Home() {
           />
         </div>
         <VoiceOverlay show={voiceShow} onClose={() => setVoiceShow(false)} />
+        <GlobalMaxRemindersPopup />
       </main>
     );
   }
@@ -133,6 +135,7 @@ export default function Home() {
           )}
         </div>
       </div>
+      <GlobalMaxRemindersPopup />
     </main>
   );
 }
