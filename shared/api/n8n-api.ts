@@ -56,12 +56,8 @@ export async function sendVmindMessage(message: string, clientId = "DEMO"): Prom
 
     console.log("📩 [n8n-api] DONNÉES DÉBALLÉES (FINAL):", finalData);
 
-    const maxReachedInvoices = finalData?.details?.max_reached_invoices || [];
-    if (maxReachedInvoices && maxReachedInvoices.length > 0) {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('vmind-max-reminders', { detail: maxReachedInvoices }));
-      }
-    }
+    // The vmind-max-reminders event is now handled by Server-Sent Events (SSE)
+    // from the Node.js backend to decouple it from the chat entirely.
 
     return finalData;
   } catch (error: any) {
