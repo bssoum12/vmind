@@ -7,9 +7,10 @@ import { AGENTS } from '../../shared/constants/data';
 interface SidebarProps {
   onInsertPrompt: (text: string) => void;
   activeAgentId?: string;
+  onAgentClick?: (agentId: string) => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId, onAgentClick }) => {
   const [activeNav, setActiveNav] = useState('dashboard');
 
   return (
@@ -40,7 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId 
           key={agent.id}
           className={`nav-item ${activeAgentId === agent.id ? 'agent-card-active' : ''}`}
           onClick={() => {
-            onInsertPrompt(`Analyse ${agent.name}`);
+            if (onAgentClick) onAgentClick(agent.id);
           }}
         >
           <IconBox style={{

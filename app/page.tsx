@@ -66,12 +66,13 @@ export default function Home() {
   if (mode === 'ASSISTANT') {
     return (
       <main className="main-container anim">
-        <AssistantSidebar onInsertPrompt={handleInsertPrompt} activeAgentId={activeAgentId} />
+        <AssistantSidebar onInsertPrompt={handleInsertPrompt} activeAgentId={activeAgentId} onAgentClick={setActiveAgentId} />
         <div className="content assistant-layout">
           <VmindChat
             initialPrompt={insertPrompt}
             onOpenVoice={() => setVoiceShow(true)}
             onAgentActive={setActiveAgentId}
+            activeAgentId={activeAgentId}
           />
           <RightPanel
             logs={logs}

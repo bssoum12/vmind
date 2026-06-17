@@ -604,6 +604,43 @@ body {
   border-color: var(--border2);
 }
 
+.suggestion-chip {
+  background: var(--navy3);
+  border: 1px solid rgba(0, 229, 200, 0.4);
+  color: var(--cyan);
+  font-family: var(--font-title);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 10px rgba(0, 229, 200, 0.1);
+}
+
+.suggestion-chip:hover {
+  background: var(--navy4);
+  border-color: var(--cyan);
+  color: #fff;
+  text-shadow: 0 0 8px var(--cyan);
+  box-shadow: 0 0 15px rgba(0, 229, 200, 0.3), inset 0 0 8px rgba(0, 229, 200, 0.1);
+  transform: translateY(-2px);
+}
+
+.suggestion-chip:active {
+  transform: translateY(0);
+  box-shadow: 0 0 8px rgba(0, 229, 200, 0.4);
+}
+
+.suggestion-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  border-color: var(--border);
+}
+
 .msg-meta {
   font-size: 10px;
   color: var(--muted);

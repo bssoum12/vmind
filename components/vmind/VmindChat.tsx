@@ -11,6 +11,7 @@ interface VmindChatProps {
   onOpenVoice: () => void;
   clientId?: string;
   onAgentActive?: (agentId: string) => void;
+  activeAgentId?: string;
 }
 
 // Mappage des tools snake_case vers les agents
@@ -29,7 +30,8 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   initialPrompt,
   onOpenVoice,
   clientId = "DEMO",
-  onAgentActive
+  onAgentActive,
+  activeAgentId = "VMIND"
 }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -145,6 +147,86 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     }
   };
 
+  const handleSuggestionClick = async (suggestion: string, toolEndpoint: string, payload: any) => {
+    if (isLoading) return;
+
+    // Ajouter le message utilisateur (la suggestion)
+    const userMessage: VmindMessage = {
+      id: `user-${Date.now()}`,
+      sender: 'user',
+      text: suggestion,
+      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+    };
+
+    const thinkingMessage: VmindMessage = {
+      id: `thinking-${Date.now()}`,
+      sender: 'vm',
+      text: '',
+      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+      isThinking: true,
+    };
+
+    setMessages((prev) => [...prev, userMessage, thinkingMessage]);
+    setIsLoading(true);
+
+    try {
+      // Utiliser la même base URL que n8n-api.ts
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const response = await fetch(`${baseUrl}${toolEndpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: clientId, ...payload })
+      });
+      const wrapper = await response.json();
+
+      setMessages((prev) => prev.filter(m => !m.isThinking));
+
+      if (!response.ok || !wrapper.ok) {
+        setMessages((prev) => [...prev, {
+          id: `err-${Date.now()}`,
+          sender: 'vm',
+          text: wrapper.error?.message || wrapper.message || 'Erreur lors de l\'appel API direct',
+          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          error: wrapper.error?.message || 'API_ERROR',
+          response_type: 'error',
+          title: 'Erreur API'
+        }]);
+      } else {
+        // wrapper = { ok, data: { ...VmindN8nResponse } }
+        // data contient le format standard identique à n8n
+        const result = wrapper.data;
+
+        if (onAgentActive) onAgentActive('VDATA');
+
+        setMessages((prev) => [...prev, {
+          id: `vm-${Date.now()}`,
+          sender: 'vm',
+          text: result.message || 'Voici les informations demandées.',
+          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          tool_used: result.tool_used || 'get_dossier_volume_evolution',
+          response_type: result.response_type || 'full',
+          title: result.title,
+          kpis: result.kpis,
+          table: result.table,
+          chart: result.chart,
+          details: result.details,
+          raw: result.raw
+        }]);
+      }
+    } catch (error: any) {
+      setMessages((prev) => prev.filter(m => !m.isThinking));
+      setMessages((prev) => [...prev, {
+        id: `err-${Date.now()}`,
+        sender: 'vm',
+        text: `Erreur de communication : ${error.message}`,
+        time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+        error: error.message,
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -152,15 +234,54 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     }
   };
 
+  const currentAgentData = activeAgentId !== 'VMIND' ? (AGENTS as any)[activeAgentId] : null;
+
   return (
     <div className="chat-panel flex flex-col h-full bg-[#0b101e]">
       <div className="chat-header p-4 border-b border-[#1c2538] flex-shrink-0">
         <div>
-          <div className="chat-title text-cyan-400 font-bold text-lg">ASSISTANT VMIND (n8n)</div>
-          <div className="chat-subtitle text-xs text-gray-400">Orchestration intelligente via Webhook</div>
+          <div className="flex items-center gap-2">
+            {currentAgentData && (
+              <span className="px-2 py-0.5 text-[10px] font-bold rounded" style={{ backgroundColor: currentAgentData.bgColor, color: currentAgentData.color, border: `1px solid ${currentAgentData.borderColor}`}}>
+                {currentAgentData.icon}
+              </span>
+            )}
+            <div className="chat-title text-cyan-400 font-bold text-lg">
+              {currentAgentData ? `ASSISTANT ${currentAgentData.name}` : 'ASSISTANT VMIND'}
+            </div>
+          </div>
+          <div className="chat-subtitle text-xs text-gray-400 mt-1">
+            {currentAgentData ? currentAgentData.desc : 'Orchestration intelligente via Webhook'}
+          </div>
+
+          {/* Suggestions Zone */}
+          {activeAgentId === 'VDATA' && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button className="suggestion-chip">
+                Taux livraison à temps ?
+              </button>
+              <button className="suggestion-chip">
+                Compare Jan-Avr ?
+              </button>
+              <button className="suggestion-chip">
+                3 KPIs dégradés ?
+              </button>
+              <button className="suggestion-chip">
+                Rapport mensuel PDF ?
+              </button>
+              <button 
+                onClick={() => handleSuggestionClick("Montre-moi l'évolution du volume des dossiers sur 12 mois", "/api/tools/get-dossier-volume-evolution", { months: 12 })}
+                className="suggestion-chip"
+                disabled={isLoading}
+              >
+                Volume 12 mois ?
+              </button>
+            </div>
+          )}
+
           {isLoading && (
-            <div className="text-[10px] text-cyan-500 animate-pulse mt-1">
-              Analyse VMIND en cours...
+            <div className="text-[10px] text-cyan-500 animate-pulse mt-2">
+              Analyse en cours...
             </div>
           )}
         </div>
