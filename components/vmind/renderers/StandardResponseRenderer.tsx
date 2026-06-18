@@ -108,9 +108,8 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
   const hasDetails = hasMeaningfulDetails(details);
   const isGenericText = Boolean(text && GENERIC_TEXTS.has(normalizeText(text) || ''));
   const shouldShowText = Boolean(text && (!isGenericText || (!hasKpis && !hasTable && !hasChart && !hasDetails)));
-  const shouldRenderSingleKpiSentence = Boolean(hasKpis && kpis?.length === 1 && !hasTable && !hasChart);
   const shouldShowDetails = Boolean(
-    hasDetails && !shouldRenderSingleKpiSentence && (response_type === 'detail' || response_type === 'full')
+    hasDetails && (response_type === 'detail' || response_type === 'full')
   );
 
   return (
@@ -137,9 +136,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
         </div>
       )}
 
-      {shouldRenderSingleKpiSentence && kpis ? (
-        <KpiSentence kpi={kpis[0]} />
-      ) : kpis && kpis.length > 0 ? (
+      {hasKpis && kpis && kpis.length > 0 ? (
         <KpiRenderer kpis={kpis} />
       ) : null}
 

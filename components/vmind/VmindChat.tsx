@@ -257,7 +257,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           {/* Suggestions Zone */}
           {activeAgentId === 'VDATA' && (
             <div className="mt-3 flex flex-wrap gap-2">
-              <button className="suggestion-chip">
+              <button 
+                onClick={() => handleSuggestionClick("Quel est le taux de dossiers livrés à temps ce mois ?", "/api/tools/get-delivery-rate", {})}
+                className="suggestion-chip"
+                disabled={isLoading}
+              >
                 Taux livraison à temps ?
               </button>
               <button className="suggestion-chip">
