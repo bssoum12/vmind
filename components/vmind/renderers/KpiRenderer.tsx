@@ -39,7 +39,7 @@ export const KpiRenderer: React.FC<KpiRendererProps> = ({ kpis }) => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.9 }}>
               {getStatusIcon(kpi.status)}
-              <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100px', color: '#9ca3af' }}>
+              <span style={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', color: '#9ca3af', lineHeight: '1.2' }}>
                 {formatLabel(kpi.label)}
               </span>
             </div>

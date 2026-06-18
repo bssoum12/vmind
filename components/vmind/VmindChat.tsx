@@ -267,7 +267,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
               <button className="suggestion-chip">
                 Compare Jan-Avr ?
               </button>
-              <button className="suggestion-chip">
+              <button 
+                onClick={() => handleSuggestionClick("Quels sont les 3 indicateurs les plus dégradés cette semaine ?", "/api/tools/get-degraded-kpis", {})}
+                className="suggestion-chip"
+                disabled={isLoading}
+              >
                 3 KPIs dégradés ?
               </button>
               <button className="suggestion-chip">
