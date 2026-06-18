@@ -126,3 +126,90 @@ export async function resetReminders(invoiceRefs: string[]): Promise<any> {
 
   return response.json();
 }
+
+// ─── Agent Management APIs ────────────────────────────────────────────────────
+
+const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+/**
+ * Fetches all deployed agents from Redis (via backend)
+ */
+export async function getAgents(): Promise<any[]> {
+  const res = await fetch(`${getBaseUrl()}/api/list-agents`);
+  if (!res.ok) throw new Error(`Failed to fetch agents (${res.status})`);
+  const data = await res.json();
+  return data.agents || [];
+}
+
+/**
+ * Pauses an agent — removes its QStash schedule but keeps config in Redis
+ */
+export async function pauseAgent(agentName: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/pause-agent/${encodeURIComponent(agentName)}`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to pause agent (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Resumes a paused agent — recreates its QStash schedule from stored trigger_rules
+ */
+export async function resumeAgent(agentName: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/resume-agent/${encodeURIComponent(agentName)}`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to resume agent (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Deletes an agent completely (removes from Redis + cancels QStash schedule)
+ */
+export async function deleteAgent(agentName: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/delete-agent/${encodeURIComponent(agentName)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to delete agent (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Updates only the recovery_config of a deployed agent.
+ * If the agent has a running schedule, it is recreated with the new config.
+ */
+export async function updateAgentConfig(agentName: string, recoveryConfig: object): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/update-agent-config/${encodeURIComponent(agentName)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ recovery_config: recoveryConfig }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to update agent config (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Triggers an immediate (one-shot) run of an agent, outside of its schedule
+ */
+export async function runAgentNow(agentName: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/run-now/${encodeURIComponent(agentName)}`, {
+    method: "POST",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to trigger agent run (${res.status})`);
+  }
+  return res.json();
+}

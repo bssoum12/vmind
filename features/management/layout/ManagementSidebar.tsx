@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
-
-import { AGENT_TEMPLATES, MY_AGENTS } from '@/shared/management/constants/data';
+import React, { useEffect, useState } from 'react';
+import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
+import { getAgents } from '@/shared/api/n8n-api';
 
 interface SidebarProps {
   currentView: string;
@@ -12,6 +12,15 @@ interface SidebarProps {
 }
 
 export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, activeCategory, onSelectCategory }) => {
+  const [agentCount, setAgentCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Fetch real agent count from backend
+    getAgents()
+      .then(agents => setAgentCount(agents.length))
+      .catch(() => setAgentCount(0));
+  }, [currentView]); // re-fetch when navigating back to agents view
+
   const handleCategoryClick = (cat: string) => {
     onSelectCategory(cat);
     onNavigate('market');
@@ -42,7 +51,13 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
       >
         <div className="nav-icon">🤖</div>
         <span>Mes Agents</span>
-        <span className="nav-badge">3</span>
+        {/* Dynamic badge — null while loading so it doesn't flash "0" */}
+        {agentCount !== null && agentCount > 0 && (
+          <span className="nav-badge">{agentCount}</span>
+        )}
+        {agentCount === 0 && (
+          <span className="nav-badge" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted)' }}>0</span>
+        )}
       </div>
       <div 
         className={`nav-item ${currentView === 'journal' ? 'active' : ''}`}
@@ -72,7 +87,9 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
         </div>
         <div className="stats-row">
           <span className="stats-label">Agents actifs</span>
-          <span className="stats-val">{MY_AGENTS.length}</span>
+          <span className="stats-val">
+            {agentCount !== null ? agentCount : '…'}
+          </span>
         </div>
         <div className="stats-row">
           <span className="stats-label">Taux de succès</span>
