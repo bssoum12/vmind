@@ -14,6 +14,15 @@ const GENERIC_TEXTS = new Set([
   'Voici le résultat demandé.',
 ]);
 
+const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  'compare_agency_performance_jan_apr': 'Analyse par agence',
+};
+
+const getToolDisplayName = (tool?: string | null) => {
+  if (!tool) return '';
+  return TOOL_DISPLAY_NAMES[tool] || tool.replace(/_/g, ' ');
+};
+
 const normalizeText = (value?: string) =>
   value
     ?.trim()
@@ -119,7 +128,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
           {message.tool_used && (
             <span className="premium-badge">
               <span className="status-dot" style={{ display: 'inline-block', width: '6px', height: '6px', background: 'var(--cyan)', borderRadius: '50%', boxShadow: '0 0 8px var(--cyan)' }}></span>
-              {message.tool_used.replace(/_/g, ' ')}
+              {getToolDisplayName(message.tool_used)}
             </span>
           )}
           {message.source && message.source !== 'memory' && (

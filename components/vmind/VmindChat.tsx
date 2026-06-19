@@ -24,6 +24,16 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'search_cotations': 'VDATA',
   'get_aged_balance': 'VDATA',
   'get_overdue_alerts': 'VDATA',
+  'compare_agency_performance_jan_apr': 'VDATA',
+};
+
+const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  'compare_agency_performance_jan_apr': 'Analyse par agence',
+};
+
+const getToolDisplayName = (tool?: string | null) => {
+  if (!tool) return '';
+  return TOOL_DISPLAY_NAMES[tool] || tool.replace(/_/g, ' ');
 };
 
 export const VmindChat: React.FC<VmindChatProps> = ({
@@ -264,7 +274,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
               >
                 Taux livraison à temps ?
               </button>
-              <button className="suggestion-chip">
+              <button
+                onClick={() => handleSuggestionClick("Compare les performances de janvier à avril par agence", "/api/tools/compare-agency-performance-jan-apr", {})}
+                className="suggestion-chip"
+                disabled={isLoading}
+              >
                 Compare Jan-Avr ?
               </button>
               <button 
@@ -319,7 +333,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                 <div className={`msg-body flex flex-col ${isUser ? 'items-start' : 'items-end'}`}>
                   {msg.tool_used && (
                     <div className={`text-[9px] uppercase mb-1 tracking-wider font-bold ${agentData ? 'text-[#00E5C8]' : 'text-cyan-600'}`}>
-                      AGENT ACTIF : {agentId} — {msg.tool_used}
+                      AGENT ACTIF : {agentId} — {getToolDisplayName(toolUsed)}
                     </div>
                   )}
 
