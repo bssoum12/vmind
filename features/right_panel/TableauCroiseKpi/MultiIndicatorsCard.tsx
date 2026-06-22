@@ -19,14 +19,19 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
     activeAgentId,
 }) => {
     const currentYear = new Date().getFullYear();
+    const todayStr = new Date().toISOString().split("T")[0];
+    const startOfYearStr = `${currentYear}-01-01`;
 
-        const [selectedYear, setSelectedYear] = useState(currentYear);
+    const [startDate, setStartDate] = useState(startOfYearStr);
+    const [endDate, setEndDate] = useState(todayStr);
     const [kpis, setKpis] = useState<Kpi[]>([]);
+    const [exportData, setExportData] = useState<any>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [hovered, setHovered] = useState(false);
     const [coords, setCoords] = useState({ top: 0, left: 0 });
     const cardRef = React.useRef<HTMLDivElement>(null);
+    const hideTimeout = React.useRef<NodeJS.Timeout | null>(null);
 
     const updateCoords = () => {
         if (cardRef.current) {
@@ -39,8 +44,32 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
     };
 
     const handleMouseEnter = () => {
+        if (hideTimeout.current) {
+            clearTimeout(hideTimeout.current);
+            hideTimeout.current = null;
+        }
         updateCoords();
         setHovered(true);
+    };
+
+    const handleMouseLeave = () => {
+        hideTimeout.current = setTimeout(() => {
+            setHovered(false);
+        }, 250); // 250ms buffer to cross the gap to the tooltip
+    };
+
+    const handleTooltipMouseEnter = () => {
+        if (hideTimeout.current) {
+            clearTimeout(hideTimeout.current);
+            hideTimeout.current = null;
+        }
+        setHovered(true);
+    };
+
+    const handleTooltipMouseLeave = () => {
+        hideTimeout.current = setTimeout(() => {
+            setHovered(false);
+        }, 250);
     };
 
     useEffect(() => {
@@ -63,7 +92,7 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
         };
     }, [hovered]);
 
-    const fetchData = async (year: number) => {
+    const fetchData = async (start: string, end: string) => {
         setLoading(true);
         setError("");
 
@@ -74,6 +103,9 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
             const clientId =
                 process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
 
+            const formattedStart = start.replace(/-/g, "");
+            const formattedEnd = end.replace(/-/g, "");
+
             const response = await fetch(
                 `${baseUrl}/api/tools/get-tableau-croise-kpi-vdata`,
                 {
@@ -83,7 +115,8 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
                     },
                     body: JSON.stringify({
                         client_id: clientId,
-                        year,
+                        startDate: formattedStart,
+                        endDate: formattedEnd,
                     }),
                 }
             );
@@ -99,9 +132,11 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
             }
 
             setKpis(json.data?.kpis || []);
+            setExportData(json.data?.exportData || null);
         } catch (err: any) {
             setError(err.message || "Erreur inconnue");
             setKpis([]);
+            setExportData(null);
         } finally {
             setLoading(false);
         }
@@ -109,9 +144,9 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
 
     useEffect(() => {
         if (activeAgentId === "VDATA") {
-            fetchData(selectedYear);
+            fetchData(startDate, endDate);
         }
-    }, [activeAgentId, selectedYear]);
+    }, [activeAgentId, startDate, endDate]);
 
     if (activeAgentId !== "VDATA") {
         return null;
@@ -127,12 +162,15 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
                 zIndex: 10,
             }}
             onMouseEnter={handleMouseEnter}
-            onMouseLeave={() => setHovered(false)}
+            onMouseLeave={handleMouseLeave}
         >
             <KpiTooltip
                 visible={hovered}
                 kpis={kpis}
                 coords={coords}
+                exportData={exportData}
+                onMouseEnter={handleTooltipMouseEnter}
+                onMouseLeave={handleTooltipMouseLeave}
             />
 
             <div
@@ -220,7 +258,7 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
                         </span>
 
                         <button
-                            onClick={() => fetchData(selectedYear)}
+                            onClick={() => fetchData(startDate, endDate)}
                             style={{
                                 background: "none",
                                 border: "none",
@@ -240,78 +278,113 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
                     <div
                         style={{
                             display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
+                            flexDirection: "column",
                             gap: "12px",
                         }}
                     >
-                        <div style={{ flex: 1 }}>
-                            <div
-                                style={{
-                                    color: "var(--white)",
-                                    fontSize: "13px",
-                                    fontWeight: 600,
-                                    marginBottom: "4px",
-                                }}
-                            >
-                                {kpis.length} KPI disponibles
-                            </div>
+                        <div
+                            style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                gap: "12px",
+                            }}
+                        >
+                            <div style={{ flex: 1 }}>
+                                <div
+                                    style={{
+                                        color: "var(--white)",
+                                        fontSize: "13px",
+                                        fontWeight: 600,
+                                        marginBottom: "4px",
+                                    }}
+                                >
+                                    {kpis.length} KPI disponibles
+                                </div>
 
-                            <div
+                                <div
+                                    style={{
+                                        color: "var(--muted)",
+                                        fontSize: "9px",
+                                        fontFamily: "var(--font-mono)",
+                                    }}
+                                >
+                                    Survolez pour afficher les détails
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Cyber-accented Date Picker Controls */}
+                        <div
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <input
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                style={{
+                                    background: "rgba(0,229,200,0.04)",
+                                    color: "var(--cyan)",
+                                    border: "1px solid rgba(0,229,200,0.15)",
+                                    borderRadius: "6px",
+                                    padding: "6px 8px",
+                                    fontFamily: "var(--font-mono)",
+                                    fontSize: "10px",
+                                    fontWeight: 600,
+                                    outline: "none",
+                                    cursor: "pointer",
+                                    transition: "border-color 0.2s, box-shadow 0.2s",
+                                }}
+                                onFocus={(e) => {
+                                    e.target.style.borderColor = "var(--cyan)";
+                                    e.target.style.boxShadow = "0 0 6px rgba(0, 229, 200, 0.2)";
+                                }}
+                                onBlur={(e) => {
+                                    e.target.style.borderColor = "rgba(0, 229, 200, 0.15)";
+                                    e.target.style.boxShadow = "none";
+                                }}
+                            />
+                            <span
                                 style={{
                                     color: "var(--muted)",
                                     fontSize: "9px",
                                     fontFamily: "var(--font-mono)",
                                 }}
                             >
-                                Survolez pour afficher les détails
-                            </div>
+                                au
+                            </span>
+                            <input
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                style={{
+                                    background: "rgba(0,229,200,0.04)",
+                                    color: "var(--cyan)",
+                                    border: "1px solid rgba(0,229,200,0.15)",
+                                    borderRadius: "6px",
+                                    padding: "6px 8px",
+                                    fontFamily: "var(--font-mono)",
+                                    fontSize: "10px",
+                                    fontWeight: 600,
+                                    outline: "none",
+                                    cursor: "pointer",
+                                    transition: "border-color 0.2s, box-shadow 0.2s",
+                                }}
+                                onFocus={(e) => {
+                                    e.target.style.borderColor = "var(--cyan)";
+                                    e.target.style.boxShadow = "0 0 6px rgba(0, 229, 200, 0.2)";
+                                }}
+                                onBlur={(e) => {
+                                    e.target.style.borderColor = "rgba(0, 229, 200, 0.15)";
+                                    e.target.style.boxShadow = "none";
+                                }}
+                            />
                         </div>
-
-                        <select
-                            value={selectedYear}
-                            onChange={(e) => setSelectedYear(Number(e.target.value))}
-                            onClick={(e) => e.stopPropagation()}
-                            style={{
-                                appearance: "none",
-                                WebkitAppearance: "none",
-
-                                background: "rgba(0,229,200,0.06)",
-                                color: "var(--cyan)",
-
-                                border: "1px solid rgba(0,229,200,0.15)",
-                                borderRadius: "8px",
-
-                                padding: "8px 28px 8px 12px",
-
-                                fontFamily: "var(--font-mono)",
-                                fontSize: "10px",
-                                fontWeight: 600,
-
-                                
-
-                                cursor: "pointer",
-
-                                boxShadow: "0 0 10px rgba(0,229,200,0.08)",
-
-                                backgroundImage: `
-    linear-gradient(45deg, transparent 50%, var(--cyan) 50%),
-    linear-gradient(135deg, var(--cyan) 50%, transparent 50%)
-  `,
-                                backgroundPosition:
-                                    "calc(100% - 12px) calc(50% - 2px), calc(100% - 8px) calc(50% - 2px)",
-                                backgroundSize: "4px 4px",
-                                backgroundRepeat: "no-repeat",
-                            }}
-                        >
-                            {Array.from({ length: 5 }, (_, i) => currentYear - i).map(
-                                (year) => (
-                                    <option key={year} value={year}>
-                                        {year}
-                                    </option>
-                                )
-                            )}
-                        </select>
                     </div>
                 )}
             </div>
