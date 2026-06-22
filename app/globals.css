@@ -422,9 +422,17 @@ body {
 .content {
   flex: 1;
   display: flex;
-  overflow: hidden;
+  overflow-y: hidden;
+  overflow-x: visible;
 }
-
+.right-panel {
+  overflow-y: auto;
+  overflow-x: visible;
+}
+.rp-section {
+  position: relative;
+  overflow: visible;
+}
 .assistant-layout {
   flex-direction: row;
 }
