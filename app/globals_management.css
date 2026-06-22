@@ -124,11 +124,19 @@
 /* â”€â”€ CONTENT â”€â”€ */
 .content {
   flex: 1;
-  overflow: hidden;
+  overflow-y: hidden;
+  overflow-x: visible;
   display: flex;
   flex-direction: column;
 }
-
+.right-panel {
+  overflow-y: auto;
+  overflow-x: visible;
+}
+.rp-section {
+  position: relative;
+  overflow: visible;
+}
 .content > div {
   flex: 1;
   display: flex;

@@ -4,7 +4,9 @@ import React from 'react';
 import { MiniKpi } from '../../components/ui/MiniKpi';
 import { AGENTS } from '../../shared/constants/data';
 import { LogEntry } from '../../shared/types';
-
+import { VolumeLineChart } from './VolumeLineChart';
+import { DeliveryRateKpi } from './DeliveryRateKpi';
+import {MultiIndicatorsCard} from './TableauCroiseKpi/MultiIndicatorsCard' ;
 interface RightPanelProps {
   logs: LogEntry[];
   onInsertPrompt: (text: string) => void;
@@ -37,6 +39,9 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginTop: '3px' }}>
           <span>Nov</span><span>Déc</span><span>Jan</span><span>Fév</span><span>Mar</span><span>Avr ●</span>
         </div>
+        <VolumeLineChart activeAgentId={activeAgentId} />
+        <DeliveryRateKpi activeAgentId={activeAgentId} />
+        <MultiIndicatorsCard activeAgentId={activeAgentId} />
       </div>
 
       {/* Agents Status */}
