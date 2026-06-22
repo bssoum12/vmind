@@ -16,6 +16,7 @@ const GENERIC_TEXTS = new Set([
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'compare_agency_performance_jan_apr': 'Analyse par agence',
+  'analyze_delay_by_client_type': 'Retards par type de client',
 };
 
 const getToolDisplayName = (tool?: string | null) => {

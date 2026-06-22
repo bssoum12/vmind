@@ -25,10 +25,12 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_aged_balance': 'VDATA',
   'get_overdue_alerts': 'VDATA',
   'compare_agency_performance_jan_apr': 'VDATA',
+  'analyze_delay_by_client_type': 'VDATA',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'compare_agency_performance_jan_apr': 'Analyse par agence',
+  'analyze_delay_by_client_type': 'Retards par type de client',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -290,6 +292,13 @@ export const VmindChat: React.FC<VmindChatProps> = ({
               </button>
               <button className="suggestion-chip">
                 Rapport mensuel PDF ?
+              </button>
+              <button
+                onClick={() => handleSuggestionClick("Analyse la corrélation entre retards et type de client", "/api/tools/analyze-delay-by-client-type", {})}
+                className="suggestion-chip"
+                disabled={isLoading}
+              >
+                Retards par type client ?
               </button>
               <button 
                 onClick={() => handleSuggestionClick("Montre-moi l'évolution du volume des dossiers sur 12 mois", "/api/tools/get-dossier-volume-evolution", { months: 12 })}
