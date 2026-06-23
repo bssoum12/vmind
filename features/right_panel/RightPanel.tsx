@@ -7,6 +7,7 @@ import { LogEntry } from '../../shared/types';
 import { VolumeLineChart } from './VolumeLineChart';
 import { DeliveryRateKpi } from './DeliveryRateKpi';
 import {MultiIndicatorsCard} from './TableauCroiseKpi/MultiIndicatorsCard' ;
+import {ScoreGlobalCard} from './TableauCroiseKpi/ScoreGlobalCard' ;
 interface RightPanelProps {
   logs: LogEntry[];
   onInsertPrompt: (text: string) => void;
@@ -19,28 +20,33 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
       {/* KPIs Live */}
       <div className="rp-section">
         <div className="rp-title">KPIs Temps Réel</div>
-        <MiniKpi label="Trésorerie" dotColor="var(--green)" val="842K TND" delta="▲ +3.2%" deltaType="up" />
-        <MiniKpi label="Impayés" dotColor="var(--red)" val="218K TND" delta="▲ +8 clients" deltaType="warning" />
-        <MiniKpi label="Dossiers Ouverts" dotColor="var(--amber)" val="43" delta="⚠ 7 en retard" deltaType="warning" />
-        <MiniKpi label="CA Mois" dotColor="var(--cyan)" val="1.847M" delta="▲ +12.3%" deltaType="up" />
-        <MiniKpi label="BL Non Facturés" dotColor="var(--purple)" val="14" delta="▼ à traiter" deltaType="down" />
+        {activeAgentId !== 'VDATA' && (
+          <>
+            <MiniKpi label="Trésorerie" dotColor="var(--green)" val="842K TND" delta="▲ +3.2%" deltaType="up" />
+            <MiniKpi label="Impayés" dotColor="var(--red)" val="218K TND" delta="▲ +8 clients" deltaType="warning" />
+            <MiniKpi label="Dossiers Ouverts" dotColor="var(--amber)" val="43" delta="⚠ 7 en retard" deltaType="warning" />
+            <MiniKpi label="CA Mois" dotColor="var(--cyan)" val="1.847M" delta="▲ +12.3%" deltaType="up" />
+            <MiniKpi label="BL Non Facturés" dotColor="var(--purple)" val="14" delta="▼ à traiter" deltaType="down" />
 
-        <div style={{ marginTop: '12px', fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>
-          CA 6 DERNIERS MOIS (TND)
-        </div>
-        <div className="mini-chart">
-          <div className="bar" style={{ height: '55%' }}></div>
-          <div className="bar" style={{ height: '70%' }}></div>
-          <div className="bar" style={{ height: '60%' }}></div>
-          <div className="bar" style={{ height: '80%' }}></div>
-          <div className="bar" style={{ height: '65%' }}></div>
-          <div className="bar current" style={{ height: '100%' }}></div>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginTop: '3px' }}>
-          <span>Nov</span><span>Déc</span><span>Jan</span><span>Fév</span><span>Mar</span><span>Avr ●</span>
-        </div>
+            <div style={{ marginTop: '12px', fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>
+              CA 6 DERNIERS MOIS (TND)
+            </div>
+            <div className="mini-chart">
+              <div className="bar" style={{ height: '55%' }}></div>
+              <div className="bar" style={{ height: '70%' }}></div>
+              <div className="bar" style={{ height: '60%' }}></div>
+              <div className="bar" style={{ height: '80%' }}></div>
+              <div className="bar" style={{ height: '65%' }}></div>
+              <div className="bar current" style={{ height: '100%' }}></div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginTop: '3px' }}>
+              <span>Nov</span><span>Déc</span><span>Jan</span><span>Fév</span><span>Mar</span><span>Avr ●</span>
+            </div>
+          </>
+        )}
+        <ScoreGlobalCard activeAgentId={activeAgentId} />
         <VolumeLineChart activeAgentId={activeAgentId} />
-        <DeliveryRateKpi activeAgentId={activeAgentId} />
+        <DeliveryRateKpi activeAgentId={activeAgentId} /> 
         <MultiIndicatorsCard activeAgentId={activeAgentId} />
       </div>
 

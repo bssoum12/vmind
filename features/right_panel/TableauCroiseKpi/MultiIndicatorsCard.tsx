@@ -327,6 +327,12 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
                                 type="date"
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
+                                onKeyDown={(e) => e.preventDefault()}
+                                onClick={(e) => {
+                                    try {
+                                        e.currentTarget.showPicker();
+                                    } catch (err) {}
+                                }}
                                 style={{
                                     background: "rgba(0,229,200,0.04)",
                                     color: "var(--cyan)",
@@ -362,6 +368,12 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
                                 type="date"
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
+                                onKeyDown={(e) => e.preventDefault()}
+                                onClick={(e) => {
+                                    try {
+                                        e.currentTarget.showPicker();
+                                    } catch (err) {}
+                                }}
                                 style={{
                                     background: "rgba(0,229,200,0.04)",
                                     color: "var(--cyan)",
