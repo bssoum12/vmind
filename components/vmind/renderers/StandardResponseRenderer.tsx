@@ -4,6 +4,7 @@ import { KpiRenderer } from './KpiRenderer';
 import { TableRenderer } from './TableRenderer';
 import { ChartRenderer } from './ChartRenderer';
 import { GenericDetailRenderer } from './GenericDetailRenderer';
+import { MonthlyReportResultRenderer } from './MonthlyReportResultRenderer';
 
 interface StandardResponseRendererProps {
   message: VmindMessage;
@@ -17,6 +18,7 @@ const GENERIC_TEXTS = new Set([
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'compare_agency_performance_jan_apr': 'Analyse par agence',
   'analyze_delay_by_client_type': 'Retards par type de client',
+  'generate_monthly_activity_report': 'Rapport mensuel',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -84,6 +86,9 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
     title,
     error,
     isThinking,
+    alerts,
+    report_url,
+    report_filename,
   } = message;
 
   if (isThinking) {
@@ -149,6 +154,14 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
       {hasKpis && kpis && kpis.length > 0 ? (
         <KpiRenderer kpis={kpis} />
       ) : null}
+
+      {message.tool_used === 'generate_monthly_activity_report' && (
+        <MonthlyReportResultRenderer
+          alerts={alerts}
+          reportUrl={report_url}
+          reportFilename={report_filename}
+        />
+      )}
 
       {hasChart && chart && (
         <ChartRenderer chart={chart} />

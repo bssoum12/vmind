@@ -10,16 +10,22 @@ export const KpiRenderer: React.FC<KpiRendererProps> = ({ kpis }) => {
 
   const getStatusColor = (status?: string) => {
     switch (status?.toLowerCase()) {
-      case 'up': return 'border-green-500/30 bg-green-500/5 shadow-[0_0_15px_rgba(34,197,94,0.15)] text-green-400';
-      case 'down': return 'border-red-500/30 bg-red-500/5 shadow-[0_0_15px_rgba(239,68,68,0.15)] text-red-400';
+      case 'up':
+      case 'success': return 'border-green-500/30 bg-green-500/5 shadow-[0_0_15px_rgba(34,197,94,0.15)] text-green-400';
+      case 'down':
+      case 'danger': return 'border-red-500/30 bg-red-500/5 shadow-[0_0_15px_rgba(239,68,68,0.15)] text-red-400';
+      case 'warning': return 'border-amber-500/30 bg-amber-500/5 shadow-[0_0_15px_rgba(245,158,11,0.12)] text-amber-400';
       default: return 'border-cyan-500/30 bg-cyan-500/5 shadow-[0_0_15px_rgba(6,182,212,0.1)] text-cyan-400';
     }
   };
 
   const getStatusIcon = (status?: string) => {
     switch (status?.toLowerCase()) {
-      case 'up': return <span className="text-green-500 text-[10px]">▲</span>;
-      case 'down': return <span className="text-red-500 text-[10px]">▼</span>;
+      case 'up':
+      case 'success': return <span className="text-green-500 text-[10px]">●</span>;
+      case 'down':
+      case 'danger': return <span className="text-red-500 text-[10px]">●</span>;
+      case 'warning': return <span className="text-amber-500 text-[10px]">●</span>;
       default: return <span className="text-cyan-500 text-[10px]">●</span>;
     }
   };
@@ -34,7 +40,7 @@ export const KpiRenderer: React.FC<KpiRendererProps> = ({ kpis }) => {
         <div 
           key={index} 
           className={`premium-kpi-card ${getStatusColor(kpi.status)}`}
-          style={{ display: 'flex', flexDirection: 'column', padding: '12px', borderRadius: '12px', borderStyle: 'solid', borderWidth: '1px' }}
+          style={{ display: 'flex', flexDirection: 'column', padding: '12px', borderRadius: '8px', borderStyle: 'solid', borderWidth: '1px' }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.9 }}>

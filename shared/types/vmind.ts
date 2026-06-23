@@ -33,6 +33,13 @@ export interface VmindChart {
   data: Array<{ label: string; value: number | string }>;
 }
 
+export interface VmindAlert {
+  title: string;
+  level: 'warning' | 'danger';
+  explanation: string;
+  action: string;
+}
+
 export type VmindN8nResponse = {
   ok: boolean;
   tool_used: VmindTool;
@@ -45,6 +52,9 @@ export type VmindN8nResponse = {
   details: any;
   raw: any;
   error: any;
+  alerts?: VmindAlert[];
+  report_url?: string | null;
+  report_filename?: string | null;
 };
 
 export interface VmindMessage {
@@ -64,4 +74,7 @@ export interface VmindMessage {
   isThinking?: boolean;
   source?: string;
   status?: string;
+  alerts?: VmindAlert[];
+  report_url?: string | null;
+  report_filename?: string | null;
 }

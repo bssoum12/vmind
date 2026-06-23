@@ -26,11 +26,13 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_overdue_alerts': 'VDATA',
   'compare_agency_performance_jan_apr': 'VDATA',
   'analyze_delay_by_client_type': 'VDATA',
+  'generate_monthly_activity_report': 'VDATA',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'compare_agency_performance_jan_apr': 'Analyse par agence',
   'analyze_delay_by_client_type': 'Retards par type de client',
+  'generate_monthly_activity_report': 'Rapport mensuel',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -141,7 +143,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           table: response.table,
           chart: response.chart,
           details: response.details,
-          raw: response.raw
+          raw: response.raw,
+          alerts: response.alerts,
+          report_url: response.report_url,
+          report_filename: response.report_filename,
+          error: response.error
         }]);
       }
 
@@ -222,7 +228,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           table: result.table,
           chart: result.chart,
           details: result.details,
-          raw: result.raw
+          raw: result.raw,
+          alerts: result.alerts,
+          report_url: result.report_url,
+          report_filename: result.report_filename,
+          error: result.error
         }]);
       }
     } catch (error: any) {
@@ -290,7 +300,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
               >
                 3 KPIs dégradés ?
               </button>
-              <button className="suggestion-chip">
+              <button
+                onClick={() => handleSuggestionClick("Génère le rapport mensuel global d’activité", "/api/tools/generate-monthly-activity-report", {})}
+                className="suggestion-chip"
+                disabled={isLoading}
+              >
                 Rapport mensuel PDF ?
               </button>
               <button
