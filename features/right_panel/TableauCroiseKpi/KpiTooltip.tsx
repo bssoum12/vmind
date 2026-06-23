@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { MultiKpiItem } from "@/shared/types/kpi";
 
 interface KpiTooltipProps {
@@ -16,22 +16,51 @@ interface CardProps {
   title: string;
   value: string | number;
   footer: React.ReactNode;
+  highlightColor: string;
 }
 
-const KpiCard: React.FC<CardProps> = ({ title, value, footer }) => {
+const KpiCard: React.FC<CardProps> = ({ title, value, footer, highlightColor }) => {
+  const [hovered, setHovered] = React.useState(false);
+
+  let borderStyle = "1px solid rgba(0, 229, 200, 0.08)";
+  let bgStyle = "rgba(10, 24, 40, 0.5)";
+  let shadowStyle = "inset 0 0 12px rgba(0, 229, 200, 0.02)";
+
+  if (hovered) {
+    if (highlightColor === "green") {
+      borderStyle = "1px solid rgba(0, 229, 200, 0.45)";
+      bgStyle = "rgba(0, 229, 200, 0.08)";
+      shadowStyle = "0 0 15px rgba(0, 229, 200, 0.15)";
+    } else if (highlightColor === "yellow") {
+      borderStyle = "1px solid rgba(255, 184, 0, 0.45)";
+      bgStyle = "rgba(255, 184, 0, 0.08)";
+      shadowStyle = "0 0 15px rgba(255, 184, 0, 0.15)";
+    } else if (highlightColor === "blue") {
+      borderStyle = "1px solid rgba(33, 150, 243, 0.45)";
+      bgStyle = "rgba(33, 150, 243, 0.08)";
+      shadowStyle = "0 0 15px rgba(33, 150, 243, 0.15)";
+    } else if (highlightColor === "purple") {
+      borderStyle = "1px solid rgba(123, 97, 255, 0.45)";
+      bgStyle = "rgba(123, 97, 255, 0.08)";
+      shadowStyle = "0 0 15px rgba(123, 97, 255, 0.15)";
+    }
+  }
+
   return (
     <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        background: "rgba(10, 24, 40, 0.5)",
-        border: "1px solid rgba(0, 229, 200, 0.08)",
+        background: bgStyle,
+        border: borderStyle,
         borderRadius: "8px",
         padding: "14px",
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
         minHeight: "92px",
-        transition: "all 0.2s ease-in-out",
-        boxShadow: "inset 0 0 12px rgba(0, 229, 200, 0.02)",
+        transition: "all 0.3s ease",
+        boxShadow: shadowStyle,
       }}
     >
       <div>
@@ -83,18 +112,14 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
   onMouseEnter,
   onMouseLeave,
 }) => {
-  if (!visible || kpis.length === 0) {
-    return null;
-  }
-
-  // Extract key KPI fields by label
-  const kpiActive = kpis.find(k => k.label === "Dossiers actifs");
-  const kpiClosed = kpis.find(k => k.label === "Dossiers clôturés");
-  const kpiSousNonFact = kpis.find(k => k.label === "Sous-dossiers non facturés");
-  const kpiSousTotal = kpis.find(k => k.label === "Total sous-dossiers");
-  const kpiUniteTotal = kpis.find(k => k.label === "Unités de chargement");
-  const kpiTeuTotal = kpis.find(k => k.label === "TEU total");
-  const kpiRemorqueTotal = kpis.find(k => k.label === "Remorques");
+  // Extract key KPI fields by label safely
+  const kpiActive = kpis?.find(k => k.label === "Dossiers actifs");
+  const kpiClosed = kpis?.find(k => k.label === "Dossiers clôturés");
+  const kpiSousNonFact = kpis?.find(k => k.label === "Sous-dossiers non facturés");
+  const kpiSousTotal = kpis?.find(k => k.label === "Total sous-dossiers");
+  const kpiUniteTotal = kpis?.find(k => k.label === "Unités de chargement");
+  const kpiTeuTotal = kpis?.find(k => k.label === "TEU total");
+  const kpiRemorqueTotal = kpis?.find(k => k.label === "Remorques");
 
   const activeVal = kpiActive?.value ?? 0;
   const activeDelta = kpiActive?.delta_24h ?? 0;
@@ -108,6 +133,71 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
   const uniteTotalVal = kpiUniteTotal?.value ?? 0;
   const teuVal = kpiTeuTotal?.value ?? 0;
   const remorqueVal = kpiRemorqueTotal?.value ?? 0;
+
+  // Animated states
+  const [animatedActiveVal, setAnimatedActiveVal] = useState(0);
+  const [animatedActiveDelta, setAnimatedActiveDelta] = useState(0);
+  const [animatedClosedVal, setAnimatedClosedVal] = useState(0);
+  const [animatedClosedDelta, setAnimatedClosedDelta] = useState(0);
+  const [animatedSousTotalVal, setAnimatedSousTotalVal] = useState(0);
+  const [animatedSousNonFactVal, setAnimatedSousNonFactVal] = useState(0);
+  const [animatedUniteTotalVal, setAnimatedUniteTotalVal] = useState(0);
+  const [animatedTeuVal, setAnimatedTeuVal] = useState(0);
+  const [animatedRemorqueVal, setAnimatedRemorqueVal] = useState(0);
+
+  useEffect(() => {
+    if (visible) {
+      const duration = 1000;
+      const startTime = performance.now();
+
+      const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const easeProgress = progress * (2 - progress); // Ease out quad
+
+        setAnimatedActiveVal(activeVal * easeProgress);
+        setAnimatedActiveDelta(activeDelta * easeProgress);
+        setAnimatedClosedVal(closedVal * easeProgress);
+        setAnimatedClosedDelta(closedDelta * easeProgress);
+        setAnimatedSousTotalVal(sousTotalVal * easeProgress);
+        setAnimatedSousNonFactVal(sousNonFactVal * easeProgress);
+        setAnimatedUniteTotalVal(uniteTotalVal * easeProgress);
+        setAnimatedTeuVal(teuVal * easeProgress);
+        setAnimatedRemorqueVal(remorqueVal * easeProgress);
+
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        }
+      };
+
+      requestAnimationFrame(animate);
+    } else {
+      setAnimatedActiveVal(0);
+      setAnimatedActiveDelta(0);
+      setAnimatedClosedVal(0);
+      setAnimatedClosedDelta(0);
+      setAnimatedSousTotalVal(0);
+      setAnimatedSousNonFactVal(0);
+      setAnimatedUniteTotalVal(0);
+      setAnimatedTeuVal(0);
+      setAnimatedRemorqueVal(0);
+    }
+  }, [
+    visible,
+    activeVal,
+    activeDelta,
+    closedVal,
+    closedDelta,
+    sousTotalVal,
+    sousNonFactVal,
+    uniteTotalVal,
+    teuVal,
+    remorqueVal,
+  ]);
+
+  if (!visible || !kpis || kpis.length === 0) {
+    return null;
+  }
 
   const tooltipWidth = 440;
   const leftPosition = coords.left - tooltipWidth - 12;
@@ -372,7 +462,8 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
         {/* Card 1: Dossiers Actifs */}
         <KpiCard
           title="Dossiers actifs"
-          value={activeVal}
+          value={Math.round(animatedActiveVal)}
+          highlightColor="green"
           footer={
             <>
               <span
@@ -387,7 +478,7 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
                   fontFamily: "var(--font-mono)",
                 }}
               >
-                +{activeDelta}
+                +{Math.round(animatedActiveDelta)}
               </span>
               <span style={{ fontSize: "9px", color: "var(--muted)", fontFamily: "var(--font-mono)", marginLeft: "4px" }}>
                 24h
@@ -399,7 +490,8 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
         {/* Card 2: Dossiers Clôturés */}
         <KpiCard
           title="Dossiers clôturés"
-          value={closedVal}
+          value={Math.round(animatedClosedVal)}
+          highlightColor="yellow"
           footer={
             <>
               <span
@@ -414,7 +506,7 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
                   fontFamily: "var(--font-mono)",
                 }}
               >
-                +{closedDelta}
+                +{Math.round(animatedClosedDelta)}
               </span>
               <span style={{ fontSize: "9px", color: "var(--muted)", fontFamily: "var(--font-mono)", marginLeft: "4px" }}>
                 24h
@@ -426,7 +518,8 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
         {/* Card 3: Sous Dossiers */}
         <KpiCard
           title="Sous Dossiers"
-          value={sousTotalVal}
+          value={Math.round(animatedSousTotalVal)}
+          highlightColor="blue"
           footer={
             <>
               <span
@@ -441,7 +534,7 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
                   fontFamily: "var(--font-mono)",
                 }}
               >
-                {sousNonFactVal}
+                {Math.round(animatedSousNonFactVal)}
               </span>
               <span style={{ fontSize: "9px", color: "var(--muted)", fontFamily: "var(--font-mono)", marginLeft: "4px" }}>
                 non facturés
@@ -453,7 +546,8 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
         {/* Card 4: Unités de Chargement */}
         <KpiCard
           title="Unités de chargement"
-          value={uniteTotalVal}
+          value={Math.round(animatedUniteTotalVal)}
+          highlightColor="purple"
           footer={
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "3px" }}>
@@ -469,7 +563,7 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
                     fontFamily: "var(--font-mono)",
                   }}
                 >
-                  {teuVal}
+                  {Math.round(animatedTeuVal)}
                 </span>
                 <span style={{ fontSize: "9px", color: "var(--muted)", fontFamily: "var(--font-mono)" }}>TEU</span>
               </div>
@@ -486,7 +580,7 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
                     fontFamily: "var(--font-mono)",
                   }}
                 >
-                  {remorqueVal}
+                  {Math.round(animatedRemorqueVal)}
                 </span>
                 <span style={{ fontSize: "9px", color: "var(--muted)", fontFamily: "var(--font-mono)" }}>Remorque</span>
               </div>
