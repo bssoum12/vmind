@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IconBox } from '../../components/ui/IconBox';
 import { AGENTS } from '../../shared/constants/data';
+import { jwtDecode } from 'jwt-decode';
 
 interface SidebarProps {
   onInsertPrompt: (text: string) => void;
@@ -12,10 +13,41 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId, onAgentClick }) => {
   const [activeNav, setActiveNav] = useState('dashboard');
+  const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
+  const [username, setUsername] = useState<string>('');
+
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('vmind_session');
+      if (token) {
+        const decoded: any = jwtDecode(token);
+        if (decoded.allowedAgents) {
+          setAllowedAgents(decoded.allowedAgents);
+        }
+        if (decoded.username) {
+          setUsername(decoded.username);
+        }
+      } else {
+        // Optionnel : rediriger vers /login si aucun token
+        window.location.href = '/login';
+      }
+    } catch (e) {
+      console.error("Erreur de décodage du token", e);
+      window.location.href = '/login';
+    }
+  }, []);
+
+  const visibleAgents = Object.values(AGENTS).filter(agent => 
+    // Toujours afficher le dashboard principal ou filtrer selon la liste
+    allowedAgents.includes(agent.id) || agent.id === 'VMIND'
+  );
 
   return (
     <div className="sidebar">
-      <div className="nav-section">Navigation</div>
+      <div className="nav-section">
+        Navigation
+        {username && <div style={{fontSize: '9px', color: 'var(--muted)', marginTop: '4px'}}>Connecté: {username}</div>}
+      </div>
 
       <div
         className={`nav-item ${activeNav === 'dashboard' ? 'active' : ''}`}
@@ -34,9 +66,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
         <span className="nav-badge">12</span>
       </div>
 
-      <div className="nav-section">Agents IA</div>
+      <div className="nav-section">Agents IA ({visibleAgents.length})</div>
 
-      {Object.values(AGENTS).map((agent) => (
+      {visibleAgents.map((agent) => (
         <div
           key={agent.id}
           className={`nav-item ${activeAgentId === agent.id ? 'agent-card-active' : ''}`}
