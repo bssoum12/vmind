@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { jwtDecode } from 'jwt-decode';
 import { 
   FileText, 
   Package, 
@@ -65,6 +66,61 @@ const tools = [
 ];
 
 export default function ToolsHub() {
+  const [isMounted, setIsMounted] = React.useState(false);
+  const [isAuthenticated, setIsAuthenticated] = React.useState<boolean | null>(null);
+
+  React.useEffect(() => {
+    setIsMounted(true);
+    try {
+      const token = localStorage.getItem('vmind_session');
+      if (!token) {
+        setIsAuthenticated(false);
+        window.location.href = '/login';
+        return;
+      }
+
+      const decoded: any = jwtDecode(token);
+      if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+        localStorage.removeItem('vmind_session');
+        setIsAuthenticated(false);
+        window.location.href = '/login';
+        return;
+      }
+
+      setIsAuthenticated(true);
+    } catch (err) {
+      console.error("Auth check failed in tools", err);
+      localStorage.removeItem('vmind_session');
+      setIsAuthenticated(false);
+      window.location.href = '/login';
+    }
+  }, []);
+
+  if (!isMounted || isAuthenticated === null || isAuthenticated === false) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0,
+        backgroundColor: '#050B16',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 99999
+      }}>
+        <div className="spinner" style={{
+          width: '40px', height: '40px',
+          border: '2px solid rgba(0, 229, 200, 0.1)',
+          borderTopColor: '#00E5C8',
+          borderRadius: '50%',
+          animation: 'spinRing 1s linear infinite'
+        }} />
+        <style jsx global>{`
+          @keyframes spinRing {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
   return (
     <div className="tools-container">
       <header className="tools-header">

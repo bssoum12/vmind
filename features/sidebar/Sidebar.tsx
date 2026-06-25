@@ -38,16 +38,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
   }, []);
 
   const visibleAgents = Object.values(AGENTS).filter(agent => 
-    // Toujours afficher le dashboard principal ou filtrer selon la liste
-    allowedAgents.includes(agent.id) || agent.id === 'VMIND'
+    allowedAgents.includes(agent.id)
   );
 
   return (
     <div className="sidebar">
-      <div className="nav-section">
-        Navigation
-        {username && <div style={{fontSize: '9px', color: 'var(--muted)', marginTop: '4px'}}>Connecté: {username}</div>}
-      </div>
+      <div className="nav-section">Navigation</div>
 
       <div
         className={`nav-item ${activeNav === 'dashboard' ? 'active' : ''}`}
@@ -68,41 +64,58 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
 
       <div className="nav-section">Agents IA ({visibleAgents.length})</div>
 
-      {visibleAgents.map((agent) => (
-        <div
-          key={agent.id}
-          className={`nav-item ${activeAgentId === agent.id ? 'agent-card-active' : ''}`}
-          onClick={() => {
-            if (onAgentClick) onAgentClick(agent.id);
-          }}
-        >
-          <IconBox style={{
-            background: agent.bgColor,
-            border: activeAgentId === agent.id ? `1px solid ${agent.color}` : 'none',
-            boxShadow: activeAgentId === agent.id ? `0 0 10px ${agent.color}40` : 'none'
-          }}>
-            <span style={{
-              fontFamily: 'var(--font-title)',
-              fontSize: '9px',
-              fontWeight: 700,
-              color: agent.color
-            }}>
-              {agent.icon}
-            </span>
-          </IconBox>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '12px', color: 'var(--white)', fontWeight: 600 }}>{agent.name}</div>
-            <div style={{ fontSize: '9px', color: 'var(--muted)' }}>{agent.desc}</div>
-          </div>
-          <div style={{
-            width: '6px',
-            height: '6px',
-            borderRadius: '50%',
-            background: activeAgentId === agent.id ? 'var(--green)' : 'var(--muted)',
-            boxShadow: activeAgentId === agent.id ? '0 0 6px var(--green)' : 'none'
-          }}></div>
+      {visibleAgents.length === 0 ? (
+        <div style={{
+          padding: '12px 14px',
+          fontSize: '11px',
+          color: 'var(--muted)',
+          fontStyle: 'italic',
+          lineHeight: 1.45,
+          border: '1px dashed rgba(255,255,255,0.06)',
+          borderRadius: '8px',
+          margin: '6px 14px',
+          textAlign: 'center',
+          background: 'rgba(255,255,255,0.01)',
+        }}>
+          Aucun agent autorisé pour votre profil.
         </div>
-      ))}
+      ) : (
+        visibleAgents.map((agent) => (
+          <div
+            key={agent.id}
+            className={`nav-item ${activeAgentId === agent.id ? 'agent-card-active' : ''}`}
+            onClick={() => {
+              if (onAgentClick) onAgentClick(agent.id);
+            }}
+          >
+            <IconBox style={{
+              background: agent.bgColor,
+              border: activeAgentId === agent.id ? `1px solid ${agent.color}` : 'none',
+              boxShadow: activeAgentId === agent.id ? `0 0 10px ${agent.color}40` : 'none'
+            }}>
+              <span style={{
+                fontFamily: 'var(--font-title)',
+                fontSize: '9px',
+                fontWeight: 700,
+                color: agent.color
+              }}>
+                {agent.icon}
+              </span>
+            </IconBox>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '12px', color: 'var(--white)', fontWeight: 600 }}>{agent.name}</div>
+              <div style={{ fontSize: '9px', color: 'var(--muted)' }}>{agent.desc}</div>
+            </div>
+            <div style={{
+              width: '6px',
+              height: '6px',
+              borderRadius: '50%',
+              background: activeAgentId === agent.id ? 'var(--green)' : 'var(--muted)',
+              boxShadow: activeAgentId === agent.id ? '0 0 6px var(--green)' : 'none'
+            }}></div>
+          </div>
+        ))
+      )}
 
       <div className="sidebar-footer">
         <div className="erp-tag">
