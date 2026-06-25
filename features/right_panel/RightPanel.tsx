@@ -115,7 +115,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
     <div className="right-panel">
       {/* KPIs Live */}
       <div className="rp-section">
-        <div className="rp-title">KPIs Temps Réel</div>
+        <div className="rp-title">{activeAgentId === 'VDATA' ? 'DONNEES & ANALYTICS - Temps Réel' : 'KPIs Temps Réel'}</div>
         {activeAgentId !== 'VDATA' && (
           <>
             <MiniKpi label="Trésorerie" dotColor="var(--green)" val="842K TND" delta="▲ +3.2%" deltaType="up" />

@@ -93,10 +93,16 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
 
   if (isThinking) {
     return (
-      <div className="flex items-center gap-1.5 p-2">
-        <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-        <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-        <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-bounce"></div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 6px' }}>
+        <style dangerouslySetInnerHTML={{__html: `
+          @keyframes vmind-bounce {
+            0%, 100% { transform: translateY(0); opacity: 0.4; }
+            50% { transform: translateY(-5px); opacity: 1; }
+          }
+        `}} />
+        <div style={{ width: '6px', height: '6px', backgroundColor: '#00E5C8', borderRadius: '50%', animation: 'vmind-bounce 1.2s infinite ease-in-out', animationDelay: '-0.32s' }} />
+        <div style={{ width: '6px', height: '6px', backgroundColor: '#00E5C8', borderRadius: '50%', animation: 'vmind-bounce 1.2s infinite ease-in-out', animationDelay: '-0.16s' }} />
+        <div style={{ width: '6px', height: '6px', backgroundColor: '#00E5C8', borderRadius: '50%', animation: 'vmind-bounce 1.2s infinite ease-in-out' }} />
       </div>
     );
   }
