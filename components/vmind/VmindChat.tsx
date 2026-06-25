@@ -260,79 +260,118 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
   return (
     <div className="chat-panel flex flex-col h-full bg-[#0b101e]">
-      <div className="chat-header p-4 border-b border-[#1c2538] flex-shrink-0">
-        <div>
-          <div className="flex items-center gap-2">
-            {currentAgentData && (
-              <span className="px-2 py-0.5 text-[10px] font-bold rounded" style={{ backgroundColor: currentAgentData.bgColor, color: currentAgentData.color, border: `1px solid ${currentAgentData.borderColor}`}}>
-                {currentAgentData.icon}
-              </span>
-            )}
-            <div className="chat-title text-cyan-400 font-bold text-lg">
-              {currentAgentData ? `ASSISTANT ${currentAgentData.name}` : 'ASSISTANT VMIND'}
-            </div>
-          </div>
-          <div className="chat-subtitle text-xs text-gray-400 mt-1">
+      <div className="chat-header flex-shrink-0" style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+
+        {/* Header top row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+
+          {/* Status dot */}
+          <div style={{
+            width: '7px', height: '7px', borderRadius: '50%',
+            background: currentAgentData ? currentAgentData.color : '#00f0ff',
+            boxShadow: `0 0 8px ${currentAgentData ? currentAgentData.color : '#00f0ff'}`,
+            flexShrink: 0,
+          }} />
+
+          {/* Agent name */}
+          <span style={{
+            fontSize: '13px',
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            color: currentAgentData ? currentAgentData.color : '#00f0ff',
+            textTransform: 'uppercase',
+          }}>
+            {currentAgentData ? `${currentAgentData.name}` : 'VMIND'}
+          </span>
+
+          {/* Description */}
+          <span style={{
+            fontSize: '11px',
+            color: 'rgba(160,180,210,0.6)',
+            fontWeight: 500,
+          }}>
             {currentAgentData ? currentAgentData.desc : 'Orchestration intelligente via Webhook'}
-          </div>
+          </span>
 
-          {/* Suggestions Zone */}
-          {activeAgentId === 'VDATA' && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button 
-                onClick={() => handleSuggestionClick("Quel est le taux de dossiers livrés à temps ce mois ?", "/api/tools/get-delivery-rate", {})}
-                className="suggestion-chip"
-                disabled={isLoading}
-              >
-                Taux livraison à temps ?
-              </button>
-              <button
-                onClick={() => handleSuggestionClick("Compare les performances de janvier à avril par agence", "/api/tools/compare-agency-performance-jan-apr", {})}
-                className="suggestion-chip"
-                disabled={isLoading}
-              >
-                Compare Jan-Avr ?
-              </button>
-              <button 
-                onClick={() => handleSuggestionClick("Quels sont les 3 indicateurs les plus dégradés cette semaine ?", "/api/tools/get-degraded-kpis", {})}
-                className="suggestion-chip"
-                disabled={isLoading}
-              >
-                3 KPIs dégradés ?
-              </button>
-              <button
-                onClick={() => handleSuggestionClick("Génère le rapport mensuel global d’activité", "/api/tools/generate-monthly-activity-report", {})}
-                className="suggestion-chip"
-                disabled={isLoading}
-              >
-                Rapport mensuel PDF ?
-              </button>
-              <button
-                onClick={() => handleSuggestionClick("Analyse la corrélation entre retards et type de client", "/api/tools/analyze-delay-by-client-type", {})}
-                className="suggestion-chip"
-                disabled={isLoading}
-              >
-                Retards par type client ?
-              </button>
-              <button 
-                onClick={() => handleSuggestionClick("Montre-moi l'évolution du volume des dossiers sur 12 mois", "/api/tools/get-dossier-volume-evolution", { months: 12 })}
-                className="suggestion-chip"
-                disabled={isLoading}
-              >
-                Volume 12 mois ?
-              </button>
-            </div>
-          )}
-
-          {isLoading && (
-            <div className="text-[10px] text-cyan-500 animate-pulse mt-2">
-              Analyse en cours...
-            </div>
-          )}
+          {/* Mode pill */}
+          <span style={{
+            fontSize: '9px',
+            fontWeight: 600,
+            letterSpacing: '0.1em',
+            padding: '2px 8px',
+            borderRadius: '99px',
+            background: currentAgentData ? `${currentAgentData.bgColor}` : 'rgba(0,240,255,0.08)',
+            color: currentAgentData ? currentAgentData.color : '#00f0ff',
+            border: `1px solid ${currentAgentData ? currentAgentData.borderColor : 'rgba(0,240,255,0.2)'}`,
+            textTransform: 'uppercase',
+          }}>
+            ASSISTANT
+          </span>
         </div>
+
+
+        {/* Suggestions Zone */}
+        {activeAgentId === 'VDATA' && (
+          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+            <button
+              onClick={() => handleSuggestionClick("Quel est le taux de dossiers livrés à temps ce mois ?", "/api/tools/get-delivery-rate", {})}
+              className="suggestion-chip"
+              style={{ flexShrink: 0 }}
+              disabled={isLoading}
+            >
+              Taux livraison à temps ?
+            </button>
+            <button
+              onClick={() => handleSuggestionClick("Compare les performances de janvier à avril par agence", "/api/tools/compare-agency-performance-jan-apr", {})}
+              className="suggestion-chip"
+              style={{ flexShrink: 0 }}
+              disabled={isLoading}
+            >
+              Compare Jan-Avr ?
+            </button>
+            <button
+              onClick={() => handleSuggestionClick("Quels sont les 3 indicateurs les plus dégradés cette semaine ?", "/api/tools/get-degraded-kpis", {})}
+              className="suggestion-chip"
+              style={{ flexShrink: 0 }}
+              disabled={isLoading}
+            >
+              3 KPIs dégradés ?
+            </button>
+            <button
+              onClick={() => handleSuggestionClick("Génère le rapport mensuel global d'activité", "/api/tools/generate-monthly-activity-report", {})}
+              className="suggestion-chip"
+              style={{ flexShrink: 0 }}
+              disabled={isLoading}
+            >
+              Rapport mensuel PDF ?
+            </button>
+            <button
+              onClick={() => handleSuggestionClick("Analyse la corrélation entre retards et type de client", "/api/tools/analyze-delay-by-client-type", {})}
+              className="suggestion-chip"
+              style={{ flexShrink: 0 }}
+              disabled={isLoading}
+            >
+              Retards par type client ?
+            </button>
+            <button
+              onClick={() => handleSuggestionClick("Montre-moi l'évolution du volume des dossiers sur 12 mois", "/api/tools/get-dossier-volume-evolution", { months: 12 })}
+              className="suggestion-chip"
+              style={{ flexShrink: 0 }}
+              disabled={isLoading}
+            >
+              Volume 12 mois ?
+            </button>
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="text-[10px] text-cyan-500 animate-pulse mt-2">
+            Analyse en cours...
+          </div>
+        )}
       </div>
 
-      <div className="messages flex-1 overflow-y-auto p-4 space-y-6">
+      <div className="messages flex-1 overflow-y-auto p-4 space-y-5">
         {messages.map((msg) => {
           const isUser = msg.sender === 'user';
           const toolUsed = msg.tool_used as string;
@@ -340,34 +379,126 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           const agentData = agentId !== 'VMIND' ? (AGENTS as any)[agentId] : null;
 
           return (
-            <div key={msg.id} className={`flex w-full ${isUser ? 'justify-start' : 'justify-end'}`}>
-              <div className={`msg flex gap-3 max-w-[85%] ${isUser ? 'flex-row' : 'flex-row-reverse'}`}>
+            <div key={msg.id} style={{ display: 'flex', width: '100%', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+              <div style={{ display: 'flex', gap: '10px', maxWidth: '88%', flexDirection: isUser ? 'row-reverse' : 'row' }}>
+
+                {/* Avatar */}
                 <div
-                  className={`msg-avatar flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${isUser
-                    ? 'bg-indigo-600 text-white shadow-[0_0_10px_rgba(79,70,229,0.3)]'
+                  style={isUser
+                    ? {
+                        alignSelf: 'flex-start',
+                        flexShrink: 0,
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        background: 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+                        color: '#fff',
+                        boxShadow: '0 0 12px rgba(79,70,229,0.45)',
+                        border: '1px solid rgba(139,92,246,0.5)',
+                      }
                     : agentData
-                      ? 'bg-[#00E5C8]/20 text-[#00E5C8] border border-[#00E5C8]/50 shadow-[0_0_15px_rgba(0,229,200,0.2)]'
-                      : 'bg-cyan-900/50 text-cyan-400 border border-cyan-500/30'
-                    }`}
+                      ? {
+                          alignSelf: 'flex-start',
+                          flexShrink: 0,
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          background: 'rgba(0,229,200,0.1)',
+                          color: '#00E5C8',
+                          boxShadow: '0 0 12px rgba(0,229,200,0.25)',
+                          border: '1px solid rgba(0,229,200,0.4)',
+                        }
+                      : {
+                          alignSelf: 'flex-start',
+                          flexShrink: 0,
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '10px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          background: 'rgba(0,240,255,0.08)',
+                          color: '#00f0ff',
+                          boxShadow: '0 0 10px rgba(0,240,255,0.2)',
+                          border: '1px solid rgba(0,240,255,0.25)',
+                        }
+                  }
                 >
                   {isUser ? 'U' : (agentData?.icon || 'VM')}
                 </div>
 
-                <div className={`msg-body flex flex-col ${isUser ? 'items-start' : 'items-end'}`}>
+                {/* Bubble body */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
+
+                  {/* Agent label */}
                   {msg.tool_used && (
-                    <div className={`text-[9px] uppercase mb-1 tracking-wider font-bold ${agentData ? 'text-[#00E5C8]' : 'text-cyan-600'}`}>
+                    <div className={`text-[9px] uppercase tracking-widest font-bold px-1 ${agentData ? 'text-[#00E5C8]' : 'text-cyan-600'}`}>
                       AGENT ACTIF : {agentId} — {getToolDisplayName(toolUsed)}
                     </div>
                   )}
 
-                  <div className={`msg-content p-4 rounded-2xl text-sm transition-all duration-500 ${isUser
-                    ? 'bg-[#1e293b]/90 border border-indigo-500/30 text-indigo-50 rounded-tl-none'
-                    : msg.error
-                      ? 'bg-red-900/40 border border-red-500/50 text-red-100'
-                      : agentData
-                        ? 'bg-[#0f172a] border border-[#00E5C8]/40 text-gray-100 rounded-tr-none shadow-[0_4px_20px_rgba(0,0,0,0.4)]'
-                        : 'bg-[#0f172a] border border-[#2a3441] text-gray-100 rounded-tr-none'
-                    }`}>
+                  {/* Message bubble */}
+                  <div
+                    style={isUser
+                      ? {
+                          background: 'linear-gradient(135deg, rgba(49,38,110,0.85) 0%, rgba(30,23,70,0.9) 100%)',
+                          border: '1px solid rgba(139,92,246,0.4)',
+                          borderRadius: '16px 4px 16px 16px',
+                          padding: '10px 14px',
+                          color: '#e8e4ff',
+                          fontSize: '13px',
+                          lineHeight: '1.55',
+                          boxShadow: '0 4px 20px rgba(79,70,229,0.2), inset 0 0 12px rgba(139,92,246,0.06)',
+                          backdropFilter: 'blur(8px)',
+                        }
+                      : msg.error
+                        ? {
+                            background: 'rgba(127,29,29,0.4)',
+                            border: '1px solid rgba(239,68,68,0.4)',
+                            borderRadius: '4px 16px 16px 16px',
+                            padding: '10px 14px',
+                            color: '#fca5a5',
+                            fontSize: '13px',
+                            lineHeight: '1.55',
+                            boxShadow: '0 4px 16px rgba(239,68,68,0.15)',
+                          }
+                        : agentData
+                          ? {
+                              background: 'linear-gradient(135deg, rgba(8,20,36,0.92) 0%, rgba(4,12,24,0.95) 100%)',
+                              border: '1px solid rgba(0,229,200,0.3)',
+                              borderRadius: '4px 16px 16px 16px',
+                              padding: '10px 14px',
+                              color: '#d1faf6',
+                              fontSize: '13px',
+                              lineHeight: '1.55',
+                              boxShadow: '0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,229,200,0.08), inset 0 0 16px rgba(0,229,200,0.04)',
+                              backdropFilter: 'blur(10px)',
+                            }
+                          : {
+                              background: 'linear-gradient(135deg, rgba(10,18,34,0.95) 0%, rgba(6,12,22,0.97) 100%)',
+                              border: '1px solid rgba(0,240,255,0.18)',
+                              borderRadius: '4px 16px 16px 16px',
+                              padding: '10px 14px',
+                              color: '#d1f4ff',
+                              fontSize: '13px',
+                              lineHeight: '1.55',
+                              boxShadow: '0 4px 20px rgba(0,0,0,0.45), inset 0 0 12px rgba(0,240,255,0.03)',
+                              backdropFilter: 'blur(8px)',
+                            }
+                    }
+                  >
                     {isUser ? (
                       <div className="whitespace-pre-wrap">{msg.text}</div>
                     ) : (
@@ -375,7 +506,15 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                     )}
                   </div>
 
-                  <div className={`msg-meta text-[9px] text-gray-500 mt-1.5 px-1 font-mono ${isUser ? 'text-left' : 'text-right'}`}>
+                  {/* Timestamp */}
+                  <div
+                    className="font-mono px-1"
+                    style={{
+                      fontSize: '9px',
+                      color: isUser ? 'rgba(139,92,246,0.5)' : 'rgba(0,240,255,0.3)',
+                      textAlign: isUser ? 'right' : 'left',
+                    }}
+                  >
                     {msg.time}
                   </div>
                 </div>

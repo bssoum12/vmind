@@ -84,6 +84,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
           <div
             key={agent.id}
             className={`nav-item ${activeAgentId === agent.id ? 'agent-card-active' : ''}`}
+            style={activeAgentId === agent.id ? {
+              '--agent-color': agent.color,
+              '--agent-bg': agent.bgColor,
+              '--agent-border': agent.borderColor,
+            } as React.CSSProperties : {}}
             onClick={() => {
               if (onAgentClick) onAgentClick(agent.id);
             }}
@@ -110,8 +115,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
               width: '6px',
               height: '6px',
               borderRadius: '50%',
-              background: activeAgentId === agent.id ? 'var(--green)' : 'var(--muted)',
-              boxShadow: activeAgentId === agent.id ? '0 0 6px var(--green)' : 'none'
+              background: activeAgentId === agent.id ? agent.color : 'var(--muted)',
+              boxShadow: activeAgentId === agent.id ? `0 0 6px ${agent.color}` : 'none'
             }}></div>
           </div>
         ))
