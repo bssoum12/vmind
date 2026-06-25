@@ -12,10 +12,21 @@ interface VolumeLineChartProps {
 }
 
 export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId }) => {
+  const currentYear = new Date().getFullYear();
+  const todayStr = new Date().toISOString().split("T")[0];
+  const startOfYearStr = `${currentYear}-01-01`;
+
   const [data, setData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [cardHovered, setCardHovered] = useState(false);
+
+  const [startDate, setStartDate] = useState(startOfYearStr);
+  const [endDate, setEndDate] = useState(todayStr);
+  const [totalDossiersCurrent, setTotalDossiersCurrent] = useState<number | null>(null);
+  const [totalDossiersPrev, setTotalDossiersPrev] = useState<number | null>(null);
+  const [prevYear, setPrevYear] = useState<number>(currentYear - 1);
 
   const fetchData = async () => {
     setLoading(true);
@@ -31,7 +42,7 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
         },
         body: JSON.stringify({
           client_id: clientId,
-          months: 12
+          months: 24
         }),
       });
 
@@ -59,6 +70,26 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
     }
   }, [activeAgentId]);
 
+  useEffect(() => {
+    if (data.length > 0) {
+      const currentYearStr = currentYear.toString();
+      const currentYearSum = data
+        .filter(d => d.label.includes(currentYearStr))
+        .reduce((sum, d) => sum + d.value, 0);
+
+      const prevYearStr = prevYear.toString();
+      const prevYearSum = data
+        .filter(d => d.label.includes(prevYearStr))
+        .reduce((sum, d) => sum + d.value, 0);
+
+      setTotalDossiersCurrent(currentYearSum);
+      setTotalDossiersPrev(prevYearSum);
+    } else {
+      setTotalDossiersCurrent(null);
+      setTotalDossiersPrev(null);
+    }
+  }, [data, currentYear, prevYear]);
+
   if (activeAgentId !== 'VDATA') return null;
 
   // Chart dimensions & layout
@@ -70,12 +101,25 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
   const chartWidth = width - (paddingX * 2);
   const chartHeight = height - (paddingY * 2);
 
-  const maxVal = data.length > 0 ? Math.max(...data.map(d => d.value)) : 0;
+  const chartDataPoints = data.length === 0 ? [] : Array.from({ length: 12 }, (_, i) => {
+    const date = new Date(currentYear, i, 1);
+    const label = date.toLocaleString('fr-FR', { month: 'short', year: 'numeric' });
+    const matchingPoint = data.find(d => {
+      const cleanDLabel = d.label.toLowerCase().replace(/\./g, '').trim();
+      const cleanLabel = label.toLowerCase().replace(/\./g, '').trim();
+      return cleanDLabel === cleanLabel;
+    });
+    return {
+      label,
+      value: matchingPoint ? matchingPoint.value : 0
+    };
+  });
+  const maxVal = chartDataPoints.length > 0 ? Math.max(...chartDataPoints.map(d => d.value)) : 0;
   const displayMax = maxVal === 0 ? 10 : Math.ceil(maxVal * 1.15); // Add margin at the top
 
   // Calculate coordinates for SVG
-  const points = data.map((d, i) => {
-    const x = paddingX + (i * (chartWidth / (data.length - 1 || 1)));
+  const points = chartDataPoints.map((d, i) => {
+    const x = paddingX + (i * (chartWidth / (chartDataPoints.length - 1 || 1)));
     const y = paddingY + chartHeight - ((d.value / displayMax) * chartHeight);
     return { x, y, ...d };
   });
@@ -101,11 +145,65 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
   };
 
   return (
-    <div className="volume-line-chart-wrapper" style={{ marginTop: '16px', position: 'relative' }}>
-      <div style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>VOLUME DOSSIERS 12 MOIS</span>
+    <div 
+      className="volume-line-chart-wrapper" 
+      onMouseEnter={() => setCardHovered(true)}
+      onMouseLeave={() => setCardHovered(false)}
+      style={{ 
+        marginTop: '16px', 
+        position: 'relative',
+        padding: '16px',
+        backgroundColor: cardHovered ? "rgba(6, 17, 31, 0.85)" : "rgba(6, 17, 31, 0.7)",
+        backgroundImage: `
+          radial-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 0),
+          radial-gradient(rgba(0, 240, 255, 0.02) 1px, transparent 0)
+        `,
+        backgroundSize: "12px 12px",
+        backgroundPosition: "0 0, 6px 6px",
+        border: cardHovered ? "1px solid rgba(0, 240, 255, 0.35)" : "1px solid rgba(0, 240, 255, 0.16)",
+        borderRadius: "8px",
+        boxShadow: cardHovered 
+          ? "0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 16px rgba(0, 240, 255, 0.08), 0 0 15px rgba(0, 240, 255, 0.1)" 
+          : "0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 16px rgba(0, 240, 255, 0.04)",
+        transform: cardHovered ? "translateY(-1px) scale(1.005)" : "none",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        overflow: "hidden",
+        cursor: "pointer",
+      }}
+    >
+      {/* Glowing Corner Brackets */}
+      <div style={{ position: "absolute", top: 0, left: 0, width: "10px", height: "10px", borderTop: "2px solid #00f0ff", borderLeft: "2px solid #00f0ff", borderRadius: "2px 0 0 0", boxShadow: "0 0 5px rgba(0, 240, 255, 0.4)" }} />
+      <div style={{ position: "absolute", top: 0, right: 0, width: "10px", height: "10px", borderTop: "2px solid #00f0ff", borderRight: "2px solid #00f0ff", borderRadius: "0 2px 0 0", boxShadow: "0 0 5px rgba(0, 240, 255, 0.4)" }} />
+      <div style={{ position: "absolute", bottom: 0, left: 0, width: "10px", height: "10px", borderBottom: "2px solid #00f0ff", borderLeft: "2px solid #00f0ff", borderRadius: "0 0 0 2px", boxShadow: "0 0 5px rgba(0, 240, 255, 0.4)" }} />
+      <div style={{ position: "absolute", bottom: 0, right: 0, width: "10px", height: "10px", borderBottom: "2px solid #00f0ff", borderRight: "2px solid #00f0ff", borderRadius: "0 0 2px 0", boxShadow: "0 0 5px rgba(0, 240, 255, 0.4)" }} />
+
+      <div style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>VOLUME DOSSIERS</span>
         {loading && <span className="chart-pulse-dot" style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--cyan)', boxShadow: '0 0 6px var(--cyan)', animation: 'pulse 1.5s infinite' }}></span>}
       </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
+        <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--white)", fontFamily: "var(--font-body)", lineHeight: 1.1 }}>
+          {totalDossiersCurrent !== null ? `${totalDossiersCurrent} dossiers` : "— dossiers"}
+        </div>
+        {totalDossiersCurrent !== null && totalDossiersPrev !== null && (
+          <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)" }}>
+            vs {prevYear} : <span style={{ color: "var(--white)", fontWeight: 600 }}>{totalDossiersPrev}</span>
+            {(() => {
+              const diff = totalDossiersCurrent - totalDossiersPrev;
+              const pct = totalDossiersPrev > 0 ? (diff / totalDossiersPrev) * 100 : 0;
+              const color = diff >= 0 ? "var(--green)" : "var(--red)";
+              const sign = diff >= 0 ? "▲ +" : "▼ ";
+              return (
+                <span style={{ color, fontWeight: 700, marginLeft: "4px" }}>
+                  ({sign}{pct.toFixed(1)}%)
+                </span>
+              );
+            })()}
+          </div>
+        )}
+      </div>
+
 
       {loading ? (
         <div style={{ height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0, 229, 200, 0.02)', borderRadius: '4px', border: '1px dashed rgba(0, 229, 200, 0.1)' }}>
@@ -127,8 +225,8 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
             <div 
               style={{
                 position: 'absolute',
-                left: `${Math.max(10, Math.min(width - 120, points[hoveredIndex].x - 60))}px`,
-                top: `${points[hoveredIndex].y - 32}px`,
+                left: `${Math.max(10, Math.min(width - 150, points[hoveredIndex].x - 75))}px`,
+                top: `${points[hoveredIndex].y - 42}px`,
                 background: 'rgba(10, 24, 40, 0.95)',
                 border: '1px solid var(--cyan)',
                 boxShadow: '0 0 12px rgba(0, 229, 200, 0.25)',
@@ -141,10 +239,33 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
                 zIndex: 10,
                 whiteSpace: 'nowrap',
                 transition: 'all 0.15s ease',
-                backdropFilter: 'blur(4px)'
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px',
               }}
             >
-              <span style={{ color: 'var(--muted)' }}>{points[hoveredIndex].label}</span> : <strong style={{ color: 'var(--cyan)' }}>{points[hoveredIndex].value}</strong> dossiers
+              <div>
+                <span style={{ color: 'var(--muted)' }}>{points[hoveredIndex].label}</span> : <strong style={{ color: 'var(--cyan)' }}>{points[hoveredIndex].value}</strong> dossiers
+              </div>
+              {(() => {
+                const currentMonthLabel = points[hoveredIndex].label;
+                const targetLabel = currentMonthLabel.replace(currentYear.toString(), prevYear.toString());
+                const prevMonth = data.find(d => {
+                  const cleanDLabel = d.label.toLowerCase().replace(/\./g, '').trim();
+                  const cleanTargetLabel = targetLabel.toLowerCase().replace(/\./g, '').trim();
+                  return cleanDLabel === cleanTargetLabel;
+                });
+                if (!prevMonth) return null;
+                const diff = points[hoveredIndex].value - prevMonth.value;
+                const sign = diff >= 0 ? "+" : "";
+                const color = diff >= 0 ? "var(--green)" : "var(--red)";
+                return (
+                  <div style={{ fontSize: '7px', color: 'rgba(255,255,255,0.5)' }}>
+                    vs {prevYear} ({prevMonth.label.split(' ')[0]}) : <strong>{prevMonth.value}</strong> <span style={{ color }}>({sign}{diff})</span>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -242,9 +363,9 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
 
           {/* X-axis Labels */}
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginTop: '4px', padding: `0 ${paddingX}px` }}>
-            <span>{getShortLabel(data[0].label)}</span>
-            <span>{getShortLabel(data[Math.floor(data.length / 2)].label)}</span>
-            <span>{getShortLabel(data[data.length - 1].label)} ●</span>
+            <span>{chartDataPoints.length > 0 ? getShortLabel(chartDataPoints[0].label) : ''}</span>
+            <span>{chartDataPoints.length > 0 ? getShortLabel(chartDataPoints[Math.floor(chartDataPoints.length / 2)].label) : ''}</span>
+            <span>{chartDataPoints.length > 0 ? `${getShortLabel(chartDataPoints[chartDataPoints.length - 1].label)} ●` : ''}</span>
           </div>
         </div>
       )}

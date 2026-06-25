@@ -7,6 +7,9 @@ interface ScoreGlobalTooltipProps {
   visible: boolean;
   coords: { top: number; left: number };
   details: any;
+  prevScore?: number | null;
+  prevDetails?: any;
+  prevYear?: number;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
 }
@@ -15,6 +18,9 @@ export const ScoreGlobalTooltip: React.FC<ScoreGlobalTooltipProps> = ({
   visible,
   coords,
   details,
+  prevScore,
+  prevDetails,
+  prevYear,
   onMouseEnter,
   onMouseLeave,
 }) => {
@@ -203,38 +209,27 @@ export const ScoreGlobalTooltip: React.FC<ScoreGlobalTooltipProps> = ({
         zIndex: 99999,
       }}
     >
-      {/* Header */}
+      {/* Cyber HUD Header */}
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: "20px",
+          borderBottom: "1px solid rgba(0, 240, 255, 0.15)",
+          paddingBottom: "8px",
+          marginBottom: "16px",
+          fontSize: "8px",
+          color: "rgba(0, 240, 255, 0.8)",
+          letterSpacing: "1px",
+          textTransform: "uppercase",
+          fontFamily: "var(--font-mono), monospace",
         }}
       >
-        <span
-          style={{
-            fontFamily: "var(--font-title)",
-            fontSize: "11px",
-            color: "var(--white)",
-            letterSpacing: "1.5px",
-            textTransform: "uppercase",
-            fontWeight: 700,
-          }}
-        >
-          Score Qualité Global
-        </span>
-        <span
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: "9px",
-            color: "var(--cyan)",
-            letterSpacing: "1px",
-            fontWeight: 600,
-          }}
-        >
-          VDATA ASSISTANT
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <span style={{ display: "inline-block", width: "4px", height: "4px", background: "#00f0ff", borderRadius: "50%", boxShadow: "0 0 4px #00f0ff" }} />
+          <span style={{ color: "#00f0ff", fontWeight: 700 }}> SCORE QUALITÉ GLOBAL </span>
+        </div>
+        <div style={{ opacity: 0.8 }}> VDATA ASSISTANT </div>
       </div>
 
       {/* Main Row: Gauge & Score Composition */}
@@ -454,6 +449,41 @@ export const ScoreGlobalTooltip: React.FC<ScoreGlobalTooltipProps> = ({
             >
               {IconElement}
             </div>
+
+            {prevScore !== undefined && prevScore !== null && (
+              <div
+                style={{
+                  marginTop: "10px",
+                  fontSize: "8px",
+                  fontFamily: "var(--font-mono)",
+                  color: "rgba(255, 255, 255, 0.4)",
+                  background: "rgba(255, 255, 255, 0.02)",
+                  border: "1px solid rgba(255, 255, 255, 0.05)",
+                  borderRadius: "4px",
+                  padding: "4px 8px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "2px",
+                  width: "110px",
+                }}
+              >
+                <span>vs {prevYear || "l'an dernier"} :</span>
+                <span style={{ color: "var(--white)", fontWeight: 700 }}>
+                  {prevScore.toFixed(2)}%
+                </span>
+                {(() => {
+                  const diff = (details?.score_qualite_global ?? 0) - prevScore;
+                  const color = diff >= 0 ? "#00e5c8" : "#ff3b30";
+                  const sign = diff >= 0 ? "+" : "";
+                  return (
+                    <span style={{ color, fontWeight: 700 }}>
+                      ({sign}{diff.toFixed(2)}%)
+                    </span>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </div>
 
@@ -790,17 +820,17 @@ export const ScoreGlobalTooltip: React.FC<ScoreGlobalTooltipProps> = ({
           </div>
           {/* Metric 6 */}
           <div style={{ background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.03)", borderRadius: "6px", padding: "8px" }}>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--amber)", fontFamily: "var(--font-mono)" }}>
-              {Math.round(animatedFacturesImpayees)}
-            </div>
-            <div style={{ fontSize: "8px", color: "var(--muted)", marginTop: "2px" }}>Factures impayées</div>
-          </div>
-          {/* Metric 7 */}
-          <div style={{ background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.03)", borderRadius: "6px", padding: "8px" }}>
             <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--red)", fontFamily: "var(--font-mono)" }}>
               {formatAmount(animatedMontantImpaye)}
             </div>
             <div style={{ fontSize: "8px", color: "var(--muted)", marginTop: "2px" }}>Montant total impayé</div>
+          </div>
+          {/* Metric 7 */}
+          <div style={{ background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.03)", borderRadius: "6px", padding: "8px" }}>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--amber)", fontFamily: "var(--font-mono)" }}>
+              {Math.round(animatedFacturesImpayees)}
+            </div>
+            <div style={{ fontSize: "8px", color: "var(--muted)", marginTop: "2px" }}>Factures impayées</div>
           </div>
           {/* Metric 8 */}
           <div style={{ background: "rgba(255,255,255,0.01)", border: "1px solid rgba(255,255,255,0.03)", borderRadius: "6px", padding: "8px" }}>
