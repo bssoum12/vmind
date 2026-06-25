@@ -435,21 +435,27 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
         overflowY: "auto",
       }}
     >
+      {/* Cyber HUD Header */}
       <div
         style={{
-          fontSize: "10px",
-          color: "var(--muted)",
-          fontFamily: "var(--font-mono)",
-          textTransform: "uppercase",
-          letterSpacing: "1.5px",
-          marginBottom: "12px",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          borderBottom: "1px solid rgba(0, 240, 255, 0.15)",
+          paddingBottom: "8px",
+          marginBottom: "16px",
+          fontSize: "8px",
+          color: "rgba(0, 240, 255, 0.8)",
+          letterSpacing: "1px",
+          textTransform: "uppercase",
+          fontFamily: "var(--font-mono), monospace",
         }}
       >
-        <span>Indicateurs clés consolidés</span>
-        <span style={{ color: "var(--cyan)", opacity: 0.8 }}>VDATA ASSISTANT</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <span style={{ display: "inline-block", width: "4px", height: "4px", background: "#00f0ff", borderRadius: "50%", boxShadow: "0 0 4px #00f0ff" }} />
+          <span style={{ color: "#00f0ff", fontWeight: 700 }}> Indicateurs clés consolidés </span>
+        </div>
+        <div style={{ opacity: 0.8 }}> VDATA ASSISTANT </div>
       </div>
 
       <div

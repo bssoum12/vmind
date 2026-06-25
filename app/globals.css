@@ -869,7 +869,7 @@ body {
 
 /* ── RIGHT PANEL ── */
 .right-panel {
-  width: 305px;
+  width: 360px;
   background: var(--navy2);
   border-left: 1px solid var(--border);
   display: flex;
