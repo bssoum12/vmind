@@ -17,6 +17,9 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
   const [scoreQualite, setScoreQualite] = useState<number | null>(null);
   const [statut, setStatut] = useState<string>("Critique");
   const [details, setDetails] = useState<any>(null);
+  const [prevScoreQualite, setPrevScoreQualite] = useState<number | null>(null);
+  const [prevDetails, setPrevDetails] = useState<any>(null);
+  const [prevYear, setPrevYear] = useState<number>(currentYear - 1);
   const [cardHovered, setCardHovered] = useState(false);
   const [hoveredStart, setHoveredStart] = useState(false);
   const [hoveredEnd, setHoveredEnd] = useState(false);
@@ -129,10 +132,50 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
       setScoreQualite(globalScore);
       setStatut(globalStatut);
       setDetails(json.data?.details || null);
+
+      // Fetch previous year data for comparison
+      const pYear = new Date().getFullYear() - 1;
+      setPrevYear(pYear);
+      const prevStart = `${pYear}0101`;
+      const prevEnd = `${pYear}1231`;
+
+      const prevResponse = await fetch(
+        `${baseUrl}/api/tools/get-score-global-vdata-kpi`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            client_id: clientId,
+            startDate: prevStart,
+            endDate: prevEnd,
+          }),
+        }
+      );
+
+      if (prevResponse.ok) {
+        const prevJson = await prevResponse.json();
+        if (prevJson.ok) {
+          const prevScore = prevJson.data?.details?.score_qualite_global ?? null;
+          const prevDets = prevJson.data?.details ?? null;
+          setPrevScoreQualite(prevScore);
+          setPrevDetails(prevDets);
+        } else {
+          setPrevScoreQualite(null);
+          setPrevDetails(null);
+        }
+      } else {
+        setPrevScoreQualite(null);
+        setPrevDetails(null);
+      }
+
     } catch (err: any) {
       setError(err.message || "Erreur inconnue");
       setScoreQualite(null);
       setDetails(null);
+      setPrevScoreQualite(null);
+      setPrevDetails(null);
     } finally {
       setLoading(false);
     }
@@ -150,21 +193,21 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
 
   // Determine status styling
   let glowClass = "glow-card-red";
-  let statusColor = "var(--red)";
+  let statusColor = "#ff3b30";
   let pulseClass = "pulse-text-red";
 
   if (scoreQualite !== null) {
     if (scoreQualite >= 85) {
       glowClass = "glow-card-cyan";
-      statusColor = "var(--green)";
+      statusColor = "#00e5c8";
       pulseClass = "pulse-text-green";
     } else if (scoreQualite >= 70) {
       glowClass = "glow-card-cyan";
-      statusColor = "var(--cyan)";
+      statusColor = "#00f0ff";
       pulseClass = "pulse-text-green";
     } else if (scoreQualite >= 50) {
       glowClass = "glow-card-amber";
-      statusColor = "var(--amber)";
+      statusColor = "#ffb800";
       pulseClass = "pulse-text-amber";
     }
   }
@@ -185,6 +228,9 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
         visible={hovered}
         coords={coords}
         details={details}
+        prevScore={prevScoreQualite}
+        prevDetails={prevDetails}
+        prevYear={prevYear}
         onMouseEnter={handleTooltipMouseEnter}
         onMouseLeave={handleTooltipMouseLeave}
       />
@@ -194,11 +240,19 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
         onMouseEnter={() => setCardHovered(true)}
         onMouseLeave={() => setCardHovered(false)}
         style={{
-          padding: "14px",
-          background: cardHovered ? "rgba(6, 17, 31, 0.85)" : "rgba(6, 17, 31, 0.6)",
-          border: cardHovered ? `1px solid ${statusColor}40` : `1px solid ${statusColor}1c`,
-          boxShadow: cardHovered ? `0 8px 24px rgba(0, 0, 0, 0.5), 0 0 15px ${statusColor}20` : "none",
-          transform: cardHovered ? "translateY(-1px) scale(1.01)" : "none",
+          padding: "16px",
+          backgroundColor: cardHovered ? "rgba(6, 17, 31, 0.85)" : "rgba(6, 17, 31, 0.7)",
+          backgroundImage: `
+            radial-gradient(${statusColor}08 1px, transparent 0),
+            radial-gradient(${statusColor}03 1px, transparent 0)
+          `,
+          backgroundSize: "12px 12px",
+          backgroundPosition: "0 0, 6px 6px",
+          border: cardHovered ? `1px solid ${statusColor}60` : `1px solid ${statusColor}2b`,
+          boxShadow: cardHovered 
+            ? `0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 16px ${statusColor}15, 0 0 15px ${statusColor}20` 
+            : `0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 16px ${statusColor}08`,
+          transform: cardHovered ? "translateY(-1px) scale(1.005)" : "none",
           borderRadius: "8px",
           position: "relative",
           overflow: "hidden",
@@ -207,6 +261,12 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
           transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
       >
+        {/* Glowing Corner Brackets (matching status color) */}
+        <div style={{ position: "absolute", top: 0, left: 0, width: "10px", height: "10px", borderTop: `2px solid ${statusColor}`, borderLeft: `2px solid ${statusColor}`, borderRadius: "2px 0 0 0", boxShadow: `0 0 5px ${statusColor}60` }} />
+        <div style={{ position: "absolute", top: 0, right: 0, width: "10px", height: "10px", borderTop: `2px solid ${statusColor}`, borderRight: `2px solid ${statusColor}`, borderRadius: "0 2px 0 0", boxShadow: `0 0 5px ${statusColor}60` }} />
+        <div style={{ position: "absolute", bottom: 0, left: 0, width: "10px", height: "10px", borderBottom: `2px solid ${statusColor}`, borderLeft: `2px solid ${statusColor}`, borderRadius: "0 0 0 2px", boxShadow: `0 0 5px ${statusColor}60` }} />
+        <div style={{ position: "absolute", bottom: 0, right: 0, width: "10px", height: "10px", borderBottom: `2px solid ${statusColor}`, borderRight: `2px solid ${statusColor}`, borderRadius: "0 0 2px 0", boxShadow: `0 0 5px ${statusColor}60` }} />
+
         {/* Subtle top indicator bar */}
         <div
           style={{
@@ -301,6 +361,34 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
               >
                 {statut}
               </div>
+              {scoreQualite !== null && prevScoreQualite !== null && (
+                <div
+                  style={{
+                    fontSize: "9px",
+                    fontFamily: "var(--font-mono)",
+                    color: "rgba(255, 255, 255, 0.4)",
+                    marginTop: "6px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  <span>vs {prevYear} :</span>
+                  <span style={{ color: "var(--white)", fontWeight: 600 }}>
+                    {prevScoreQualite.toFixed(2)}%
+                  </span>
+                  {(() => {
+                    const diff = scoreQualite - prevScoreQualite;
+                    const color = diff >= 0 ? "var(--green)" : "var(--red)";
+                    const sign = diff >= 0 ? "▲ +" : "▼ ";
+                    return (
+                      <span style={{ color, fontWeight: 700, marginLeft: "2px" }}>
+                        ({sign}{diff.toFixed(2)}%)
+                      </span>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
 
             {/* Cyber-accented Date Inputs Row */}
@@ -310,6 +398,8 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
                 alignItems: "center",
                 gap: "6px",
                 marginTop: "4px",
+                zIndex: 20,
+                position: "relative",
               }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -324,36 +414,30 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
                   } catch (err) {}
                 }}
                 style={{
-                  flex: 1,
-                  background: "rgba(0,229,200,0.04)",
-                  color: "var(--cyan)",
-                  border: hoveredStart ? "1px solid rgba(0,229,200,0.4)" : "1px solid rgba(0,229,200,0.15)",
-                  boxShadow: hoveredStart ? "0 0 8px rgba(0, 229, 200, 0.15)" : "none",
-                  borderRadius: "6px",
-                  padding: "5px 8px",
+                  background: "rgba(0, 240, 255, 0.04)",
+                  color: "#00f0ff",
+                  border: "1px solid rgba(0, 240, 255, 0.2)",
+                  borderRadius: "4px",
+                  padding: "3px 6px",
                   fontFamily: "var(--font-mono)",
-                  fontSize: "10px",
-                  fontWeight: 600,
+                  fontSize: "8px",
                   outline: "none",
                   cursor: "pointer",
-                  textAlign: "center",
                   transition: "all 0.2s ease",
                 }}
-                onMouseEnter={() => setHoveredStart(true)}
-                onMouseLeave={() => setHoveredStart(false)}
                 onFocus={(e) => {
-                  e.target.style.borderColor = "var(--cyan)";
-                  e.target.style.boxShadow = "0 0 6px rgba(0, 229, 200, 0.2)";
+                  e.target.style.borderColor = "#00f0ff";
+                  e.target.style.boxShadow = "0 0 6px rgba(0, 240, 255, 0.2)";
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = "rgba(0, 229, 200, 0.15)";
+                  e.target.style.borderColor = "rgba(0, 240, 255, 0.2)";
                   e.target.style.boxShadow = "none";
                 }}
               />
               <span
                 style={{
                   color: "var(--muted)",
-                  fontSize: "9px",
+                  fontSize: "8px",
                   fontFamily: "var(--font-mono)",
                   flexShrink: 0,
                 }}
@@ -371,29 +455,23 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
                   } catch (err) {}
                 }}
                 style={{
-                  flex: 1,
-                  background: "rgba(0,229,200,0.04)",
-                  color: "var(--cyan)",
-                  border: hoveredEnd ? "1px solid rgba(0,229,200,0.4)" : "1px solid rgba(0,229,200,0.15)",
-                  boxShadow: hoveredEnd ? "0 0 8px rgba(0, 229, 200, 0.15)" : "none",
-                  borderRadius: "6px",
-                  padding: "5px 8px",
+                  background: "rgba(0, 240, 255, 0.04)",
+                  color: "#00f0ff",
+                  border: "1px solid rgba(0, 240, 255, 0.2)",
+                  borderRadius: "4px",
+                  padding: "3px 6px",
                   fontFamily: "var(--font-mono)",
-                  fontSize: "10px",
-                  fontWeight: 600,
+                  fontSize: "8px",
                   outline: "none",
                   cursor: "pointer",
-                  textAlign: "center",
                   transition: "all 0.2s ease",
                 }}
-                onMouseEnter={() => setHoveredEnd(true)}
-                onMouseLeave={() => setHoveredEnd(false)}
                 onFocus={(e) => {
-                  e.target.style.borderColor = "var(--cyan)";
-                  e.target.style.boxShadow = "0 0 6px rgba(0, 229, 200, 0.2)";
+                  e.target.style.borderColor = "#00f0ff";
+                  e.target.style.boxShadow = "0 0 6px rgba(0, 240, 255, 0.2)";
                 }}
                 onBlur={(e) => {
-                  e.target.style.borderColor = "rgba(0, 229, 200, 0.15)";
+                  e.target.style.borderColor = "rgba(0, 240, 255, 0.2)";
                   e.target.style.boxShadow = "none";
                 }}
               />
