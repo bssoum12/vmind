@@ -29,6 +29,7 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'generate_monthly_activity_report': 'VDATA',
   'get_monthly_validated_revenue': 'VFIN',
   'get_clients_overdue_30_days': 'VFIN',
+  'compare_monthly_revenue': 'VFIN',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -393,6 +394,18 @@ export const VmindChat: React.FC<VmindChatProps> = ({
               disabled={isLoading}
             >
               Clients Impayés &gt; 30 jours ?
+            </button>
+            <button
+              onClick={() => handleSuggestionClick(
+                "Comparer le CA de ce mois avec le mois précédent",
+                "/api/tools/compare-monthly-revenue",
+                {}
+              )}
+              className="suggestion-chip"
+              style={{ flexShrink: 0 }}
+              disabled={isLoading}
+            >
+              Comparer CA mois précédent
             </button>
           </div>
         )}
