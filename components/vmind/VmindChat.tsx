@@ -28,6 +28,7 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'analyze_delay_by_client_type': 'VDATA',
   'generate_monthly_activity_report': 'VDATA',
   'get_monthly_validated_revenue': 'VFIN',
+  'get_clients_overdue_30_days': 'VFIN',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -380,6 +381,18 @@ export const VmindChat: React.FC<VmindChatProps> = ({
               disabled={isLoading}
             >
               CA validé ce mois ?
+            </button>
+            <button
+              onClick={() => handleSuggestionClick(
+                "Combien de clients ont des impayés supérieurs à 30 jours ?",
+                "/api/tools/get-clients-overdue-30-days",
+                {}
+              )}
+              className="suggestion-chip"
+              style={{ flexShrink: 0 }}
+              disabled={isLoading}
+            >
+              Clients Impayés &gt; 30 jours ?
             </button>
           </div>
         )}
