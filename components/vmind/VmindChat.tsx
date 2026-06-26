@@ -27,6 +27,7 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'compare_agency_performance_jan_apr': 'VDATA',
   'analyze_delay_by_client_type': 'VDATA',
   'generate_monthly_activity_report': 'VDATA',
+  'get_monthly_validated_revenue': 'VFIN',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -214,7 +215,8 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         // data contient le format standard identique à n8n
         const result = wrapper.data;
 
-        if (onAgentActive) onAgentActive('VDATA');
+        const agentIdForTool = TOOL_TO_AGENT[result.tool_used] || activeAgentId;
+        if (onAgentActive && agentIdForTool) onAgentActive(agentIdForTool);
 
         setMessages((prev) => [...prev, {
           id: `vm-${Date.now()}`,
@@ -360,6 +362,24 @@ export const VmindChat: React.FC<VmindChatProps> = ({
               disabled={isLoading}
             >
               Volume 12 mois ?
+            </button>
+          </div>
+        )}
+
+        {/* VFIN Suggestions */}
+        {activeAgentId === 'VFIN' && (
+          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+            <button
+              onClick={() => handleSuggestionClick(
+                "Quel est le chiffre d'affaires validé ce mois ?",
+                "/api/tools/get-monthly-validated-revenue",
+                {}
+              )}
+              className="suggestion-chip"
+              style={{ flexShrink: 0 }}
+              disabled={isLoading}
+            >
+              CA validé ce mois ?
             </button>
           </div>
         )}
