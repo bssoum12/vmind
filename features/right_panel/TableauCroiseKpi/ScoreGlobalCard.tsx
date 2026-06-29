@@ -27,9 +27,25 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [hovered, setHovered] = useState(false);
-  const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const [coords, setCoords] = useState<{ top: number; left: number; height?: number }>({ top: 0, left: 0 });
   const cardRef = React.useRef<HTMLDivElement>(null);
   const hideTimeout = React.useRef<NodeJS.Timeout | null>(null);
+  const [animProgress, setAnimProgress] = useState(0);
+
+  // Count-up progress animation
+  useEffect(() => {
+    if (loading || scoreQualite === null) return;
+    setAnimProgress(0);
+    const duration = 1200;
+    const start = performance.now();
+    const animate = (now: number) => {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = t * (2 - t);
+      setAnimProgress(ease);
+      if (t < 1) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }, [scoreQualite, loading]);
 
   const updateCoords = () => {
     if (cardRef.current) {
@@ -37,6 +53,7 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
       setCoords({
         top: rect.top,
         left: rect.left,
+        height: rect.height,
       });
     }
   };
@@ -347,7 +364,7 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
                   fontFamily: "var(--font-body)",
                 }}
               >
-                {scoreQualite !== null ? `${scoreQualite.toFixed(2)}%` : "N/A"}
+                {scoreQualite !== null ? `${(scoreQualite * animProgress).toFixed(2)}%` : "N/A"}
               </div>
               <div
                 style={{
@@ -375,10 +392,12 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
                 >
                   <span>vs {prevYear} :</span>
                   <span style={{ color: "var(--white)", fontWeight: 600 }}>
-                    {prevScoreQualite.toFixed(2)}%
+                    {((prevScoreQualite || 0) * animProgress).toFixed(2)}%
                   </span>
                   {(() => {
-                    const diff = scoreQualite - prevScoreQualite;
+                    const currentScore = (scoreQualite || 0) * animProgress;
+                    const currentPrev = (prevScoreQualite || 0) * animProgress;
+                    const diff = currentScore - currentPrev;
                     const color = diff >= 0 ? "var(--green)" : "var(--red)";
                     const sign = diff >= 0 ? "▲ +" : "▼ ";
                     return (

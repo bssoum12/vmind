@@ -10,6 +10,12 @@ import {MultiIndicatorsCard} from './TableauCroiseKpi/MultiIndicatorsCard' ;
 import {ScoreGlobalCard} from './TableauCroiseKpi/ScoreGlobalCard' ;
 import {LatestReportCard} from './TableauCroiseKpi/LatestReportCard';
 import {AlertsCard} from './TableauCroiseKpi/AlertsCard';
+import { VfinMonthlyRevenueCard } from './TableauCroiseKpi/VfinMonthlyRevenueCard';
+import { VfinOverdueCard } from './TableauCroiseKpi/VfinOverdueCard';
+import { VfinSixMonthChartCard } from './TableauCroiseKpi/VfinSixMonthChartCard';
+import { VfinMarginCard } from './TableauCroiseKpi/VfinMarginCard';
+import { VfinTopClientsCard } from './TableauCroiseKpi/VfinTopClientsCard';
+import { VfinTresorerieCard } from './TableauCroiseKpi/VfinTresorerieCard';
 interface RightPanelProps {
   logs: LogEntry[];
   onInsertPrompt: (text: string) => void;
@@ -115,8 +121,14 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
     <div className="right-panel">
       {/* KPIs Live */}
       <div className="rp-section">
-        <div className="rp-title">{activeAgentId === 'VDATA' ? 'DONNEES & ANALYTICS - Temps Réel' : 'KPIs Temps Réel'}</div>
-        {activeAgentId !== 'VDATA' && (
+        <div className="rp-title">
+          {activeAgentId === 'VDATA' 
+            ? 'DONNEES & ANALYTICS - Temps Réel' 
+            : activeAgentId === 'VFIN' 
+              ? 'FINANCE & COMPTABILITE - Temps Réel' 
+              : 'KPIs Temps Réel'}
+        </div>
+        {activeAgentId !== 'VDATA' && activeAgentId !== 'VFIN' && (
           <>
             <MiniKpi label="Trésorerie" dotColor="var(--green)" val="842K TND" delta="▲ +3.2%" deltaType="up" />
             <MiniKpi label="Impayés" dotColor="var(--red)" val="218K TND" delta="▲ +8 clients" deltaType="warning" />
@@ -141,6 +153,12 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
           </>
         )}
         <ScoreGlobalCard activeAgentId={activeAgentId} />
+        <VfinMonthlyRevenueCard activeAgentId={activeAgentId} />
+        <VfinOverdueCard activeAgentId={activeAgentId} />
+        <VfinSixMonthChartCard activeAgentId={activeAgentId} />
+        <VfinMarginCard activeAgentId={activeAgentId} />
+        <VfinTopClientsCard activeAgentId={activeAgentId} />
+        <VfinTresorerieCard activeAgentId={activeAgentId} />
         <VolumeLineChart activeAgentId={activeAgentId} />
         <DeliveryRateKpi activeAgentId={activeAgentId} /> 
         <MultiIndicatorsCard activeAgentId={activeAgentId} />

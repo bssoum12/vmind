@@ -175,6 +175,16 @@ export const ScoreGlobalTooltip: React.FC<ScoreGlobalTooltipProps> = ({
   const tooltipWidth = 520;
   const leftPosition = Math.max(10, coords.left - tooltipWidth - 12);
 
+  // Dynamic top positioning to prevent overflowing the viewport
+  const tooltipHeight = 580; // Estimated height for ScoreGlobalTooltip
+  let topPosition = coords.top - 20;
+  if (typeof window !== "undefined") {
+    if (topPosition + tooltipHeight > window.innerHeight) {
+      topPosition = window.innerHeight - tooltipHeight - 20;
+    }
+    topPosition = Math.max(20, topPosition);
+  }
+
   const formatAmount = (amount: number): string => {
     return amount.toLocaleString('fr-FR', {
       minimumFractionDigits: 3,
@@ -193,7 +203,7 @@ export const ScoreGlobalTooltip: React.FC<ScoreGlobalTooltipProps> = ({
       style={{
         position: "fixed",
         left: `${leftPosition}px`,
-        top: `${coords.top - 20}px`,
+        top: `${topPosition}px`,
         width: `${tooltipWidth}px`,
 
         background: "rgba(6, 17, 31, 0.98)",
