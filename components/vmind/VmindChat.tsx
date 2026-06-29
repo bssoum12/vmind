@@ -31,6 +31,7 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_clients_overdue_30_days': 'VFIN',
   'compare_monthly_revenue': 'VFIN',
   'get_lowest_margin_5clients_quarter': 'VFIN',
+  'get_treasury_status_today': 'VFIN',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -419,6 +420,18 @@ export const VmindChat: React.FC<VmindChatProps> = ({
               disabled={isLoading}
             >
               Top 5 marges faibles
+            </button>
+            <button
+              onClick={() => handleSuggestionClick(
+                "Quelle est la situation de trésorerie aujourd'hui ?",
+                "/api/tools/get-treasury-status-today",
+                {}
+              )}
+              className="suggestion-chip"
+              style={{ flexShrink: 0 }}
+              disabled={isLoading}
+            >
+              Trésorerie aujourd'hui ?
             </button>
           </div>
         )}
