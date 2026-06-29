@@ -30,6 +30,7 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_monthly_validated_revenue': 'VFIN',
   'get_clients_overdue_30_days': 'VFIN',
   'compare_monthly_revenue': 'VFIN',
+  'get_lowest_margin_5clients_quarter': 'VFIN',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -406,6 +407,18 @@ export const VmindChat: React.FC<VmindChatProps> = ({
               disabled={isLoading}
             >
               Comparer CA mois précédent
+            </button>
+            <button
+              onClick={() => handleSuggestionClick(
+                "Montre-moi les 5 clients avec les marges les plus faibles ce trimestre",
+                "/api/tools/get-lowest-margin-5clients-quarter",
+                {}
+              )}
+              className="suggestion-chip"
+              style={{ flexShrink: 0 }}
+              disabled={isLoading}
+            >
+              Top 5 marges faibles
             </button>
           </div>
         )}
