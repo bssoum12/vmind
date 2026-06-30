@@ -432,7 +432,7 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
           </div>
         ) : noData ? (
           <div style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontStyle: 'italic' }}>
-            Aucune donnée ce mois-ci
+            Aucune donnée pour cette période
           </div>
         ) : kpi ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
