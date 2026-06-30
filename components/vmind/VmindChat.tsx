@@ -32,6 +32,7 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'compare_monthly_revenue': 'VFIN',
   'get_lowest_margin_5clients_quarter': 'VFIN',
   'get_treasury_status_today': 'VFIN',
+  'get_treasury_forecast_30_days': 'VFIN',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -432,6 +433,18 @@ export const VmindChat: React.FC<VmindChatProps> = ({
               disabled={isLoading}
             >
               Trésorerie aujourd'hui ?
+            </button>
+            <button
+              onClick={() => handleSuggestionClick(
+                "Prévision de trésorerie pour les 30 prochains jours",
+                "/api/tools/get-treasury-forecast-30-days",
+                {}
+              )}
+              className="suggestion-chip"
+              style={{ flexShrink: 0 }}
+              disabled={isLoading}
+            >
+              Prévision trésorerie 30 jours
             </button>
           </div>
         )}
