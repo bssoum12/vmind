@@ -1,5 +1,18 @@
 "use client";
 
+
+function getAuthToken() {
+  if (typeof window === 'undefined') return '';
+  const mcpToken = localStorage.getItem('vmind_mcp_token');
+  if (mcpToken) return mcpToken;
+  try {
+    const sessionStr = localStorage.getItem('vmind_session');
+    if (!sessionStr) return '';
+    if (sessionStr.startsWith('eyJ')) return sessionStr;
+    const parsed = JSON.parse(sessionStr);
+    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
+  } catch(e) { return ''; }
+}
 import React, { useEffect, useState, useRef } from "react";
 
 interface UnpaidInterval {
@@ -41,7 +54,8 @@ export const VfinOverdueCard: React.FC<VfinOverdueCardProps> = ({ activeAgentId 
 
       const response = await fetch(`${baseUrl}/api/tools/get-overdue-balance`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json",
+          "Authorization": `Bearer ${getAuthToken()}`, },
         body: JSON.stringify({ client_id: clientId }),
       });
 

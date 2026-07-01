@@ -21,7 +21,7 @@ import { JournalView } from '@/features/management/journal/JournalView';
 import { ReportsView } from '@/features/management/reports/ReportsView';
 import { IntegrationsView } from '@/features/management/integrations/IntegrationsView';
 import { ProfileView } from '@/features/management/profile/ProfileView';
-
+import { ConnectorsHub } from '@/features/connectors/ConnectorsHub';
 /* ─────────────────────────────────────────────────────
    Accès Non Autorisé View (Premium VMIND Design)
 ───────────────────────────────────────────────────── */
@@ -218,6 +218,19 @@ export default function Home() {
     setTimeout(() => setInsertPrompt(undefined), 100);
   };
 
+  const [assistantView, setAssistantView] = useState<'chat' | 'connectors'>('chat');
+
+  useEffect(() => {
+    const handleSwitchView = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail === 'connectors' || customEvent.detail === 'chat') {
+        setAssistantView(customEvent.detail as 'chat' | 'connectors');
+      }
+    };
+    window.addEventListener('switch-assistant-view', handleSwitchView);
+    return () => window.removeEventListener('switch-assistant-view', handleSwitchView);
+  }, []);
+
   // Management Mode State
   const [currentView, setCurrentView] = useState('market'); 
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
@@ -287,7 +300,8 @@ export default function Home() {
     return (
       <main className="main-container anim">
         <AssistantSidebar onInsertPrompt={handleInsertPrompt} activeAgentId={activeAgentId} onAgentClick={setActiveAgentId} />
-        <div className="content assistant-layout">
+        
+        <div className="content assistant-layout" style={{ display: assistantView === 'chat' ? 'flex' : 'none' }}>
           <VmindChat
             initialPrompt={insertPrompt}
             onOpenVoice={() => setVoiceShow(true)}
@@ -301,6 +315,11 @@ export default function Home() {
             activeAgentId={activeAgentId}
           />
         </div>
+        
+        <div style={{ display: assistantView === 'connectors' ? 'block' : 'none', flex: 1, height: '100%' }}>
+          <ConnectorsHub />
+        </div>
+
         <VoiceOverlay show={voiceShow} onClose={() => setVoiceShow(false)} />
         <GlobalMaxRemindersPopup />
       </main>

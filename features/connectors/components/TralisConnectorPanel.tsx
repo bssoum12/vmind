@@ -1,0 +1,614 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { CheckCircle2, AlertTriangle, Link2, Shield, X, Database, ChevronDown, ChevronUp, Eye, FileEdit, Zap } from 'lucide-react';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface UserInfo {
+  username: string;
+  client_id: string;
+  roles: string[];
+  allowedAgents: string[];
+}
+
+type AuthLevel = 'always' | 'approval' | 'denied';
+type AccessType = 'read' | 'write' | 'sensitive';
+
+interface ToolMeta {
+  name: string;
+  description: string;
+  agent: string;
+  accessType: AccessType;
+  authLevel: AuthLevel;
+}
+
+// ─── Tool Metadata (mirroring backend permissions.ts) ────────────────────────
+const ALL_TOOL_METADATA: ToolMeta[] = [
+  // VFIN — Lecture
+  { name: 'get_monthly_validated_revenue', description: 'Chiffre d\'affaires mensuel validé', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'get_clients_overdue_30_days',   description: 'Clients en retard depuis +30 jours', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'get_treasury_status_today',     description: 'Position de trésorerie du jour', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'get_treasury_forecast_30_days', description: 'Prévision trésorerie sur 30 jours', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'get_lowest_margin_5clients_quarter', description: '5 clients avec les plus faibles marges ce trimestre', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'compare_monthly_revenue',       description: 'Comparaison CA mensuel N vs N-1', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'get_overdue_balance',           description: 'Balance âgée des impayés', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'get_six_month_revenue_trend',   description: 'Tendance CA sur 6 mois glissants', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'compare_monthly_margin',        description: 'Comparaison marges mensuelles', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'get_top_clients_revenue',       description: 'Top clients par chiffre d\'affaires', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'get_tresorerie_position',       description: 'Position de trésorerie consolidée', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'get_aged_balance',              description: 'Balance âgée détaillée', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'get_overdue_alerts',            description: 'Alertes créances en retard', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'get_invoice_detail',            description: 'Détail d\'une facture', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  { name: 'get_margin_by_dossier',         description: 'Marge par dossier', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
+  // VFIN — Action sensible
+  { name: 'print_invoice_report',          description: 'Génère et imprime un rapport de facturation', agent: 'VFIN', accessType: 'sensitive', authLevel: 'approval' },
+  // VBUY
+  { name: 'get_purchase_invoice_detail',   description: 'Détail d\'une facture d\'achat', agent: 'VBUY', accessType: 'read', authLevel: 'always' },
+  // VMOVE
+  { name: 'get_dossier_detail',            description: 'Détail d\'un dossier de transport', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
+  { name: 'get_expedition_status',         description: 'Statut d\'une expédition', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
+  { name: 'get_dossier_volume_evolution',  description: 'Évolution du volume dossiers', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
+  { name: 'get_delivery_rate',             description: 'Taux de livraison à temps', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
+  { name: 'analyze_delay_by_client_type',  description: 'Analyse des délais par type client', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
+  { name: 'get_exploitation_kpis',         description: 'KPIs opérationnels exploitation', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
+  // VSELL
+  { name: 'get_customer_profile',          description: 'Profil complet d\'un client', agent: 'VSELL', accessType: 'read', authLevel: 'always' },
+  { name: 'search_cotations',              description: 'Recherche de cotations commerciales', agent: 'VSELL', accessType: 'read', authLevel: 'always' },
+  { name: 'get_commercial_kpis',           description: 'KPIs commerciaux et CRM', agent: 'VSELL', accessType: 'read', authLevel: 'always' },
+  { name: 'compare_agency_performance_jan_apr', description: 'Comparaison performance agences Jan-Avr', agent: 'VSELL', accessType: 'read', authLevel: 'always' },
+  // VDATA
+  { name: 'generate_monthly_activity_report', description: 'Rapport d\'activité mensuel global', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
+  { name: 'get_degraded_kpis',             description: 'KPIs dégradés et alertes', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
+  { name: 'get_tableau_croise',            description: 'Tableau croisé analytique', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
+  { name: 'get_score_global',              description: 'Score global de performance', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
+  { name: 'get_alerts_kpi_vdata',          description: 'Alertes KPI analytics', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
+  { name: 'list_tables',                   description: 'Liste les tables disponibles', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
+  { name: 'ping_db',                       description: 'Vérification de la connexion base de données', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
+  { name: 'list_vd_files',                 description: 'Fichiers VD disponibles', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
+  { name: 'list_e255_files',               description: 'Fichiers E255 disponibles', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
+  { name: 'read_allowed_file',             description: 'Lecture d\'un fichier autorisé', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
+  { name: 'run_readonly_query',            description: 'Exécute une requête SQL en lecture seule', agent: 'VDATA', accessType: 'sensitive', authLevel: 'approval' },
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Robustly extract the VMIND session token from localStorage.
+ * Handles multiple storage formats gracefully.
+ */
+function getVmindSessionToken(): string | null {
+  try {
+    const raw = localStorage.getItem('vmind_session');
+    if (!raw) {
+      console.warn('[Connectors] vmind_session: clé absente dans localStorage');
+      return null;
+    }
+
+    // Try direct string (raw JWT)
+    if (raw.startsWith('eyJ')) {
+      console.log('[Connectors] vmind_session: format token direct trouvé');
+      return raw;
+    }
+
+    const parsed = JSON.parse(raw);
+    // Various formats: { token }, { access_token }, { user: { token } }, { data: { token } }
+    const token =
+      parsed?.token ||
+      parsed?.access_token ||
+      parsed?.user?.token ||
+      parsed?.data?.token ||
+      null;
+
+    if (token) {
+      console.log('[Connectors] vmind_session: token extrait avec succès (format JSON)');
+    } else {
+      console.warn('[Connectors] vmind_session: clé trouvée mais aucun token valide dans la structure JSON', Object.keys(parsed));
+    }
+    return token;
+  } catch (err) {
+    console.error('[Connectors] vmind_session: erreur de parsing JSON', err);
+    return null;
+  }
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+const AUTH_BADGE: Record<AuthLevel, { label: string; bg: string; color: string }> = {
+  always:   { label: 'Toujours autoriser',      bg: 'rgba(0, 229, 200, 0.1)',  color: '#00E5C8' },
+  approval: { label: 'Nécessite approbation',   bg: 'rgba(255, 193, 7, 0.1)',  color: '#ffc107' },
+  denied:   { label: 'Non autorisé',            bg: 'rgba(255, 71, 87, 0.1)',  color: '#ff4757' },
+};
+
+const ACCESS_ICON: Record<AccessType, React.ReactNode> = {
+  read:      <Eye size={13} />,
+  write:     <FileEdit size={13} />,
+  sensitive: <Zap size={13} />,
+};
+
+const ACCESS_LABEL: Record<AccessType, string> = {
+  read:      'Lecture seule',
+  write:     'Écriture',
+  sensitive: 'Action sensible',
+};
+
+const AGENT_COLORS: Record<string, { bg: string; color: string }> = {
+  VFIN:  { bg: 'rgba(0, 229, 200, 0.1)',  color: '#00E5C8' },
+  VDATA: { bg: 'rgba(130, 80, 255, 0.1)', color: '#8250FF' },
+  VSELL: { bg: 'rgba(255, 130, 0, 0.1)',  color: '#FF8200' },
+  VMOVE: { bg: 'rgba(50, 170, 255, 0.1)', color: '#32AAFF' },
+  VBUY:  { bg: 'rgba(255, 71, 87, 0.1)',  color: '#ff4757' },
+  VSTOCK:{ bg: 'rgba(0, 200, 100, 0.1)',  color: '#00C864' },
+};
+
+function ToolRow({ tool, isAuthorized }: { tool: ToolMeta; isAuthorized: boolean }) {
+  const badge = isAuthorized ? AUTH_BADGE[tool.authLevel] : AUTH_BADGE['denied'];
+  const agentStyle = AGENT_COLORS[tool.agent] || { bg: 'rgba(255,255,255,0.05)', color: '#8FA3B8' };
+
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center',
+        padding: '14px 20px',
+        gap: '16px',
+        borderBottom: '1px solid rgba(255,255,255,0.04)',
+        transition: 'background 0.15s',
+        opacity: isAuthorized ? 1 : 0.4,
+      }}
+      onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
+      onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+    >
+      {/* Icon */}
+      <div style={{
+        color: isAuthorized ? '#8FA3B8' : '#4A5E72',
+        flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
+        fontSize: '12px', width: '100px',
+      }}>
+        {ACCESS_ICON[tool.accessType]}
+        <span style={{ marginLeft: '4px' }}>{ACCESS_LABEL[tool.accessType]}</span>
+      </div>
+
+      {/* Name + description */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '13px', fontWeight: 600, color: isAuthorized ? '#fff' : '#6A7E95', marginBottom: '2px' }}>
+          {tool.name}
+        </div>
+        <div style={{ fontSize: '12px', color: '#6A7E95', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {tool.description}
+        </div>
+      </div>
+
+      {/* Agent badge */}
+      <div style={{
+        padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700,
+        background: agentStyle.bg, color: agentStyle.color,
+        flexShrink: 0,
+      }}>
+        {tool.agent}
+      </div>
+
+      {/* Auth badge */}
+      <div style={{
+        padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+        background: badge.bg, color: badge.color,
+        flexShrink: 0, whiteSpace: 'nowrap',
+      }}>
+        {badge.label}
+      </div>
+    </div>
+  );
+}
+
+function ToolSection({ title, tools, authorizedNames, collapsible = false }: {
+  title: string;
+  tools: ToolMeta[];
+  authorizedNames: Set<string>;
+  collapsible?: boolean;
+}) {
+  const [open, setOpen] = useState(true);
+  if (tools.length === 0) return null;
+
+  return (
+    <div style={{
+      background: 'rgba(5, 12, 24, 0.4)',
+      border: '1px solid rgba(255,255,255,0.06)',
+      borderRadius: '12px',
+      overflow: 'hidden',
+      marginBottom: '16px',
+    }}>
+      <div
+        style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '14px 20px',
+          background: 'rgba(255,255,255,0.02)',
+          borderBottom: open ? '1px solid rgba(255,255,255,0.05)' : 'none',
+          cursor: collapsible ? 'pointer' : 'default',
+        }}
+        onClick={() => collapsible && setOpen(v => !v)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Shield size={15} color="#8FA3B8" />
+          <span style={{ fontSize: '13px', fontWeight: 700 }}>{title}</span>
+          <span style={{ fontSize: '12px', color: '#6A7E95', background: 'rgba(255,255,255,0.05)', padding: '1px 8px', borderRadius: '10px' }}>
+            {tools.length}
+          </span>
+        </div>
+        {collapsible && (open ? <ChevronUp size={16} color="#6A7E95" /> : <ChevronDown size={16} color="#6A7E95" />)}
+      </div>
+      {open && tools.map(tool => (
+        <ToolRow key={tool.name} tool={tool} isAuthorized={authorizedNames.has(tool.name)} />
+      ))}
+    </div>
+  );
+}
+
+// ─── Props (state is now owned by ConnectorsHub) ─────────────────────────────
+
+interface TralisConnectorPanelProps {
+  status: 'loading' | 'idle' | 'connected' | 'error';
+  session: McpSession | null;
+  onConnected: (token: string, data: McpSession) => void;
+  onDisconnected: () => void;
+}
+
+// Import McpSession type from Hub
+import type { McpSession } from '../ConnectorsHub';
+
+// ─── Main Panel ──────────────────────────────────────────────────────────────
+
+export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
+  status,
+  session,
+  onConnected,
+  onDisconnected,
+}) => {
+  // Local UI state only (modal, form fields)
+  const [showModal, setShowModal]         = useState(false);
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginClientId, setLoginClientId] = useState('DEMO');
+  const [loginLoading, setLoginLoading]   = useState(false);
+  const [loginError, setLoginError]       = useState('');
+  const [errorMessage]                    = useState('Impossible de joindre le serveur MCP.');
+
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+  // Convenience aliases
+  const userInfo           = session?.user ?? null;
+  const authorizedToolNames = new Set<string>(session?.tools ?? []);
+
+  // ── Option A: Use current VMIND session ────────────────────────────────────
+  const handleUseCurrentSession = async () => {
+    setLoginLoading(true);
+    setLoginError('');
+
+    const token = getVmindSessionToken();
+    if (!token) {
+      setLoginError('Session VMIND introuvable. Veuillez vous reconnecter à VMIND.');
+      setLoginLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${baseUrl}/api/mcp/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.ok) {
+        console.log('[Connectors] Session VMIND acceptée par MCP — user:', data.user?.username);
+        setShowModal(false);
+        setLoginError('');
+        onConnected(token, data);
+      } else {
+        const msg = data?.error || `Erreur ${res.status} : session non autorisée sur le serveur MCP.`;
+        console.warn('[Connectors] Session VMIND refusée par MCP:', msg);
+        setLoginError(msg);
+      }
+    } catch (err) {
+      console.error('[Connectors] Erreur réseau lors de la validation:', err);
+      setLoginError('Serveur MCP indisponible. Vérifiez que le backend est démarré.');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  // ── Option B: Manual login ─────────────────────────────────────────────────
+  const handleManualLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginLoading(true);
+    setLoginError('');
+
+    try {
+      const res = await fetch(`${baseUrl}/api/mcp/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginUsername, password: loginPassword, client_id: loginClientId }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.ok) {
+        console.log('[Connectors] Connexion manuelle réussie — user:', data.user?.username);
+        setShowModal(false);
+        setLoginError('');
+        onConnected(data.token, data);
+      } else {
+        setLoginError(data?.error || 'Identifiants invalides.');
+      }
+    } catch (err) {
+      setLoginError('Serveur indisponible. Vérifiez que le backend est démarré.');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  // ── Disconnect — delegates to Hub ─────────────────────────────────────────
+  const handleDisconnect = () => onDisconnected();
+
+  // ── Build tool sections ────────────────────────────────────────────────────
+  const readTools      = ALL_TOOL_METADATA.filter(t => t.accessType === 'read');
+  const sensitiveTools = ALL_TOOL_METADATA.filter(t => t.accessType === 'sensitive' || t.accessType === 'write');
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  return (
+    <div style={{ maxWidth: '900px' }}>
+
+      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: '12px',
+            background: 'rgba(0, 229, 200, 0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '1px solid rgba(0, 229, 200, 0.15)',
+          }}>
+            <Database size={24} color="#00E5C8" />
+          </div>
+          <div>
+            <h1 style={{ fontSize: '22px', fontWeight: 800, margin: '0 0 4px 0' }}>TraLIS MCP</h1>
+            <div style={{ fontSize: '13px', color: '#8FA3B8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {status === 'loading' && <span>Vérification du statut…</span>}
+              {status === 'idle' && (
+                <span style={{ color: '#ffc107', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <AlertTriangle size={13} /> Connecteur non activé
+                </span>
+              )}
+              {status === 'connected' && (
+                <span style={{ color: '#00E5C8', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <CheckCircle2 size={13} />
+                  Connecté — {userInfo?.username}&nbsp;·&nbsp;Tenant&nbsp;{userInfo?.client_id || 'DEMO'}
+                </span>
+              )}
+              {status === 'error' && (
+                <span style={{ color: '#ff4757', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <AlertTriangle size={13} /> {errorMessage}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {status === 'connected' ? (
+          <button onClick={handleDisconnect} style={{
+            background: 'transparent', color: '#8FA3B8',
+            border: '1px solid rgba(255,255,255,0.1)',
+            padding: '8px 16px', borderRadius: '8px',
+            fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+            transition: 'color 0.2s',
+          }}
+            onMouseOver={e => e.currentTarget.style.color = '#fff'}
+            onMouseOut={e => e.currentTarget.style.color = '#8FA3B8'}
+          >
+            Déconnecter
+          </button>
+        ) : status !== 'loading' && (
+          <button onClick={() => setShowModal(true)} style={{
+            background: 'linear-gradient(90deg, #00E5C8 0%, #21F3D6 100%)',
+            color: '#021010', border: 'none',
+            padding: '8px 16px', borderRadius: '8px',
+            fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            boxShadow: '0 0 10px rgba(0, 229, 200, 0.2)',
+          }}>
+            <Link2 size={14} /> Connecter
+          </button>
+        )}
+      </div>
+
+      <p style={{ color: '#8FA3B8', fontSize: '13px', lineHeight: 1.65, marginBottom: '36px', maxWidth: '680px' }}>
+        Le connecteur TraLIS MCP permet à VMIND d'exécuter des outils directement sur votre ERP, en respectant vos rôles et permissions TraLIS.
+        Une fois activé, l'IA consulte ces autorisations en temps réel et adapte ses réponses à votre profil.
+      </p>
+
+      {/* ── CONNECTED : Infos + Tool sections ─────────────────────────────── */}
+      {status === 'connected' && userInfo && (
+        <>
+          {/* Account info */}
+          <div style={{
+            display: 'flex', gap: '24px', flexWrap: 'wrap',
+            padding: '16px 20px',
+            background: 'rgba(5, 12, 24, 0.4)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '12px', marginBottom: '28px',
+          }}>
+            {[
+              { label: 'Compte', value: userInfo.username },
+              { label: 'Tenant', value: userInfo.client_id || 'DEMO' },
+              { label: 'Rôles TraLIS', value: userInfo.roles.join(', ') || '—' },
+              { label: 'Agents autorisés', value: userInfo.allowedAgents.join(', ') || '—' },
+            ].map(({ label, value }) => (
+              <div key={label}>
+                <div style={{ fontSize: '11px', color: '#6A7E95', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>{label}</div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#fff' }}>{value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Section title */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>Autorisations des outils</h2>
+            <span style={{ fontSize: '12px', color: '#6A7E95' }}>
+              {authorizedToolNames.size} outil{authorizedToolNames.size !== 1 ? 's' : ''} autorisé{authorizedToolNames.size !== 1 ? 's' : ''} sur {ALL_TOOL_METADATA.length} disponibles
+            </span>
+          </div>
+
+          {/* Column header */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '16px',
+            padding: '8px 20px', fontSize: '11px', color: '#6A7E95',
+            textTransform: 'uppercase', letterSpacing: '0.05em',
+            borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '8px',
+          }}>
+            <span style={{ width: '100px' }}>Type d'accès</span>
+            <span style={{ flex: 1 }}>Outil</span>
+            <span style={{ width: '50px', textAlign: 'center' }}>Agent</span>
+            <span style={{ width: '160px', textAlign: 'right' }}>Autorisation</span>
+          </div>
+
+          <ToolSection
+            title="Outils en lecture seule"
+            tools={readTools}
+            authorizedNames={authorizedToolNames}
+            collapsible
+          />
+          <ToolSection
+            title="Actions sensibles"
+            tools={sensitiveTools}
+            authorizedNames={authorizedToolNames}
+            collapsible
+          />
+        </>
+      )}
+
+      {/* ── IDLE: teaser of what tools are available ───────────────────────── */}
+      {status === 'idle' && (
+        <div style={{
+          padding: '32px', textAlign: 'center',
+          background: 'rgba(5, 12, 24, 0.3)',
+          border: '1px dashed rgba(255,255,255,0.08)',
+          borderRadius: '12px', color: '#6A7E95',
+        }}>
+          <Shield size={32} style={{ marginBottom: '16px', opacity: 0.4 }} />
+          <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 600, color: '#8FA3B8' }}>
+            Connecteur non activé
+          </p>
+          <p style={{ margin: 0, fontSize: '13px' }}>
+            {ALL_TOOL_METADATA.length} outils ERP disponibles selon vos droits TraLIS.
+            Connectez-vous pour voir vos autorisations.
+          </p>
+        </div>
+      )}
+
+      {/* ── LOGIN MODAL ─────────────────────────────────────────────────────── */}
+      {showModal && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(2, 6, 14, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999,
+        }}>
+          <div style={{
+            background: 'linear-gradient(160deg, rgba(12, 28, 52, 1) 0%, rgba(6, 15, 30, 1) 100%)',
+            border: '1px solid rgba(0, 229, 200, 0.35)',
+            borderRadius: '24px',
+            width: '100%', maxWidth: '440px',
+            padding: '32px',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+            position: 'relative',
+          }}>
+            <button onClick={() => setShowModal(false)} style={{
+              position: 'absolute', top: 20, right: 20,
+              background: 'transparent', border: 'none', color: '#6A7E95', cursor: 'pointer',
+            }}>
+              <X size={20} />
+            </button>
+
+            <h2 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 6px 0' }}>Connexion au connecteur MCP</h2>
+            <p style={{ color: '#8FA3B8', fontSize: '13px', marginBottom: '28px', lineHeight: 1.55 }}>
+              Choisissez une méthode pour activer l'accès sécurisé de l'IA à votre ERP TraLIS.
+            </p>
+
+            {/* Option A */}
+            <button onClick={handleUseCurrentSession} disabled={loginLoading} style={{
+              width: '100%',
+              background: 'linear-gradient(90deg, #00E5C8 0%, #21F3D6 100%)',
+              color: '#021010', border: 'none',
+              padding: '13px', borderRadius: '12px',
+              fontSize: '14px', fontWeight: 800, cursor: 'pointer',
+              marginBottom: '20px',
+              boxShadow: '0 0 20px rgba(0, 229, 200, 0.15)',
+              display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+              opacity: loginLoading ? 0.7 : 1,
+            }}>
+              {loginLoading ? 'Validation en cours…' : 'Utiliser ma session VMIND actuelle'}
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.08)' }} />
+              <span style={{ fontSize: '11px', color: '#6A7E95', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>ou compte TraLIS différent</span>
+              <div style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.08)' }} />
+            </div>
+
+            {/* Option B */}
+            <form onSubmit={handleManualLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {[
+                { label: 'Identifiant', type: 'text', value: loginUsername, onChange: setLoginUsername, placeholder: 'Username ou Email', required: true },
+                { label: 'Mot de passe', type: 'password', value: loginPassword, onChange: setLoginPassword, placeholder: '••••••••', required: true },
+                { label: 'Tenant (Client ID)', type: 'text', value: loginClientId, onChange: setLoginClientId, placeholder: 'DEMO', required: true },
+              ].map(field => (
+                <div key={field.label}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#8FA3B8', marginBottom: '6px', fontWeight: 600 }}>
+                    {field.label}
+                  </label>
+                  <input
+                    type={field.type}
+                    value={field.value}
+                    onChange={e => field.onChange(e.target.value)}
+                    placeholder={field.placeholder}
+                    required={field.required}
+                    style={{
+                      width: '100%', padding: '11px 14px', boxSizing: 'border-box',
+                      background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none',
+                    }}
+                  />
+                </div>
+              ))}
+
+              {loginError && (
+                <div style={{
+                  color: '#ff4757', fontSize: '13px',
+                  background: 'rgba(255, 71, 87, 0.08)', border: '1px solid rgba(255, 71, 87, 0.2)',
+                  padding: '10px 14px', borderRadius: '8px',
+                  display: 'flex', alignItems: 'flex-start', gap: '8px',
+                }}>
+                  <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <button type="submit" disabled={loginLoading} style={{
+                width: '100%',
+                background: 'rgba(255,255,255,0.05)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.12)',
+                padding: '13px', borderRadius: '12px',
+                fontSize: '14px', fontWeight: 600, cursor: 'pointer',
+                marginTop: '4px', transition: 'background 0.2s',
+                opacity: loginLoading ? 0.7 : 1,
+              }}
+                onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+              >
+                {loginLoading ? 'Connexion…' : 'Se connecter'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
