@@ -21,6 +21,7 @@ import { JournalView } from '@/features/management/journal/JournalView';
 import { ReportsView } from '@/features/management/reports/ReportsView';
 import { IntegrationsView } from '@/features/management/integrations/IntegrationsView';
 import { ProfileView } from '@/features/management/profile/ProfileView';
+import { SignupRequestsView } from '@/features/management/signup_requests/SignupRequestsView';
 
 /* ─────────────────────────────────────────────────────
    Accès Non Autorisé View (Premium VMIND Design)
@@ -183,8 +184,12 @@ export default function Home() {
 
         // Authorization check for Management mode (Administrators only)
         if (mode === 'MANAGEMENT') {
-          const roles = decoded.roles || [];
-          if (!roles.includes('Administrators')) {
+          const roles = Array.isArray(decoded.roles)
+            ? decoded.roles
+            : typeof decoded.roles === 'string'
+              ? [decoded.roles]
+              : [];
+          if (!roles.includes('Administrators') && !roles.includes('Administrator')) {
             setIsAuthorized(false);
             return;
           }
@@ -335,6 +340,10 @@ export default function Home() {
 
           {currentView === 'journal' && (
             <JournalView />
+          )}
+
+          {currentView === 'signup-requests' && (
+            <SignupRequestsView />
           )}
 
           {currentView === 'reports' && (
