@@ -16,7 +16,7 @@ import { GlobalMaxRemindersPopup } from "@/components/vmind/GlobalMaxRemindersPo
 import { ManagementSidebar } from "@/features/management/layout/ManagementSidebar";
 import { MarketplaceView } from '@/features/management/marketplace/MarketplaceView';
 import { AgentsView } from '@/features/management/agents/AgentsView';
-import { WizardView } from '@/features/management/wizard/WizardView';
+import { WizardRouter } from '@/features/management/wizard/WizardRouter';
 import { JournalView } from '@/features/management/journal/JournalView';
 import { ReportsView } from '@/features/management/reports/ReportsView';
 import { IntegrationsView } from '@/features/management/integrations/IntegrationsView';
@@ -157,7 +157,7 @@ export default function Home() {
 
   useEffect(() => {
     setIsMounted(true);
-    
+
     const checkAuth = () => {
       try {
         const token = localStorage.getItem('vmind_session');
@@ -206,7 +206,7 @@ export default function Home() {
       sessionStorage.removeItem('vmind_session_id');
     }
   }, []);
-  
+
   // Assistant Mode State
   const [voiceShow, setVoiceShow] = useState(false);
   const [insertPrompt, setInsertPrompt] = useState<string | undefined>(undefined);
@@ -219,7 +219,7 @@ export default function Home() {
   };
 
   // Management Mode State
-  const [currentView, setCurrentView] = useState('market'); 
+  const [currentView, setCurrentView] = useState('market');
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('all');
 
@@ -270,7 +270,7 @@ export default function Home() {
   // Access Blocker if not authorized for current mode (Management)
   if (!isAuthorized) {
     return (
-      <UnauthorizedView 
+      <UnauthorizedView
         onBackToLogin={() => {
           localStorage.removeItem('vmind_session');
           window.location.href = '/login';
@@ -310,8 +310,8 @@ export default function Home() {
   // MANAGEMENT MODE
   return (
     <main className="main-container anim">
-      <ManagementSidebar 
-        currentView={currentView} 
+      <ManagementSidebar
+        currentView={currentView}
         onNavigate={handleNavigate}
         activeCategory={activeCategory}
         onSelectCategory={handleSelectCategory}
@@ -319,17 +319,17 @@ export default function Home() {
       <div className="content management-layout">
         <div className="view-container">
           {currentView === 'market' && (
-            <MarketplaceView 
-              onDeploy={handleDeploy} 
+            <MarketplaceView
+              onDeploy={handleDeploy}
               activeCategory={activeCategory}
               onSelectCategory={handleSelectCategory}
             />
           )}
-          
+
           {currentView === 'agents' && (
-            <AgentsView 
-              onNavigate={setCurrentView} 
-              onConfigure={handleDeploy} 
+            <AgentsView
+              onNavigate={setCurrentView}
+              onConfigure={handleDeploy}
             />
           )}
 
@@ -350,9 +350,9 @@ export default function Home() {
           )}
 
           {currentView === 'wizard' && selectedTemplate && (
-            <WizardView 
-              templateId={selectedTemplate} 
-              onCancel={handleCancelWizard} 
+            <WizardRouter
+              templateId={selectedTemplate}
+              onCancel={handleCancelWizard}
             />
           )}
         </div>

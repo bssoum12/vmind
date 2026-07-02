@@ -12,6 +12,21 @@ export interface AgentTemplate {
 }
 
 export const AGENT_TEMPLATES: AgentTemplate[] = [
+  //*****************added by hamdi*********************** */
+  {
+    id: 'prospection',
+    name: 'Agent de Prospection',
+    description: 'Recherche et contacte automatiquement de nouveaux prospects qualifiés à partir d’un jeu de données fourni afin de générer des leads.',
+    category: 'Commercial · Ventes',
+    icon: '🎯',
+    accent: '#E01A59',
+    iconBg: 'rgba(224, 26, 89, 0.12)',
+    tag: 'new',
+    deployments: 0,
+    connections: ['tralis', 'Email', 'odoo']
+  },
+  //**************************
+
   {
     id: 'recouvrement',
     name: 'Agent de Recouvrement',

@@ -8,6 +8,7 @@ import {
   deleteAgent,
   runAgentNow,
 } from '@/shared/api/n8n-api';
+import { useRouter } from 'next/navigation';
 
 interface AgentsViewProps {
   onNavigate: (view: string) => void;
@@ -55,7 +56,8 @@ function triggerRuleSummary(rules: any[]): string {
   return interval;
 }
 
-export const AgentsView: React.FC<AgentsViewProps> = ({ onNavigate, onConfigure }) => {
+export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
+  const router = useRouter();
   const [agents, setAgents] = useState<LiveAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,9 +146,9 @@ export const AgentsView: React.FC<AgentsViewProps> = ({ onNavigate, onConfigure 
   };
 
   const statusMeta: Record<AgentStatus, { label: string; dot: string; pill: string }> = {
-    running: { label: 'Actif',   dot: '#00E5A0', pill: 'sp-running' },
-    paused:  { label: 'En pause', dot: '#FFB800', pill: 'sp-pending' },
-    stopped: { label: 'Arrêté',  dot: '#FF4757', pill: 'sp-stopped' },
+    running: { label: 'Actif', dot: '#00E5A0', pill: 'sp-running' },
+    paused: { label: 'En pause', dot: '#FFB800', pill: 'sp-pending' },
+    stopped: { label: 'Arrêté', dot: '#FF4757', pill: 'sp-stopped' },
   };
 
   return (
@@ -313,11 +315,23 @@ export const AgentsView: React.FC<AgentsViewProps> = ({ onNavigate, onConfigure 
                           {/* Config */}
                           <button
                             className="row-btn"
-                            onClick={() => onConfigure('recouvrement')}
+                            onClick={() => onConfigure(agent.run_mode === 'prospection' ? 'prospection' : 'recouvrement')}
                             title="Modifier la configuration"
                           >
                             ⚙️
                           </button>
+
+                          {/* Open Workspace (Only for Prospect Agents) */}
+                          {agent.run_mode === 'prospection' && (
+                            <button
+                              className="row-btn"
+                              onClick={() => router.push(`/prospect-agent-workspace/${agent.agent_id || 1}`)}
+                              title="Ouvrir l'espace de travail"
+                              style={{ color: '#00E5C8', borderColor: 'rgba(0,229,200,0.3)' }}
+                            >
+                              🚀 Espace
+                            </button>
+                          )}
 
                           {/* Delete */}
                           <button
@@ -364,11 +378,11 @@ export const AgentsView: React.FC<AgentsViewProps> = ({ onNavigate, onConfigure 
 
             {/* Info rows */}
             {[
-              { label: '📋 Mode',         value: selected.run_mode },
-              { label: '🌍 Timezone',      value: selected.workflow_timezone },
+              { label: '📋 Mode', value: selected.run_mode },
+              { label: '🌍 Timezone', value: selected.workflow_timezone },
               { label: '⏰ Planification', value: triggerRuleSummary(selected.trigger_rules) },
-              { label: '🔑 Schedule ID',   value: selected.schedule_id || 'Aucun (en pause)' },
-              { label: '🏷️ Session',       value: selected.session_id },
+              { label: '🔑 Schedule ID', value: selected.schedule_id || 'Aucun (en pause)' },
+              { label: '🏷️ Session', value: selected.session_id },
               { label: '🕓 Dernière exéc.', value: formatDate(selected.lastExecuted || undefined) },
             ].map(row => (
               <div key={row.label} style={{
