@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 
 interface Lead {
@@ -49,6 +52,9 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
   const [isSending, setIsSending] = useState(false);
   const [isSavingEmail, setIsSavingEmail] = useState(false);
   const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
+  
+  const params = useParams();
+  const agentId = params.agentId;
 
   useEffect(() => {
     if (lead) {
@@ -56,6 +62,12 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
       setStatut(lead.statut);
       setCorps(lead.corps || '');
       setCc(lead.email_cc !== undefined && lead.email_cc !== null ? lead.email_cc : (defaultCc || ''));
+      
+      // Reset loading states when switching leads
+      setIsQualifying(false);
+      setIsSending(false);
+      setIsGeneratingEmail(false);
+      setIsSavingEmail(false);
     }
   }, [lead, defaultCc]);
 
@@ -63,7 +75,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
 
   const handleManualStatusChange = async (newStatus: string) => {
     try {
-      const res = await fetch('/api/leads', {
+      const res = await fetch(`${API_BASE_URL}/api/prospect-agent/agent-leads/${agentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -84,10 +96,10 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
   const handleQualifyIA = async () => {
     setIsQualifying(true);
     try {
-      const res = await fetch('/api/qualify', {
+      const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_ids: [lead.id] }),
+        body: JSON.stringify({ lead_ids: [lead.id], agentId }),
       });
 
       if (res.ok) {
@@ -105,7 +117,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
   const handleGenerateEmail = async () => {
     setIsGeneratingEmail(true);
     try {
-      const res = await fetch('/api/leads', {
+      const res = await fetch(`${API_BASE_URL}/api/prospect-agent/agent-leads/${agentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -138,7 +150,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
       window.location.href = mailtoUrl;
 
       // Record in DB with Success status (statut of lead remains unchanged)
-      const res = await fetch('/api/leads', {
+      const res = await fetch(`${API_BASE_URL}/api/prospect-agent/agent-leads/${agentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -167,7 +179,6 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
 
   return (
     <>
-      <div className={`drawer-backdrop ${isOpen ? 'open' : ''}`} onClick={onClose} />
       <div className={`drawer ${isOpen ? 'open' : ''}`}>
         <div className="drawer-header">
           <div>

@@ -2,6 +2,9 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useParams } from 'next/navigation';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 
 interface Lead {
@@ -36,6 +39,9 @@ interface LeadsViewProps {
 }
 
 export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: LeadsViewProps) {
+  const params = useParams();
+  const agentId = params.agentId;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [sourceFilter, setSourceFilter] = useState('All');
@@ -52,6 +58,35 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
   const [isBulkQualifying, setIsBulkQualifying] = useState(false);
   const [qualifyingCount, setQualifyingCount] = useState(0);
+
+  const [availableAgents, setAvailableAgents] = useState<any[]>([]);
+  const [selectedAgentIds, setSelectedAgentIds] = useState<number[]>([Number(agentId)]);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/list-agents`, { headers: { 'x-client-id': 'PROSPECT_AGENT' } })
+      .then(res => res.json())
+      .then(data => {
+        let agents = [];
+        if (Array.isArray(data)) {
+          agents = data;
+        } else if (data && Array.isArray(data.agents)) {
+          agents = data.agents;
+        }
+        // Filter out agents that don't have an agent_id and ensure they are prospection agents
+        const validProspectAgents = agents.filter((a: any) => 
+          a && a.agent_id != null && a.run_mode === 'prospection'
+        );
+        setAvailableAgents(validProspectAgents);
+      })
+      .catch(err => console.error("Failed to load agents", err));
+  }, []);
+
+  const handleAgentToggle = (id: number) => {
+    setSelectedAgentIds(prev => 
+      prev.includes(id) && prev.length > 1 ? prev.filter(a => a !== id) : 
+      prev.includes(id) ? prev : [...prev, id]
+    );
+  };
 
   // Filter leads
   const filteredLeads = useMemo(() => {
@@ -169,27 +204,30 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
     setCsvUploading(true);
     setUploadMessage(null);
     setImportProgress({ current: 0, total: leadsData.length });
-
     let successCount = 0;
     let failCount = 0;
+    let lastError = '';
     const imported: Lead[] = [];
 
     for (let i = 0; i < leadsData.length; i++) {
       const lead = leadsData[i];
       try {
-        const res = await fetch('/api/leads', {
+        const res = await fetch(`${API_BASE_URL}/api/agent-leads`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(lead),
+          body: JSON.stringify({ ...lead, agentIds: selectedAgentIds }),
         });
         if (res.ok) {
           const newLead = await res.json();
           imported.push(newLead);
           successCount++;
         } else {
+          const errData = await res.json().catch(() => ({}));
+          lastError = errData.error || `Erreur HTTP ${res.status}`;
           failCount++;
         }
-      } catch (err) {
+      } catch (err: any) {
+        lastError = err.message || 'Network error';
         failCount++;
       }
       setImportProgress({ current: i + 1, total: leadsData.length });
@@ -231,10 +269,14 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
         setUploadMessage(null);
 
         // Forward to backend which calls n8n and normalizes the response
-        const res = await fetch('/api/import-file', {
+        const res = await fetch(`${API_BASE_URL}/api/prospect-agent/import/file`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileContent: text, fileType })
+          body: JSON.stringify({
+            fileContent: text,
+            fileType: file.type || fileType,
+            agentIds: selectedAgentIds
+          })
         });
 
         const data = await res.json();
@@ -265,10 +307,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
     setUploadMessage(null);
 
     try {
-      const res = await fetch('/api/import-url', {
+      const res = await fetch(`${API_BASE_URL}/api/prospect-agent/import/url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: importUrl.trim() })
+        body: JSON.stringify({ url: importUrl.trim(), agentIds: selectedAgentIds })
       });
       const data = await res.json();
 
@@ -360,10 +402,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
     try {
       const lead_ids = newlyImportedLeads.map((l: Lead) => l.id);
 
-      const res = await fetch('/api/qualify', {
+      const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_ids }),
+        body: JSON.stringify({ lead_ids, agentId }),
       });
 
       if (res.ok) {
@@ -396,10 +438,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
     try {
       const lead_ids = filteredLeads.map((l: Lead) => l.id);
 
-      const res = await fetch('/api/qualify', {
+      const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_ids }),
+        body: JSON.stringify({ lead_ids, agentId }),
       });
 
       if (res.ok) {
@@ -561,6 +603,36 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
             >
               ✍️ Saisie Manuelle
             </button>
+          </div>
+
+          {/* Multi-Agent Selector */}
+          <div style={{ marginBottom: '1.5rem' }}>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+              Attribuer aux agents :
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {availableAgents.map((agent, index) => (
+                <button
+                  key={agent.agent_id || `agent-${index}`}
+                  type="button"
+                  onClick={() => handleAgentToggle(agent.agent_id)}
+                  style={{
+                    padding: '0.4rem 0.8rem',
+                    borderRadius: '20px',
+                    fontSize: '0.8rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    backgroundColor: selectedAgentIds.includes(agent.agent_id) ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                    borderColor: selectedAgentIds.includes(agent.agent_id) ? 'var(--accent-primary)' : 'var(--border-color)',
+                    color: selectedAgentIds.includes(agent.agent_id) ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {agent.agent_name || agent.nom || 'Agent Inconnu'}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div style={{ minHeight: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

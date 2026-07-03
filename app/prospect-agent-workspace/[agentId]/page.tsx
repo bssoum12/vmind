@@ -42,10 +42,13 @@ export default function AgentWorkspacePage() {
       if (leadsRes.ok) {
         const data = await leadsRes.json();
         setLeads(data);
-        if (selectedLead) {
-          const updated = data.find((l: any) => l.id === selectedLead.id);
-          if (updated) setSelectedLead(updated);
-        }
+        setSelectedLead((prev: any) => {
+          if (prev) {
+            const updated = data.find((l: any) => l.id === prev.id);
+            return updated || prev;
+          }
+          return prev;
+        });
       }
       if (campaignsRes.ok) setCampaigns(await campaignsRes.json());
       if (logsRes.ok) setLogs(await logsRes.json());
@@ -55,7 +58,7 @@ export default function AgentWorkspacePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [agentId, selectedLead]);
+  }, [agentId]);
 
   useEffect(() => {
     fetchData();
@@ -141,7 +144,11 @@ export default function AgentWorkspacePage() {
         <LeadDetailDrawer 
           lead={selectedLead} 
           isOpen={isDrawerOpen} 
-          onClose={() => setIsDrawerOpen(false)} 
+          onClose={() => setIsDrawerOpen(false)}
+          onRefresh={fetchData}
+          threshold={60}
+          signature=""
+          defaultCc=""
         />
       )}
     </div>
