@@ -26,15 +26,32 @@ export async function sendVmindMessage(message: string, clientId = "DEMO"): Prom
   let mcp_token;
   if (typeof window !== "undefined") {
     try {
-      const sessionStr = localStorage.getItem("vmind_session");
-      const vmindToken = sessionStr ? JSON.parse(sessionStr).token : null;
-      mcp_token = localStorage.getItem("vmind_mcp_token") || vmindToken;
+      mcp_token = localStorage.getItem("vmind_mcp_token");
+      if (!mcp_token || mcp_token === "null") {
+        const sessionStr = localStorage.getItem("vmind_session");
+        if (sessionStr) {
+          try {
+            mcp_token = JSON.parse(sessionStr).token;
+          } catch(e2) {
+             mcp_token = sessionStr; // Fallback in case vmind_session is just the raw token string
+          }
+        }
+      }
     } catch (e) {
       console.warn("Could not parse tokens:", e);
     }
   }
 
   try {
+    if (!mcp_token) {
+      console.warn("⚠️ [n8n-api] Aucun mcp_token trouvé. Blocage de l'appel vers n8n.");
+      return {
+        ok: false,
+        response_type: "error",
+        message: "Veuillez activer votre session dans le Connecteur MCP (Panneau de gauche) avant de poser une question."
+      };
+    }
+
     const response = await fetch(proxyUrl, {
       method: "POST",
       headers: {
