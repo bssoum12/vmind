@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 };
 
 import { ModeProvider } from "@/shared/contexts/ModeContext";
+import { SessionTimeoutProvider } from "@/components/vmind/SessionTimeoutProvider";
 
 export default function RootLayout({
   children,
@@ -19,8 +20,10 @@ export default function RootLayout({
     <html lang="fr" className={`${orbitron.variable} ${syne.variable} ${jetBrainsMono.variable}`}>
       <body className={syne.className}>
         <ModeProvider>
-          <TopBar />
-          {children}
+          <SessionTimeoutProvider>
+            <TopBar />
+            {children}
+          </SessionTimeoutProvider>
         </ModeProvider>
       </body>
     </html>

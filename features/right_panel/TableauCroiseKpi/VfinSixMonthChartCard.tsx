@@ -1,5 +1,18 @@
 "use client";
 
+
+function getAuthToken() {
+  if (typeof window === 'undefined') return '';
+  const mcpToken = localStorage.getItem('vmind_mcp_token');
+  if (mcpToken) return mcpToken;
+  try {
+    const sessionStr = localStorage.getItem('vmind_session');
+    if (!sessionStr) return '';
+    if (sessionStr.startsWith('eyJ')) return sessionStr;
+    const parsed = JSON.parse(sessionStr);
+    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
+  } catch(e) { return ''; }
+}
 import React, { useEffect, useState } from "react";
 
 interface TrendDataPoint {
@@ -30,7 +43,8 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
 
       const response = await fetch(`${baseUrl}/api/tools/get-six-month-revenue-trend`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json",
+          "Authorization": `Bearer ${getAuthToken()}`, },
         body: JSON.stringify({ client_id: clientId }),
       });
 

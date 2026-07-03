@@ -23,16 +23,29 @@ export async function sendVmindMessage(message: string, clientId = "DEMO"): Prom
 
   console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, session_id: sessionId });
 
+  let mcp_token;
+  if (typeof window !== "undefined") {
+    try {
+      const sessionStr = localStorage.getItem("vmind_session");
+      const vmindToken = sessionStr ? JSON.parse(sessionStr).token : null;
+      mcp_token = localStorage.getItem("vmind_mcp_token") || vmindToken;
+    } catch (e) {
+      console.warn("Could not parse tokens:", e);
+    }
+  }
+
   try {
     const response = await fetch(proxyUrl, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        ...(mcp_token ? { "Authorization": `Bearer ${mcp_token}` } : {})
       },
       body: JSON.stringify({
         message,
         client_id: clientId,
-        session_id: sessionId
+        session_id: sessionId,
+        mcp_token
       })
     });
 
