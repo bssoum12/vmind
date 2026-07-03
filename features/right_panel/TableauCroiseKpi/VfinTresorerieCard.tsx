@@ -1,5 +1,18 @@
 "use client";
 
+
+function getAuthToken() {
+  if (typeof window === 'undefined') return '';
+  const mcpToken = localStorage.getItem('vmind_mcp_token');
+  if (mcpToken) return mcpToken;
+  try {
+    const sessionStr = localStorage.getItem('vmind_session');
+    if (!sessionStr) return '';
+    if (sessionStr.startsWith('eyJ')) return sessionStr;
+    const parsed = JSON.parse(sessionStr);
+    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
+  } catch(e) { return ''; }
+}
 import React, { useEffect, useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -45,7 +58,8 @@ export const VfinTresorerieCard: React.FC<VfinTresorerieCardProps> = ({ activeAg
 
       const res = await fetch(`${baseUrl}/api/tools/get-tresorerie-position`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json",
+          "Authorization": `Bearer ${getAuthToken()}`, },
         body: JSON.stringify({ client_id: clientId }),
       });
       if (res.ok) {

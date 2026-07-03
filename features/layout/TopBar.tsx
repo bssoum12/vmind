@@ -66,7 +66,8 @@ export const TopBar: React.FC = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('vmind_session');
+    localStorage.clear();
+    sessionStorage.clear();
     window.location.href = '/login';
   };
 

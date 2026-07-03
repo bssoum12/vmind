@@ -16,25 +16,67 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
   const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
   const [username, setUsername] = useState<string>('');
 
-  useEffect(() => {
+  const updatePermissions = () => {
     try {
-      const token = localStorage.getItem('vmind_session');
-      if (token) {
-        const decoded: any = jwtDecode(token);
-        if (decoded.allowedAgents) {
-          setAllowedAgents(decoded.allowedAgents);
+      // 1. Read live allowed agents from ConnectorsHub synchronization if available
+      const storedAllowedAgents = localStorage.getItem('vmind_allowed_agents');
+
+      // Prioritize MCP Token if it exists, otherwise fall back to VMIND Session
+      const mcpToken = localStorage.getItem('vmind_mcp_token');
+      const sessionToken = localStorage.getItem('vmind_session');
+      
+      let tokenToUse = null;
+      if (mcpToken) {
+        tokenToUse = mcpToken;
+      } else if (sessionToken) {
+        // Handle both raw JWT or JSON format in vmind_session
+        if (sessionToken.startsWith('eyJ')) {
+          tokenToUse = sessionToken;
+        } else {
+          try {
+            const parsed = JSON.parse(sessionToken);
+            tokenToUse = parsed.token || parsed.access_token || parsed.user?.token;
+          } catch (e) {
+            tokenToUse = null;
+          }
         }
+      }
+
+      if (tokenToUse) {
+        const decoded: any = jwtDecode(tokenToUse);
         if (decoded.username) {
           setUsername(decoded.username);
+        }
+
+        // If we have live database allowed agents, use them directly (respecting PostgreSQL)
+        if (storedAllowedAgents) {
+          try {
+            setAllowedAgents(JSON.parse(storedAllowedAgents));
+            return;
+          } catch (e) {
+            // fallback
+          }
+        }
+
+        if (decoded.allowedAgents) {
+          setAllowedAgents(decoded.allowedAgents);
+        } else {
+          setAllowedAgents([]);
         }
       } else {
         // Optionnel : rediriger vers /login si aucun token
         window.location.href = '/login';
       }
     } catch (e) {
-      console.error("Erreur de décodage du token", e);
+      console.error("Erreur de décodage du token dans la sidebar", e);
       window.location.href = '/login';
     }
+  };
+
+  useEffect(() => {
+    updatePermissions();
+    window.addEventListener('mcp-session-updated', updatePermissions);
+    return () => window.removeEventListener('mcp-session-updated', updatePermissions);
   }, []);
 
   const visibleAgents = Object.values(AGENTS).filter(agent => 
@@ -47,7 +89,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
 
       <div
         className={`nav-item ${activeNav === 'dashboard' ? 'active' : ''}`}
-        onClick={() => setActiveNav('dashboard')}
+        onClick={() => {
+          setActiveNav('dashboard');
+          window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'chat' }));
+        }}
       >
         <div className="nav-icon">🏠</div>
         <span>Dashboard</span>
@@ -55,11 +100,26 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
 
       <div
         className={`nav-item ${activeNav === 'history' ? 'active' : ''}`}
-        onClick={() => setActiveNav('history')}
+        onClick={() => {
+          setActiveNav('history');
+          window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'chat' }));
+        }}
       >
         <div className="nav-icon">💬</div>
         <span>Conversations</span>
         <span className="nav-badge">12</span>
+      </div>
+
+      <div
+        className={`nav-item ${activeNav === 'connectors' ? 'active' : ''}`}
+        onClick={() => {
+          setActiveNav('connectors');
+          // Dispatch a custom event to notify page.tsx to switch view
+          window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'connectors' }));
+        }}
+      >
+        <div className="nav-icon">🔌</div>
+        <span>Connecteurs</span>
       </div>
 
       <div className="nav-section">Agents IA ({visibleAgents.length})</div>

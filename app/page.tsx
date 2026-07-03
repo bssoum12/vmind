@@ -23,6 +23,7 @@ import { IntegrationsView } from '@/features/management/integrations/Integration
 import { ProfileView } from '@/features/management/profile/ProfileView';
 import { SignupRequestsView } from '@/features/management/signup_requests/SignupRequestsView';
 
+import { ConnectorsHub } from '@/features/connectors/ConnectorsHub';
 /* ─────────────────────────────────────────────────────
    Accès Non Autorisé View (Premium VMIND Design)
 ───────────────────────────────────────────────────── */
@@ -171,7 +172,8 @@ export default function Home() {
         const decoded: any = jwtDecode(token);
         // Expiration check
         if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-          localStorage.removeItem('vmind_session');
+          localStorage.clear();
+          sessionStorage.clear();
           setIsAuthenticated(false);
           window.location.href = '/login';
           return;
@@ -197,7 +199,8 @@ export default function Home() {
         setIsAuthorized(true);
       } catch (err) {
         console.error("Auth check failed", err);
-        localStorage.removeItem('vmind_session');
+        localStorage.clear();
+        sessionStorage.clear();
         setIsAuthenticated(false);
         window.location.href = '/login';
       }
@@ -222,6 +225,19 @@ export default function Home() {
     setInsertPrompt(text);
     setTimeout(() => setInsertPrompt(undefined), 100);
   };
+
+  const [assistantView, setAssistantView] = useState<'chat' | 'connectors'>('chat');
+
+  useEffect(() => {
+    const handleSwitchView = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail === 'connectors' || customEvent.detail === 'chat') {
+        setAssistantView(customEvent.detail as 'chat' | 'connectors');
+      }
+    };
+    window.addEventListener('switch-assistant-view', handleSwitchView);
+    return () => window.removeEventListener('switch-assistant-view', handleSwitchView);
+  }, []);
 
   // Management Mode State
   const [currentView, setCurrentView] = useState('market'); 
@@ -292,7 +308,8 @@ export default function Home() {
     return (
       <main className="main-container anim">
         <AssistantSidebar onInsertPrompt={handleInsertPrompt} activeAgentId={activeAgentId} onAgentClick={setActiveAgentId} />
-        <div className="content assistant-layout">
+        
+        <div className="content assistant-layout" style={{ display: assistantView === 'chat' ? 'flex' : 'none' }}>
           <VmindChat
             initialPrompt={insertPrompt}
             onOpenVoice={() => setVoiceShow(true)}
@@ -306,6 +323,11 @@ export default function Home() {
             activeAgentId={activeAgentId}
           />
         </div>
+        
+        <div style={{ display: assistantView === 'connectors' ? 'block' : 'none', flex: 1, height: '100%' }}>
+          <ConnectorsHub />
+        </div>
+
         <VoiceOverlay show={voiceShow} onClose={() => setVoiceShow(false)} />
         <GlobalMaxRemindersPopup />
       </main>

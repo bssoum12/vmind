@@ -634,28 +634,7 @@ export const SignupRequestsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Client ID / Instance name */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <label style={{ fontSize: '10px', fontWeight: 700, color: '#00E5C8', textTransform: 'uppercase', letterSpacing: '0.08em' }}>ID Client (Connector TraLIS)</label>
-                <input
-                  type="text"
-                  value={clientId}
-                  onChange={(e) => setClientId(e.target.value.toUpperCase())}
-                  placeholder="DEMO"
-                  style={{
-                    width: '100%',
-                    height: '42px',
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(0, 229, 200, 0.28)',
-                    borderRadius: '8px',
-                    padding: '0 12px',
-                    color: '#FFFFFF',
-                    outline: 'none',
-                    fontSize: '13px'
-                  }}
-                  required
-                />
-              </div>
+
 
               {/* Info alert */}
               <div style={{ padding: '10px 12px', background: 'rgba(0, 229, 200, 0.05)', border: '1px solid rgba(0, 229, 200, 0.15)', borderRadius: '8px', fontSize: '11px', color: '#8FA3B8', lineHeight: 1.5 }}>

@@ -38,8 +38,8 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
   // Fonction de déconnexion sécurisée
   const handleLogout = () => {
     try {
-      localStorage.removeItem('vmind_session');
-      sessionStorage.removeItem('vmind_session_id');
+      localStorage.clear();
+      sessionStorage.clear();
       setShowWarning(false);
       
       // Nettoyage des timers
