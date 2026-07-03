@@ -59,7 +59,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
   useEffect(() => {
     if (lead) {
       setSujet(lead.sujet || '');
-      setStatut(lead.statut);
+      setStatut(lead.statut || '');
       setCorps(lead.corps || '');
       setCc(lead.email_cc !== undefined && lead.email_cc !== null ? lead.email_cc : (defaultCc || ''));
       
@@ -75,7 +75,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
 
   const handleManualStatusChange = async (newStatus: string) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/prospect-agent/agent-leads/${agentId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -117,7 +117,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
   const handleGenerateEmail = async () => {
     setIsGeneratingEmail(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/prospect-agent/agent-leads/${agentId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -150,7 +150,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
       window.location.href = mailtoUrl;
 
       // Record in DB with Success status (statut of lead remains unchanged)
-      const res = await fetch(`${API_BASE_URL}/api/prospect-agent/agent-leads/${agentId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -175,7 +175,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
     }
   };
 
-  const isQualified = (lead.score !== null && lead.score >= threshold) || statut === 'Qualifié';
+  const isQualified = lead.est_qualifie === true || (lead.score !== null && lead.score >= threshold) || statut === 'Qualifié';
 
   return (
     <>
@@ -319,10 +319,8 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
                 value={statut}
                 onChange={(e) => handleManualStatusChange(e.target.value)}
               >
-                <option value="Nouveau">Nouveau</option>
                 <option value="Qualifié">Qualifié</option>
                 <option value="Écarté">Écarté</option>
-                <option value="Erreur">Erreur</option>
               </select>
             </div>
           </div>

@@ -96,7 +96,8 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
         lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (lead.entreprise || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesStatus = statusFilter === 'All' || lead.statut === statusFilter;
+      const displayedStatus = lead.est_qualifie === true ? 'Qualifié' : lead.est_qualifie === false ? 'Écarté' : lead.statut || 'Nouveau';
+      const matchesStatus = statusFilter === 'All' || displayedStatus === statusFilter;
 
       const matchesSource = sourceFilter === 'All' || lead.source === sourceFilter;
 
@@ -120,7 +121,9 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
       } else if (sortBy === 'score') {
         comparison = (a.score ?? -1) - (b.score ?? -1);
       } else if (sortBy === 'statut') {
-        comparison = (a.statut || '').localeCompare(b.statut || '');
+        const statusA = a.est_qualifie === true ? 'Qualifié' : a.est_qualifie === false ? 'Écarté' : a.statut || 'Nouveau';
+        const statusB = b.est_qualifie === true ? 'Qualifié' : b.est_qualifie === false ? 'Écarté' : b.statut || 'Nouveau';
+        comparison = statusA.localeCompare(statusB);
       } else if (sortBy === 'emails_count') {
         comparison = (a.emails_count || 0) - (b.emails_count || 0);
       }
@@ -756,9 +759,9 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
           }}
         >
           <option value="All">Tous les statuts</option>
-          {Array.from(new Set(leads.map(l => l.statut).filter(Boolean))).map(st => (
-            <option key={st} value={st}>{st}</option>
-          ))}
+          <option value="Nouveau">Nouveau</option>
+          <option value="Qualifié">Qualifié</option>
+          <option value="Écarté">Écarté</option>
         </select>
 
         {/* Source Filter */}
@@ -856,8 +859,8 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                       )}
                     </td>
                     <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
-                      <span className={`badge badge-${lead.statut === 'Qualifié' ? 'qualified' : lead.statut === 'Écarté' ? 'discarded' : lead.statut === 'Erreur' ? 'error' : 'new'}`}>
-                        {lead.statut}
+                      <span className={`badge badge-${lead.est_qualifie === true ? 'qualified' : lead.est_qualifie === false ? 'discarded' : lead.statut === 'Erreur' ? 'error' : 'new'}`}>
+                        {lead.est_qualifie === true ? 'Qualifié' : lead.est_qualifie === false ? 'Écarté' : lead.statut || 'Nouveau'}
                       </span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
