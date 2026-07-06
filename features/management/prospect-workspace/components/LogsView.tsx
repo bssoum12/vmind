@@ -59,7 +59,7 @@ export default function LogsView({ logs }: LogsViewProps) {
           <h1>Journaux d&apos;Exécution</h1>
           <p>Suivi en temps réel des actions menées par les agents VMIND (Collecte, Qualification, Prospection)</p>
         </div>
-        <button className="btn btn-secondary" onClick={() => fetchLogs(true)}>
+        <button className="btn btn-secondary" onClick={() => {}}>
           🔄 Actualiser les Logs
         </button>
       </div>

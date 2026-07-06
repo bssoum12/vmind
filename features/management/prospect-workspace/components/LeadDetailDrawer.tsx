@@ -60,7 +60,14 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
   useEffect(() => {
     if (lead) {
       setSujet(lead.sujet || '');
-      setStatut(lead.statut || '');
+      
+      let currentStatus = 'Nouveau';
+      if ((lead as any).est_qualifie === true) currentStatus = 'Qualifié';
+      else if ((lead as any).est_qualifie === false) currentStatus = 'Écarté';
+      else if ((lead as any).statut_traitement) currentStatus = (lead as any).statut_traitement;
+      else currentStatus = lead.statut || 'Nouveau';
+      setStatut(currentStatus);
+
       setCorps(lead.corps || '');
       setCc(lead.email_cc !== undefined && lead.email_cc !== null ? lead.email_cc : (defaultCc || ''));
       

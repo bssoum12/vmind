@@ -325,7 +325,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                           {agent.run_mode === 'prospection' && (
                             <button
                               className="row-btn"
-                              onClick={() => router.push(`/prospect-agent-workspace/${agent.agent_id || 1}`)}
+                              onClick={() => router.push(`/prospect-agent-workspace/${(agent as any).agent_id || 1}`)}
                               title="Ouvrir l'espace de travail"
                               style={{ color: '#00E5C8', borderColor: 'rgba(0,229,200,0.3)' }}
                             >
