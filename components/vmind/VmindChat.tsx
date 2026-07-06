@@ -46,6 +46,15 @@ const getToolDisplayName = (tool?: string | null) => {
   return TOOL_DISPLAY_NAMES[tool] || tool.replace(/_/g, ' ');
 };
 
+const FAST_TRACK_REGISTRY: Record<string, string> = {
+  "Taux livraison à temps ?": "Veuillez me fournir le taux de livraison à temps global.",
+  "Compare Jan-Avr ?": "Fais une comparaison détaillée des indicateurs entre Janvier et Avril.",
+  "3 KPIs dégradés ?": "Affiche-moi les 3 KPIs les plus dégradés actuellement.",
+  "Rapport mensuel PDF ?": "Génère et affiche le rapport mensuel d'activité au format PDF.",
+  "Retards par type client ?": "Quels sont les retards actuels classés par type de client ?",
+  "Volume 12 mois ?": "Quel est le volume total traité sur les 12 derniers mois ?"
+};
+
 export const VmindChat: React.FC<VmindChatProps> = ({
   initialPrompt,
   onOpenVoice,
@@ -157,6 +166,89 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         }]);
       }
 
+    } catch (error: any) {
+      setMessages((prev) => prev.filter(m => !m.isThinking));
+      setMessages((prev) => [...prev, {
+        id: `err-${Date.now()}`,
+        sender: 'vm',
+        text: `Erreur de communication avec n8n : ${error.message}`,
+        time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+        error: error.message,
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFastTrackClick = async (shortLabel: string) => {
+    if (isLoading) return;
+    
+    const professionalMessage = FAST_TRACK_REGISTRY[shortLabel];
+    if (!professionalMessage) return;
+
+    setInput('');
+    setIsLoading(true);
+
+    const userMessage: VmindMessage = {
+      id: `user-${Date.now()}`,
+      sender: 'user',
+      text: professionalMessage,
+      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+    };
+
+    const thinkingMessage: VmindMessage = {
+      id: `thinking-${Date.now()}`,
+      sender: 'vm',
+      text: '',
+      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+      isThinking: true,
+    };
+
+    setMessages((prev) => [...prev, userMessage, thinkingMessage]);
+
+    try {
+      // Déclenche le Webhook n8n comme pour un message normal (via l'IA)
+      let response = await sendVmindMessage(professionalMessage, clientId);
+
+      setMessages((prev) => prev.filter(m => !m.isThinking));
+
+      const isOk = response && (response.ok === true || (response.ok as any) === "true");
+
+      if (!isOk) {
+        setMessages((prev) => [...prev, {
+          id: `err-${Date.now()}`,
+          sender: 'vm',
+          text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
+          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          error: response?.error || 'NO_RESPONSE',
+          response_type: 'error',
+          title: response?.title || 'Erreur n8n'
+        }]);
+      } else {
+        const toolUsed = response.tool_used as string;
+        const agentId = TOOL_TO_AGENT[toolUsed] || 'VMIND';
+
+        if (onAgentActive) onAgentActive(agentId);
+
+        setMessages((prev) => [...prev, {
+          id: `vm-${Date.now()}`,
+          sender: 'vm',
+          text: response.message || 'Voici les informations demandées.',
+          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          tool_used: response.tool_used,
+          response_type: response.response_type || 'full',
+          title: response.title,
+          kpis: response.kpis,
+          table: response.table,
+          chart: response.chart,
+          details: response.details,
+          raw: response.raw,
+          alerts: response.alerts,
+          report_url: response.report_url,
+          report_filename: response.report_filename,
+          error: response.error
+        }]);
+      }
     } catch (error: any) {
       setMessages((prev) => prev.filter(m => !m.isThinking));
       setMessages((prev) => [...prev, {
@@ -320,54 +412,17 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         {/* Suggestions Zone */}
         {activeAgentId === 'VDATA' && (
           <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
-            <button
-              onClick={() => handleSuggestionClick("Quel est le taux de dossiers livrés à temps ce mois ?", "/api/tools/get-delivery-rate", {})}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Taux livraison à temps ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick("Compare les performances de janvier à avril par agence", "/api/tools/compare-agency-performance-jan-apr", {})}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Compare Jan-Avr ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick("Quels sont les 3 indicateurs les plus dégradés cette semaine ?", "/api/tools/get-degraded-kpis", {})}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              3 KPIs dégradés ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick("Génère le rapport mensuel global d'activité", "/api/tools/generate-monthly-activity-report", {})}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Rapport mensuel PDF ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick("Analyse la corrélation entre retards et type de client", "/api/tools/analyze-delay-by-client-type", {})}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Retards par type client ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick("Montre-moi l'évolution du volume des dossiers sur 12 mois", "/api/tools/get-dossier-volume-evolution", { months: 12 })}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Volume 12 mois ?
-            </button>
+            {Object.keys(FAST_TRACK_REGISTRY).map((label) => (
+              <button
+                key={label}
+                onClick={() => handleFastTrackClick(label)}
+                className="suggestion-chip"
+                style={{ flexShrink: 0 }}
+                disabled={isLoading}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         )}
 
