@@ -1,5 +1,6 @@
 'use client';
 
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 
@@ -175,7 +176,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
     }
   };
 
-  const isQualified = lead.est_qualifie === true || (lead.score !== null && lead.score >= threshold) || statut === 'Qualifié';
+  const isQualified = statut.includes('Qualifi') ? true : statut.includes('cart') ? false : (lead.est_qualifie === true || (lead.score !== null && lead.score >= threshold));
 
   return (
     <>
@@ -319,6 +320,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
                 value={statut}
                 onChange={(e) => handleManualStatusChange(e.target.value)}
               >
+                <option value="Nouveau">Nouveau</option>
                 <option value="Qualifié">Qualifié</option>
                 <option value="Écarté">Écarté</option>
               </select>

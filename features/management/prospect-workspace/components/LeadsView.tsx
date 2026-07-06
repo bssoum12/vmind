@@ -121,9 +121,12 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
       } else if (sortBy === 'score') {
         comparison = (a.score ?? -1) - (b.score ?? -1);
       } else if (sortBy === 'statut') {
-        const statusA = a.est_qualifie === true ? 'Qualifié' : a.est_qualifie === false ? 'Écarté' : a.statut || 'Nouveau';
-        const statusB = b.est_qualifie === true ? 'Qualifié' : b.est_qualifie === false ? 'Écarté' : b.statut || 'Nouveau';
-        comparison = statusA.localeCompare(statusB);
+        const getStatusWeight = (lead: Lead) => {
+          if (lead.est_qualifie === true) return 3; // Qualifié
+          if (lead.est_qualifie === false) return 1; // Écarté
+          return 2; // Nouveau or anything else
+        };
+        comparison = getStatusWeight(a) - getStatusWeight(b);
       } else if (sortBy === 'emails_count') {
         comparison = (a.emails_count || 0) - (b.emails_count || 0);
       }

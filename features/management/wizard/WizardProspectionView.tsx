@@ -1,5 +1,6 @@
 'use client';
 
+
 import React, { useState } from 'react';
 import { Button } from '@/shared/management/components/Button';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
