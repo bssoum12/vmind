@@ -73,7 +73,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
           agents = data.agents;
         }
         // Filter out agents that don't have an agent_id and ensure they are prospection agents
-        const validProspectAgents = agents.filter((a: any) => 
+        const validProspectAgents = agents.filter((a: any) =>
           a && a.agent_id != null && a.run_mode === 'prospection'
         );
         setAvailableAgents(validProspectAgents);
@@ -82,9 +82,9 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
   }, []);
 
   const handleAgentToggle = (id: number) => {
-    setSelectedAgentIds(prev => 
-      prev.includes(id) && prev.length > 1 ? prev.filter(a => a !== id) : 
-      prev.includes(id) ? prev : [...prev, id]
+    setSelectedAgentIds(prev =>
+      prev.includes(id) && prev.length > 1 ? prev.filter(a => a !== id) :
+        prev.includes(id) ? prev : [...prev, id]
     );
   };
 
@@ -121,12 +121,9 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
       } else if (sortBy === 'score') {
         comparison = (a.score ?? -1) - (b.score ?? -1);
       } else if (sortBy === 'statut') {
-        const getStatusWeight = (lead: Lead) => {
-          if (lead.est_qualifie === true) return 3; // Qualifié
-          if (lead.est_qualifie === false) return 1; // Écarté
-          return 2; // Nouveau or anything else
-        };
-        comparison = getStatusWeight(a) - getStatusWeight(b);
+        const statusA = a.est_qualifie === true ? 'Qualifié' : a.est_qualifie === false ? 'Écarté' : a.statut || 'Nouveau';
+        const statusB = b.est_qualifie === true ? 'Qualifié' : b.est_qualifie === false ? 'Écarté' : b.statut || 'Nouveau';
+        comparison = statusA.localeCompare(statusB);
       } else if (sortBy === 'emails_count') {
         comparison = (a.emails_count || 0) - (b.emails_count || 0);
       }

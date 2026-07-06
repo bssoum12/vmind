@@ -71,6 +71,14 @@ export default function AgentWorkspacePage() {
     setIsDrawerOpen(true);
   };
 
+  const handleOpenLeadById = (id: number) => {
+    const lead = leads.find((l: any) => l.id === id);
+    if (lead) {
+      setSelectedLead(lead);
+      setIsDrawerOpen(true);
+    }
+  };
+
   return (
     <div className="workspace-container app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden' }}>
 
@@ -135,7 +143,7 @@ export default function AgentWorkspacePage() {
           <div style={{ padding: '2.5rem', maxWidth: '1600px', margin: '0 auto' }}>
             {activeTab === 'dashboard' && <DashboardView leads={leads} campaigns={campaigns} threshold={60} />}
             {activeTab === 'leads' && <LeadsView leads={leads} threshold={60} onOpenLead={handleOpenLead} onRefresh={fetchData} />}
-            {activeTab === 'outbox' && <CampaignsView campaigns={campaigns} onRefresh={fetchData} defaultCc="" onOpenLeadById={() => { }} />}
+            {activeTab === 'outbox' && <CampaignsView campaigns={campaigns} onRefresh={fetchData} defaultCc="" onOpenLeadById={handleOpenLeadById} />}
             {activeTab === 'logs' && <LogsView logs={logs} />}
           </div>
         )}

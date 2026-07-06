@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 
 import React, { useState, useEffect } from 'react';
@@ -53,24 +53,17 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
   const [isSending, setIsSending] = useState(false);
   const [isSavingEmail, setIsSavingEmail] = useState(false);
   const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
-  
+
   const params = useParams();
   const agentId = params.agentId;
 
   useEffect(() => {
     if (lead) {
       setSujet(lead.sujet || '');
-      
-      let currentStatus = 'Nouveau';
-      if ((lead as any).est_qualifie === true) currentStatus = 'Qualifié';
-      else if ((lead as any).est_qualifie === false) currentStatus = 'Écarté';
-      else if ((lead as any).statut_traitement) currentStatus = (lead as any).statut_traitement;
-      else currentStatus = lead.statut || 'Nouveau';
-      setStatut(currentStatus);
-
+      setStatut(lead.statut || '');
       setCorps(lead.corps || '');
       setCc(lead.email_cc !== undefined && lead.email_cc !== null ? lead.email_cc : (defaultCc || ''));
-      
+
       // Reset loading states when switching leads
       setIsQualifying(false);
       setIsSending(false);
@@ -183,7 +176,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
     }
   };
 
-  const isQualified = statut.includes('Qualifi') ? true : statut.includes('cart') ? false : (lead.est_qualifie === true || (lead.score !== null && lead.score >= threshold));
+  const isQualified = statut.includes('Qualifi') ? true : statut.includes('cart') ? false : ((lead as any).est_qualifie === true || (lead.score !== null && lead.score >= threshold));
 
   return (
     <>
@@ -327,7 +320,6 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
                 value={statut}
                 onChange={(e) => handleManualStatusChange(e.target.value)}
               >
-                <option value="Nouveau">Nouveau</option>
                 <option value="Qualifié">Qualifié</option>
                 <option value="Écarté">Écarté</option>
               </select>
@@ -404,3 +396,4 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
     </>
   );
 }
+
