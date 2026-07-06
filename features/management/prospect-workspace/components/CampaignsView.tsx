@@ -1,7 +1,7 @@
 'use client';
 
-
 import React, { useState, useEffect, useMemo } from 'react';
+import { useParams } from 'next/navigation';
 
 interface EmailCampaign {
   id: number;
@@ -26,7 +26,11 @@ interface CampaignsViewProps {
   onOpenLeadById: (id: number) => void;
 }
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
 export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenLeadById }: CampaignsViewProps) {
+  const params = useParams();
+  const agentId = params.agentId;
   const [selectedEmail, setSelectedEmail] = useState<EmailCampaign | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sujet, setSujet] = useState('');
@@ -53,7 +57,11 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((email) => {
       // Status filter
-      if (statusFilter !== 'All' && email.statut !== statusFilter) return false;
+      if (statusFilter !== 'All') {
+        if (statusFilter === 'Succès' && !['Succès', 'Envoyé'].includes(email.statut)) return false;
+        else if (statusFilter === 'Erreur' && !['Erreur', 'Echec'].includes(email.statut)) return false;
+        else if (!['Succès', 'Erreur'].includes(statusFilter) && email.statut !== statusFilter) return false;
+      }
       
       // Mode filter
       const mode = email.mode_envoi || 'Manuel';
@@ -99,9 +107,9 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
       window.location.href = mailtoUrl;
 
       // Record sending result in SQL Server
-      const res = await fetch('/api/leads', {
+      const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-client-id': 'PROSPECT_AGENT', 'x-user-id': '1' },
         body: JSON.stringify({
           id: selectedEmail.lead_id,
           action: 'send_email',
@@ -198,7 +206,10 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
           }}
         >
           <option value="All">Tous les statuts</option>
-          {Array.from(new Set(campaigns.map(c => c.statut).filter(Boolean))).map(st => (
+          <option value="Succès">Succès / Délivré</option>
+          <option value="Erreur">Erreur</option>
+          <option value="Brouillon">Brouillon</option>
+          {Array.from(new Set(campaigns.map(c => c.statut).filter(Boolean))).filter(s => !['Succès', 'Erreur', 'Brouillon', 'Envoyé', 'Echec'].includes(s)).map(st => (
             <option key={st} value={st}>{st}</option>
           ))}
         </select>
@@ -213,7 +224,9 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
           }}
         >
           <option value="All">Tous les modes</option>
-          {Array.from(new Set(campaigns.map(c => c.mode_envoi).filter(Boolean))).map(mode => (
+          <option value="Auto">🤖 Automatique</option>
+          <option value="Manuel">👤 Manuel</option>
+          {Array.from(new Set(campaigns.map(c => c.mode_envoi).filter(Boolean))).filter(m => m !== 'Auto' && m !== 'Manuel').map(mode => (
             <option key={mode} value={mode}>{mode}</option>
           ))}
         </select>
