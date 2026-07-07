@@ -16,6 +16,9 @@ interface VmindChatProps {
 
 // Mappage des tools snake_case vers les agents
 const TOOL_TO_AGENT: Record<string, string> = {
+  'get_delivery_rate': 'VDATA',
+  'get_degraded_kpis': 'VDATA',
+  'get_dossier_volume_evolution': 'VDATA',
   'get_invoice_detail': 'VDATA',
   'get_dossier_detail': 'VDATA',
   'get_expedition_status': 'VDATA',
