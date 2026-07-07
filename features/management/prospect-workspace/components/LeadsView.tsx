@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
+import GlobalLeadsModal from './GlobalLeadsModal';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -58,6 +59,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
   const [isBulkQualifying, setIsBulkQualifying] = useState(false);
   const [qualifyingCount, setQualifyingCount] = useState(0);
+  const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
 
   const [availableAgents, setAvailableAgents] = useState<any[]>([]);
   const [selectedAgentIds, setSelectedAgentIds] = useState<number[]>([Number(agentId)]);
@@ -485,7 +487,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
           >
             {isBulkQualifying ? '🤖 Qualification...' : `🤖 Qualifier la sélection (${filteredLeads.length})`}
           </button>
-          <button className="btn btn-primary" onClick={() => setShowImportConsole(!showImportConsole)}>
+          <button className="btn btn-primary" onClick={() => setIsGlobalModalOpen(true)}>
+              ✨ Assigner Prospect Existant
+            </button>
+            <button className="btn btn-primary" onClick={() => setShowImportConsole(!showImportConsole)}>
             ⚡ Ingestion Prospects {showImportConsole ? '▲' : '▼'}
           </button>
           <input
@@ -524,6 +529,13 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
           `}</style>
         </div>
       )}
+
+      <GlobalLeadsModal
+        isOpen={isGlobalModalOpen}
+        agentId={Number(agentId)}
+        onClose={() => setIsGlobalModalOpen(false)}
+        onSuccess={onRefresh}
+      />
 
       {/* Upload Status Alert */}
       {uploadMessage && (
@@ -1018,6 +1030,14 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
         </div>,
         document.body
       )}
+
+      {/* Global Leads Assignment Modal */}
+      <GlobalLeadsModal
+        isOpen={isGlobalModalOpen}
+        agentId={Number(agentId)}
+        onClose={() => setIsGlobalModalOpen(false)}
+        onSuccess={onRefresh}
+      />
     </div>
   );
 }
