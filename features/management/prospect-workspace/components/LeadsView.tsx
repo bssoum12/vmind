@@ -4,9 +4,9 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
 import GlobalLeadsModal from './GlobalLeadsModal';
+import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-
 
 interface Lead {
   id: number;
@@ -63,6 +63,116 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
   const [availableAgents, setAvailableAgents] = useState<any[]>([]);
   const [selectedAgentIds, setSelectedAgentIds] = useState<number[]>([Number(agentId)]);
+
+  // Tutorial state
+  const [leadsTutorialStep, setLeadsTutorialStep] = useState<number>(0);
+
+  useEffect(() => {
+    if (!localStorage.getItem('vmind_tutorial_workspace_prospects')) {
+      localStorage.setItem('vmind_tutorial_workspace_prospects', 'true');
+      setLeadsTutorialStep(1);
+    }
+  }, []);
+
+  const nextTutorialStep = () => {
+    if (leadsTutorialStep === 5 && filteredLeads.length === 0) {
+      setLeadsTutorialStep(0); // skip 6 if no rows
+    } else if (leadsTutorialStep >= 6) {
+      setLeadsTutorialStep(0);
+    } else {
+      setLeadsTutorialStep(s => s + 1);
+    }
+  };
+
+  const getTutorialContent = () => {
+    switch (leadsTutorialStep) {
+      case 1:
+        return {
+          title: "Exportation",
+          message: "Besoin de vos données en externe ? Exportez instantanément la vue filtrée en CSV.",
+          mood: 'settled' as GuideMood
+        };
+      case 2:
+        return {
+          title: "Qualification en masse",
+          message: "Demandez à l'IA de scanner et qualifier tous les prospects sélectionnés en temps réel.",
+          mood: 'focused' as GuideMood
+        };
+      case 3:
+        return {
+          title: "Assignation",
+          message: "Vous avez des leads globaux ? Cliquez ici pour les affecter directement à cet agent.",
+          mood: 'curious' as GuideMood
+        };
+      case 4:
+        return {
+          title: "Ingestion Avancée",
+          message: "Importez massivement via fichier, API, ou un simple copier-coller. Je m'occupe de la structure.",
+          mood: 'convinced' as GuideMood
+        };
+      case 5:
+        return {
+          title: "Recherche & Filtres",
+          message: "Filtrez vos prospects par recherche texte, statut IA, source, ou score ICP pour trouver l'aiguille dans la botte de foin.",
+          mood: 'focused' as GuideMood
+        };
+      case 6:
+        return {
+          title: "Détails du Prospect",
+          message: "Ouvrez ce panneau pour découvrir l'analyse complète de l'IA, ses recherches web sur l'entreprise, et les emails générés.",
+          mood: 'curious' as GuideMood
+        };
+      default:
+        return null;
+    }
+  };
+
+  const getTabBtnStyle = (step: number) => {
+    if (leadsTutorialStep === step) {
+      return { 
+        position: 'relative' as any, 
+        zIndex: 10001, 
+        boxShadow: '0 0 0 4px rgba(0,229,200,0.8)', 
+        pointerEvents: 'none' as any,
+        background: 'var(--card-bg)'
+      };
+    }
+    return {};
+  };
+
+  const renderTutorialArrow = (step: number) => {
+    if (leadsTutorialStep === step) {
+      return (
+        <div style={{
+          position: 'absolute',
+          top: '-45px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          animation: 'bounceArrow 1.5s infinite ease-in-out',
+          pointerEvents: 'none',
+          zIndex: 10002
+        }}>
+          {[0.2, 0.6, 1].map((opacity, i) => (
+            <div key={i} style={{
+              width: '16px',
+              height: '16px',
+              borderBottom: '4px solid #00E5C8',
+              borderRight: '4px solid #00E5C8',
+              transform: 'rotate(45deg)',
+              opacity: opacity,
+              filter: 'drop-shadow(2px 2px 4px rgba(0, 229, 200, 0.6))',
+              borderRadius: '2px',
+              marginBottom: '-8px'
+            }} />
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/list-agents`, { headers: { 'x-client-id': 'PROSPECT_AGENT' } })
@@ -470,27 +580,53 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
   return (
     <div className="fade-in">
-      <div className="view-header">
+      {/* ── Tutorial Overlay ── */}
+      {leadsTutorialStep > 0 && (
+        <div 
+          onClick={nextTutorialStep}
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.8)', zIndex: 10000,
+            cursor: 'pointer'
+          }} 
+        />
+      )}
+
+      {/* ── VMind Guide for Tutorial ── */}
+      {leadsTutorialStep > 0 && (
+        <VMindGuide 
+          isOpen={leadsTutorialStep > 0}
+          title={getTutorialContent()?.title}
+          message={getTutorialContent()?.message || null}
+          mood={getTutorialContent()?.mood}
+        />
+      )}
+
+      <div className="view-header" style={{ position: 'relative', zIndex: leadsTutorialStep > 0 && leadsTutorialStep < 5 ? 10001 : 1 }}>
         <div className="view-title">
           <h1>Liste des Prospects</h1>
           <p>Visualiser, filtrer et gérer vos leads qualifiés par l&apos;intelligence artificielle</p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button className="btn btn-secondary" onClick={exportToCSV}>
+          <button className="btn btn-secondary" onClick={exportToCSV} style={{ ...getTabBtnStyle(1) }}>
+            {renderTutorialArrow(1)}
             📥 Exporter CSV ({sortedLeads.length})
           </button>
           <button
             className="btn btn-secondary"
             onClick={handleBulkQualify}
             disabled={isBulkQualifying || csvUploading || filteredLeads.length === 0}
-            style={{ borderColor: 'var(--accent-secondary)' }}
+            style={{ borderColor: 'var(--accent-secondary)', ...getTabBtnStyle(2) }}
           >
+            {renderTutorialArrow(2)}
             {isBulkQualifying ? '🤖 Qualification...' : `🤖 Qualifier la sélection (${filteredLeads.length})`}
           </button>
-          <button className="btn btn-primary" onClick={() => setIsGlobalModalOpen(true)}>
+          <button className="btn btn-primary" onClick={() => setIsGlobalModalOpen(true)} style={{ ...getTabBtnStyle(3) }}>
+              {renderTutorialArrow(3)}
               ✨ Assigner Prospect Existant
             </button>
-            <button className="btn btn-primary" onClick={() => setShowImportConsole(!showImportConsole)}>
+            <button className="btn btn-primary" onClick={() => setShowImportConsole(!showImportConsole)} style={{ ...getTabBtnStyle(4) }}>
+            {renderTutorialArrow(4)}
             ⚡ Ingestion Prospects {showImportConsole ? '▲' : '▼'}
           </button>
           <input
@@ -745,7 +881,8 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
       )}
 
       {/* Filters Panel */}
-      <div className="filters-bar">
+      <div className="filters-bar" style={{ ...(leadsTutorialStep === 5 ? getTabBtnStyle(5) : {}) }}>
+        {renderTutorialArrow(5)}
         {/* Search */}
         <div className="search-input-wrapper">
           <span className="search-icon">🔍</span>
@@ -807,7 +944,7 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
       </div>
 
       {/* Table */}
-      <div className="table-container">
+      <div className="table-container" style={{ overflowX: leadsTutorialStep === 6 ? 'visible' : 'auto' }}>
         <table className="leads-table">
           <thead>
             <tr>
@@ -903,9 +1040,10 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                     <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                       <button
                         className="btn btn-secondary"
-                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem' }}
+                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', ...(paginatedLeads.indexOf(lead) === 0 ? getTabBtnStyle(6) : {}) }}
                         onClick={() => onOpenLead(lead)}
                       >
+                        {paginatedLeads.indexOf(lead) === 0 && renderTutorialArrow(6)}
                         👁️ Détail
                       </button>
                     </td>

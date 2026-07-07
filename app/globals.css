@@ -2974,3 +2974,4 @@ textarea.form-input {
   animation: scorePulseExc 2s infinite ease-in-out;
 }
 
+@keyframes bounceArrow { 0% { transform: translate(-50%, 0); } 100% { transform: translate(-50%, -8px); } }

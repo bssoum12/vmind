@@ -2,13 +2,30 @@
 
 
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/shared/management/components/Button';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
+import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
 
 interface WizardViewProps {
   templateId: string;
   onCancel: () => void;
 }
+
+const VIRTUAL_MIND_GUIDE: Record<string, { title: string; text: string }> = {
+  agent_name: { title: "Identité de l'Agent", text: "Donnez un nom unique à votre agent. Ce nom vous aidera à l'identifier facilement dans votre espace de travail et dans les logs de prospection." },
+  modele_llm: { title: "Cerveau de l'Agent (LLM)", text: "Le modèle sélectionné définit l'intelligence de votre agent. Llama 3.3 est recommandé pour sa rapidité et son rapport coût/performance." },
+  secteur_activite: { title: "Secteur d'Activité", text: "Ciblez précisément les secteurs pertinents. VirtualMind analysera le site web du prospect pour vérifier s'il correspond à cette liste." },
+  taille_entreprise: { title: "Taille de l'Entreprise", text: "Filtrez par effectif. Les TPE/PME réagissent différemment des Grands Comptes." },
+  poste_contact: { title: "Cible Décisionnaire", text: "Qui souhaitez-vous contacter ? VirtualMind identifiera la personne la plus proche de ce poste (CEO, DAF, CTO...)." },
+  zone_geo: { title: "Zone Géographique", text: "Où se situent vos prospects idéaux ? L'agent adaptera sa recherche et la langue de contact en conséquence." },
+  seuil_qualification: { title: "Seuil de Qualification", text: "Le score minimal sur 100 requis pour qu'un lead soit considéré comme qualifié et contacté automatiquement par l'agent." },
+  ponderations: { title: "Pondérations ICP", text: "Répartissez l'importance (sur 100) entre le secteur, la taille, le poste et le pays. Cela dicte la formule de scoring IA." },
+  signature_email: { title: "Signature d'Email", text: "Cette signature sera insérée automatiquement à la fin de tous les emails générés par VirtualMind. Soyez professionnel !" },
+  default_cc: { title: "Copie Conforme (CC)", text: "Ajoutez votre adresse email ou celle d'un manager pour recevoir une copie des emails envoyés aux prospects." },
+  email_limits: { title: "Cadence d'Envoi", text: "Configurez le délai entre chaque email pour éviter d'être marqué comme spam. Les limites journalières protègent la réputation de votre domaine." },
+  trigger_rules: { title: "Planification Autonome", text: "Définissez quand votre agent doit s'activer de manière autonome (ex: tous les lundis à 8h). N8N gère cette orchestration." }
+};
 
 interface TriggerRule {
   interval: string;
@@ -28,12 +45,16 @@ function TagInput({
   tags,
   onChange,
   placeholder,
-  suggestions
+  suggestions,
+  onFocus,
+  onBlur
 }: {
   tags: string[];
   onChange: (tags: string[]) => void;
   placeholder: string;
   suggestions: string[];
+  onFocus?: () => void;
+  onBlur?: () => void;
 }) {
   const [inputValue, setInputValue] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -101,7 +122,16 @@ function TagInput({
             setInputValue(e.target.value);
             setShowSuggestions(true);
           }}
-          onFocus={() => setShowSuggestions(true)}
+          onFocus={(e) => {
+          setShowSuggestions(true);
+          if (onFocus) onFocus();
+        }}
+        onBlur={(e) => {
+          setTimeout(() => {
+            if (onBlur) onBlur();
+            setShowSuggestions(false);
+          }, 200);
+        }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
@@ -168,6 +198,16 @@ function TagInput({
 
 export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, onCancel }) => {
   const [step, setStep] = useState(1);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  const getMoodForField = (field: string | null): GuideMood => {
+    if (!field) return 'curious';
+    const curiousFields = ['agent_name', 'zone_geo', 'taille_entreprise'];
+    const convincedFields = ['modele_llm', 'seuil_qualification', 'ponderations'];
+    if (curiousFields.includes(field)) return 'curious';
+    if (convincedFields.includes(field)) return 'convinced';
+    return 'focused';
+  };
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployed, setDeployed] = useState(false);
   const template = AGENT_TEMPLATES.find(t => t.id === templateId);
@@ -436,7 +476,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <input
                       type="text"
                       className="form-input"
-                      value={formData.agent_name}
+                      value={formData.agent_name} onFocus={() => setFocusedField('agent_name')} onBlur={() => setFocusedField(null)}
                       onChange={(e) => setFormData({ ...formData, agent_name: e.target.value })}
                       placeholder="Ex: Yasmine, Mohamed, Amira..."
                     />
@@ -446,7 +486,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <label className="form-label">Modèle de Langage (LLM)</label>
                     <select
                       className="form-input"
-                      value={formData.prospection_config.modele_llm}
+                      value={formData.prospection_config.modele_llm} onFocus={() => setFocusedField('modele_llm')} onBlur={() => setFocusedField(null)}
                       onChange={(e) => setFormData({
                         ...formData,
                         prospection_config: { ...formData.prospection_config, modele_llm: e.target.value }
@@ -460,12 +500,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                   </div>
                 </div>
 
-                <div className="form-group" style={{ marginTop: '10px' }}>
-                  <label className="form-label">Mode Opérationnel (Automatique Uniquement)</label>
-                  <div style={{ padding: '10px', backgroundColor: 'rgba(255, 255, 255, 0.05)', borderRadius: '6px', color: 'var(--muted)', fontSize: '0.9rem' }}>
-                    L'agent est configuré en mode <strong>Automatique</strong>. Il qualifiera les leads et enverra directement les emails si le score dépasse le seuil, sans validation humaine préalable.
-                  </div>
-                </div>
+                
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <Button variant="primary" onClick={() => validateAndNext(2)}>Profil Client (ICP) →</Button>
@@ -483,7 +518,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <label className="form-label">Secteur d'activité</label>
                     <TagInput
                       tags={formData.prospection_config.icp.secteur_activite}
-                      onChange={(t) => updateIcp('secteur_activite', t)}
+                      onChange={(t) => updateIcp('secteur_activite', t)} onFocus={() => setFocusedField('secteur_activite')} onBlur={() => setFocusedField(null)}
                       placeholder="Ajouter un secteur..."
                       suggestions={['Transport', 'Logistique', 'Industrie', 'Commerce', 'BTP', 'Santé', 'IT', 'Finance', 'E-commerce', 'Energie', 'Services']}
                     />
@@ -495,14 +530,14 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                         type="number"
                         className="form-input"
                         style={{ flex: 1 }}
-                        value={formData.prospection_config.icp.taille_min}
+                        value={formData.prospection_config.icp.taille_min} onFocus={() => setFocusedField('taille_entreprise')} onBlur={() => setFocusedField(null)}
                         onChange={(e) => updateIcp('taille_min', Number(e.target.value))}
                       />
                       <input
                         type="number"
                         className="form-input"
                         style={{ flex: 1 }}
-                        value={formData.prospection_config.icp.taille_max}
+                        value={formData.prospection_config.icp.taille_max} onFocus={() => setFocusedField('taille_entreprise')} onBlur={() => setFocusedField(null)}
                         onChange={(e) => updateIcp('taille_max', Number(e.target.value))}
                       />
                     </div>
@@ -514,7 +549,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <label className="form-label">Poste du contact</label>
                     <TagInput
                       tags={formData.prospection_config.icp.poste_contact}
-                      onChange={(t) => updateIcp('poste_contact', t)}
+                      onChange={(t) => updateIcp('poste_contact', t)} onFocus={() => setFocusedField('poste_contact')} onBlur={() => setFocusedField(null)}
                       placeholder="Ajouter un poste..."
                       suggestions={['DAF', 'DSI', 'Directeur Ops', 'DG', 'PDG', 'Responsable Logistique', 'Directeur Commercial', 'CEO', 'CTO', 'Directeur Marketing', 'Responsable Achats']}
                     />
@@ -523,7 +558,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <label className="form-label">Zone géographique</label>
                     <TagInput
                       tags={formData.prospection_config.icp.zone_geo}
-                      onChange={(t) => updateIcp('zone_geo', t)}
+                      onChange={(t) => updateIcp('zone_geo', t)} onFocus={() => setFocusedField('zone_geo')} onBlur={() => setFocusedField(null)}
                       placeholder="Ajouter un pays..."
                       suggestions={['Tunisie', 'Maroc', 'Belgique', 'France', 'Suisse', 'Canada', 'Sénégal', 'Côte d\'Ivoire', 'Algérie', 'Monaco', 'Luxembourg']}
                     />
@@ -540,7 +575,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     min="0"
                     max="100"
                     style={{ width: '100%', marginBottom: '10px' }}
-                    value={formData.prospection_config.icp.seuil_qualification}
+                    value={formData.prospection_config.icp.seuil_qualification} onFocus={() => setFocusedField('seuil_qualification')} onBlur={() => setFocusedField(null)}
                     onChange={(e) => updateIcp('seuil_qualification', parseInt(e.target.value))}
                   />
                 </div>
@@ -550,7 +585,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <input
                       type="number"
                       className="form-input"
-                      value={formData.prospection_config.icp.poids_secteur}
+                      value={formData.prospection_config.icp.poids_secteur} onFocus={() => setFocusedField('ponderations')} onBlur={() => setFocusedField(null)}
                       onChange={(e) => updateIcp('poids_secteur', Number(e.target.value))}
                     />
                   </div>
@@ -559,7 +594,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <input
                       type="number"
                       className="form-input"
-                      value={formData.prospection_config.icp.poids_taille}
+                      value={formData.prospection_config.icp.poids_taille} onFocus={() => setFocusedField('ponderations')} onBlur={() => setFocusedField(null)}
                       onChange={(e) => updateIcp('poids_taille', Number(e.target.value))}
                     />
                   </div>
@@ -568,7 +603,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <input
                       type="number"
                       className="form-input"
-                      value={formData.prospection_config.icp.poids_poste}
+                      value={formData.prospection_config.icp.poids_poste} onFocus={() => setFocusedField('ponderations')} onBlur={() => setFocusedField(null)}
                       onChange={(e) => updateIcp('poids_poste', Number(e.target.value))}
                     />
                   </div>
@@ -577,7 +612,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <input
                       type="number"
                       className="form-input"
-                      value={formData.prospection_config.icp.poids_pays}
+                      value={formData.prospection_config.icp.poids_pays} onFocus={() => setFocusedField('ponderations')} onBlur={() => setFocusedField(null)}
                       onChange={(e) => updateIcp('poids_pays', Number(e.target.value))}
                     />
                   </div>
@@ -601,7 +636,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                   <textarea
                     className="form-input"
                     style={{ minHeight: '100px', fontSize: '13px', lineHeight: '1.5' }}
-                    value={formData.prospection_config.campaign.signature_email}
+                    value={formData.prospection_config.campaign.signature_email} onFocus={() => setFocusedField('signature_email')} onBlur={() => setFocusedField(null)}
                     onChange={(e) => updateCampaign('signature_email', e.target.value)}
                     placeholder="Cordialement,&#10;L'équipe Commerciale..."
                   />
@@ -611,7 +646,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                   <label className="form-label">Copie conforme (CC) par défaut</label>
                   <TagInput
                     tags={formData.prospection_config.campaign.default_cc ? formData.prospection_config.campaign.default_cc.split(/[,;]+/).map(s => s.trim()).filter(Boolean) : []}
-                    onChange={(tags) => updateCampaign('default_cc', tags.join(','))}
+                    onChange={(tags) => updateCampaign('default_cc', tags.join(','))} onFocus={() => setFocusedField('default_cc')} onBlur={() => setFocusedField(null)}
                     placeholder="Ajouter une adresse email..."
                     suggestions={[]}
                   />
@@ -626,7 +661,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <input
                       type="number"
                       className="form-input"
-                      value={formData.prospection_config.campaign.delai_envois}
+                      value={formData.prospection_config.campaign.delai_envois} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
                       onChange={(e) => updateCampaign('delai_envois', Number(e.target.value))}
                     />
                   </div>
@@ -635,7 +670,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <input
                       type="number"
                       className="form-input"
-                      value={formData.prospection_config.campaign.max_emails_jour}
+                      value={formData.prospection_config.campaign.max_emails_jour} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
                       onChange={(e) => updateCampaign('max_emails_jour', Number(e.target.value))}
                     />
                   </div>
@@ -645,7 +680,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                   <label className="form-label">Email de récapitulatif quotidien</label>
                   <TagInput
                     tags={formData.prospection_config.campaign.email_recap ? formData.prospection_config.campaign.email_recap.split(',').map(s => s.trim()).filter(Boolean) : []}
-                    onChange={(tags) => updateCampaign('email_recap', tags.join(','))}
+                    onChange={(tags) => updateCampaign('email_recap', tags.join(','))} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
                     placeholder="Ajouter une adresse email..."
                     suggestions={[]}
                   />
@@ -735,7 +770,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                             <label className="form-label" style={{ fontWeight: 'bold' }}>Trigger Interval</label>
                             <select
                               className="form-input"
-                              value={rule.interval}
+                              value={rule.interval} onFocus={() => setFocusedField('trigger_rules')} onBlur={() => setFocusedField(null)}
                               onChange={(e) => updateTriggerRuleAtIndex(index, 'interval', e.target.value)}
                             >
                               <option value="Seconds">Seconds</option>
@@ -758,7 +793,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                                 className="form-input"
                                 min="1"
                                 max="59"
-                                value={rule.secondsBetween}
+                                value={rule.secondsBetween} onFocus={() => setFocusedField('trigger_rules')} onBlur={() => setFocusedField(null)}
                                 onChange={(e) => updateTriggerRuleAtIndex(index, 'secondsBetween', Number(e.target.value))}
                               />
                             </div>
@@ -772,7 +807,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                                 className="form-input"
                                 min="1"
                                 max="59"
-                                value={rule.minutesBetween}
+                                value={rule.minutesBetween} onFocus={() => setFocusedField('trigger_rules')} onBlur={() => setFocusedField(null)}
                                 onChange={(e) => updateTriggerRuleAtIndex(index, 'minutesBetween', Number(e.target.value))}
                               />
                             </div>
@@ -787,7 +822,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                                   className="form-input"
                                   min="1"
                                   max="23"
-                                  value={rule.hoursBetween}
+                                  value={rule.hoursBetween} onFocus={() => setFocusedField('trigger_rules')} onBlur={() => setFocusedField(null)}
                                   onChange={(e) => updateTriggerRuleAtIndex(index, 'hoursBetween', Number(e.target.value))}
                                 />
                               </div>
@@ -798,7 +833,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                                   className="form-input"
                                   min="0"
                                   max="59"
-                                  value={rule.triggerAtMinute}
+                                  value={rule.triggerAtMinute} onFocus={() => setFocusedField('trigger_rules')} onBlur={() => setFocusedField(null)}
                                   onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtMinute', Number(e.target.value))}
                                 />
                               </div>
@@ -837,7 +872,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                                   className="form-input"
                                   min="0"
                                   max="59"
-                                  value={rule.triggerAtMinute}
+                                  value={rule.triggerAtMinute} onFocus={() => setFocusedField('trigger_rules')} onBlur={() => setFocusedField(null)}
                                   onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtMinute', Number(e.target.value))}
                                 />
                               </div>
@@ -936,6 +971,15 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
               </div>
             </div>
           )}
+
+        
+            {/* VirtualMind Floating Guide */}
+      <VMindGuide 
+        isOpen={!!focusedField}
+        title={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].title : undefined}
+        message={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].text : null}
+        mood={getMoodForField(focusedField)}
+      />
 
         </div>
       </div>

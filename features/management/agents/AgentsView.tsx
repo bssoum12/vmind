@@ -9,6 +9,7 @@ import {
   runAgentNow,
 } from '@/shared/api/n8n-api';
 import { useRouter } from 'next/navigation';
+import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
 
 interface AgentsViewProps {
   onNavigate: (view: string) => void;
@@ -64,6 +65,134 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const [selected, setSelected] = useState<LiveAgent | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null); // agent_name being actioned
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
+
+  // Tutorial state
+  const [tutorialStep, setTutorialStep] = useState<number>(0);
+  const [tutorialAgent, setTutorialAgent] = useState<LiveAgent | null>(null);
+
+  const startTutorial = (agent: LiveAgent) => {
+    const storageKey = `vmind_tutorial_done_${agent.run_mode}`;
+    if (localStorage.getItem(storageKey)) return;
+    
+    localStorage.setItem(storageKey, 'true');
+    setTutorialAgent(agent);
+    setTutorialStep(1);
+  };
+
+  const restartTutorial = () => {
+    // Clear all tutorial keys
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('vmind_tutorial_done_')) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+    
+    // Also remove the old generic key just in case
+    localStorage.removeItem('vmind_agent_tutorial_done');
+    
+    showToast('Tutoriels réinitialisés pour tous les types d\'agents. Survolez un agent pour commencer.', 'ok');
+  };
+
+  const nextTutorialStep = () => {
+    if (tutorialStep === 3 && tutorialAgent?.run_mode !== 'prospection') {
+      setTutorialStep(5);
+    } else if (tutorialStep >= 5) {
+      setTutorialStep(0);
+      setTutorialAgent(null);
+    } else {
+      setTutorialStep(s => s + 1);
+    }
+  };
+
+  const getTutorialContent = () => {
+    if (!tutorialAgent) return null;
+    switch (tutorialStep) {
+      case 1:
+        return {
+          title: "Exécution Immédiate",
+          message: "Exécutez l'agent immédiatement, indépendamment de sa planification.",
+          mood: 'focused' as GuideMood
+        };
+      case 2:
+        return {
+          title: "Activer / Désactiver",
+          message: tutorialAgent.run_mode === 'prospection' 
+            ? "Le bouton Start active le mode automatique. L'agent commencera à envoyer des emails de prospection selon vos limites."
+            : "Le bouton Start active la planification cron pour relancer automatiquement les impayés.",
+          mood: 'convinced' as GuideMood
+        };
+      case 3:
+        return {
+          title: "Configuration",
+          message: "Modifiez la configuration de cet agent à tout moment.",
+          mood: 'focused' as GuideMood
+        };
+      case 4:
+        return {
+          title: "Espace de Travail",
+          message: "Ouvrez l'Espace de Travail pour suivre vos leads, valider les emails et superviser l'agent.",
+          mood: 'curious' as GuideMood
+        };
+      case 5:
+        return {
+          title: "Suppression",
+          message: "Supprimez définitivement cet agent. Soyez certain de votre choix.",
+          mood: 'settled' as GuideMood
+        };
+      default:
+        return null;
+    }
+  };
+
+  const getBtnStyle = (agent: LiveAgent, step: number) => {
+    if (tutorialStep === step && tutorialAgent?.agent_name === agent.agent_name) {
+      return { 
+        position: 'relative' as any, 
+        zIndex: 10001, 
+        boxShadow: '0 0 0 4px rgba(0,229,200,0.8)', 
+        pointerEvents: 'none' as any,
+        background: 'var(--card-bg)'
+      };
+    }
+    return {};
+  };
+
+  const renderTutorialArrow = (agent: LiveAgent, step: number) => {
+    if (tutorialStep === step && tutorialAgent?.agent_name === agent.agent_name) {
+      return (
+        <div style={{
+          position: 'absolute',
+          top: '-45px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          animation: 'bounceArrow 1.5s infinite ease-in-out',
+          pointerEvents: 'none',
+          zIndex: 10002
+        }}>
+          {[0.2, 0.6, 1].map((opacity, i) => (
+            <div key={i} style={{
+              width: '16px',
+              height: '16px',
+              borderBottom: '4px solid #00E5C8',
+              borderRight: '4px solid #00E5C8',
+              transform: 'rotate(45deg)',
+              opacity: opacity,
+              filter: 'drop-shadow(2px 2px 4px rgba(0, 229, 200, 0.6))',
+              borderRadius: '2px',
+              marginBottom: '-8px' // overlaps them slightly
+            }} />
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
 
   const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setToast({ msg, type });
@@ -154,6 +283,28 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   return (
     <div id="view-agents" className="anim" style={{ position: 'relative' }}>
 
+      {/* ── Tutorial Overlay ── */}
+      {tutorialStep > 0 && (
+        <div 
+          onClick={nextTutorialStep}
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.8)', zIndex: 10000,
+            cursor: 'pointer'
+          }} 
+        />
+      )}
+
+      {/* ── VMind Guide for Tutorial ── */}
+      {tutorialStep > 0 && tutorialAgent && (
+        <VMindGuide 
+          isOpen={tutorialStep > 0}
+          title={getTutorialContent()?.title}
+          message={getTutorialContent()?.message || null}
+          mood={getTutorialContent()?.mood}
+        />
+      )}
+
       {/* ── Toast ── */}
       {toast && (
         <div style={{
@@ -176,6 +327,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           <div className="page-sub">Gérez et surveillez vos employés virtuels en temps réel</div>
         </div>
         <div className="page-actions">
+          <button className="btn" onClick={restartTutorial} style={{ marginRight: 8, background: 'rgba(0, 229, 200, 0.1)', color: '#00E5C8', border: '1px solid rgba(0, 229, 200, 0.3)' }}>ℹ️ Relancer le tutoriel</button>
           <button className="btn" onClick={refresh} style={{ marginRight: 8 }}>🔄 Rafraîchir</button>
           <button className="btn" onClick={() => onNavigate('reports')}>📊 Rapports consolidés</button>
         </div>
@@ -184,7 +336,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
       <div className="scroll" style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
 
         {/* ── Table ── */}
-        <div className="agents-table-wrap" style={{ flex: 1, minWidth: 0 }}>
+        <div className="agents-table-wrap" style={{ flex: 1, minWidth: 0, overflow: tutorialStep > 0 ? 'visible' : 'hidden' }}>
           {loading && (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--muted)' }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
@@ -234,6 +386,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                   return (
                     <tr
                       key={agent.agent_name}
+                      onMouseEnter={() => startTutorial(agent)}
                       onClick={() => setSelected(isSelected ? null : agent)}
                       style={{
                         cursor: 'pointer',
@@ -286,7 +439,9 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                             disabled={busy}
                             onClick={() => handleRunNow(agent)}
                             title="Exécuter maintenant"
+                            style={{ ...getBtnStyle(agent, 1) }}
                           >
+                            {renderTutorialArrow(agent, 1)}
                             {busy ? '…' : '▶ Run'}
                           </button>
 
@@ -297,7 +452,9 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                               disabled={busy}
                               onClick={() => handlePause(agent)}
                               title="Mettre en pause"
+                              style={{ ...getBtnStyle(agent, 2) }}
                             >
+                              {renderTutorialArrow(agent, 2)}
                               {busy ? '…' : '⏸ Stop'}
                             </button>
                           ) : (
@@ -306,8 +463,9 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                               disabled={busy}
                               onClick={() => handleResume(agent)}
                               title="Reprendre"
-                              style={{ color: '#00E5A0', borderColor: 'rgba(0,229,160,0.3)' }}
+                              style={{ color: '#00E5A0', borderColor: 'rgba(0,229,160,0.3)', ...getBtnStyle(agent, 2) }}
                             >
+                              {renderTutorialArrow(agent, 2)}
                               {busy ? '…' : '▶ Start'}
                             </button>
                           )}
@@ -317,7 +475,9 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                             className="row-btn"
                             onClick={() => onConfigure(agent.run_mode === 'prospection' ? 'prospection' : 'recouvrement')}
                             title="Modifier la configuration"
+                            style={{ ...getBtnStyle(agent, 3) }}
                           >
+                            {renderTutorialArrow(agent, 3)}
                             ⚙️
                           </button>
 
@@ -327,8 +487,9 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                               className="row-btn"
                               onClick={() => router.push(`/prospect-agent-workspace/${(agent as any).agent_id || 1}`)}
                               title="Ouvrir l'espace de travail"
-                              style={{ color: '#00E5C8', borderColor: 'rgba(0,229,200,0.3)' }}
+                              style={{ color: '#00E5C8', borderColor: 'rgba(0,229,200,0.3)', ...getBtnStyle(agent, 4) }}
                             >
+                              {renderTutorialArrow(agent, 4)}
                               🚀 Espace
                             </button>
                           )}
@@ -339,7 +500,9 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                             disabled={busy}
                             onClick={() => handleDelete(agent)}
                             title="Supprimer l'agent"
+                            style={{ ...getBtnStyle(agent, 5) }}
                           >
+                            {renderTutorialArrow(agent, 5)}
                             🗑️
                           </button>
                         </div>
