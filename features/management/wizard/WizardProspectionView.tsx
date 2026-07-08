@@ -1,11 +1,12 @@
 'use client';
 
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/shared/management/components/Button';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
 import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
+import { OnboardingChat } from './components/OnboardingChat';
 
 interface WizardViewProps {
   templateId: string;
@@ -200,6 +201,31 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
   const [step, setStep] = useState(1);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
+  const [showStep2Guide, setShowStep2Guide] = useState(false);
+  const step2GuideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const triggerStep2Guide = () => {
+    setShowStep2Guide(true);
+    if (step2GuideTimeoutRef.current) {
+      clearTimeout(step2GuideTimeoutRef.current);
+    }
+    step2GuideTimeoutRef.current = setTimeout(() => {
+      setShowStep2Guide(false);
+    }, 10000);
+  };
+
+  useEffect(() => {
+    if (step === 2) {
+      triggerStep2Guide();
+    } else {
+      setShowStep2Guide(false);
+      if (step2GuideTimeoutRef.current) {
+        clearTimeout(step2GuideTimeoutRef.current);
+      }
+    }
+  }, [step]);
+
+
   const getMoodForField = (field: string | null): GuideMood => {
     if (!field) return 'curious';
     const curiousFields = ['agent_name', 'zone_geo', 'taille_entreprise'];
@@ -218,6 +244,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     workflow_timezone: 'Africa/Tunis',
     prospection_config: {
       modele_llm: 'llama-3.3-70b-versatile',
+      agent_mission: '',
       icp: {
         secteur_activite: [] as string[],
         taille_min: 50,
@@ -348,7 +375,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
   };
 
   const validateAndNext = (nextStep: number) => {
-    if (step === 2 && nextStep === 3) {
+    if (step === 3 && nextStep === 4) {
       const sum = formData.prospection_config.icp.poids_secteur +
         formData.prospection_config.icp.poids_taille +
         formData.prospection_config.icp.poids_poste +
@@ -448,23 +475,28 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
             <div className={`wstep ${step === 2 ? 'active' : step > 2 ? 'done' : ''}`}>
               <div className="wstep-inner">
                 <div className="wstep-num">2</div>
-                <div className="wstep-label">Profil Client (ICP)</div>
+                <div className="wstep-label">Briefing</div>
               </div>
             </div>
             <div className={`wstep ${step === 3 ? 'active' : step > 3 ? 'done' : ''}`}>
               <div className="wstep-inner">
                 <div className="wstep-num">3</div>
-                <div className="wstep-label">Campagne & Limites</div>
+                <div className="wstep-label">ICP</div>
               </div>
             </div>
             <div className={`wstep ${step === 4 ? 'active' : step > 4 ? 'done' : ''}`}>
               <div className="wstep-inner">
                 <div className="wstep-num">4</div>
+                <div className="wstep-label">Campagne</div>
+              </div>
+            </div>
+            <div className={`wstep ${step === 5 ? 'active' : step > 5 ? 'done' : ''}`}>
+              <div className="wstep-inner">
+                <div className="wstep-num">5</div>
                 <div className="wstep-label">Planification</div>
               </div>
             </div>
           </div>
-
           {/* STEP 1: Identité */}
           {step === 1 && (
             <div id="step1" className="anim">
@@ -503,14 +535,62 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Button variant="primary" onClick={() => validateAndNext(2)}>Profil Client (ICP) →</Button>
+                <Button variant="primary" onClick={() => validateAndNext(2)}>Briefing & Objectifs →</Button>
               </div>
             </div>
           )}
 
-          {/* STEP 2: Cibles ICP */}
+          
+          {/* STEP 2: Briefing & Objectifs */}
           {step === 2 && (
             <div id="step2" className="anim">
+              <div className="wcard">
+                <div className="wcard-title">
+                  <span className="dot" style={{ backgroundColor: template?.accent || '#FF4757' }}></span>
+                  Briefing de l'Agent
+                  <span 
+                    onClick={triggerStep2Guide}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: '50%',
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                      color: '#aaa',
+                      fontSize: '12px',
+                      marginLeft: '10px',
+                      cursor: 'pointer'
+                    }}
+                    title="Aide"
+                  >?</span>
+                </div>
+                <p style={{ color: 'var(--text)', marginBottom: '1rem', fontSize: '0.95rem' }}>Discutez avec VirtualMind pour définir la mission de l'agent. Il vous posera quelques questions pour comprendre votre offre et vos objectifs.</p>
+                <OnboardingChat 
+                  initialMission={formData.prospection_config.agent_mission}
+                  onConfirm={(mission) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      prospection_config: { ...prev.prospection_config, agent_mission: mission }
+                    }));
+                    validateAndNext(3);
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
+                <Button variant="secondary" onClick={() => validateAndNext(1)}>← Retour</Button>
+                {formData.prospection_config.agent_mission && (
+                   <Button variant="primary" onClick={() => validateAndNext(3)}>Profil Client (ICP) →</Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: Cibles ICP */}
+
+          {step === 3 && (
+            <div id="step3" className="anim">
               <div className="wcard">
                 <div className="wcard-title"><span className="dot" style={{ backgroundColor: template?.accent || '#FF4757' }}></span>Critères ICP (Valeurs Cibles)</div>
                 <div className="form-row">
@@ -620,15 +700,15 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-                <Button onClick={() => validateAndNext(1)}>← Retour</Button>
-                <Button variant="primary" onClick={() => validateAndNext(3)}>Campagne & Limites →</Button>
+                <Button onClick={() => validateAndNext(2)}>← Retour</Button>
+                <Button variant="primary" onClick={() => validateAndNext(4)}>Campagne & Limites →</Button>
               </div>
             </div>
           )}
 
           {/* STEP 3: Campagne & Limites */}
-          {step === 3 && (
-            <div id="step3" className="anim">
+          {step === 4 && (
+            <div id="step4" className="anim">
               <div className="wcard">
                 <div className="wcard-title"><span className="dot" style={{ backgroundColor: template?.accent || '#00e5c8' }}></span>Signature & Copie Conforme</div>
                 <div className="form-group" style={{ marginBottom: '20px' }}>
@@ -688,15 +768,15 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-                <Button onClick={() => validateAndNext(2)}>← Retour</Button>
-                <Button variant="primary" onClick={() => validateAndNext(4)}>Planification →</Button>
+                <Button onClick={() => validateAndNext(3)}>← Retour</Button>
+                <Button variant="primary" onClick={() => validateAndNext(5)}>Planification →</Button>
               </div>
             </div>
           )}
 
           {/* STEP 4: Planification */}
-          {step === 4 && (
-            <div id="step4" className="anim">
+          {step === 5 && (
+            <div id="step5" className="anim">
               <div className="wcard">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <div className="wcard-title" style={{ margin: 0 }}>
@@ -964,7 +1044,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 )}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-                <Button onClick={() => validateAndNext(3)}>← Retour</Button>
+                <Button onClick={() => validateAndNext(4)}>← Retour</Button>
                 <Button variant="primary" onClick={handleDeploy} disabled={isDeploying || formData.trigger_rules.length === 0}>
                   {isDeploying ? 'Déploiement en cours...' : '🚀 Lancer le déploiement n8n'}
                 </Button>
@@ -975,10 +1055,10 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
         
             {/* VirtualMind Floating Guide */}
       <VMindGuide 
-        isOpen={!!focusedField}
-        title={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].title : undefined}
-        message={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].text : null}
-        mood={getMoodForField(focusedField)}
+        isOpen={!!focusedField || showStep2Guide}
+        title={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].title : showStep2Guide ? "Briefing de l'Agent" : undefined}
+        message={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].text : showStep2Guide ? "Cette section est cruciale. Les réponses que vous donnerez ici définiront le contexte global et la compréhension de l'IA. Soyez le plus précis possible, car ces informations impacteront directement la qualité des emails générés." : null}
+        mood={focusedField ? getMoodForField(focusedField) : showStep2Guide ? 'convinced' : undefined}
       />
 
         </div>
