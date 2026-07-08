@@ -49,13 +49,27 @@ const getToolDisplayName = (tool?: string | null) => {
   return TOOL_DISPLAY_NAMES[tool] || tool.replace(/_/g, ' ');
 };
 
-const FAST_TRACK_REGISTRY: Record<string, string> = {
+const VDATA_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Taux livraison à temps ?": "Veuillez me fournir le taux de livraison à temps global.",
   "Compare Jan-Avr ?": "Fais une comparaison détaillée des indicateurs entre Janvier et Avril.",
   "3 KPIs dégradés ?": "Affiche-moi les 3 KPIs les plus dégradés actuellement.",
   "Rapport mensuel PDF ?": "Génère et affiche le rapport mensuel d'activité au format PDF.",
   "Retards par type client ?": "Quels sont les retards actuels classés par type de client ?",
   "Volume 12 mois ?": "Quel est le volume total traité sur les 12 derniers mois ?"
+};
+
+const VFIN_FAST_TRACK_REGISTRY: Record<string, string> = {
+  "CA validé ce mois ?": "Quel est le chiffre d'affaires validé pour ce mois en cours ?",
+  "Clients Impayés > 30 jours ?": "Combien de clients ont des impayés supérieurs à 30 jours ?",
+  "Comparer CA mois précédent": "Fais une comparaison détaillée du chiffre d'affaires entre ce mois-ci et le mois précédent.",
+  "Top 5 marges faibles": "Montre-moi les 5 clients avec les marges les plus faibles sur ce trimestre.",
+  "Trésorerie aujourd'hui ?": "Quelle est la situation précise de la trésorerie aujourd'hui ?",
+  "Prévision trésorerie 30J ?": "Génère la prévision de trésorerie pour les 30 prochains jours."
+};
+
+const FAST_TRACK_REGISTRY: Record<string, string> = {
+  ...VDATA_FAST_TRACK_REGISTRY,
+  ...VFIN_FAST_TRACK_REGISTRY
 };
 
 export const VmindChat: React.FC<VmindChatProps> = ({
@@ -415,7 +429,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         {/* Suggestions Zone */}
         {activeAgentId === 'VDATA' && (
           <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
-            {Object.keys(FAST_TRACK_REGISTRY).map((label) => (
+            {Object.keys(VDATA_FAST_TRACK_REGISTRY).map((label) => (
               <button
                 key={label}
                 onClick={() => handleFastTrackClick(label)}
@@ -432,78 +446,17 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         {/* VFIN Suggestions */}
         {activeAgentId === 'VFIN' && (
           <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
-            <button
-              onClick={() => handleSuggestionClick(
-                "Quel est le chiffre d'affaires validé ce mois ?",
-                "/api/tools/get-monthly-validated-revenue",
-                {}
-              )}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              CA validé ce mois ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick(
-                "Combien de clients ont des impayés supérieurs à 30 jours ?",
-                "/api/tools/get-clients-overdue-30-days",
-                {}
-              )}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Clients Impayés &gt; 30 jours ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick(
-                "Comparer le CA de ce mois avec le mois précédent",
-                "/api/tools/compare-monthly-revenue",
-                {}
-              )}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Comparer CA mois précédent
-            </button>
-            <button
-              onClick={() => handleSuggestionClick(
-                "Montre-moi les 5 clients avec les marges les plus faibles ce trimestre",
-                "/api/tools/get-lowest-margin-5clients-quarter",
-                {}
-              )}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Top 5 marges faibles
-            </button>
-            <button
-              onClick={() => handleSuggestionClick(
-                "Quelle est la situation de trésorerie aujourd'hui ?",
-                "/api/tools/get-treasury-status-today",
-                {}
-              )}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Trésorerie aujourd'hui ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick(
-                "Prévision de trésorerie pour les 30 prochains jours",
-                "/api/tools/get-treasury-forecast-30-days",
-                {}
-              )}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Prévision trésorerie 30 jours
-            </button>
+            {Object.keys(VFIN_FAST_TRACK_REGISTRY).map((label) => (
+              <button
+                key={label}
+                onClick={() => handleFastTrackClick(label)}
+                className="suggestion-chip"
+                style={{ flexShrink: 0 }}
+                disabled={isLoading}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         )}
 
