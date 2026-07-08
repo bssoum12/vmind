@@ -7,7 +7,7 @@ import { jwtDecode } from 'jwt-decode';
 import {
   Shield, User, Lock, Eye, EyeOff,
   RefreshCw, Clock, ArrowRight, ShieldCheck, BarChart3,
-  Mail, Key
+  Mail, Key, ShieldAlert
 } from 'lucide-react';
 import { Turnstile } from '@marsidev/react-turnstile';
 
@@ -603,7 +603,7 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok || !data.ok) {
         if (data.error === 'deactivated') {
-          setDeactivatedMessage(data.message || 'Veuillez régulariser votre situation en contactant VirtualDev.');
+          setDeactivatedMessage(data.message || 'Veuillez régulariser votre situation en contactant l\'équipe VirtualDev.');
           setShowDeactivatedPopup(true);
           return;
         }

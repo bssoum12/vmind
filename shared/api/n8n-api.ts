@@ -48,8 +48,16 @@ export async function sendVmindMessage(message: string, clientId = "DEMO"): Prom
       return {
         ok: false,
         response_type: "error",
-        message: "Veuillez activer votre session dans le Connecteur MCP (Panneau de gauche) avant de poser une question."
-      };
+        message: "Veuillez activer votre session dans le Connecteur MCP (Panneau de gauche) avant de poser une question.",
+        tool_used: null,
+        title: "Connexion requise",
+        kpis: [],
+        table: { columns: [], rows: [] },
+        chart: { type: null, title: "", description: "", xKey: "", yKey: "", data: [] },
+        details: null,
+        raw: null,
+        error: "MCP_NOT_CONNECTED"
+      } as VmindN8nResponse;
     }
 
     const response = await fetch(proxyUrl, {
@@ -158,14 +166,33 @@ export async function resetReminders(invoiceRefs: string[]): Promise<any> {
 }
 
 // ─── Agent Management APIs ────────────────────────────────────────────────────
-
+ 
 const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window !== "undefined") {
+    try {
+      const sessionStr = localStorage.getItem("vmind_session");
+      if (sessionStr) {
+        const token = JSON.parse(sessionStr).token;
+        if (token) {
+          return { "Authorization": `Bearer ${token}` };
+        }
+      }
+    } catch (e) {
+      console.warn("Could not retrieve session token:", e);
+    }
+  }
+  return {};
+}
 
 /**
  * Fetches all deployed agents from Redis (via backend)
  */
 export async function getAgents(): Promise<any[]> {
-  const res = await fetch(`${getBaseUrl()}/api/list-agents`);
+  const res = await fetch(`${getBaseUrl()}/api/list-agents`, {
+    headers: getAuthHeaders()
+  });
   if (!res.ok) throw new Error(`Failed to fetch agents (${res.status})`);
   const data = await res.json();
   return data.agents || [];
@@ -177,6 +204,7 @@ export async function getAgents(): Promise<any[]> {
 export async function pauseAgent(agentName: string): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/pause-agent/${encodeURIComponent(agentName)}`, {
     method: "POST",
+    headers: getAuthHeaders()
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -191,6 +219,7 @@ export async function pauseAgent(agentName: string): Promise<any> {
 export async function resumeAgent(agentName: string): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/resume-agent/${encodeURIComponent(agentName)}`, {
     method: "POST",
+    headers: getAuthHeaders()
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -205,6 +234,7 @@ export async function resumeAgent(agentName: string): Promise<any> {
 export async function deleteAgent(agentName: string): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/delete-agent/${encodeURIComponent(agentName)}`, {
     method: "DELETE",
+    headers: getAuthHeaders()
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -220,7 +250,10 @@ export async function deleteAgent(agentName: string): Promise<any> {
 export async function updateAgentConfig(agentName: string, recoveryConfig: object): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/update-agent-config/${encodeURIComponent(agentName)}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
     body: JSON.stringify({ recovery_config: recoveryConfig }),
   });
   if (!res.ok) {
@@ -236,6 +269,7 @@ export async function updateAgentConfig(agentName: string, recoveryConfig: objec
 export async function runAgentNow(agentName: string): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/run-now/${encodeURIComponent(agentName)}`, {
     method: "POST",
+    headers: getAuthHeaders()
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
