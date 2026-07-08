@@ -1,8 +1,26 @@
-/* Global Styles & Variables - Premium VMIND Dark Theme */
-
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 15px rgba(99, 102, 241, 0.2); }
+  50% { box-shadow: 0 0 25px rgba(99, 102, 241, 0.4); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+
 .workspace-container {
+/* Global Styles & Variables - Premium VMIND Dark Theme */
+
+
+& {
   --bg-primary: var(--navy);
   --bg-secondary: var(--navy2);
   --bg-tertiary: var(--navy3);
@@ -36,36 +54,24 @@
   --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.workspace-container ::-webkit-scrollbar {
+& ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-.workspace-container ::-webkit-scrollbar-track {
+& ::-webkit-scrollbar-track {
   background: var(--bg-primary);
 }
-.workspace-container ::-webkit-scrollbar-thumb {
+& ::-webkit-scrollbar-thumb {
   background: var(--border-color);
   border-radius: 4px;
 }
-.workspace-container ::-webkit-scrollbar-thumb:hover {
+& ::-webkit-scrollbar-thumb:hover {
   background: var(--border-hover);
 }
 
 /* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 
-@keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 15px rgba(99, 102, 241, 0.2); }
-  50% { box-shadow: 0 0 25px rgba(99, 102, 241, 0.4); }
-}
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
 
 .fade-in {
   animation: fadeIn var(--transition-normal) forwards;
@@ -938,4 +944,7 @@
   font-size: 2rem;
   color: var(--text-muted);
   margin-bottom: 1rem;
+}
+
+
 }

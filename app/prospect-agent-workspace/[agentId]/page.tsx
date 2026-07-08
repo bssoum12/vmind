@@ -11,7 +11,7 @@ import LogsView from '../../../features/management/prospect-workspace/components
 import LeadDetailDrawer from '../../../features/management/prospect-workspace/components/LeadDetailDrawer';
 import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
 
-import '../../../features/management/prospect-workspace/workspace.css';
+import '../../../features/management/prospect-workspace/workspace.scss';
 
 export default function AgentWorkspacePage() {
   const { agentId } = useParams();
