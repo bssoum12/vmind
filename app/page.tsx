@@ -11,6 +11,7 @@ import { RightPanel } from "@/features/right_panel/RightPanel";
 import { VoiceOverlay } from "@/features/voice/VoiceOverlay";
 import { VmindChat } from "@/components/vmind/VmindChat";
 import { GlobalMaxRemindersPopup } from "@/components/vmind/GlobalMaxRemindersPopup";
+import { ConversationsProvider } from "@/shared/contexts/ConversationsContext";
 
 // Management Mode Components
 import { ManagementSidebar } from "@/features/management/layout/ManagementSidebar";
@@ -306,31 +307,33 @@ export default function Home() {
 
   if (mode === 'ASSISTANT') {
     return (
-      <main className="main-container anim">
-        <AssistantSidebar onInsertPrompt={handleInsertPrompt} activeAgentId={activeAgentId} onAgentClick={setActiveAgentId} />
-        
-        <div className="content assistant-layout" style={{ display: assistantView === 'chat' ? 'flex' : 'none' }}>
-          <VmindChat
-            initialPrompt={insertPrompt}
-            onOpenVoice={() => setVoiceShow(true)}
-            onAgentActive={setActiveAgentId}
-            activeAgentId={activeAgentId}
-            clientId={clientId}
-          />
-          <RightPanel
-            logs={logs}
-            onInsertPrompt={handleInsertPrompt}
-            activeAgentId={activeAgentId}
-          />
-        </div>
-        
-        <div style={{ display: assistantView === 'connectors' ? 'block' : 'none', flex: 1, height: '100%' }}>
-          <ConnectorsHub />
-        </div>
+      <ConversationsProvider>
+        <main className="main-container anim">
+          <AssistantSidebar onInsertPrompt={handleInsertPrompt} activeAgentId={activeAgentId} onAgentClick={setActiveAgentId} />
+          
+          <div className="content assistant-layout" style={{ display: assistantView === 'chat' ? 'flex' : 'none' }}>
+            <VmindChat
+              initialPrompt={insertPrompt}
+              onOpenVoice={() => setVoiceShow(true)}
+              onAgentActive={setActiveAgentId}
+              activeAgentId={activeAgentId}
+              clientId={clientId}
+            />
+            <RightPanel
+              logs={logs}
+              onInsertPrompt={handleInsertPrompt}
+              activeAgentId={activeAgentId}
+            />
+          </div>
+          
+          <div style={{ display: assistantView === 'connectors' ? 'block' : 'none', flex: 1, height: '100%' }}>
+            <ConnectorsHub />
+          </div>
 
-        <VoiceOverlay show={voiceShow} onClose={() => setVoiceShow(false)} />
-        <GlobalMaxRemindersPopup />
-      </main>
+          <VoiceOverlay show={voiceShow} onClose={() => setVoiceShow(false)} />
+          <GlobalMaxRemindersPopup />
+        </main>
+      </ConversationsProvider>
     );
   }
 

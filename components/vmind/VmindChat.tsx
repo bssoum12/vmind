@@ -5,6 +5,7 @@ import { VmindMessage } from '@/shared/types/vmind';
 import { sendVmindMessage } from '@/shared/api/n8n-api';
 import { ToolResultRenderer } from './renderers/ToolResultRenderer';
 import { resolveAgentFromTool, AGENTS } from '@/shared/constants/data';
+import { useConversations } from '@/shared/contexts/ConversationsContext';
 
 interface VmindChatProps {
   initialPrompt?: string;
@@ -79,7 +80,43 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   onAgentActive,
   activeAgentId = "VMIND"
 }) => {
+  const { activeConversationId, createNewConversation, conversations } = useConversations();
   const [input, setInput] = useState('');
+
+  // Fetch history when conversation changes
+  useEffect(() => {
+    if (!activeConversationId) {
+      setMessages([{ id: 'init-1', sender: 'vm', text: 'Bonjour. Je suis connecté via n8n. Que puis-je pour vous ?', time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) }]);
+      return;
+    }
+    const fetchHistory = async () => {
+      try {
+        setIsLoading(true);
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
+        if (token && token.startsWith("{")) token = JSON.parse(token).token;
+
+        const res = await fetch(`${baseUrl}/api/conversations/${activeConversationId}/messages`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.ok && data.messages.length > 0) {
+           const historyMsgs = data.messages.map((m: any, i: number) => {
+              if (m.role === 'human') {
+                 return { id: `hist-h-${i}`, sender: 'user', text: m.text, time: '' };
+              } else {
+                 return { id: `hist-a-${i}`, sender: 'vm', text: m.message || m.text || 'Réponse', time: '', ...m };
+              }
+           });
+           setMessages(historyMsgs);
+        } else {
+           setMessages([{ id: 'init-1', sender: 'vm', text: `Nouvelle discussion.`, time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) }]);
+        }
+      } catch (err) { console.error("Error fetching history", err); }
+      finally { setIsLoading(false); }
+    };
+    fetchHistory();
+  }, [activeConversationId]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -134,7 +171,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     setMessages((prev) => [...prev, userMessage, thinkingMessage]);
 
     try {
-      let response = await sendVmindMessage(text, clientId);
+      let targetConvId = activeConversationId;
+      if (!targetConvId) {
+         targetConvId = await createNewConversation(activeAgentId, text);
+      }
+      let response = await sendVmindMessage(text, targetConvId, activeAgentId, clientId);
 
       console.log("✅ [VmindChat] Réponse reçue de l'API:", {
         tool: response.tool_used,
@@ -225,7 +266,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
     try {
       // Déclenche le Webhook n8n comme pour un message normal (via l'IA)
-      let response = await sendVmindMessage(professionalMessage, clientId);
+      let targetConvId = activeConversationId;
+      if (!targetConvId) {
+         targetConvId = await createNewConversation(activeAgentId, professionalMessage);
+      }
+      let response = await sendVmindMessage(professionalMessage, targetConvId, activeAgentId, clientId);
 
       setMessages((prev) => prev.filter(m => !m.isThinking));
 

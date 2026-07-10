@@ -14,14 +14,14 @@ function getVmindSessionId() {
 /**
  * Appelle n8n via le Proxy du Backend pour éviter les problèmes de CORS
  */
-export async function sendVmindMessage(message: string, clientId = "DEMO"): Promise<VmindN8nResponse> {
+export async function sendVmindMessage(message: string, conversationId: string, agentId: string, clientId = "DEMO"): Promise<VmindN8nResponse> {
   const sessionId = getVmindSessionId();
 
   // On utilise une variable d'environnement pour Vercel, ou localhost par défaut
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
   const proxyUrl = `${baseUrl}/api/n8n-proxy`;
 
-  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, session_id: sessionId });
+  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId });
 
   let mcp_token;
   if (typeof window !== "undefined") {
@@ -69,7 +69,9 @@ export async function sendVmindMessage(message: string, clientId = "DEMO"): Prom
       body: JSON.stringify({
         message,
         client_id: clientId,
-        session_id: sessionId,
+        vmind_session_id: sessionId,
+        conversation_id: conversationId,
+        agent_id: agentId,
         mcp_token
       })
     });
