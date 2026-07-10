@@ -176,7 +176,13 @@ function getAuthHeaders(): Record<string, string> {
     try {
       const sessionStr = localStorage.getItem("vmind_session");
       if (sessionStr) {
-        const token = JSON.parse(sessionStr).token;
+        let token = sessionStr;
+        if (sessionStr.trim().startsWith("{")) {
+          try {
+            const parsed = JSON.parse(sessionStr);
+            token = parsed?.token || parsed?.access_token || parsed?.user?.token || sessionStr;
+          } catch (e) {}
+        }
         if (token) {
           return { "Authorization": `Bearer ${token}` };
         }
