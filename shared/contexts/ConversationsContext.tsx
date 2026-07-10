@@ -18,6 +18,8 @@ interface ConversationsContextType {
   renameConversation: (conversationId: string, newTitle: string) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<void>;
   refreshConversations: () => Promise<void>;
+  bumpConversation: (conversationId: string) => void;
+  updateConversationTitle: (conversationId: string, newTitle: string) => void;
   isLoading: boolean;
 }
 
@@ -82,6 +84,24 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     return fallbackId;
   };
 
+  
+  const bumpConversation = (conversationId: string) => {
+    setConversations(prev => {
+      const idx = prev.findIndex(c => c.conversation_id === conversationId);
+      if (idx <= 0) return prev; // already at top or not found
+      const copy = [...prev];
+      const [item] = copy.splice(idx, 1);
+      item.updated_at = new Date().toISOString();
+      return [item, ...copy];
+    });
+  };
+
+  const updateConversationTitle = (conversationId: string, newTitle: string) => {
+    setConversations(prev => 
+      prev.map(c => c.conversation_id === conversationId ? { ...c, title: newTitle } : c)
+    );
+  };
+
   const renameConversation = async (conversationId: string, newTitle: string) => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -133,6 +153,8 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       renameConversation,
       deleteConversation,
       refreshConversations: fetchConversations,
+      bumpConversation,
+      updateConversationTitle,
       isLoading
     }}>
       {children}

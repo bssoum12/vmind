@@ -80,7 +80,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   onAgentActive,
   activeAgentId = "VMIND"
 }) => {
-  const { activeConversationId, createNewConversation, conversations } = useConversations();
+  const { activeConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle } = useConversations();
   const [input, setInput] = useState('');
 
   // Fetch history when conversation changes
@@ -177,6 +177,32 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       }
       let response = await sendVmindMessage(text, targetConvId, activeAgentId, clientId);
 
+      // Call bump
+      bumpConversation(targetConvId);
+
+      // Call smart-title async if this is a new conversation (or just always call it, backend handles it, but let's only do it if the title is generic)
+      const currentConv = conversations.find(c => c.conversation_id === targetConvId);
+      if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
+        // Fire and forget
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
+        if (token && token.startsWith("{")) token = JSON.parse(token).token;
+        
+        fetch(`${baseUrl}/api/conversations/${targetConvId}/smart-title`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ message: text || text })
+        })
+        .then(res => res.json())
+        .then(data => {
+           if (data.ok && data.conversation) {
+             updateConversationTitle(targetConvId, data.conversation.title);
+           }
+        })
+        .catch(err => console.error("Smart title error", err));
+      }
+
+
       console.log("✅ [VmindChat] Réponse reçue de l'API:", {
         tool: response.tool_used,
         type: response.response_type,
@@ -271,6 +297,32 @@ export const VmindChat: React.FC<VmindChatProps> = ({
          targetConvId = await createNewConversation(activeAgentId, professionalMessage);
       }
       let response = await sendVmindMessage(professionalMessage, targetConvId, activeAgentId, clientId);
+
+      // Call bump
+      bumpConversation(targetConvId);
+
+      // Call smart-title async if this is a new conversation (or just always call it, backend handles it, but let's only do it if the title is generic)
+      const currentConv = conversations.find(c => c.conversation_id === targetConvId);
+      if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
+        // Fire and forget
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
+        if (token && token.startsWith("{")) token = JSON.parse(token).token;
+        
+        fetch(`${baseUrl}/api/conversations/${targetConvId}/smart-title`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ message: professionalMessage })
+        })
+        .then(res => res.json())
+        .then(data => {
+           if (data.ok && data.conversation) {
+             updateConversationTitle(targetConvId, data.conversation.title);
+           }
+        })
+        .catch(err => console.error("Smart title error", err));
+      }
+
 
       setMessages((prev) => prev.filter(m => !m.isThinking));
 
