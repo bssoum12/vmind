@@ -186,9 +186,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
             {isActiveAgent && (
               <div style={{ padding: '4px 10px 10px 42px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <button
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    setActiveConversationId(null);
+                    const newId = await createNewConversation(agent.id, "Nouvelle discussion");
+                    setActiveConversationId(newId);
                     if (onAgentClick) onAgentClick(agent.id);
                     window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'chat' }));
                   }}
