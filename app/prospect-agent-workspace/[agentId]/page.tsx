@@ -10,6 +10,7 @@ import CampaignsView from '../../../features/management/prospect-workspace/compo
 import LogsView from '../../../features/management/prospect-workspace/components/LogsView';
 import LeadDetailDrawer from '../../../features/management/prospect-workspace/components/LeadDetailDrawer';
 import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
+import { getAgents } from '@/shared/api/n8n-api';
 
 import '../../../features/management/prospect-workspace/workspace.scss';
 
@@ -27,6 +28,7 @@ export default function AgentWorkspacePage() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [agentName, setAgentName] = useState<string>('Chargement...');
 
   // Tutorial state
   const [navTutorialStep, setNavTutorialStep] = useState<number>(0);
@@ -36,7 +38,23 @@ export default function AgentWorkspacePage() {
       localStorage.setItem('vmind_tutorial_workspace_nav', 'true');
       setNavTutorialStep(1);
     }
-  }, []);
+
+    async function fetchAgentName() {
+      try {
+        const agents = await getAgents();
+        const currentAgent = agents.find(a => a.agent_id === agentId);
+        if (currentAgent) {
+          setAgentName(currentAgent.agent_name);
+        } else {
+          setAgentName('Agent Inconnu');
+        }
+      } catch (err) {
+        console.error(err);
+        setAgentName('Agent');
+      }
+    }
+    fetchAgentName();
+  }, [agentId]);
 
   const nextTutorialStep = () => {
     if (navTutorialStep >= 4) {
@@ -124,9 +142,9 @@ export default function AgentWorkspacePage() {
     return null;
   };
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (isPolling = false) => {
     if (!agentId) return;
-    setIsLoading(true);
+    if (!isPolling) setIsLoading(true);
     try {
       const headers = { 'x-client-id': 'PROSPECT_AGENT' };
 
@@ -155,12 +173,16 @@ export default function AgentWorkspacePage() {
     } catch (err) {
       console.error("Failed to fetch agent data:", err);
     } finally {
-      setIsLoading(false);
+      if (!isPolling) setIsLoading(false);
     }
   }, [agentId]);
 
   useEffect(() => {
-    fetchData();
+    fetchData(false);
+    const interval = setInterval(() => {
+      fetchData(true);
+    }, 5000); // Auto-refresh every 5 seconds to get latest async statuses from n8n and logs
+    return () => clearInterval(interval);
   }, [fetchData]);
 
   const handleOpenLead = (lead: any) => {
@@ -221,7 +243,7 @@ export default function AgentWorkspacePage() {
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>Espace de Travail : {agentId}</h1>
+            <h1 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>Espace de Travail : {agentName}</h1>
             <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '4px 0 0 0' }}>Supervisez l'agent de prospection en temps réel.</p>
           </div>
         </div>
