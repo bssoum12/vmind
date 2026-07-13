@@ -1,5 +1,9 @@
 "use client";
 
+import React, { useEffect, useState } from "react";
+import { ScoreGlobalTooltip } from "./ScoreGlobalTooltip";
+import { useKpis } from "../../../shared/contexts/KpiCacheContext";
+import { SkeletonLoader } from "@/components/vmind/SkeletonLoader";
 
 function getAuthToken() {
   if (typeof window === 'undefined') return '';
@@ -13,37 +17,35 @@ function getAuthToken() {
     return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
   } catch(e) { return ''; }
 }
-import React, { useEffect, useState } from "react";
-import { ScoreGlobalTooltip } from "./ScoreGlobalTooltip";
 
 interface Props {
   activeAgentId?: string;
 }
 
 export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
-  const currentYear = new Date().getFullYear();
-  const todayStr = new Date().toISOString().split("T")[0];
-  const startOfYearStr = `${currentYear}-01-01`;
-
-  const [startDate, setStartDate] = useState(startOfYearStr);
-  const [endDate, setEndDate] = useState(todayStr);
-  const [scoreQualite, setScoreQualite] = useState<number | null>(null);
-  const [statut, setStatut] = useState<string>("Critique");
-  const [details, setDetails] = useState<any>(null);
+  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
+  
   const [prevScoreQualite, setPrevScoreQualite] = useState<number | null>(null);
   const [prevDetails, setPrevDetails] = useState<any>(null);
-  const [prevYear, setPrevYear] = useState<number>(currentYear - 1);
+  const [prevYear, setPrevYear] = useState<number>(new Date().getFullYear() - 1);
+  
   const [cardHovered, setCardHovered] = useState(false);
-  const [hoveredStart, setHoveredStart] = useState(false);
-  const [hoveredEnd, setHoveredEnd] = useState(false);
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [hovered, setHovered] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number; height?: number }>({ top: 0, left: 0 });
   const cardRef = React.useRef<HTMLDivElement>(null);
   const hideTimeout = React.useRef<NodeJS.Timeout | null>(null);
   const [animProgress, setAnimProgress] = useState(0);
+
+  // Read current active year data from Context
+  const agentData = kpisByAgent["vdata"] || {};
+  const toolData = agentData.get_score_global_vdata_kpi || {};
+  
+  const scoreQualite = toolData.ok && toolData.kpis ? (toolData.kpis.find((k: any) => k.label === "Score qualité global")?.value ?? null) : null;
+  const statut = toolData.details?.statut ?? "Critique";
+  const details = toolData.details || null;
+  
+  const loading = loadingByAgent["vdata"] && !toolData.ok;
+  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
 
   // Count-up progress animation
   useEffect(() => {
@@ -83,7 +85,7 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
   const handleMouseLeave = () => {
     hideTimeout.current = setTimeout(() => {
       setHovered(false);
-    }, 250); // 250ms buffer to transition to the tooltip
+    }, 250);
   };
 
   const handleTooltipMouseEnter = () => {
@@ -120,51 +122,10 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
     };
   }, [hovered]);
 
-  const fetchData = async (start: string, end: string) => {
-    setLoading(true);
-    setError("");
-
+  const fetchPrevYearData = async () => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
       const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
-
-      const formattedStart = start.replace(/-/g, "");
-      const formattedEnd = end.replace(/-/g, "");
-
-      const response = await fetch(
-        `${baseUrl}/api/tools/get-score-global-vdata-kpi`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          "Authorization": `Bearer ${getAuthToken()}`,
-          },
-          body: JSON.stringify({
-            client_id: clientId,
-            startDate: formattedStart,
-            endDate: formattedEnd,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const json = await response.json();
-
-      if (!json.ok) {
-        throw new Error(json.error || "Erreur serveur");
-      }
-
-      const globalScore = json.data?.details?.score_qualite_global ?? 0;
-      const globalStatut = json.data?.details?.statut ?? "Critique";
-
-      setScoreQualite(globalScore);
-      setStatut(globalStatut);
-      setDetails(json.data?.details || null);
-
-      // Fetch previous year data for comparison
       const pYear = new Date().getFullYear() - 1;
       setPrevYear(pYear);
       const prevStart = `${pYear}0101`;
@@ -176,7 +137,7 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-          "Authorization": `Bearer ${getAuthToken()}`,
+            "Authorization": `Bearer ${getAuthToken()}`,
           },
           body: JSON.stringify({
             client_id: clientId,
@@ -189,35 +150,20 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
       if (prevResponse.ok) {
         const prevJson = await prevResponse.json();
         if (prevJson.ok) {
-          const prevScore = prevJson.data?.details?.score_qualite_global ?? null;
-          const prevDets = prevJson.data?.details ?? null;
-          setPrevScoreQualite(prevScore);
-          setPrevDetails(prevDets);
-        } else {
-          setPrevScoreQualite(null);
-          setPrevDetails(null);
+          setPrevScoreQualite(prevJson.data?.details?.score_qualite_global ?? null);
+          setPrevDetails(prevJson.data?.details ?? null);
         }
-      } else {
-        setPrevScoreQualite(null);
-        setPrevDetails(null);
       }
-
-    } catch (err: any) {
-      setError(err.message || "Erreur inconnue");
-      setScoreQualite(null);
-      setDetails(null);
-      setPrevScoreQualite(null);
-      setPrevDetails(null);
-    } finally {
-      setLoading(false);
+    } catch (e) {
+      console.warn("Failed to fetch prev year score global:", e);
     }
   };
 
   useEffect(() => {
     if (activeAgentId === "VDATA") {
-      fetchData(startDate, endDate);
+      fetchPrevYearData();
     }
-  }, [activeAgentId, startDate, endDate]);
+  }, [activeAgentId]);
 
   if (activeAgentId !== "VDATA") {
     return null;
@@ -325,22 +271,10 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
         >
           Score Qualité Global
         </div>
-
         {loading ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div
-              style={{
-                width: "6px",
-                height: "6px",
-                borderRadius: "50%",
-                background: statusColor,
-                boxShadow: `0 0 6px ${statusColor}`,
-                animation: "pulse 1.5s infinite",
-              }}
-            />
-            <span style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)" }}>
-              CALCUL DU SCORE…
-            </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", height: "54px" }}>
+            <SkeletonLoader height="26px" width="50%" />
+            <SkeletonLoader height="12px" width="30%" />
           </div>
         ) : error ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -348,7 +282,7 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
               {error}
             </span>
             <button
-              onClick={() => fetchData(startDate, endDate)}
+              onClick={() => fetchKpis('vdata', true, 'get_score_global_vdata_kpi')}
               style={{
                 background: "none",
                 border: "none",
@@ -423,92 +357,6 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
                   })()}
                 </div>
               )}
-            </div>
-
-            {/* Cyber-accented Date Inputs Row */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                marginTop: "4px",
-                zIndex: 20,
-                position: "relative",
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                onKeyDown={(e) => e.preventDefault()}
-                onClick={(e) => {
-                  try {
-                    e.currentTarget.showPicker();
-                  } catch (err) {}
-                }}
-                style={{
-                  background: "rgba(0, 240, 255, 0.04)",
-                  color: "#00f0ff",
-                  border: "1px solid rgba(0, 240, 255, 0.2)",
-                  borderRadius: "4px",
-                  padding: "3px 6px",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "8px",
-                  outline: "none",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = "#00f0ff";
-                  e.target.style.boxShadow = "0 0 6px rgba(0, 240, 255, 0.2)";
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = "rgba(0, 240, 255, 0.2)";
-                  e.target.style.boxShadow = "none";
-                }}
-              />
-              <span
-                style={{
-                  color: "var(--muted)",
-                  fontSize: "8px",
-                  fontFamily: "var(--font-mono)",
-                  flexShrink: 0,
-                }}
-              >
-                au
-              </span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                onKeyDown={(e) => e.preventDefault()}
-                onClick={(e) => {
-                  try {
-                    e.currentTarget.showPicker();
-                  } catch (err) {}
-                }}
-                style={{
-                  background: "rgba(0, 240, 255, 0.04)",
-                  color: "#00f0ff",
-                  border: "1px solid rgba(0, 240, 255, 0.2)",
-                  borderRadius: "4px",
-                  padding: "3px 6px",
-                  fontFamily: "var(--font-mono)",
-                  fontSize: "8px",
-                  outline: "none",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                }}
-                onFocus={(e) => {
-                  e.target.style.borderColor = "#00f0ff";
-                  e.target.style.boxShadow = "0 0 6px rgba(0, 240, 255, 0.2)";
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = "rgba(0, 240, 255, 0.2)";
-                  e.target.style.boxShadow = "none";
-                }}
-              />
             </div>
           </div>
         )}

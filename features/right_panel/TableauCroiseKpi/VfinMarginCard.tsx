@@ -1,45 +1,45 @@
 "use client";
 
-
-function getAuthToken() {
-  if (typeof window === 'undefined') return '';
-  const mcpToken = localStorage.getItem('vmind_mcp_token');
-  if (mcpToken) return mcpToken;
-  try {
-    const sessionStr = localStorage.getItem('vmind_session');
-    if (!sessionStr) return '';
-    if (sessionStr.startsWith('eyJ')) return sessionStr;
-    const parsed = JSON.parse(sessionStr);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
-  } catch(e) { return ''; }
-}
 import React, { useEffect, useState } from "react";
 import { VfinMarginTooltip } from "./VfinMarginTooltip";
+import { useKpis } from "../../../shared/contexts/KpiCacheContext";
+import { SkeletonLoader } from "@/components/vmind/SkeletonLoader";
 
 interface VfinMarginCardProps {
   activeAgentId?: string;
 }
 
 export const VfinMarginCard: React.FC<VfinMarginCardProps> = ({ activeAgentId }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
   const [hovered, setHovered] = useState(false);
-
-  // States for API data
-  const [tauxCourant, setTauxCourant] = useState<number | null>(null);
-  const [tauxCourantFormatted, setTauxCourantFormatted] = useState<string>("0.0");
-  const [tauxPrecedent, setTauxPrecedent] = useState<number | null>(null);
-  const [tauxPrecedentFormatted, setTauxPrecedentFormatted] = useState<string>("0.0");
-  const [ecartTaux, setEcartTaux] = useState<number | null>(null);
-
-  const [caCourant, setCaCourant] = useState<number>(0);
-  const [margeCourant, setMargeCourant] = useState<number>(0);
-  const [caPrecedent, setCaPrecedent] = useState<number>(0);
-  const [margePrecedent, setMargePrecedent] = useState<number>(0);
+  const [animProgress, setAnimProgress] = useState(0);
 
   const [coords, setCoords] = useState<{ top: number; left: number; height?: number }>({ top: 0, left: 0 });
   const cardRef = React.useRef<HTMLDivElement>(null);
   const hideTimeout = React.useRef<NodeJS.Timeout | null>(null);
+
+  // Read current active data from Context
+  const agentData = kpisByAgent["vfin"] || {};
+  const toolData = agentData.compare_monthly_margin || {};
+
+  const kpis = toolData.ok && toolData.kpis ? toolData.kpis : [];
+
+  const currentKpi = kpis.find((k: any) => k.label.toLowerCase().includes("courant"));
+  const prevKpi = kpis.find((k: any) => k.label.toLowerCase().includes("précédent"));
+  const varKpi = kpis.find((k: any) => k.label.toLowerCase().includes("variation"));
+
+  const tauxCourant = currentKpi ? currentKpi.value : null;
+  const tauxPrecedent = prevKpi ? prevKpi.value : null;
+  const ecartTaux = varKpi ? varKpi.value : null;
+
+  const detailsObj = toolData.data?.details || {};
+  const caCourant = detailsObj.caCourant ?? 0;
+  const margeCourant = detailsObj.margeCourant ?? 0;
+  const caPrecedent = detailsObj.caPrecedent ?? 0;
+  const margePrecedent = detailsObj.margePrecedent ?? 0;
+
+  const loading = loadingByAgent["vfin"] && !toolData.ok;
+  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
 
   const updateCoords = () => {
     if (cardRef.current) {
@@ -100,68 +100,6 @@ export const VfinMarginCard: React.FC<VfinMarginCardProps> = ({ activeAgentId })
       window.removeEventListener("resize", handleUpdate);
     };
   }, [hovered]);
-
-  const [animProgress, setAnimProgress] = useState(0);
-
-  const fetchData = async () => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
-
-      const response = await fetch(`${baseUrl}/api/tools/compare-monthly-margin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json",
-          "Authorization": `Bearer ${getAuthToken()}`, },
-        body: JSON.stringify({ client_id: clientId }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const json = await response.json();
-      if (json.ok && json.data) {
-        const kpis = json.data.kpis || [];
-        const currentKpi = kpis.find((k: any) => k.label.toLowerCase().includes("courant"));
-        const prevKpi = kpis.find((k: any) => k.label.toLowerCase().includes("précédent"));
-        const varKpi = kpis.find((k: any) => k.label.toLowerCase().includes("variation"));
-
-        if (currentKpi) {
-          setTauxCourant(currentKpi.value);
-          setTauxCourantFormatted(currentKpi.display);
-        }
-        if (prevKpi) {
-          setTauxPrecedent(prevKpi.value);
-          setTauxPrecedentFormatted(prevKpi.display);
-        }
-        if (varKpi) {
-          setEcartTaux(varKpi.value);
-        }
-        
-        const detailsObj = json.data.details || {};
-        setCaCourant(detailsObj.caCourant ?? 0);
-        setMargeCourant(detailsObj.margeCourant ?? 0);
-        setCaPrecedent(detailsObj.caPrecedent ?? 0);
-        setMargePrecedent(detailsObj.margePrecedent ?? 0);
-      } else {
-        throw new Error(json.error || "Impossible de charger le taux de marge");
-      }
-    } catch (err: any) {
-      console.error("[VfinMarginCard] Error:", err);
-      setError(err.message || "Erreur de chargement");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeAgentId === "VFIN") {
-      fetchData();
-    }
-  }, [activeAgentId]);
 
   // Count-up progress animation
   useEffect(() => {
@@ -268,48 +206,12 @@ export const VfinMarginCard: React.FC<VfinMarginCardProps> = ({ activeAgentId })
           }}
         >
           <span>Marge brute (%)</span>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              fetchData();
-            }}
-            title="Actualiser"
-            style={{
-              background: "none",
-              border: "none",
-              color: themeColor,
-              cursor: "pointer",
-              fontSize: "10px",
-              padding: "2px",
-              display: "flex",
-              alignItems: "center",
-              opacity: 0.7,
-              transition: "opacity 0.2s",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-            onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-            </svg>
-          </button>
         </div>
 
         {loading ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0" }}>
-            <div
-              style={{
-                width: "6px",
-                height: "6px",
-                borderRadius: "50%",
-                background: themeColor,
-                boxShadow: `0 0 6px ${themeColor}`,
-                animation: "pulse 1.5s infinite",
-              }}
-            />
-            <span style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)" }}>
-              CHARGEMENT DU TAUX DE MARGE…
-            </span>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "8px 0" }}>
+            <SkeletonLoader height="28px" width="50%" />
+            <SkeletonLoader height="12px" width="70%" />
           </div>
         ) : error ? (
           <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -317,7 +219,7 @@ export const VfinMarginCard: React.FC<VfinMarginCardProps> = ({ activeAgentId })
               {error}
             </span>
             <button
-              onClick={fetchData}
+              onClick={() => fetchKpis('vfin', true)}
               style={{
                 background: "none",
                 border: "none",

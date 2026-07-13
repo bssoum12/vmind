@@ -1,19 +1,8 @@
 "use client";
 
-
-function getAuthToken() {
-  if (typeof window === 'undefined') return '';
-  const mcpToken = localStorage.getItem('vmind_mcp_token');
-  if (mcpToken) return mcpToken;
-  try {
-    const sessionStr = localStorage.getItem('vmind_session');
-    if (!sessionStr) return '';
-    if (sessionStr.startsWith('eyJ')) return sessionStr;
-    const parsed = JSON.parse(sessionStr);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
-  } catch(e) { return ''; }
-}
 import React, { useEffect, useState } from "react";
+import { useKpis } from "../../../shared/contexts/KpiCacheContext";
+import { SkeletonLoader } from "@/components/vmind/SkeletonLoader";
 
 interface TrendDataPoint {
   annee: number;
@@ -28,49 +17,18 @@ interface VfinSixMonthChartCardProps {
 }
 
 export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ activeAgentId }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [cardHovered, setCardHovered] = useState(false);
-  const [data, setData] = useState<TrendDataPoint[]>([]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
+  // Read current active data from Context
+  const agentData = kpisByAgent["vfin"] || {};
+  const toolData = agentData.get_six_month_revenue_trend || {};
 
-      const response = await fetch(`${baseUrl}/api/tools/get-six-month-revenue-trend`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json",
-          "Authorization": `Bearer ${getAuthToken()}`, },
-        body: JSON.stringify({ client_id: clientId }),
-      });
+  const data: TrendDataPoint[] = toolData.data?.data || [];
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const resJson = await response.json();
-      if (resJson.ok && resJson.data && Array.isArray(resJson.data.data)) {
-        setData(resJson.data.data);
-      } else {
-        throw new Error(resJson.error || "Impossible de charger l'historique");
-      }
-    } catch (err: any) {
-      console.error("[VfinSixMonthChartCard] Error:", err);
-      setError(err.message || "Erreur de chargement");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeAgentId === "VFIN") {
-      fetchData();
-    }
-  }, [activeAgentId]);
+  const loading = loadingByAgent["vfin"] && !toolData.ok;
+  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
 
   if (activeAgentId !== "VFIN") {
     return null;
@@ -95,6 +53,21 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
     return parts[0] || label;
   };
 
+  const points = data.map((d, i) => {
+    const x = paddingX + (i * (plotWidth / (data.length - 1 || 1)));
+    const yCa = paddingY + plotHeight - ((d.ca / displayMax) * plotHeight);
+    const yMarge = paddingY + plotHeight - ((d.marge / displayMax) * plotHeight);
+    return { x, yCa, yMarge, ...d };
+  });
+
+  const caLinePath = points.length > 0 
+    ? points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.yCa.toFixed(1)}`).join(' ') 
+    : '';
+
+  const margeLinePath = points.length > 0
+    ? points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.yMarge.toFixed(1)}`).join(' ')
+    : '';
+
   return (
     <div
       onMouseEnter={() => setCardHovered(true)}
@@ -102,7 +75,7 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
       style={{
         position: "relative",
         marginTop: "16px",
-        overflow: "visible",
+        overflow: "hidden",
         padding: "16px",
         backgroundColor: cardHovered ? "rgba(6, 17, 31, 0.85)" : "rgba(6, 17, 31, 0.7)",
         backgroundImage: `
@@ -119,7 +92,6 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
         transform: cardHovered ? "translateY(-1px) scale(1.005)" : "none",
         transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
         cursor: "pointer",
-        zIndex: 10,
       }}
     >
       {/* Glowing Corner Brackets */}
@@ -127,8 +99,8 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
       <div style={{ position: "absolute", top: 0, right: 0, width: "10px", height: "10px", borderTop: `2px solid ${themeColor}`, borderRight: `2px solid ${themeColor}`, borderRadius: "0 2px 0 0", boxShadow: `0 0 5px ${themeColor}60` }} />
       <div style={{ position: "absolute", bottom: 0, left: 0, width: "10px", height: "10px", borderBottom: `2px solid ${themeColor}`, borderLeft: `2px solid ${themeColor}`, borderRadius: "0 0 0 2px", boxShadow: `0 0 5px ${themeColor}60` }} />
       <div style={{ position: "absolute", bottom: 0, right: 0, width: "10px", height: "10px", borderBottom: `2px solid ${themeColor}`, borderRight: `2px solid ${themeColor}`, borderRadius: "0 0 2px 0", boxShadow: `0 0 5px ${themeColor}60` }} />
-
-      {/* scanline top */}
+      
+      {/* linear top scanline */}
       <div
         style={{
           position: "absolute",
@@ -155,49 +127,13 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
           alignItems: "center",
         }}
       >
-        <span>CA 6 Derniers Mois (TND)</span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            fetchData();
-          }}
-          title="Actualiser"
-          style={{
-            background: "none",
-            border: "none",
-            color: themeColor,
-            cursor: "pointer",
-            fontSize: "10px",
-            padding: "2px",
-            display: "flex",
-            alignItems: "center",
-            opacity: 0.7,
-            transition: "opacity 0.2s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-          </svg>
-        </button>
+        <span>Évolution CA & Marge (6 mois)</span>
       </div>
 
       {loading ? (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "16px 0" }}>
-          <div
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: themeColor,
-              boxShadow: `0 0 6px ${themeColor}`,
-              animation: "pulse 1.5s infinite",
-            }}
-          />
-          <span style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)" }}>
-            CHARGEMENT DE L'HISTORIQUE…
-          </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", height: "72px", justifyContent: "center" }}>
+          <SkeletonLoader height="40px" width="100%" />
+          <SkeletonLoader height="12px" width="60%" />
         </div>
       ) : error ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -205,7 +141,7 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
             {error}
           </span>
           <button
-            onClick={fetchData}
+            onClick={() => fetchKpis('vfin', true)}
             style={{
               background: "none",
               border: "none",
@@ -222,128 +158,138 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
           </button>
         </div>
       ) : data.length === 0 ? (
-        <div style={{ fontSize: "9px", color: "var(--muted)", fontFamily: "var(--font-mono)", padding: "8px 0" }}>
+        <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)", fontStyle: "italic" }}>
           Aucune donnée disponible
         </div>
       ) : (
         <div style={{ position: "relative" }}>
-          
-          {/* Responsive Bars & Grid Layout */}
-          <div style={{ position: "relative", height: "65px", marginTop: "12px" }}>
-            
-            {/* Grid Backdrop Lines */}
-            <div style={{ position: "absolute", top: 0, left: `${paddingX}px`, right: `${paddingX}px`, height: "1px", borderTop: "1px dashed rgba(255,255,255,0.04)" }} />
-            <div style={{ position: "absolute", top: "50%", left: `${paddingX}px`, right: `${paddingX}px`, height: "1px", borderTop: "1px dashed rgba(255,255,255,0.04)" }} />
-            <div style={{ position: "absolute", bottom: 0, left: `${paddingX}px`, right: `${paddingX}px`, height: "1px", borderTop: "1px solid rgba(255,255,255,0.08)" }} />
-
-            {/* Bars Container */}
+          {/* Custom HTML Premium Tooltip */}
+          {hoveredIndex !== null && points[hoveredIndex] && (
             <div 
-              style={{ 
-                display: "flex", 
-                height: "100%", 
-                alignItems: "flex-end", 
-                paddingLeft: `${paddingX}px`, 
-                paddingRight: `${paddingX}px`, 
-                position: "relative", 
-                zIndex: 2 
+              style={{
+                position: 'absolute',
+                left: `${Math.max(10, Math.min(cardWidth - 140, points[hoveredIndex].x - 65))}px`,
+                top: `${points[hoveredIndex].yCa - 42}px`,
+                background: 'rgba(10, 24, 40, 0.95)',
+                border: `1px solid ${themeColor}`,
+                boxShadow: `0 0 12px ${themeColor}40`,
+                borderRadius: '4px',
+                padding: '4px 8px',
+                fontSize: '8px',
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--white)',
+                pointerEvents: 'none',
+                zIndex: 10,
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '2px',
               }}
             >
-              {data.map((d, i) => {
-                const pct = d.ca / displayMax;
-                const barHeight = Math.max(pct * 100, 3); // Min 3% height for flat months
-                const isHovered = hoveredIndex === i;
-
-                return (
-                  <div
-                    key={`${d.mois}-${d.annee}`}
-                    style={{
-                      flex: 1,
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      height: "100%",
-                      justifyContent: "flex-end",
-                      position: "relative",
-                    }}
-                    onMouseEnter={() => setHoveredIndex(i)}
-                    onMouseLeave={() => setHoveredIndex(null)}
-                  >
-                    {/* Tooltip centered over this specific bar */}
-                    {isHovered && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          bottom: `calc(${barHeight}% + 6px)`,
-                          backgroundColor: "rgba(6, 17, 31, 0.95)",
-                          border: `1px solid ${themeColor}`,
-                          boxShadow: `0 4px 12px rgba(0,0,0,0.5), 0 0 8px ${themeColor}20`,
-                          padding: "5px 8px",
-                          borderRadius: "4px",
-                          fontSize: "9px",
-                          fontFamily: "var(--font-mono)",
-                          whiteSpace: "nowrap",
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          pointerEvents: "none",
-                          zIndex: 100,
-                        }}
-                      >
-                        <span style={{ color: "var(--white)", fontWeight: 700 }}>
-                          {d.ca.toLocaleString("fr-TN", { minimumFractionDigits: 2 })} TND
-                        </span>
-                        <span style={{ color: "var(--muted)", fontSize: "8px" }}>
-                          {d.label}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* The Bar itself */}
-                    <div
-                      style={{
-                        width: "16px",
-                        height: `${barHeight}%`,
-                        borderRadius: "3px 3px 0 0",
-                        background: isHovered
-                          ? `linear-gradient(180deg, #00FF87 0%, ${themeColor} 100%)`
-                          : `linear-gradient(180deg, #00E676 0%, ${themeColor}50 100%)`,
-                        boxShadow: isHovered ? `0 0 10px ${themeColor}60` : "none",
-                        transition: "all 0.2s ease-in-out",
-                        cursor: "pointer",
-                      }}
-                    />
-                  </div>
-                );
-              })}
+              <div>
+                <strong style={{ color: 'var(--white)' }}>{points[hoveredIndex].label}</strong>
+              </div>
+              <div>
+                <span style={{ color: 'var(--muted)' }}>CA :</span> <strong style={{ color: themeColor }}>{points[hoveredIndex].ca.toLocaleString("fr-TN", { maximumFractionDigits: 0 })}</strong> TND
+              </div>
+              <div>
+                <span style={{ color: 'var(--muted)' }}>Marge :</span> <strong style={{ color: '#00f0ff' }}>{points[hoveredIndex].marge.toLocaleString("fr-TN", { maximumFractionDigits: 0 })}</strong> TND
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Month Labels beneath bars (Perfect alignment with flex: 1 matching bars slots) */}
-          <div
-            style={{
-              display: "flex",
-              fontSize: "8px",
-              color: "var(--muted)",
-              fontFamily: "var(--font-mono)",
-              marginTop: "6px",
-              paddingLeft: `${paddingX}px`,
-              paddingRight: `${paddingX}px`,
-            }}
-          >
-            {data.map((d, i) => (
-              <span
-                key={i}
-                style={{
-                  flex: 1,
-                  textAlign: "center",
-                  color: hoveredIndex === i ? "var(--white)" : "var(--muted)",
-                  fontWeight: hoveredIndex === i ? 700 : 400,
-                  transition: "color 0.2s",
-                }}
-              >
-                {getShortLabel(d.label)}
-              </span>
-            ))}
+          {/* SVG Multi Line Chart */}
+          <svg width="100%" height={chartHeight} viewBox={`0 0 ${cardWidth} ${chartHeight}`} style={{ display: 'block', overflow: 'visible' }}>
+            <defs>
+              <filter id="vfin-neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="1.5" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            {/* Grid lines */}
+            <line x1={paddingX} y1={paddingY} x2={cardWidth - paddingX} y2={paddingY} stroke="rgba(255,255,255,0.03)" strokeWidth="0.8" />
+            <line x1={paddingX} y1={paddingY + plotHeight} x2={cardWidth - paddingX} y2={paddingY + plotHeight} stroke="rgba(255,255,255,0.06)" strokeWidth="0.8" />
+
+            {/* Hover Vertical Guide Line */}
+            {hoveredIndex !== null && points[hoveredIndex] && (
+              <line 
+                x1={points[hoveredIndex].x} 
+                y1={paddingY} 
+                x2={points[hoveredIndex].x} 
+                y2={chartHeight - paddingY} 
+                stroke="rgba(255,255,255,0.15)" 
+                strokeDasharray="2 2" 
+                strokeWidth="1"
+              />
+            )}
+
+            {/* CA Path Line (Green) */}
+            {caLinePath && (
+              <path 
+                d={caLinePath} 
+                fill="none" 
+                stroke={themeColor} 
+                strokeWidth="1.8" 
+                filter="url(#vfin-neon-glow)" 
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+
+            {/* Marge Path Line (Cyan/Blue) */}
+            {margeLinePath && (
+              <path 
+                d={margeLinePath} 
+                fill="none" 
+                stroke="#00f0ff" 
+                strokeWidth="1.5" 
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+
+            {/* Interactive invisible bars for hover triggers */}
+            {points.map((p, i) => {
+              const rectWidth = plotWidth / (points.length - 1 || 1);
+              const xStart = p.x - (rectWidth / 2);
+              return (
+                <rect
+                  key={`hover-${i}`}
+                  x={xStart}
+                  y={0}
+                  width={rectWidth}
+                  height={chartHeight}
+                  fill="transparent"
+                  style={{ cursor: 'pointer' }}
+                  onMouseEnter={() => setHoveredIndex(i)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                />
+              );
+            })}
+          </svg>
+
+          {/* Legend indicator badges */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "7px", fontFamily: "var(--font-mono)", marginTop: "4px" }}>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <div style={{ width: "6px", height: "1.5px", backgroundColor: themeColor }} />
+                <span style={{ color: "var(--muted)", textTransform: "uppercase" }}>CA</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <div style={{ width: "6px", height: "1.5px", backgroundColor: "#00f0ff" }} />
+                <span style={{ color: "var(--muted)", textTransform: "uppercase" }}>Marge</span>
+              </div>
+            </div>
+            
+            <div style={{ color: "rgba(255,255,255,0.3)" }}>
+              {getShortLabel(data[0].label)} → {getShortLabel(data[data.length - 1].label)}
+            </div>
           </div>
         </div>
       )}

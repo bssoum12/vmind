@@ -1,5 +1,8 @@
 "use client";
 
+import React, { useEffect, useState } from 'react';
+import { useKpis } from '../../shared/contexts/KpiCacheContext';
+import { SkeletonLoader } from '../../components/vmind/SkeletonLoader';
 
 function getAuthToken() {
   if (typeof window === 'undefined') return '';
@@ -13,7 +16,6 @@ function getAuthToken() {
     return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
   } catch(e) { return ''; }
 }
-import React, { useEffect, useState } from 'react';
 
 interface ChartDataPoint {
   label: string;
@@ -25,29 +27,33 @@ interface VolumeLineChartProps {
 }
 
 export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId }) => {
-  const currentYear = new Date().getFullYear();
-  const todayStr = new Date().toISOString().split("T")[0];
-  const startOfYearStr = `${currentYear}-01-01`;
+  const { kpisByAgent, loadingByAgent, fetchKpis, startDate, endDate } = useKpis();
 
-  const [data, setData] = useState<ChartDataPoint[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [cardHovered, setCardHovered] = useState(false);
 
-  const [startDate, setStartDate] = useState(startOfYearStr);
-  const [endDate, setEndDate] = useState(todayStr);
-  const [totalDossiersCurrent, setTotalDossiersCurrent] = useState<number | null>(null);
   const [totalDossiersPrev, setTotalDossiersPrev] = useState<number | null>(null);
-  const [prevYear, setPrevYear] = useState<number>(currentYear - 1);
+  const [prevYear, setPrevYear] = useState<number>(new Date().getFullYear() - 1);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
+  // Read current active data from Context
+  const agentData = kpisByAgent["vdata"] || {};
+  const toolData = agentData.get_dossier_volume_evolution || {};
+
+  const activeData: ChartDataPoint[] = toolData.chart?.data || [];
+  const totalDossiersCurrent = activeData.reduce((acc, d) => acc + d.value, 0);
+
+  const loading = loadingByAgent["vdata"] && !toolData.ok;
+  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
+
+  const fetchPrevYearVolume = async () => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
       const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
-      
+      const pYear = parseInt(startDate.substring(0, 4)) - 1;
+      setPrevYear(pYear);
+      const prevStart = `${pYear}${startDate.substring(4)}`;
+      const prevEnd = `${pYear}${endDate.substring(4)}`;
+
       const response = await fetch(`${baseUrl}/api/tools/get-dossier-volume-evolution`, {
         method: 'POST',
         headers: {
@@ -56,53 +62,28 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
         },
         body: JSON.stringify({
           client_id: clientId,
-          months: 24
+          startDate: prevStart,
+          endDate: prevEnd
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (response.ok) {
+        const resJson = await response.json();
+        if (resJson.ok && resJson.data && resJson.data.chart && resJson.data.chart.data) {
+          const sum = resJson.data.chart.data.reduce((acc: number, d: any) => acc + d.value, 0);
+          setTotalDossiersPrev(sum);
+        }
       }
-
-      const resJson = await response.json();
-      if (resJson.ok && resJson.data && resJson.data.chart && resJson.data.chart.data) {
-        setData(resJson.data.chart.data);
-      } else {
-        throw new Error(resJson.error?.message || "Format de données invalide");
-      }
-    } catch (err: any) {
-      console.error("Error fetching dossier volume evolution:", err);
-      setError(err.message || "Impossible de charger les données");
-    } finally {
-      setLoading(false);
+    } catch (e) {
+      console.warn("Failed to fetch prev year volume:", e);
     }
   };
 
   useEffect(() => {
-    if (activeAgentId === 'VDATA') {
-      fetchData();
+    if (activeAgentId === 'VDATA' && startDate && endDate) {
+      fetchPrevYearVolume();
     }
-  }, [activeAgentId]);
-
-  useEffect(() => {
-    if (data.length > 0) {
-      const currentYearStr = currentYear.toString();
-      const currentYearSum = data
-        .filter(d => d.label.includes(currentYearStr))
-        .reduce((sum, d) => sum + d.value, 0);
-
-      const prevYearStr = prevYear.toString();
-      const prevYearSum = data
-        .filter(d => d.label.includes(prevYearStr))
-        .reduce((sum, d) => sum + d.value, 0);
-
-      setTotalDossiersCurrent(currentYearSum);
-      setTotalDossiersPrev(prevYearSum);
-    } else {
-      setTotalDossiersCurrent(null);
-      setTotalDossiersPrev(null);
-    }
-  }, [data, currentYear, prevYear]);
+  }, [activeAgentId, startDate, endDate]);
 
   if (activeAgentId !== 'VDATA') return null;
 
@@ -115,19 +96,7 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
   const chartWidth = width - (paddingX * 2);
   const chartHeight = height - (paddingY * 2);
 
-  const chartDataPoints = data.length === 0 ? [] : Array.from({ length: 12 }, (_, i) => {
-    const date = new Date(currentYear, i, 1);
-    const label = date.toLocaleString('fr-FR', { month: 'short', year: 'numeric' });
-    const matchingPoint = data.find(d => {
-      const cleanDLabel = d.label.toLowerCase().replace(/\./g, '').trim();
-      const cleanLabel = label.toLowerCase().replace(/\./g, '').trim();
-      return cleanDLabel === cleanLabel;
-    });
-    return {
-      label,
-      value: matchingPoint ? matchingPoint.value : 0
-    };
-  });
+  const chartDataPoints = activeData;
   const maxVal = chartDataPoints.length > 0 ? Math.max(...chartDataPoints.map(d => d.value)) : 0;
   const displayMax = maxVal === 0 ? 10 : Math.ceil(maxVal * 1.15); // Add margin at the top
 
@@ -193,14 +162,17 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
 
       <div style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>VOLUME DOSSIERS</span>
-        {loading && <span className="chart-pulse-dot" style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', background: 'var(--cyan)', boxShadow: '0 0 6px var(--cyan)', animation: 'pulse 1.5s infinite' }}></span>}
       </div>
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
-        <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--white)", fontFamily: "var(--font-body)", lineHeight: 1.1 }}>
-          {totalDossiersCurrent !== null ? `${totalDossiersCurrent} dossiers` : "— dossiers"}
-        </div>
-        {totalDossiersCurrent !== null && totalDossiersPrev !== null && (
+        {loading ? (
+          <SkeletonLoader height="22px" width="100px" />
+        ) : (
+          <div style={{ fontSize: "20px", fontWeight: 800, color: "var(--white)", fontFamily: "var(--font-body)", lineHeight: 1.1 }}>
+            {totalDossiersCurrent !== 0 ? `${totalDossiersCurrent} dossiers` : "— dossiers"}
+          </div>
+        )}
+        {!loading && totalDossiersCurrent !== 0 && totalDossiersPrev !== null && (
           <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)" }}>
             vs {prevYear} : <span style={{ color: "var(--white)", fontWeight: 600 }}>{totalDossiersPrev}</span>
             {(() => {
@@ -218,17 +190,17 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
         )}
       </div>
 
-
       {loading ? (
-        <div style={{ height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0, 229, 200, 0.02)', borderRadius: '4px', border: '1px dashed rgba(0, 229, 200, 0.1)' }}>
-          <div style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>CHARGEMENT DES DONNÉES...</div>
+        <div style={{ height: '72px', display: 'flex', flexDirection: 'column', gap: '8px', justifyContent: 'center' }}>
+          <SkeletonLoader height="40px" width="100%" />
+          <SkeletonLoader height="12px" width="60%" />
         </div>
       ) : error ? (
         <div style={{ height: '72px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'rgba(255, 71, 87, 0.02)', borderRadius: '4px', border: '1px dashed rgba(255, 71, 87, 0.15)', padding: '8px' }}>
           <div style={{ fontSize: '8px', fontFamily: 'var(--font-mono)', color: 'var(--red)', textAlign: 'center', marginBottom: '4px' }}>{error}</div>
-          <button onClick={fetchData} style={{ background: 'none', border: 'none', color: 'var(--cyan)', fontFamily: 'var(--font-mono)', fontSize: '8px', textDecoration: 'underline', cursor: 'pointer' }}>Réessayer</button>
+          <button onClick={() => fetchKpis('vdata', true, 'get_dossier_volume_evolution')} style={{ background: 'none', border: 'none', color: 'var(--cyan)', fontFamily: 'var(--font-mono)', fontSize: '8px', textDecoration: 'underline', cursor: 'pointer' }}>Réessayer</button>
         </div>
-      ) : data.length === 0 ? (
+      ) : chartDataPoints.length === 0 ? (
         <div style={{ height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0, 229, 200, 0.02)', borderRadius: '4px', border: '1px dashed rgba(0, 229, 200, 0.1)' }}>
           <div style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>AUCUNE DONNÉE DISPONIBLE</div>
         </div>
@@ -262,24 +234,6 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
               <div>
                 <span style={{ color: 'var(--muted)' }}>{points[hoveredIndex].label}</span> : <strong style={{ color: 'var(--cyan)' }}>{points[hoveredIndex].value}</strong> dossiers
               </div>
-              {(() => {
-                const currentMonthLabel = points[hoveredIndex].label;
-                const targetLabel = currentMonthLabel.replace(currentYear.toString(), prevYear.toString());
-                const prevMonth = data.find(d => {
-                  const cleanDLabel = d.label.toLowerCase().replace(/\./g, '').trim();
-                  const cleanTargetLabel = targetLabel.toLowerCase().replace(/\./g, '').trim();
-                  return cleanDLabel === cleanTargetLabel;
-                });
-                if (!prevMonth) return null;
-                const diff = points[hoveredIndex].value - prevMonth.value;
-                const sign = diff >= 0 ? "+" : "";
-                const color = diff >= 0 ? "var(--green)" : "var(--red)";
-                return (
-                  <div style={{ fontSize: '7px', color: 'rgba(255,255,255,0.5)' }}>
-                    vs {prevYear} ({prevMonth.label.split(' ')[0]}) : <strong>{prevMonth.value}</strong> <span style={{ color }}>({sign}{diff})</span>
-                  </div>
-                );
-              })()}
             </div>
           )}
 
