@@ -2974,3 +2974,23 @@ textarea.form-input {
   animation: scorePulseExc 2s infinite ease-in-out;
 }
 
+/* ── SKELETON LOADER ANIMATIONS ── */
+@keyframes skeletonPulse {
+  0% {
+    background-color: rgba(255, 255, 255, 0.04);
+  }
+  50% {
+    background-color: rgba(255, 255, 255, 0.10);
+  }
+  100% {
+    background-color: rgba(255, 255, 255, 0.04);
+  }
+}
+
+.skeleton-box {
+  display: inline-block;
+  height: 100%;
+  width: 100%;
+  border-radius: 4px;
+  animation: skeletonPulse 1.5s infinite ease-in-out;
+}

@@ -14,53 +14,26 @@ function getAuthToken() {
   } catch(e) { return ''; }
 }
 import React, { useEffect, useState } from "react";
+import { SkeletonLoader } from "@/components/vmind/SkeletonLoader";
 
 interface LatestReportCardProps {
   activeAgentId?: string;
 }
 
+import { useKpis } from "@/shared/contexts/KpiCacheContext";
+
 export const LatestReportCard: React.FC<LatestReportCardProps> = ({ activeAgentId }) => {
-  const [report, setReport] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
   const [hovered, setHovered] = useState(false);
 
-  const fetchLatestReport = async () => {
-    setLoading(true);
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
+  const agentData = kpisByAgent["vdata"] || {};
+  const report = agentData.get_latest_report || null;
+  const loading = loadingByAgent["vdata"] && !report;
 
-      const response = await fetch(`${baseUrl}/api/tools/get-latest-report`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${getAuthToken()}`,
-        },
-        body: JSON.stringify({
-          client_id: clientId,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const json = await response.json();
-      if (json.ok) {
-        setReport(json.data);
-      }
-    } catch (err) {
-      console.error("[LatestReportCard] Error fetching report:", err);
-    } finally {
-      setLoading(false);
-    }
+  const fetchLatestReport = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    fetchKpis("vdata", true, "get_latest_report");
   };
-
-  useEffect(() => {
-    if (activeAgentId === "VDATA") {
-      fetchLatestReport();
-    }
-  }, [activeAgentId]);
 
   if (activeAgentId !== "VDATA") {
     return null;
@@ -163,20 +136,12 @@ export const LatestReportCard: React.FC<LatestReportCardProps> = ({ activeAgentI
       </div>
 
       {loading ? (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: "var(--purple)",
-              boxShadow: "0 0 6px var(--purple)",
-              animation: "pulse 1.5s infinite",
-            }}
-          />
-          <span style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)" }}>
-            CHARGEMENT…
-          </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", height: "32px" }}>
+          <SkeletonLoader height="32px" width="32px" style={{ borderRadius: "4px" }} />
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px" }}>
+            <SkeletonLoader height="12px" width="60%" />
+            <SkeletonLoader height="8px" width="40%" />
+          </div>
         </div>
       ) : report ? (
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>

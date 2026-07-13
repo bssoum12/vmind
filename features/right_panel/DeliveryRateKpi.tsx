@@ -1,20 +1,9 @@
 "use client";
 
-
-function getAuthToken() {
-  if (typeof window === 'undefined') return '';
-  const mcpToken = localStorage.getItem('vmind_mcp_token');
-  if (mcpToken) return mcpToken;
-  try {
-    const sessionStr = localStorage.getItem('vmind_session');
-    if (!sessionStr) return '';
-    if (sessionStr.startsWith('eyJ')) return sessionStr;
-    const parsed = JSON.parse(sessionStr);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
-  } catch(e) { return ''; }
-}
 import React, { useEffect, useState, useRef } from 'react';
 import { DeliveryRateTooltip } from './TableauCroiseKpi/DeliveryRateTooltip';
+import { useKpis } from '../../shared/contexts/KpiCacheContext';
+import { SkeletonLoader } from '../../components/vmind/SkeletonLoader';
 
 interface DeliveryKpiData {
   value: number;
@@ -27,23 +16,11 @@ interface DeliveryRateKpiProps {
 }
 
 export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId }) => {
-  const currentYear = new Date().getFullYear();
-  const todayStr = new Date().toISOString().split("T")[0];
-  const startOfYearStr = `${currentYear}-01-01`;
+  const { kpisByAgent, loadingByAgent, fetchKpis, startDate, endDate } = useKpis();
 
-  const [startDate, setStartDate] = useState(startOfYearStr);
-  const [endDate, setEndDate] = useState(todayStr);
-  const [kpi, setKpi] = useState<DeliveryKpiData | null>(null);
-  const [totalMouvements, setTotalMouvements] = useState(0);
-  const [mouvementsATemps, setMouvementsATemps] = useState(0);
-  const [mouvementsEnRetard, setMouvementsEnRetard] = useState(0);
-  const [lateDeliveries, setLateDeliveries] = useState<any[]>([]);
   const [prevTaux, setPrevTaux] = useState<number | null>(null);
-  const [prevYear, setPrevYear] = useState<number>(currentYear - 1);
+  const [prevYear, setPrevYear] = useState<number>(new Date().getFullYear() - 1);
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [noData, setNoData] = useState(false);
   const [cardHovered, setCardHovered] = useState(false);
   const [animatedPercent, setAnimatedPercent] = useState(0);
 
@@ -53,68 +30,57 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
   const cardRef = useRef<HTMLDivElement>(null);
   const hideTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchData = async (start: string, end: string) => {
-    setLoading(true);
-    setError(null);
-    setNoData(false);
-    setKpi(null);
+  // Read current active data from Context
+  const agentData = kpisByAgent["vdata"] || {};
+  const toolData = agentData.get_delivery_rate || {};
 
+  const kpis = toolData.ok && toolData.kpis ? toolData.kpis : [];
+  const details = toolData.details || null;
+  const tableRows = toolData.table?.rows || [];
+
+  const kpi: DeliveryKpiData | null = kpis.length > 0 ? {
+    value: kpis[0].value,
+    display: kpis[0].display,
+    status: kpis[0].status
+  } : null;
+
+  const totalMouvements = details?.total_mouvements_realises || 0;
+  const mouvementsATemps = details?.mouvements_a_temps || 0;
+  const mouvementsEnRetard = details?.mouvements_en_retard || 0;
+  const lateDeliveries = tableRows;
+
+  const loading = loadingByAgent["vdata"] && !toolData.ok;
+  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
+  const noData = !loading && toolData.ok && kpis.length === 0;
+
+  function getAuthToken() {
+    if (typeof window === 'undefined') return '';
+    const mcpToken = localStorage.getItem('vmind_mcp_token');
+    if (mcpToken) return mcpToken;
+    try {
+      const sessionStr = localStorage.getItem('vmind_session');
+      if (!sessionStr) return '';
+      if (sessionStr.startsWith('eyJ')) return sessionStr;
+      const parsed = JSON.parse(sessionStr);
+      return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
+    } catch(e) { return ''; }
+  }
+
+  const fetchPrevYearRate = async () => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || 'DEMO';
-
-      const formattedStart = start.replace(/-/g, "");
-      const formattedEnd = end.replace(/-/g, "");
-
-      const response = await fetch(`${baseUrl}/api/tools/get-delivery-rate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`, },
-        body: JSON.stringify({ 
-          client_id: clientId,
-          startDate: formattedStart,
-          endDate: formattedEnd
-        }),
-      });
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const resJson = await response.json();
-
-      if (!resJson.ok) {
-        throw new Error(resJson.error?.message || 'Erreur serveur');
-      }
-
-      const data = resJson.data;
-
-      // If no KPIs were returned, it means no data for this month
-      if (!data.kpis || data.kpis.length === 0) {
-        setNoData(true);
-        return;
-      }
-
-      const k = data.kpis[0];
-      setKpi({
-        value: k.value,
-        display: k.display,
-        status: k.status,
-      });
-
-      setTotalMouvements(data.details?.total_mouvements_realises || 0);
-      setMouvementsATemps(data.details?.mouvements_a_temps || 0);
-      setMouvementsEnRetard(data.details?.mouvements_en_retard || 0);
-      setLateDeliveries(data.table?.rows || []);
-
-      // Fetch previous year data for comparison
-      const pYear = new Date().getFullYear() - 1;
+      const pYear = parseInt(startDate.substring(0, 4)) - 1;
       setPrevYear(pYear);
-      const prevStart = `${pYear}0101`;
-      const prevEnd = `${pYear}1231`;
+      const prevStart = `${pYear}${startDate.substring(4)}`;
+      const prevEnd = `${pYear}${endDate.substring(4)}`;
 
       const prevResponse = await fetch(`${baseUrl}/api/tools/get-delivery-rate`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`, },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`,
+        },
         body: JSON.stringify({ 
           client_id: clientId,
           startDate: prevStart,
@@ -132,18 +98,15 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
       } else {
         setPrevTaux(null);
       }
-
     } catch (err: any) {
-      setError(err.message || 'Erreur inconnue');
+      console.warn("Failed to fetch prev year delivery rate:", err);
       setPrevTaux(null);
-    } finally {
-      setLoading(false);
     }
   };
 
   useEffect(() => {
     if (activeAgentId === 'VDATA' && startDate && endDate) {
-      fetchData(startDate, endDate);
+      fetchPrevYearRate();
     }
   }, [activeAgentId, startDate, endDate]);
 
@@ -320,116 +283,21 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
           Livraison à temps
         </div>
 
-        {/* Cyber-accented Date Inputs Row */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            marginBottom: "12px",
-            zIndex: 20,
-            position: "relative",
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            onKeyDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              try {
-                e.currentTarget.showPicker();
-              } catch (err) {}
-            }}
-            style={{
-              background: "rgba(0, 240, 255, 0.04)",
-              color: "#00f0ff",
-              border: "1px solid rgba(0, 240, 255, 0.2)",
-              borderRadius: "4px",
-              padding: "3px 6px",
-              fontFamily: "var(--font-mono)",
-              fontSize: "8px",
-              outline: "none",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = "#00f0ff";
-              e.target.style.boxShadow = "0 0 6px rgba(0, 240, 255, 0.2)";
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = "rgba(0, 240, 255, 0.2)";
-              e.target.style.boxShadow = "none";
-            }}
-          />
-          <span
-            style={{
-              color: "var(--muted)",
-              fontSize: "8px",
-              fontFamily: "var(--font-mono)",
-              flexShrink: 0,
-            }}
-          >
-            au
-          </span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            onKeyDown={(e) => e.preventDefault()}
-            onClick={(e) => {
-              try {
-                e.currentTarget.showPicker();
-              } catch (err) {}
-            }}
-            style={{
-              background: "rgba(0, 240, 255, 0.04)",
-              color: "#00f0ff",
-              border: "1px solid rgba(0, 240, 255, 0.2)",
-              borderRadius: "4px",
-              padding: "3px 6px",
-              fontFamily: "var(--font-mono)",
-              fontSize: "8px",
-              outline: "none",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = "#00f0ff";
-              e.target.style.boxShadow = "0 0 6px rgba(0, 240, 255, 0.2)";
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = "rgba(0, 240, 255, 0.2)";
-              e.target.style.boxShadow = "none";
-            }}
-          />
-        </div>
-
         {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0' }}>
-            <div
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: 'var(--cyan)',
-                boxShadow: '0 0 6px var(--cyan)',
-                animation: 'pulse 1.5s infinite',
-                flexShrink: 0,
-              }}
-            />
-            <span style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--muted)' }}>
-              CALCUL EN COURS…
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <SkeletonLoader height="68px" width="68px" style={{ borderRadius: '50%' }} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <SkeletonLoader height="16px" width="90%" />
+              <SkeletonLoader height="12px" width="60%" />
+            </div>
           </div>
         ) : error ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <span style={{ fontSize: '8px', fontFamily: 'var(--font-mono)', color: 'var(--red)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <span style={{ color: "var(--red)", fontSize: "9px", fontFamily: "var(--font-mono)" }}>
               {error}
             </span>
             <button
-              onClick={() => fetchData(startDate, endDate)}
+              onClick={() => fetchKpis('vdata', true, 'get_delivery_rate')}
               style={{
                 background: 'none',
                 border: 'none',

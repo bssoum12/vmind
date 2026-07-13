@@ -285,3 +285,52 @@ export async function runAgentNow(agentName: string): Promise<any> {
   }
   return res.json();
 }
+
+/**
+ * Appelle l'agent n8n KPI via le Proxy sécurisé du Backend
+ */
+export async function fetchN8nKpis(
+  params: {
+    allowed_agents: string;
+    client_id: string;
+    startDate: string;
+    endDate: string;
+    target_tool?: string;
+    forceRefresh?: boolean;
+  },
+  signal?: AbortSignal
+): Promise<any> {
+  const proxyUrl = `${getBaseUrl()}/api/n8n-proxy/kpis-agent`;
+  const erp_name = "TraLis"; // Default ERP name
+
+  const response = await fetch(proxyUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      allowed_agents: params.allowed_agents,
+      erp_name,
+      startDate: params.startDate,
+      endDate: params.endDate,
+      target_tool: params.target_tool,
+      forceRefresh: params.forceRefresh
+    }),
+    signal
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur Proxy KPI (${response.status})`);
+  }
+
+  const text = await response.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch (err) {
+    console.warn("[KPI API] Response from proxy is not valid JSON:", text);
+    return {};
+  }
+}
+
