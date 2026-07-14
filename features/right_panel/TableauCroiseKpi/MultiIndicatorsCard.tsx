@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { KpiTooltip } from "./KpiTooltip";
+import { useKpis } from "../../../shared/contexts/KpiCacheContext";
+import { SkeletonLoader } from "@/components/vmind/SkeletonLoader";
 
 interface Kpi {
     label: string;
@@ -18,26 +20,21 @@ interface Props {
 export const MultiIndicatorsCard: React.FC<Props> = ({
     activeAgentId,
 }) => {
-    const [startDate, setStartDate] = useState("");
-    const [endDate, setEndDate] = useState("");
-    const [kpis, setKpis] = useState<Kpi[]>([]);
-    const [exportData, setExportData] = useState<any>(null);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
+    const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
     const [hovered, setHovered] = useState(false);
     const [coords, setCoords] = useState({ top: 0, left: 0 });
-    const [mounted, setMounted] = useState(false);
     const cardRef = React.useRef<HTMLDivElement>(null);
     const hideTimeout = React.useRef<NodeJS.Timeout | null>(null);
 
-    useEffect(() => {
-        setMounted(true);
-        const currentYear = new Date().getFullYear();
-        const todayStr = new Date().toISOString().split("T")[0];
-        const startOfYearStr = `${currentYear}-01-01`;
-        setStartDate(startOfYearStr);
-        setEndDate(todayStr);
-    }, []);
+    // Read current active data from Context
+    const agentData = kpisByAgent["vdata"] || {};
+    const toolData = agentData.get_tableau_croise || {};
+    
+    const kpis = toolData.ok && toolData.kpis ? (toolData.kpis as Kpi[]) : [];
+    const exportData = toolData.data?.exportData || null;
+
+    const loading = loadingByAgent["vdata"] && !toolData.ok;
+    const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
 
     const updateCoords = () => {
         if (cardRef.current) {
@@ -61,7 +58,7 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
     const handleMouseLeave = () => {
         hideTimeout.current = setTimeout(() => {
             setHovered(false);
-        }, 250); // 250ms buffer to cross the gap to the tooltip
+        }, 250);
     };
 
     const handleTooltipMouseEnter = () => {
@@ -97,62 +94,6 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
             window.removeEventListener("resize", handleUpdate);
         };
     }, [hovered]);
-
-    const fetchData = async (start: string, end: string) => {
-        setLoading(true);
-        setError("");
-
-        try {
-            const baseUrl =
-                process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-
-            const clientId =
-                process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
-
-            const formattedStart = start.replace(/-/g, "");
-            const formattedEnd = end.replace(/-/g, "");
-
-            const response = await fetch(
-                `${baseUrl}/api/tools/get-tableau-croise-kpi-vdata`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        client_id: clientId,
-                        startDate: formattedStart,
-                        endDate: formattedEnd,
-                    }),
-                }
-            );
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-
-            const json = await response.json();
-
-            if (!json.ok) {
-                throw new Error(json.error || "Erreur serveur");
-            }
-
-            setKpis(json.data?.kpis || []);
-            setExportData(json.data?.exportData || null);
-        } catch (err: any) {
-            setError(err.message || "Erreur inconnue");
-            setKpis([]);
-            setExportData(null);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        if (activeAgentId === "VDATA" && startDate && endDate) {
-            fetchData(startDate, endDate);
-        }
-    }, [activeAgentId, startDate, endDate]);
 
     if (activeAgentId !== "VDATA") {
         return null;
@@ -244,33 +185,9 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
                     {/* Left Section */}
                     <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "10px" }}>
                         {loading ? (
-                            <div
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        width: "6px",
-                                        height: "6px",
-                                        borderRadius: "50%",
-                                        background: "var(--cyan)",
-                                        boxShadow: "0 0 6px var(--cyan)",
-                                        animation: "pulse 1.5s infinite",
-                                    }}
-                                />
-
-                                <span
-                                    style={{
-                                        fontSize: "9px",
-                                        fontFamily: "var(--font-mono)",
-                                        color: "var(--muted)",
-                                    }}
-                                >
-                                    CHARGEMENT…
-                                </span>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                <SkeletonLoader height="16px" width="70%" />
+                                <SkeletonLoader height="10px" width="50%" />
                             </div>
                         ) : error ? (
                             <div
@@ -291,7 +208,7 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
                                 </span>
 
                                 <button
-                                    onClick={() => fetchData(startDate, endDate)}
+                                    onClick={() => fetchKpis('vdata', true, 'get_tableau_croise')}
                                     style={{
                                         background: "none",
                                         border: "none",
@@ -331,92 +248,6 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
                                 </div>
                             </div>
                         )}
-
-                        {/* Cyber-accented Date Picker Controls */}
-                        <div
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                zIndex: 20,
-                                position: "relative",
-                                marginTop: "4px",
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                onKeyDown={(e) => e.preventDefault()}
-                                onClick={(e) => {
-                                    try {
-                                        e.currentTarget.showPicker();
-                                    } catch (err) {}
-                                }}
-                                style={{
-                                    background: "rgba(0, 240, 255, 0.04)",
-                                    color: "#00f0ff",
-                                    border: "1px solid rgba(0, 240, 255, 0.2)",
-                                    borderRadius: "4px",
-                                    padding: "3px 6px",
-                                    fontFamily: "var(--font-mono)",
-                                    fontSize: "8px",
-                                    outline: "none",
-                                    cursor: "pointer",
-                                    transition: "all 0.2s ease",
-                                }}
-                                onFocus={(e) => {
-                                    e.target.style.borderColor = "#00f0ff";
-                                    e.target.style.boxShadow = "0 0 6px rgba(0, 240, 255, 0.2)";
-                                }}
-                                onBlur={(e) => {
-                                    e.target.style.borderColor = "rgba(0, 240, 255, 0.2)";
-                                    e.target.style.boxShadow = "none";
-                                }}
-                            />
-                            <span
-                                style={{
-                                    color: "var(--muted)",
-                                    fontSize: "8px",
-                                    fontFamily: "var(--font-mono)",
-                                    flexShrink: 0,
-                                }}
-                            >
-                                au
-                            </span>
-                            <input
-                                type="date"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                                onKeyDown={(e) => e.preventDefault()}
-                                onClick={(e) => {
-                                    try {
-                                        e.currentTarget.showPicker();
-                                    } catch (err) {}
-                                }}
-                                style={{
-                                    background: "rgba(0, 240, 255, 0.04)",
-                                    color: "#00f0ff",
-                                    border: "1px solid rgba(0, 240, 255, 0.2)",
-                                    borderRadius: "4px",
-                                    padding: "3px 6px",
-                                    fontFamily: "var(--font-mono)",
-                                    fontSize: "8px",
-                                    outline: "none",
-                                    cursor: "pointer",
-                                    transition: "all 0.2s ease",
-                                }}
-                                onFocus={(e) => {
-                                    e.target.style.borderColor = "#00f0ff";
-                                    e.target.style.boxShadow = "0 0 6px rgba(0, 240, 255, 0.2)";
-                                }}
-                                onBlur={(e) => {
-                                    e.target.style.borderColor = "rgba(0, 240, 255, 0.2)";
-                                    e.target.style.boxShadow = "none";
-                                }}
-                            />
-                        </div>
                     </div>
 
                     {/* Right Section: Animated Radar Web Chart */}

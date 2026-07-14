@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useKpis } from "../../../shared/contexts/KpiCacheContext";
+import { SkeletonLoader } from "@/components/vmind/SkeletonLoader";
 
 interface ClientRevenue {
   rank: number;
@@ -15,51 +17,19 @@ interface VfinTopClientsCardProps {
 }
 
 export const VfinTopClientsCard: React.FC<VfinTopClientsCardProps> = ({ activeAgentId }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
   const [hovered, setHovered] = useState(false);
-  const [clients, setClients] = useState<ClientRevenue[]>([]);
-  const [period, setPeriod] = useState<string>("");
   const [animProgress, setAnimProgress] = useState(0);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError("");
+  // Read current active data from Context
+  const agentData = kpisByAgent["vfin"] || {};
+  const toolData = agentData.get_top_clients || {};
 
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
+  const clients: ClientRevenue[] = toolData.data?.data || [];
+  const period = toolData.data?.period || "";
 
-      const response = await fetch(`${baseUrl}/api/tools/get-top-clients-revenue`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: clientId }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const json = await response.json();
-      if (json.ok && json.data && Array.isArray(json.data.data)) {
-        setClients(json.data.data);
-        if (json.data.period) setPeriod(json.data.period);
-      } else {
-        throw new Error(json.error || "Impossible de charger les données");
-      }
-    } catch (err: any) {
-      console.error("[VfinTopClientsCard] Error:", err);
-      setError(err.message || "Erreur de chargement");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeAgentId === "VFIN") {
-      fetchData();
-    }
-  }, [activeAgentId]);
+  const loading = loadingByAgent["vfin"] && !toolData.ok;
+  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
 
   // Count-up progress animation
   useEffect(() => {
@@ -144,48 +114,13 @@ export const VfinTopClientsCard: React.FC<VfinTopClientsCardProps> = ({ activeAg
         }}
       >
         <span>Top 5 Clients — CA</span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            fetchData();
-          }}
-          title="Actualiser"
-          style={{
-            background: "none",
-            border: "none",
-            color: themeColor,
-            cursor: "pointer",
-            fontSize: "10px",
-            padding: "2px",
-            display: "flex",
-            alignItems: "center",
-            opacity: 0.7,
-            transition: "opacity 0.2s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-          </svg>
-        </button>
       </div>
 
       {loading ? (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0" }}>
-          <div
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: themeColor,
-              boxShadow: `0 0 6px ${themeColor}`,
-              animation: "pulse 1.5s infinite",
-            }}
-          />
-          <span style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)" }}>
-            CHARGEMENT DU TOP CLIENTS…
-          </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "8px 0" }}>
+          <SkeletonLoader height="36px" width="100%" />
+          <SkeletonLoader height="36px" width="100%" />
+          <SkeletonLoader height="36px" width="100%" />
         </div>
       ) : error ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -193,7 +128,7 @@ export const VfinTopClientsCard: React.FC<VfinTopClientsCardProps> = ({ activeAg
             {error}
           </span>
           <button
-            onClick={fetchData}
+            onClick={() => fetchKpis('vfin', true)}
             style={{
               background: "none",
               border: "none",
@@ -276,7 +211,7 @@ export const VfinTopClientsCard: React.FC<VfinTopClientsCardProps> = ({ activeAg
               </div>
 
               {/* Client Metric (CA Total & Count) */}
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", flexShrink: 0 }}>
+              <div style={{ display: "flex", flexDirection: "column", flexShrink: 0, alignItems: "flex-end" }}>
                 <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--white)", fontFamily: "var(--font-mono)" }}>
                   {fmt(c.caTotal * animProgress)} <span style={{ fontSize: "8px", fontWeight: 500, color: "var(--muted)" }}>TND</span>
                 </span>

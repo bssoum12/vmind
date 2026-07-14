@@ -5,6 +5,7 @@ import { VmindMessage } from '@/shared/types/vmind';
 import { sendVmindMessage } from '@/shared/api/n8n-api';
 import { ToolResultRenderer } from './renderers/ToolResultRenderer';
 import { resolveAgentFromTool, AGENTS } from '@/shared/constants/data';
+import { useConversations } from '@/shared/contexts/ConversationsContext';
 
 interface VmindChatProps {
   initialPrompt?: string;
@@ -16,6 +17,9 @@ interface VmindChatProps {
 
 // Mappage des tools snake_case vers les agents
 const TOOL_TO_AGENT: Record<string, string> = {
+  'get_delivery_rate': 'VDATA',
+  'get_degraded_kpis': 'VDATA',
+  'get_dossier_volume_evolution': 'VDATA',
   'get_invoice_detail': 'VDATA',
   'get_dossier_detail': 'VDATA',
   'get_expedition_status': 'VDATA',
@@ -46,6 +50,29 @@ const getToolDisplayName = (tool?: string | null) => {
   return TOOL_DISPLAY_NAMES[tool] || tool.replace(/_/g, ' ');
 };
 
+const VDATA_FAST_TRACK_REGISTRY: Record<string, string> = {
+  "Taux livraison à temps ?": "Veuillez me fournir le taux de livraison à temps global.",
+  "Compare Jan-Avr ?": "Fais une comparaison détaillée des indicateurs entre Janvier et Avril.",
+  "3 KPIs dégradés ?": "Affiche-moi les 3 KPIs les plus dégradés actuellement.",
+  "Rapport mensuel PDF ?": "Génère et affiche le rapport mensuel d'activité au format PDF.",
+  "Retards par type client ?": "Quels sont les retards actuels classés par type de client ?",
+  "Volume 12 mois ?": "Quel est le volume total traité sur les 12 derniers mois ?"
+};
+
+const VFIN_FAST_TRACK_REGISTRY: Record<string, string> = {
+  "CA validé ce mois ?": "Quel est le chiffre d'affaires validé pour ce mois en cours ?",
+  "Clients Impayés > 30 jours ?": "Combien de clients ont des impayés supérieurs à 30 jours ?",
+  "Comparer CA mois précédent": "Fais une comparaison détaillée du chiffre d'affaires entre ce mois-ci et le mois précédent.",
+  "Top 5 marges faibles": "Montre-moi les 5 clients avec les marges les plus faibles sur ce trimestre.",
+  "Trésorerie aujourd'hui ?": "Quelle est la situation précise de la trésorerie aujourd'hui ?",
+  "Prévision trésorerie 30J ?": "Génère la prévision de trésorerie pour les 30 prochains jours."
+};
+
+const FAST_TRACK_REGISTRY: Record<string, string> = {
+  ...VDATA_FAST_TRACK_REGISTRY,
+  ...VFIN_FAST_TRACK_REGISTRY
+};
+
 export const VmindChat: React.FC<VmindChatProps> = ({
   initialPrompt,
   onOpenVoice,
@@ -53,7 +80,43 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   onAgentActive,
   activeAgentId = "VMIND"
 }) => {
+  const { activeConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle } = useConversations();
   const [input, setInput] = useState('');
+
+  // Fetch history when conversation changes
+  useEffect(() => {
+    if (!activeConversationId) {
+      setMessages([{ id: 'init-1', sender: 'vm', text: 'Bonjour. Je suis connecté via n8n. Que puis-je pour vous ?', time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) }]);
+      return;
+    }
+    const fetchHistory = async () => {
+      try {
+        setIsLoading(true);
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
+        if (token && token.startsWith("{")) token = JSON.parse(token).token;
+
+        const res = await fetch(`${baseUrl}/api/conversations/${activeConversationId}/messages`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (data.ok && data.messages.length > 0) {
+           const historyMsgs = data.messages.map((m: any, i: number) => {
+              if (m.role === 'human') {
+                 return { id: `hist-h-${i}`, sender: 'user', text: m.text, time: '' };
+              } else {
+                 return { id: `hist-a-${i}`, sender: 'vm', text: m.message || m.text || 'Réponse', time: '', ...m };
+              }
+           });
+           setMessages(historyMsgs);
+        } else {
+           setMessages([{ id: 'init-1', sender: 'vm', text: `Nouvelle discussion.`, time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) }]);
+        }
+      } catch (err) { console.error("Error fetching history", err); }
+      finally { setIsLoading(false); }
+    };
+    fetchHistory();
+  }, [activeConversationId]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -108,7 +171,37 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     setMessages((prev) => [...prev, userMessage, thinkingMessage]);
 
     try {
-      let response = await sendVmindMessage(text, clientId);
+      let targetConvId = activeConversationId;
+      if (!targetConvId) {
+         targetConvId = await createNewConversation(activeAgentId, text);
+      }
+      let response = await sendVmindMessage(text, targetConvId, activeAgentId, clientId);
+
+      // Call bump
+      bumpConversation(targetConvId);
+
+      // Call smart-title async if this is a new conversation (or just always call it, backend handles it, but let's only do it if the title is generic)
+      const currentConv = conversations.find(c => c.conversation_id === targetConvId);
+      if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
+        // Fire and forget
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
+        if (token && token.startsWith("{")) token = JSON.parse(token).token;
+        
+        fetch(`${baseUrl}/api/conversations/${targetConvId}/smart-title`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ message: text || text })
+        })
+        .then(res => res.json())
+        .then(data => {
+           if (data.ok && data.conversation) {
+             updateConversationTitle(targetConvId, data.conversation.title);
+           }
+        })
+        .catch(err => console.error("Smart title error", err));
+      }
+
 
       console.log("✅ [VmindChat] Réponse reçue de l'API:", {
         tool: response.tool_used,
@@ -157,6 +250,119 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         }]);
       }
 
+    } catch (error: any) {
+      setMessages((prev) => prev.filter(m => !m.isThinking));
+      setMessages((prev) => [...prev, {
+        id: `err-${Date.now()}`,
+        sender: 'vm',
+        text: `Erreur de communication avec n8n : ${error.message}`,
+        time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+        error: error.message,
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFastTrackClick = async (shortLabel: string) => {
+    if (isLoading) return;
+    
+    const professionalMessage = FAST_TRACK_REGISTRY[shortLabel];
+    if (!professionalMessage) return;
+
+    setInput('');
+    setIsLoading(true);
+
+    const userMessage: VmindMessage = {
+      id: `user-${Date.now()}`,
+      sender: 'user',
+      text: professionalMessage,
+      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+    };
+
+    const thinkingMessage: VmindMessage = {
+      id: `thinking-${Date.now()}`,
+      sender: 'vm',
+      text: '',
+      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+      isThinking: true,
+    };
+
+    setMessages((prev) => [...prev, userMessage, thinkingMessage]);
+
+    try {
+      // Déclenche le Webhook n8n comme pour un message normal (via l'IA)
+      let targetConvId = activeConversationId;
+      if (!targetConvId) {
+         targetConvId = await createNewConversation(activeAgentId, professionalMessage);
+      }
+      let response = await sendVmindMessage(professionalMessage, targetConvId, activeAgentId, clientId);
+
+      // Call bump
+      bumpConversation(targetConvId);
+
+      // Call smart-title async if this is a new conversation (or just always call it, backend handles it, but let's only do it if the title is generic)
+      const currentConv = conversations.find(c => c.conversation_id === targetConvId);
+      if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
+        // Fire and forget
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
+        if (token && token.startsWith("{")) token = JSON.parse(token).token;
+        
+        fetch(`${baseUrl}/api/conversations/${targetConvId}/smart-title`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ message: professionalMessage })
+        })
+        .then(res => res.json())
+        .then(data => {
+           if (data.ok && data.conversation) {
+             updateConversationTitle(targetConvId, data.conversation.title);
+           }
+        })
+        .catch(err => console.error("Smart title error", err));
+      }
+
+
+      setMessages((prev) => prev.filter(m => !m.isThinking));
+
+      const isOk = response && (response.ok === true || (response.ok as any) === "true");
+
+      if (!isOk) {
+        setMessages((prev) => [...prev, {
+          id: `err-${Date.now()}`,
+          sender: 'vm',
+          text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
+          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          error: response?.error || 'NO_RESPONSE',
+          response_type: 'error',
+          title: response?.title || 'Erreur n8n'
+        }]);
+      } else {
+        const toolUsed = response.tool_used as string;
+        const agentId = TOOL_TO_AGENT[toolUsed] || 'VMIND';
+
+        if (onAgentActive) onAgentActive(agentId);
+
+        setMessages((prev) => [...prev, {
+          id: `vm-${Date.now()}`,
+          sender: 'vm',
+          text: response.message || 'Voici les informations demandées.',
+          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          tool_used: response.tool_used,
+          response_type: response.response_type || 'full',
+          title: response.title,
+          kpis: response.kpis,
+          table: response.table,
+          chart: response.chart,
+          details: response.details,
+          raw: response.raw,
+          alerts: response.alerts,
+          report_url: response.report_url,
+          report_filename: response.report_filename,
+          error: response.error
+        }]);
+      }
     } catch (error: any) {
       setMessages((prev) => prev.filter(m => !m.isThinking));
       setMessages((prev) => [...prev, {
@@ -320,132 +526,34 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         {/* Suggestions Zone */}
         {activeAgentId === 'VDATA' && (
           <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
-            <button
-              onClick={() => handleSuggestionClick("Quel est le taux de dossiers livrés à temps ce mois ?", "/api/tools/get-delivery-rate", {})}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Taux livraison à temps ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick("Compare les performances de janvier à avril par agence", "/api/tools/compare-agency-performance-jan-apr", {})}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Compare Jan-Avr ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick("Quels sont les 3 indicateurs les plus dégradés cette semaine ?", "/api/tools/get-degraded-kpis", {})}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              3 KPIs dégradés ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick("Génère le rapport mensuel global d'activité", "/api/tools/generate-monthly-activity-report", {})}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Rapport mensuel PDF ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick("Analyse la corrélation entre retards et type de client", "/api/tools/analyze-delay-by-client-type", {})}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Retards par type client ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick("Montre-moi l'évolution du volume des dossiers sur 12 mois", "/api/tools/get-dossier-volume-evolution", { months: 12 })}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Volume 12 mois ?
-            </button>
+            {Object.keys(VDATA_FAST_TRACK_REGISTRY).map((label) => (
+              <button
+                key={label}
+                onClick={() => handleFastTrackClick(label)}
+                className="suggestion-chip"
+                style={{ flexShrink: 0 }}
+                disabled={isLoading}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         )}
 
         {/* VFIN Suggestions */}
         {activeAgentId === 'VFIN' && (
           <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
-            <button
-              onClick={() => handleSuggestionClick(
-                "Quel est le chiffre d'affaires validé ce mois ?",
-                "/api/tools/get-monthly-validated-revenue",
-                {}
-              )}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              CA validé ce mois ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick(
-                "Combien de clients ont des impayés supérieurs à 30 jours ?",
-                "/api/tools/get-clients-overdue-30-days",
-                {}
-              )}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Clients Impayés &gt; 30 jours ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick(
-                "Comparer le CA de ce mois avec le mois précédent",
-                "/api/tools/compare-monthly-revenue",
-                {}
-              )}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Comparer CA mois précédent
-            </button>
-            <button
-              onClick={() => handleSuggestionClick(
-                "Montre-moi les 5 clients avec les marges les plus faibles ce trimestre",
-                "/api/tools/get-lowest-margin-5clients-quarter",
-                {}
-              )}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Top 5 marges faibles
-            </button>
-            <button
-              onClick={() => handleSuggestionClick(
-                "Quelle est la situation de trésorerie aujourd'hui ?",
-                "/api/tools/get-treasury-status-today",
-                {}
-              )}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Trésorerie aujourd'hui ?
-            </button>
-            <button
-              onClick={() => handleSuggestionClick(
-                "Prévision de trésorerie pour les 30 prochains jours",
-                "/api/tools/get-treasury-forecast-30-days",
-                {}
-              )}
-              className="suggestion-chip"
-              style={{ flexShrink: 0 }}
-              disabled={isLoading}
-            >
-              Prévision trésorerie 30 jours
-            </button>
+            {Object.keys(VFIN_FAST_TRACK_REGISTRY).map((label) => (
+              <button
+                key={label}
+                onClick={() => handleFastTrackClick(label)}
+                className="suggestion-chip"
+                style={{ flexShrink: 0 }}
+                disabled={isLoading}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         )}
 

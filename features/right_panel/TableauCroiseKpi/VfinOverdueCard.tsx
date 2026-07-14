@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+import { useKpis } from "../../../shared/contexts/KpiCacheContext";
+import { SkeletonLoader } from "@/components/vmind/SkeletonLoader";
 
 interface UnpaidInterval {
   key: string;
@@ -17,66 +19,30 @@ interface VfinOverdueCardProps {
 }
 
 export const VfinOverdueCard: React.FC<VfinOverdueCardProps> = ({ activeAgentId }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
   const [hovered, setHovered] = useState(false);
   const [activeIntervalKey, setActiveIntervalKey] = useState<string | null>(null);
   const [donutHovered, setDonutHovered] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
 
-  const [totalImpayes, setTotalImpayes] = useState<number>(0);
-  const [totalFormatted, setTotalFormatted] = useState<string>("0,00");
-  const [nbClients, setNbClients] = useState<number>(0);
-  const [intervals, setIntervals] = useState<UnpaidInterval[]>([]);
-
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError("");
+  // Read current active data from Context
+  const agentData = kpisByAgent["vfin"] || {};
+  const toolData = agentData.get_overdue_balance || {};
 
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
+  const kpis = toolData.ok && toolData.kpis ? toolData.kpis : [];
+  const intervals: UnpaidInterval[] = toolData.data?.intervals || [];
 
-      const response = await fetch(`${baseUrl}/api/tools/get-overdue-balance`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: clientId }),
-      });
+  const totalKpi = kpis.find((k: any) => k.label.toLowerCase().includes("montant"));
+  const clientsKpi = kpis.find((k: any) => k.label.toLowerCase().includes("client"));
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+  const totalImpayes = totalKpi ? totalKpi.value : 0;
+  const totalFormatted = totalKpi ? totalKpi.display : "0,00";
+  const nbClients = clientsKpi ? clientsKpi.value : 0;
 
-      const json = await response.json();
-      if (json.ok && json.data) {
-        const resultData = json.data;
-        
-        const kpis = resultData.kpis || [];
-        const totalKpi = kpis.find((k: any) => k.label.toLowerCase().includes("montant"));
-        const clientsKpi = kpis.find((k: any) => k.label.toLowerCase().includes("client"));
-
-        setTotalImpayes(totalKpi ? totalKpi.value : 0);
-        setTotalFormatted(totalKpi ? totalKpi.display : "0,00");
-        setNbClients(clientsKpi ? clientsKpi.value : 0);
-        setIntervals(resultData.intervals || []);
-      } else {
-        throw new Error(json.error || "Impossible de charger les données");
-      }
-    } catch (err: any) {
-      console.error("[VfinOverdueCard] Error:", err);
-      setError(err.message || "Erreur de chargement");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeAgentId === "VFIN") {
-      fetchData();
-    }
-  }, [activeAgentId]);
+  const loading = loadingByAgent["vfin"] && !toolData.ok;
+  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
 
   // Count-up progress animation
   useEffect(() => {
@@ -194,48 +160,16 @@ export const VfinOverdueCard: React.FC<VfinOverdueCardProps> = ({ activeAgentId 
         }}
       >
         <span>Répartition des impayés</span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            fetchData();
-          }}
-          title="Actualiser"
-          style={{
-            background: "none",
-            border: "none",
-            color: themeColor,
-            cursor: "pointer",
-            fontSize: "10px",
-            padding: "2px",
-            display: "flex",
-            alignItems: "center",
-            opacity: 0.7,
-            transition: "opacity 0.2s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-          </svg>
-        </button>
       </div>
 
       {loading ? (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "16px 0" }}>
-          <div
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: themeColor,
-              boxShadow: `0 0 6px ${themeColor}`,
-              animation: "pulse 1.5s infinite",
-            }}
-          />
-          <span style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)" }}>
-            CHARGEMENT DE LA RÉPARTITION…
-          </span>
+        <div style={{ display: "flex", gap: "16px", alignItems: "center", padding: "8px 0" }}>
+          <SkeletonLoader height="72px" width="72px" style={{ borderRadius: "50%" }} />
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
+            <SkeletonLoader height="16px" width="80%" />
+            <SkeletonLoader height="12px" width="50%" />
+            <SkeletonLoader height="10px" width="60%" />
+          </div>
         </div>
       ) : error ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -243,7 +177,7 @@ export const VfinOverdueCard: React.FC<VfinOverdueCardProps> = ({ activeAgentId 
             {error}
           </span>
           <button
-            onClick={fetchData}
+            onClick={() => fetchKpis('vfin', true)}
             style={{
               background: "none",
               border: "none",
@@ -260,228 +194,137 @@ export const VfinOverdueCard: React.FC<VfinOverdueCardProps> = ({ activeAgentId 
           </button>
         </div>
       ) : (
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          
-          {/* Left: Premium SVG Donut Chart */}
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          {/* SVG Donut */}
           <div 
+            style={{ position: "relative", width: "72px", height: "72px", flexShrink: 0 }}
             onMouseEnter={() => setDonutHovered(true)}
-            onMouseLeave={() => setDonutHovered(false)}
-            style={{ 
-              position: "relative", 
-              flexShrink: 0, 
-              width: "80px", 
-              height: "80px", 
-              display: "flex", 
-              alignItems: "center", 
-              justifyContent: "center" 
+            onMouseLeave={() => {
+              setDonutHovered(false);
+              setActiveIntervalKey(null);
             }}
           >
-            <svg width="80" height="80" viewBox="0 0 80 80" style={{ transform: "rotate(0deg)" }}>
+            <svg width="72" height="72" viewBox="0 0 72 72">
               <defs>
-                <filter id="segment-glow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="2.5" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                <filter id="donutGlow">
+                  <feGaussianBlur stdDeviation="2" result="blur" />
+                  <feMerge>
+                    <feMergeNode in="blur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
                 </filter>
               </defs>
+              {/* Back track ring */}
+              <circle cx="36" cy="36" r={radius} fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth={strokeWidth} />
               
-              {/* Background Track */}
-              <circle
-                cx="40"
-                cy="40"
-                r={radius}
-                fill="none"
-                stroke="rgba(255, 255, 255, 0.04)"
-                strokeWidth={strokeWidth}
-              />
-              
-              {/* Curved Glowing Segments */}
-              {segmentCircles.map((seg) => {
-                const isSelected = activeIntervalKey === seg.key;
+              {segmentCircles.map((seg, idx) => {
+                const isActive = activeIntervalKey === seg.key;
+                const isAnyActive = activeIntervalKey !== null;
+                const strokeOp = isAnyActive ? (isActive ? 1.0 : 0.25) : 0.85;
+                
                 return (
                   <circle
                     key={seg.key}
-                    cx="40"
-                    cy="40"
+                    cx="36"
+                    cy="36"
                     r={radius}
                     fill="none"
                     stroke={seg.color}
-                    strokeWidth={strokeWidth}
+                    strokeWidth={isActive ? strokeWidth + 2.0 : strokeWidth}
                     strokeDasharray={seg.dashArray}
-                    strokeDashoffset="0"
+                    transform={`rotate(${seg.rotation} 36 36)`}
+                    strokeLinecap="round"
                     style={{
-                      transform: `rotate(${seg.rotation}deg)`,
-                      transformOrigin: "40px 40px",
-                      transition: "opacity 0.3s ease",
-                      pointerEvents: "none",
-                      filter: isSelected ? "url(#segment-glow)" : "none",
-                      opacity: activeIntervalKey === null || isSelected ? 1 : 0.3,
+                      transition: "all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1)",
+                      cursor: "pointer",
+                      opacity: strokeOp,
+                      filter: isActive ? "url(#donutGlow)" : "none"
                     }}
+                    onMouseEnter={() => setActiveIntervalKey(seg.key)}
                   />
                 );
               })}
             </svg>
-
-            {/* Inner Info Card */}
+            
+            {/* Center Summary details */}
             <div
               style={{
                 position: "absolute",
-                width: "52px",
-                height: "52px",
-                borderRadius: "50%",
-                backgroundColor: "rgba(6, 17, 31, 0.98)",
+                inset: 0,
                 display: "flex",
-                flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                border: "1px solid rgba(255,255,255,0.06)",
-                boxShadow: "inset 0 0 6px rgba(0,0,0,0.6)",
-                pointerEvents: "none",
+                flexDirection: "column",
+                pointerEvents: "none"
               }}
             >
-              <span
-                style={{
-                  fontSize: donutHovered 
-                    ? "7.5px" 
-                    : "10px",
-                  fontWeight: 800,
-                  fontFamily: "var(--font-mono)",
-                  color: "var(--white)",
-                  textAlign: "center",
-                  whiteSpace: "nowrap",
-                  transition: "font-size 0.2s ease",
-                }}
-              >
-                {donutHovered ? fmt(totalImpayes * animProgress) : formatCompact(totalImpayes * animProgress)}
-              </span>
-              <span
-                style={{
-                  fontSize: "7px",
-                  fontFamily: "var(--font-mono)",
-                  color: "var(--muted)",
-                  marginTop: "1px",
-                }}
-              >
-                TND
-              </span>
+              {activeIntervalKey ? (
+                (() => {
+                  const activeSeg = intervals.find(i => i.key === activeIntervalKey);
+                  return (
+                    <>
+                      <span style={{ fontSize: "10px", fontWeight: 800, color: "#ffffff", fontFamily: "var(--font-mono)" }}>
+                        {activeSeg ? `${activeSeg.percentage.toFixed(0)}%` : ""}
+                      </span>
+                      <span style={{ fontSize: "6px", color: "var(--muted)", fontWeight: 500, fontFamily: "var(--font-mono)", textTransform: "uppercase" }}>
+                        {activeSeg ? activeSeg.label : ""}
+                      </span>
+                    </>
+                  );
+                })()
+              ) : (
+                <>
+                  <span style={{ fontSize: "9px", fontWeight: 800, color: "#ffffff", fontFamily: "var(--font-mono)" }}>
+                    {formatCompact(totalImpayes)}
+                  </span>
+                  <span style={{ fontSize: "6px", color: "var(--muted)", fontWeight: 500, fontFamily: "var(--font-mono)" }}>
+                    TOTAL
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Right: Intervals Breakdown */}
-          <div style={{ flexGrow: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
-            {intervals.map((item) => {
-              const isSelected = activeIntervalKey === item.key;
-              const resolvedColor = item.color === "var(--red)" ? "#FF4757" : item.color === "var(--green)" ? "#1D9E75" : item.color;
-              const animatedAmount = item.amount * animProgress;
-              const animatedNbClients = Math.round(item.nbClients * animProgress);
-              
+          {/* Legend Grid */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px" }}>
+            {segmentCircles.map((seg) => {
+              const isActive = activeIntervalKey === seg.key;
+              const isAnyActive = activeIntervalKey !== null;
+              const textOpacity = isAnyActive ? (isActive ? 1.0 : 0.35) : 0.85;
+
               return (
                 <div
-                  key={item.key}
-                  onMouseEnter={() => setActiveIntervalKey(item.key)}
-                  onMouseLeave={() => setActiveIntervalKey(null)}
+                  key={seg.key}
                   style={{
-                    position: "relative",
-                    padding: "5px 6px",
-                    background: isSelected ? "rgba(255, 255, 255, 0.04)" : "rgba(255, 255, 255, 0.015)",
-                    border: isSelected ? `1px solid ${resolvedColor}40` : "1px solid rgba(255, 255, 255, 0.03)",
-                    borderRadius: "4px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    fontSize: "8px",
+                    fontFamily: "var(--font-mono)",
                     cursor: "pointer",
-                    transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                    opacity: activeIntervalKey === null || isSelected ? 1 : 0.6,
+                    opacity: textOpacity,
+                    transition: "opacity 0.2s"
                   }}
+                  onMouseEnter={() => setActiveIntervalKey(seg.key)}
+                  onMouseLeave={() => setActiveIntervalKey(null)}
                 >
-                  {/* Inner container for text/dots */}
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                    }}
-                  >
-                    {/* Top line: Label + Percentage */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <div
-                          style={{
-                            width: "6px",
-                            height: "6px",
-                            borderRadius: "50%",
-                            backgroundColor: resolvedColor,
-                            boxShadow: isSelected ? `0 0 6px ${resolvedColor}` : `0 0 3px ${resolvedColor}`,
-                            transition: "all 0.2s",
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize: "9.5px",
-                            color: "var(--white)",
-                            fontWeight: 600,
-                          }}
-                        >
-                          {item.label}
-                        </span>
-                      </div>
-                      <span
-                        style={{
-                          fontSize: "9.5px",
-                          fontWeight: 700,
-                          fontFamily: "var(--font-mono)",
-                          color: resolvedColor,
-                        }}
-                      >
-                        {item.percentage}%
-                      </span>
-                    </div>
-
-                    {/* Bottom line: Amount + Clients count */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "3px" }}>
-                      <span
-                        style={{
-                          fontSize: "9.5px",
-                          fontWeight: 600,
-                          fontFamily: "var(--font-mono)",
-                          color: "rgba(255, 255, 255, 0.7)",
-                        }}
-                      >
-                        {fmt(animatedAmount)}{" "}
-                        <span style={{ fontSize: "7px", color: "var(--muted)", fontWeight: 500 }}>TND</span>
-                      </span>
-                      <span
-                        style={{
-                          fontSize: "7.5px",
-                          fontFamily: "var(--font-mono)",
-                          color: "rgba(255, 255, 255, 0.25)",
-                        }}
-                      >
-                        {animatedNbClients} client{animatedNbClients > 1 ? "s" : ""}
-                      </span>
-                    </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "5px", minWidth: 0 }}>
+                    <div style={{ width: "6px", height: "6px", borderRadius: "1px", background: seg.color, flexShrink: 0 }} />
+                    <span style={{ color: "var(--muted)", textTransform: "uppercase", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {seg.label}
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+                    <span style={{ color: "var(--white)", fontWeight: 600 }}>
+                      {seg.amountFormatted}
+                    </span>
                   </div>
                 </div>
               );
             })}
           </div>
-
         </div>
       )}
-
-      {/* Divider */}
-      <div style={{ height: "1px", backgroundColor: "rgba(255,255,255,0.06)", margin: "10px 0 6px 0" }} />
-
-      {/* Footer */}
-      <div
-        style={{
-          fontSize: "8px",
-          color: "var(--muted)",
-          fontFamily: "var(--font-mono)",
-          display: "flex",
-          justifyContent: "space-between",
-        }}
-      >
-        <span>TOTAL IMPAYÉS : {fmt(totalImpayes * animProgress)} TND</span>
-        <span style={{ color: "rgba(255, 255, 255, 0.3)" }}>
-          {Math.round(nbClients * animProgress)} clients au total
-        </span>
-      </div>
     </div>
   );
 };

@@ -1,105 +1,43 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useKpis } from "../../../shared/contexts/KpiCacheContext";
+import { SkeletonLoader } from "@/components/vmind/SkeletonLoader";
 
 interface VfinMonthlyRevenueCardProps {
   activeAgentId?: string;
 }
 
 export const VfinMonthlyRevenueCard: React.FC<VfinMonthlyRevenueCardProps> = ({ activeAgentId }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
   const [hovered, setHovered] = useState(false);
-
-  // States for API data
-  const [caTotal, setCaTotal] = useState<number | null>(null);
-  const [caFormatted, setCaFormatted] = useState<string>("0,00");
-  const [margeTotal, setMargeTotal] = useState<number | null>(null);
-  const [margeFormatted, setMargeFormatted] = useState<string>("0,00");
-  const [tauxMarge, setTauxMarge] = useState<number | null>(null);
-
-  const [caPrecedent, setCaPrecedent] = useState<number | null>(null);
-  const [caPrecedentFormatted, setCaPrecedentFormatted] = useState<string>("0,00");
-  const [evolutionPct, setEvolutionPct] = useState<number | null>(null);
-
   const [animProgress, setAnimProgress] = useState(0);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError("");
+  // Read current active data from Context
+  const agentData = kpisByAgent["vfin"] || {};
+  
+  const revToolData = agentData.get_monthly_validated_revenue || {};
+  const compToolData = agentData.compare_monthly_revenue || {};
 
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
+  const revKpis = revToolData.ok && revToolData.kpis ? revToolData.kpis : [];
+  const compKpis = compToolData.ok && compToolData.kpis ? compToolData.kpis : [];
 
-      // 1. Fetch current month validated revenue
-      const revResponse = await fetch(`${baseUrl}/api/tools/get-monthly-validated-revenue`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: clientId }),
-      });
+  const caKpi = revKpis.find((k: any) => k.label.includes("CA"));
+  const margeKpi = revKpis.find((k: any) => k.label.includes("Marge"));
+  const rateKpi = revKpis.find((k: any) => k.label.includes("Taux"));
 
-      // 2. Fetch comparison with previous month
-      const compResponse = await fetch(`${baseUrl}/api/tools/compare-monthly-revenue`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: clientId }),
-      });
+  const caTotal = caKpi ? caKpi.value : null;
+  const margeTotal = margeKpi ? margeKpi.value : null;
+  const tauxMarge = rateKpi ? rateKpi.value : null;
 
-      if (!revResponse.ok || !compResponse.ok) {
-        throw new Error("Erreur de connexion aux API financières.");
-      }
+  const prevCaKpi = compKpis.find((k: any) => k.label.includes("précédent"));
+  const evoKpi = compKpis.find((k: any) => k.label.includes("Évolution"));
 
-      const revJson = await revResponse.json();
-      const compJson = await compResponse.json();
+  const caPrecedent = prevCaKpi ? prevCaKpi.value : null;
+  const evolutionPct = evoKpi ? evoKpi.value : null;
 
-      if (revJson.ok && revJson.data) {
-        const kpis = revJson.data.kpis || [];
-        const caKpi = kpis.find((k: any) => k.label.includes("CA"));
-        const margeKpi = kpis.find((k: any) => k.label.includes("Marge"));
-        const rateKpi = kpis.find((k: any) => k.label.includes("Taux"));
-
-        if (caKpi) {
-          setCaTotal(caKpi.value);
-          setCaFormatted(caKpi.display);
-        }
-        if (margeKpi) {
-          setMargeTotal(margeKpi.value);
-          setMargeFormatted(margeKpi.display);
-        }
-        if (rateKpi) {
-          setTauxMarge(rateKpi.value);
-        }
-      } else {
-        throw new Error(revJson.error || "Impossible de charger le CA validé");
-      }
-
-      if (compJson.ok && compJson.data) {
-        const kpis = compJson.data.kpis || [];
-        const prevCaKpi = kpis.find((k: any) => k.label.includes("précédent"));
-        const evoKpi = kpis.find((k: any) => k.label.includes("Évolution"));
-
-        if (prevCaKpi) {
-          setCaPrecedent(prevCaKpi.value);
-          setCaPrecedentFormatted(prevCaKpi.display);
-        }
-        if (evoKpi) {
-          setEvolutionPct(evoKpi.value);
-        }
-      }
-    } catch (err: any) {
-      console.error("[VfinMonthlyRevenueCard] Error:", err);
-      setError(err.message || "Erreur de chargement");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (activeAgentId === "VFIN") {
-      fetchData();
-    }
-  }, [activeAgentId]);
+  const loading = loadingByAgent["vfin"] && !revToolData.ok;
+  const error = !loading && !revToolData.ok && agentData.error ? agentData.error : "";
 
   // Count-up progress animation
   useEffect(() => {
@@ -183,48 +121,23 @@ export const VfinMonthlyRevenueCard: React.FC<VfinMonthlyRevenueCardProps> = ({ 
         }}
       >
         <span>CA Mois (TND)</span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            fetchData();
-          }}
-          title="Actualiser"
-          style={{
-            background: "none",
-            border: "none",
-            color: themeColor,
-            cursor: "pointer",
-            fontSize: "10px",
-            padding: "2px",
-            display: "flex",
-            alignItems: "center",
-            opacity: 0.7,
-            transition: "opacity 0.2s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-          </svg>
-        </button>
       </div>
 
       {loading ? (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0" }}>
-          <div
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: themeColor,
-              boxShadow: `0 0 6px ${themeColor}`,
-              animation: "pulse 1.5s infinite",
-            }}
-          />
-          <span style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)" }}>
-            CHARGEMENT DES DONNÉES FINANCIÈRES…
-          </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "8px 0" }}>
+          <SkeletonLoader height="28px" width="60%" />
+          <SkeletonLoader height="12px" width="40%" />
+          <div style={{ height: "1px", backgroundColor: "rgba(255,255,255,0.06)", margin: "4px 0" }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            <div>
+              <SkeletonLoader height="8px" width="40%" style={{ marginBottom: "4px" }} />
+              <SkeletonLoader height="12px" width="80%" />
+            </div>
+            <div>
+              <SkeletonLoader height="8px" width="40%" style={{ marginBottom: "4px" }} />
+              <SkeletonLoader height="12px" width="80%" />
+            </div>
+          </div>
         </div>
       ) : error ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -232,7 +145,7 @@ export const VfinMonthlyRevenueCard: React.FC<VfinMonthlyRevenueCardProps> = ({ 
             {error}
           </span>
           <button
-            onClick={fetchData}
+            onClick={() => fetchKpis('vfin', true)}
             style={{
               background: "none",
               border: "none",

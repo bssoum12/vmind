@@ -3,4 +3,4 @@ node_modules/
 .env
 
 *.tsbuildinfos
-tsconfig.tsbuildinfo
+tsconfig.tsbuildinfo"tsconfig.tsbuildinfo" 

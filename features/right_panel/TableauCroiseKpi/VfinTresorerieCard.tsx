@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useKpis } from "../../../shared/contexts/KpiCacheContext";
+import { SkeletonLoader } from "@/components/vmind/SkeletonLoader";
 
 interface TresorerieData {
   tresorerieNette: number;
@@ -22,10 +23,8 @@ interface VfinTresorerieCardProps {
 }
 
 export const VfinTresorerieCard: React.FC<VfinTresorerieCardProps> = ({ activeAgentId }) => {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
   const [hovered, setHovered] = useState(false);
-  const [data, setData] = useState<TresorerieData | null>(null);
 
   // Animated values
   const [animNet, setAnimNet] = useState(0);
@@ -36,38 +35,14 @@ export const VfinTresorerieCard: React.FC<VfinTresorerieCardProps> = ({ activeAg
   const [animFacture, setAnimFacture] = useState(0);
   const [animRetard, setAnimRetard] = useState(0);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
+  // Read current active data from Context
+  const agentData = kpisByAgent["vfin"] || {};
+  const toolData = agentData.get_tresorerie_kpi || {};
 
-      const res = await fetch(`${baseUrl}/api/tools/get-tresorerie-position`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: clientId }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.ok && json.data) {
-          setData(json.data);
-        } else {
-          throw new Error(json.error || "Erreur serveur");
-        }
-      } else {
-        throw new Error(`HTTP ${res.status}`);
-      }
-    } catch (err: any) {
-      setError(err.message || "Erreur de chargement");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const data: TresorerieData | null = toolData.ok && toolData.data ? toolData.data : null;
 
-  useEffect(() => {
-    if (activeAgentId === "VFIN") fetchData();
-  }, [activeAgentId]);
+  const loading = loadingByAgent["vfin"] && !toolData.ok;
+  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
 
   // Count-up animation when data arrives
   useEffect(() => {
@@ -100,7 +75,6 @@ export const VfinTresorerieCard: React.FC<VfinTresorerieCardProps> = ({ activeAg
   if (activeAgentId !== "VFIN") return null;
 
   const isPositive = data ? data.tendance === "positive" : true;
-  const themeColor = isPositive ? "#1D9E75" : "var(--red)";
   const themeColorHex = isPositive ? "#1D9E75" : "#FF4757";
 
   const fmt = (n: number) =>
@@ -163,26 +137,22 @@ export const VfinTresorerieCard: React.FC<VfinTresorerieCardProps> = ({ activeAg
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
         <span>Trésorerie (TND)</span>
-        <button onClick={(e) => { e.stopPropagation(); fetchData(); }} title="Actualiser"
-          style={{ background: "none", border: "none", color: themeColorHex, cursor: "pointer", fontSize: "10px", padding: "2px", display: "flex", alignItems: "center", opacity: 0.7 }}
-          onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
-          onMouseLeave={e => (e.currentTarget.style.opacity = "0.7")}
-        >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-          </svg>
-        </button>
       </div>
 
       {loading ? (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0" }}>
-          <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: themeColorHex, boxShadow: `0 0 6px ${themeColorHex}`, animation: "pulse 1.5s infinite" }} />
-          <span style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)" }}>CHARGEMENT TRÉSORERIE…</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "8px 0" }}>
+          <SkeletonLoader height="28px" width="50%" />
+          <SkeletonLoader height="10px" width="80%" />
+          <SkeletonLoader height="6px" width="100%" style={{ borderRadius: "3px" }} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginTop: "4px" }}>
+            <SkeletonLoader height="36px" width="100%" />
+            <SkeletonLoader height="36px" width="100%" />
+          </div>
         </div>
       ) : error ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
           <span style={{ color: "var(--red)", fontSize: "9px", fontFamily: "var(--font-mono)" }}>{error}</span>
-          <button onClick={fetchData} style={{ background: "none", border: "none", color: "var(--cyan)", cursor: "pointer", fontSize: "8px", fontFamily: "var(--font-mono)", textDecoration: "underline", padding: 0 }}>Réessayer</button>
+          <button onClick={() => fetchKpis('vfin', true)} style={{ background: "none", border: "none", color: "var(--cyan)", cursor: "pointer", fontSize: "8px", fontFamily: "var(--font-mono)", textDecoration: "underline", padding: 0 }}>Réessayer</button>
         </div>
       ) : data ? (
         <>

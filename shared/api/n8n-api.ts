@@ -24,25 +24,71 @@ const getAuthHeaders = (baseHeaders: Record<string, string> = {}) => {
 /**
  * Appelle n8n via le Proxy du Backend pour éviter les problèmes de CORS
  */
-export async function sendVmindMessage(message: string, clientId = "DEMO"): Promise<VmindN8nResponse> {
+export async function sendVmindMessage(message: string, conversationId: string, agentId: string, clientId = "DEMO"): Promise<VmindN8nResponse> {
   const sessionId = getVmindSessionId();
 
   // On utilise une variable d'environnement pour Vercel, ou localhost par défaut
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
   const proxyUrl = `${baseUrl}/api/n8n-proxy`;
 
-  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, session_id: sessionId });
+  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId });
+
+  let mcp_token;
+  if (typeof window !== "undefined") {
+    try {
+      mcp_token = localStorage.getItem("vmind_mcp_token");
+      if (!mcp_token || mcp_token === "null") {
+        const sessionStr = localStorage.getItem("vmind_session");
+        if (sessionStr) {
+          try {
+            mcp_token = JSON.parse(sessionStr).token;
+          } catch(e2) {
+             mcp_token = sessionStr; // Fallback in case vmind_session is just the raw token string
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Could not parse tokens:", e);
+    }
+  }
 
   try {
+    if (!mcp_token) {
+      console.warn("⚠️ [n8n-api] Aucun mcp_token trouvé. Blocage de l'appel vers n8n.");
+      return {
+        ok: false,
+        response_type: "error",
+        message: "Veuillez activer votre session dans le Connecteur MCP (Panneau de gauche) avant de poser une question.",
+        tool_used: null,
+        title: "Connexion requise",
+        kpis: [],
+        table: { columns: [], rows: [] },
+        chart: { type: null, title: "", description: "", xKey: "", yKey: "", data: [] },
+        details: null,
+        raw: null,
+        error: "MCP_NOT_CONNECTED"
+      } as VmindN8nResponse;
+    }
+
     const response = await fetch(proxyUrl, {
       method: "POST",
+<<<<<<< HEAD
       headers: getAuthHeaders({
         "Content-Type": "application/json"
       }),
+=======
+      headers: {
+        "Content-Type": "application/json",
+        ...(mcp_token ? { "Authorization": `Bearer ${mcp_token}` } : {})
+      },
+>>>>>>> origin/develop
       body: JSON.stringify({
         message,
         client_id: clientId,
-        session_id: sessionId
+        vmind_session_id: sessionId,
+        conversation_id: conversationId,
+        agent_id: agentId,
+        mcp_token
       })
     });
 
@@ -138,8 +184,31 @@ export async function resetReminders(invoiceRefs: string[]): Promise<any> {
 }
 
 // ─── Agent Management APIs ────────────────────────────────────────────────────
-
+ 
 const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window !== "undefined") {
+    try {
+      const sessionStr = localStorage.getItem("vmind_session");
+      if (sessionStr) {
+        let token = sessionStr;
+        if (sessionStr.trim().startsWith("{")) {
+          try {
+            const parsed = JSON.parse(sessionStr);
+            token = parsed?.token || parsed?.access_token || parsed?.user?.token || sessionStr;
+          } catch (e) {}
+        }
+        if (token) {
+          return { "Authorization": `Bearer ${token}` };
+        }
+      }
+    } catch (e) {
+      console.warn("Could not retrieve session token:", e);
+    }
+  }
+  return {};
+}
 
 /**
  * Fetches all deployed agents from Redis (via backend)
@@ -205,7 +274,14 @@ export async function deleteAgent(agentName: string): Promise<any> {
 export async function updateAgentConfig(agentName: string, recoveryConfig: object): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/update-agent-config/${encodeURIComponent(agentName)}`, {
     method: "PATCH",
+<<<<<<< HEAD
     headers: getAuthHeaders({ "Content-Type": "application/json" }),
+=======
+    headers: { 
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+>>>>>>> origin/develop
     body: JSON.stringify({ recovery_config: recoveryConfig }),
   });
   if (!res.ok) {
@@ -229,3 +305,52 @@ export async function runAgentNow(agentName: string): Promise<any> {
   }
   return res.json();
 }
+
+/**
+ * Appelle l'agent n8n KPI via le Proxy sécurisé du Backend
+ */
+export async function fetchN8nKpis(
+  params: {
+    allowed_agents: string;
+    client_id: string;
+    startDate: string;
+    endDate: string;
+    target_tool?: string;
+    forceRefresh?: boolean;
+  },
+  signal?: AbortSignal
+): Promise<any> {
+  const proxyUrl = `${getBaseUrl()}/api/n8n-proxy/kpis-agent`;
+  const erp_name = "TraLis"; // Default ERP name
+
+  const response = await fetch(proxyUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      allowed_agents: params.allowed_agents,
+      erp_name,
+      startDate: params.startDate,
+      endDate: params.endDate,
+      target_tool: params.target_tool,
+      forceRefresh: params.forceRefresh
+    }),
+    signal
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur Proxy KPI (${response.status})`);
+  }
+
+  const text = await response.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch (err) {
+    console.warn("[KPI API] Response from proxy is not valid JSON:", text);
+    return {};
+  }
+}
+

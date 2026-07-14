@@ -13,12 +13,26 @@ interface SidebarProps {
 
 export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, activeCategory, onSelectCategory }) => {
   const [agentCount, setAgentCount] = useState<number | null>(null);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState<number | null>(null);
 
   useEffect(() => {
     // Fetch real agent count from backend
     getAgents()
       .then(agents => setAgentCount(agents.length))
       .catch(() => setAgentCount(0));
+
+    // Fetch pending signup requests count
+    fetch('http://localhost:3001/api/auth/vmind/signup-requests')
+      .then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+          const pending = data.requests.filter((r: any) => r.status === 'pending');
+          setPendingRequestsCount(pending.length);
+        } else {
+          setPendingRequestsCount(0);
+        }
+      })
+      .catch(() => setPendingRequestsCount(0));
   }, [currentView]); // re-fetch when navigating back to agents view
 
   const handleCategoryClick = (cat: string) => {
@@ -57,6 +71,18 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
         )}
         {agentCount === 0 && (
           <span className="nav-badge" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted)' }}>0</span>
+        )}
+      </div>
+      <div 
+        className={`nav-item ${currentView === 'signup-requests' ? 'active' : ''}`} 
+        onClick={() => onNavigate('signup-requests')}
+      >
+        <div className="nav-icon">📩</div>
+        <span>Demandes d&apos;inscription</span>
+        {pendingRequestsCount !== null && pendingRequestsCount > 0 && (
+          <span className="nav-badge" style={{ background: 'rgba(255, 179, 0, 0.15)', color: '#FFB300', border: '1px solid rgba(255, 179, 0, 0.3)' }}>
+            {pendingRequestsCount}
+          </span>
         )}
       </div>
       <div 

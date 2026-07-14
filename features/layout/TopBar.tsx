@@ -32,10 +32,14 @@ export const TopBar: React.FC = () => {
           }
         }
         
-        if (decoded.roles && Array.isArray(decoded.roles)) {
-          const roles = decoded.roles;
+        if (decoded.roles) {
+          const roles = Array.isArray(decoded.roles)
+            ? decoded.roles
+            : typeof decoded.roles === 'string'
+              ? [decoded.roles]
+              : [];
           // Mapping exact des noms de rôles DNN → label français affiché
-          if (roles.includes('Administrators') || roles.includes('Superusers')) {
+          if (roles.includes('Administrators') || roles.includes('Administrator') || roles.includes('Superusers')) {
             setRoleLabel('Administrateur');
           } else if (roles.some((r: string) => ['usersFinances','Service Comptabilité','usersCompta','usersDecaissement','usersEncaissements','usersReglementDivers'].includes(r))) {
             setRoleLabel('Finance & Comptabilité');
@@ -62,7 +66,8 @@ export const TopBar: React.FC = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem('vmind_session');
+    localStorage.clear();
+    sessionStorage.clear();
     window.location.href = '/login';
   };
 

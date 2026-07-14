@@ -1,5 +1,18 @@
 "use client";
 
+
+function getAuthToken() {
+  if (typeof window === 'undefined') return '';
+  const mcpToken = localStorage.getItem('vmind_mcp_token');
+  if (mcpToken) return mcpToken;
+  try {
+    const sessionStr = localStorage.getItem('vmind_session');
+    if (!sessionStr) return '';
+    if (sessionStr.startsWith('eyJ')) return sessionStr;
+    const parsed = JSON.parse(sessionStr);
+    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
+  } catch(e) { return ''; }
+}
 import React from 'react';
 import { MiniKpi } from '../../components/ui/MiniKpi';
 import { AGENTS } from '../../shared/constants/data';
@@ -22,7 +35,10 @@ interface RightPanelProps {
   activeAgentId?: string;
 }
 
-export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, activeAgentId }) => {
+import { KpiCacheProvider, useKpis } from '../../shared/contexts/KpiCacheContext';
+
+const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, activeAgentId }) => {
+  const { startDate, endDate, updateGlobalDates, error, clearError } = useKpis();
   const [performances, setPerformances] = React.useState<Record<string, number>>({
     VDATA: 0,
     VFIN: 0,
@@ -46,16 +62,10 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || 'DEMO';
 
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const startDate = `${currentYear}0101`;
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const endDate = `${currentYear}${month}${day}`;
-
       const response = await fetch(`${baseUrl}/api/tools/get-score-global-vdata-kpi`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getAuthToken()}`, },
         body: JSON.stringify({ 
           client_id: clientId,
           startDate,
@@ -88,7 +98,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
     if (activeAgentId === 'VDATA') {
       fetchDomainPerformance();
     }
-  }, [activeAgentId]);
+  }, [activeAgentId, startDate, endDate]);
 
   React.useEffect(() => {
     const duration = 1200;
@@ -117,17 +127,92 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
     requestAnimationFrame(animate);
   }, [performances]);
 
+  // Convert YYYYMMDD string to YYYY-MM-DD input date value format
+  const toInputValue = (dateStr: string) => {
+    if (dateStr.length !== 8) return '';
+    return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+  };
+
   return (
     <div className="right-panel">
       {/* KPIs Live */}
       <div className="rp-section">
-        <div className="rp-title">
-          {activeAgentId === 'VDATA' 
-            ? 'DONNEES & ANALYTICS - Temps Réel' 
-            : activeAgentId === 'VFIN' 
-              ? 'FINANCE & COMPTABILITE - Temps Réel' 
-              : 'KPIs Temps Réel'}
+        <div className="rp-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>
+            {activeAgentId === 'VDATA' 
+              ? 'DONNEES & ANALYTICS - Temps Réel' 
+              : activeAgentId === 'VFIN' 
+                ? 'FINANCE & COMPTABILITE - Temps Réel' 
+                : 'KPIs Temps Réel'}
+          </span>
         </div>
+
+        {/* Global Date Picker for VDATA and VFIN */}
+        {(activeAgentId === 'VDATA' || activeAgentId === 'VFIN') && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <label style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: '4px' }}>Début</label>
+              <input 
+                type="date" 
+                value={toInputValue(startDate)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/-/g, '');
+                  if (val.length === 8) updateGlobalDates(val, endDate);
+                }}
+                style={{
+                  background: 'var(--navy3)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  color: 'var(--white)',
+                  fontSize: '11px',
+                  fontFamily: 'var(--font-mono)',
+                  padding: '4px 8px',
+                  outline: 'none'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+              <label style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: '4px' }}>Fin</label>
+              <input 
+                type="date" 
+                value={toInputValue(endDate)}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/-/g, '');
+                  if (val.length === 8) updateGlobalDates(startDate, val);
+                }}
+                style={{
+                  background: 'var(--navy3)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '4px',
+                  color: 'var(--white)',
+                  fontSize: '11px',
+                  fontFamily: 'var(--font-mono)',
+                  padding: '4px 8px',
+                  outline: 'none'
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Global Error Banner */}
+        {error && (
+          <div style={{ 
+            background: 'rgba(255, 71, 87, 0.12)', 
+            border: '1px solid rgba(255, 71, 87, 0.3)', 
+            color: 'var(--red)', 
+            fontSize: '10px', 
+            padding: '6px 12px', 
+            borderRadius: '4px', 
+            marginBottom: '16px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span>{error}</span>
+            <button onClick={clearError} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>✕</button>
+          </div>
+        )}
         {activeAgentId !== 'VDATA' && activeAgentId !== 'VFIN' && (
           <>
             <MiniKpi label="Trésorerie" dotColor="var(--green)" val="842K TND" delta="▲ +3.2%" deltaType="up" />
@@ -377,3 +462,9 @@ export const RightPanel: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
     </div>
   );
 };
+
+export const RightPanel: React.FC<RightPanelProps> = (props) => (
+  <KpiCacheProvider>
+    <RightPanelContent {...props} />
+  </KpiCacheProvider>
+);
