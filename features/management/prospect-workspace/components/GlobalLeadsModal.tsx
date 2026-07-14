@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useProspectSocket } from '../hooks/useProspectSocket';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -78,6 +79,18 @@ export default function GlobalLeadsModal({ isOpen, agentId, onClose, onSuccess }
             setLoading(false);
         }
     };
+
+    const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+    useProspectSocket((payload) => {
+        if (['agent_leads', 'agent_lead_access'].includes(payload.table)) {
+            if (debounceTimer.current) {
+                clearTimeout(debounceTimer.current);
+            }
+            debounceTimer.current = setTimeout(() => {
+                fetchGlobalLeads();
+            }, 500);
+        }
+    });
 
     const handleAssign = async () => {
         if (selectedIds.size === 0) return;

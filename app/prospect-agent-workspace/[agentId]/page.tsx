@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, LayoutDashboard, Users, Mail, Activity } from 'lucide-react';
 
@@ -11,8 +11,11 @@ import LogsView from '../../../features/management/prospect-workspace/components
 import LeadDetailDrawer from '../../../features/management/prospect-workspace/components/LeadDetailDrawer';
 import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
 import { getAgents } from '@/shared/api/n8n-api';
+import { useProspectSocket } from '../../../features/management/prospect-workspace/hooks/useProspectSocket';
 
 import '../../../features/management/prospect-workspace/workspace.scss';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function AgentWorkspacePage() {
   const { agentId } = useParams();
@@ -149,9 +152,9 @@ export default function AgentWorkspacePage() {
       const headers = { 'Authorization': `Bearer ${localStorage.getItem('vmind_session')}` };
 
       const [leadsRes, campaignsRes, logsRes] = await Promise.all([
-        fetch(`http://localhost:3001/api/agent-leads/${agentId}`, { headers, cache: 'no-store' }),
-        fetch(`http://localhost:3001/api/agent-campaigns/${agentId}`, { headers, cache: 'no-store' }),
-        fetch(`http://localhost:3001/api/agent-logs/${agentId}`, { headers, cache: 'no-store' })
+        fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, { headers, cache: 'no-store' }),
+        fetch(`${API_BASE_URL}/api/agent-campaigns/${agentId}`, { headers, cache: 'no-store' }),
+        fetch(`${API_BASE_URL}/api/agent-logs/${agentId}`, { headers, cache: 'no-store' })
       ]);
 
       if (leadsRes.ok) {
@@ -180,6 +183,17 @@ export default function AgentWorkspacePage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+  useProspectSocket((payload) => {
+    // When a DB update happens, debounce the fetch by 500ms to batch multiple updates
+    if (debounceTimer.current) {
+      clearTimeout(debounceTimer.current);
+    }
+    debounceTimer.current = setTimeout(() => {
+      fetchData();
+    }, 500);
+  });
 
   const handleOpenLead = (lead: any) => {
     setSelectedLead(lead);

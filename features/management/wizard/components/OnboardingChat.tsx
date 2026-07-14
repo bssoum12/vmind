@@ -48,7 +48,8 @@ export function OnboardingChat({ initialMission, onConfirm }: OnboardingChatProp
     setIsLoading(true);
 
     try {
-      const res = await fetch('http://localhost:3001/api/prospect-agent/onboarding-chat', {
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const res = await fetch(`${API_BASE_URL}/api/prospect-agent/onboarding-chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: newMessages.filter(m => m.role !== 'system') })
