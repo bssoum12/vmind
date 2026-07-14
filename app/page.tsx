@@ -193,7 +193,7 @@ export default function Home() {
             : typeof decoded.roles === 'string'
               ? [decoded.roles]
               : [];
-          if (!roles.includes('Administrators') && !roles.includes('Administrator')) {
+          if (!roles.includes('Administrators') && !roles.includes('Utilisateur') && !roles.includes('Administrator')) {
             setIsAuthorized(false);
             return;
           }
