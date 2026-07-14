@@ -23,7 +23,7 @@ interface Props {
 }
 
 export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
-  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   
   const [prevScoreQualite, setPrevScoreQualite] = useState<number | null>(null);
   const [prevDetails, setPrevDetails] = useState<any>(null);
@@ -45,7 +45,7 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
   const details = toolData.details || null;
   
   const loading = loadingByAgent["vdata"] && !toolData.ok;
-  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
+  const error = !loading && !toolData.ok && globalError ? globalError : "";
 
   // Count-up progress animation
   useEffect(() => {

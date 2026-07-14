@@ -19,7 +19,7 @@ interface VfinOverdueCardProps {
 }
 
 export const VfinOverdueCard: React.FC<VfinOverdueCardProps> = ({ activeAgentId }) => {
-  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const [hovered, setHovered] = useState(false);
   const [activeIntervalKey, setActiveIntervalKey] = useState<string | null>(null);
   const [donutHovered, setDonutHovered] = useState(false);
@@ -32,7 +32,7 @@ export const VfinOverdueCard: React.FC<VfinOverdueCardProps> = ({ activeAgentId 
   const toolData = agentData.get_overdue_balance || {};
 
   const kpis = toolData.ok && toolData.kpis ? toolData.kpis : [];
-  const intervals: UnpaidInterval[] = toolData.data?.intervals || [];
+  const intervals: UnpaidInterval[] = toolData.intervals || toolData.data?.intervals || [];
 
   const totalKpi = kpis.find((k: any) => k.label.toLowerCase().includes("montant"));
   const clientsKpi = kpis.find((k: any) => k.label.toLowerCase().includes("client"));
@@ -42,7 +42,7 @@ export const VfinOverdueCard: React.FC<VfinOverdueCardProps> = ({ activeAgentId 
   const nbClients = clientsKpi ? clientsKpi.value : 0;
 
   const loading = loadingByAgent["vfin"] && !toolData.ok;
-  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
+  const error = !loading && !toolData.ok && globalError ? globalError : "";
 
   // Count-up progress animation
   useEffect(() => {

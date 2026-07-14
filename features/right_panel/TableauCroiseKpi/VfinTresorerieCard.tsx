@@ -23,7 +23,7 @@ interface VfinTresorerieCardProps {
 }
 
 export const VfinTresorerieCard: React.FC<VfinTresorerieCardProps> = ({ activeAgentId }) => {
-  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const [hovered, setHovered] = useState(false);
 
   // Animated values
@@ -37,12 +37,12 @@ export const VfinTresorerieCard: React.FC<VfinTresorerieCardProps> = ({ activeAg
 
   // Read current active data from Context
   const agentData = kpisByAgent["vfin"] || {};
-  const toolData = agentData.get_tresorerie_kpi || {};
+  const toolData = agentData.get_tresorerie_position || agentData.get_tresorerie_kpi || {};
 
-  const data: TresorerieData | null = toolData.ok && toolData.data ? toolData.data : null;
+  const data: TresorerieData | null = toolData.ok ? (toolData.data || toolData) : null;
 
   const loading = loadingByAgent["vfin"] && !toolData.ok;
-  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
+  const error = !loading && !toolData.ok && globalError ? globalError : "";
 
   // Count-up animation when data arrives
   useEffect(() => {
