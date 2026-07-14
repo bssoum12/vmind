@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 
 import React, { useState, useEffect } from 'react';
@@ -6,6 +6,13 @@ import { useParams } from 'next/navigation';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+const getAuthHeaders = () => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : '';
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': token ? `Bearer ${token}` : ''
+  };
+};
 
 interface Lead {
   id: number;
@@ -78,7 +85,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
     try {
       const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           id: lead.id,
           action: 'update_status',
@@ -99,7 +106,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
     try {
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ lead_ids: [lead.id], agentId }),
       });
 
@@ -120,7 +127,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
     try {
       const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           id: lead.id,
           action: 'generate_email'
@@ -153,7 +160,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
       // Record in DB with Success status (statut of lead remains unchanged)
       const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           id: lead.id,
           action: 'send_email',

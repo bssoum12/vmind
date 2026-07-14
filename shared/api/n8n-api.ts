@@ -1,15 +1,25 @@
 import { VmindN8nResponse } from '../types/vmind';
 
 function getVmindSessionId() {
-  let sessionId = sessionStorage.getItem("vmind_session_id");
+  let sessionId = typeof window !== 'undefined' ? sessionStorage.getItem("vmind_session_id") : null;
 
   if (!sessionId) {
     sessionId = crypto.randomUUID();
-    sessionStorage.setItem("vmind_session_id", sessionId);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem("vmind_session_id", sessionId);
+    }
   }
 
   return sessionId;
 }
+
+const getAuthHeaders = (baseHeaders: Record<string, string> = {}) => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem("vmind_session") : null;
+  return {
+    ...baseHeaders,
+    ...(token ? { "Authorization": `Bearer ${token}` } : {})
+  };
+};
 
 /**
  * Appelle n8n via le Proxy du Backend pour éviter les problèmes de CORS
@@ -26,9 +36,9 @@ export async function sendVmindMessage(message: string, clientId = "DEMO"): Prom
   try {
     const response = await fetch(proxyUrl, {
       method: "POST",
-      headers: {
+      headers: getAuthHeaders({
         "Content-Type": "application/json"
-      },
+      }),
       body: JSON.stringify({
         message,
         client_id: clientId,
@@ -84,9 +94,9 @@ export async function deployAgent(config: any, clientId = "DEMO"): Promise<any> 
 
   const response = await fetch(webhookUrl, {
     method: "POST",
-    headers: {
+    headers: getAuthHeaders({
       "Content-Type": "application/json"
-    },
+    }),
     body: JSON.stringify(payloadArray)
   });
 
@@ -113,9 +123,9 @@ export async function resetReminders(invoiceRefs: string[]): Promise<any> {
 
   const response = await fetch(url, {
     method: "POST",
-    headers: {
+    headers: getAuthHeaders({
       "Content-Type": "application/json"
-    },
+    }),
     body: JSON.stringify({ invoice_refs: invoiceRefs })
   });
 
@@ -135,7 +145,9 @@ const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "http://localhost:30
  * Fetches all deployed agents from Redis (via backend)
  */
 export async function getAgents(): Promise<any[]> {
-  const res = await fetch(`${getBaseUrl()}/api/list-agents`);
+  const res = await fetch(`${getBaseUrl()}/api/list-agents`, {
+    headers: getAuthHeaders()
+  });
   if (!res.ok) throw new Error(`Failed to fetch agents (${res.status})`);
   const data = await res.json();
   return data.agents || [];
@@ -147,6 +159,7 @@ export async function getAgents(): Promise<any[]> {
 export async function pauseAgent(agentName: string): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/pause-agent/${encodeURIComponent(agentName)}`, {
     method: "POST",
+    headers: getAuthHeaders()
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -161,6 +174,7 @@ export async function pauseAgent(agentName: string): Promise<any> {
 export async function resumeAgent(agentName: string): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/resume-agent/${encodeURIComponent(agentName)}`, {
     method: "POST",
+    headers: getAuthHeaders()
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -175,6 +189,7 @@ export async function resumeAgent(agentName: string): Promise<any> {
 export async function deleteAgent(agentName: string): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/delete-agent/${encodeURIComponent(agentName)}`, {
     method: "DELETE",
+    headers: getAuthHeaders()
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -190,7 +205,7 @@ export async function deleteAgent(agentName: string): Promise<any> {
 export async function updateAgentConfig(agentName: string, recoveryConfig: object): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/update-agent-config/${encodeURIComponent(agentName)}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ recovery_config: recoveryConfig }),
   });
   if (!res.ok) {
@@ -206,6 +221,7 @@ export async function updateAgentConfig(agentName: string, recoveryConfig: objec
 export async function runAgentNow(agentName: string): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/run-now/${encodeURIComponent(agentName)}`, {
     method: "POST",
+    headers: getAuthHeaders()
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

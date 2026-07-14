@@ -62,7 +62,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
   const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
 
   const [availableAgents, setAvailableAgents] = useState<any[]>([]);
-  const [selectedAgentIds, setSelectedAgentIds] = useState<number[]>([Number(agentId)]);
+  const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([agentId as string]);
 
   // Tutorial state
   const [leadsTutorialStep, setLeadsTutorialStep] = useState<number>(0);
@@ -175,7 +175,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
   };
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/list-agents`, { headers: { 'x-client-id': 'PROSPECT_AGENT' } })
+    fetch(`${API_BASE_URL}/api/list-agents`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('vmind_session')}` } })
       .then(res => res.json())
       .then(data => {
         let agents = [];
@@ -193,7 +193,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
       .catch(err => console.error("Failed to load agents", err));
   }, []);
 
-  const handleAgentToggle = (id: number) => {
+  const handleAgentToggle = (id: string) => {
     setSelectedAgentIds(prev =>
       prev.includes(id) && prev.length > 1 ? prev.filter(a => a !== id) :
         prev.includes(id) ? prev : [...prev, id]
@@ -329,7 +329,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
       try {
         const res = await fetch(`${API_BASE_URL}/api/agent-leads`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`
+          },
           body: JSON.stringify({ ...lead, agentIds: selectedAgentIds }),
         });
         if (res.ok) {
@@ -386,7 +389,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
         // Forward to backend which calls n8n and normalizes the response
         const res = await fetch(`${API_BASE_URL}/api/prospect-agent/import/file`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`
+          },
           body: JSON.stringify({
             fileContent: text,
             fileType: file.type || fileType,
@@ -424,7 +430,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
     try {
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/import/url`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`
+        },
         body: JSON.stringify({ url: importUrl.trim(), agentIds: selectedAgentIds })
       });
       const data = await res.json();
@@ -519,7 +528,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`
+        },
         body: JSON.stringify({ lead_ids, agentId }),
       });
 
@@ -555,7 +567,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`
+        },
         body: JSON.stringify({ lead_ids, agentId }),
       });
 
@@ -668,7 +683,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
       <GlobalLeadsModal
         isOpen={isGlobalModalOpen}
-        agentId={Number(agentId)}
+        agentId={agentId as string}
         onClose={() => setIsGlobalModalOpen(false)}
         onSuccess={onRefresh}
       />
@@ -1172,7 +1187,7 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
       {/* Global Leads Assignment Modal */}
       <GlobalLeadsModal
         isOpen={isGlobalModalOpen}
-        agentId={Number(agentId)}
+        agentId={agentId as string}
         onClose={() => setIsGlobalModalOpen(false)}
         onSuccess={onRefresh}
       />

@@ -109,7 +109,7 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
       // Record sending result in SQL Server
       const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'x-client-id': 'PROSPECT_AGENT', 'x-user-id': '1' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vmind_session')}` },
         body: JSON.stringify({
           id: selectedEmail.lead_id,
           action: 'send_email',

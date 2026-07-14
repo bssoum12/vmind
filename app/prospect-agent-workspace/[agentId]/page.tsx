@@ -97,10 +97,10 @@ export default function AgentWorkspacePage() {
 
   const getTabBtnStyle = (step: number) => {
     if (navTutorialStep === step) {
-      return { 
-        position: 'relative' as any, 
-        zIndex: 10001, 
-        boxShadow: '0 0 0 4px rgba(0,229,200,0.8)', 
+      return {
+        position: 'relative' as any,
+        zIndex: 10001,
+        boxShadow: '0 0 0 4px rgba(0,229,200,0.8)',
         pointerEvents: 'none' as any,
         background: 'var(--card-bg)'
       };
@@ -142,11 +142,11 @@ export default function AgentWorkspacePage() {
     return null;
   };
 
-  const fetchData = useCallback(async (isPolling = false) => {
+  const fetchData = useCallback(async () => {
     if (!agentId) return;
-    if (!isPolling) setIsLoading(true);
+    setIsLoading(true);
     try {
-      const headers = { 'x-client-id': 'PROSPECT_AGENT' };
+      const headers = { 'Authorization': `Bearer ${localStorage.getItem('vmind_session')}` };
 
       const [leadsRes, campaignsRes, logsRes] = await Promise.all([
         fetch(`http://localhost:3001/api/agent-leads/${agentId}`, { headers, cache: 'no-store' }),
@@ -173,16 +173,12 @@ export default function AgentWorkspacePage() {
     } catch (err) {
       console.error("Failed to fetch agent data:", err);
     } finally {
-      if (!isPolling) setIsLoading(false);
+      setIsLoading(false);
     }
   }, [agentId]);
 
   useEffect(() => {
-    fetchData(false);
-    const interval = setInterval(() => {
-      fetchData(true);
-    }, 5000); // Auto-refresh every 5 seconds to get latest async statuses from n8n and logs
-    return () => clearInterval(interval);
+    fetchData();
   }, [fetchData]);
 
   const handleOpenLead = (lead: any) => {
@@ -203,19 +199,19 @@ export default function AgentWorkspacePage() {
 
       {/* ── Tutorial Overlay ── */}
       {navTutorialStep > 0 && (
-        <div 
+        <div
           onClick={nextTutorialStep}
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(0,0,0,0.8)', zIndex: 10000,
             cursor: 'pointer'
-          }} 
+          }}
         />
       )}
 
       {/* ── VMind Guide for Tutorial ── */}
       {navTutorialStep > 0 && (
-        <VMindGuide 
+        <VMindGuide
           isOpen={navTutorialStep > 0}
           title={getTutorialContent()?.title}
           message={getTutorialContent()?.message || null}
@@ -227,7 +223,7 @@ export default function AgentWorkspacePage() {
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '20px 32px', borderBottom: '1px solid var(--border)',
-        background: 'rgba(8, 20, 38, 0.4)', 
+        background: 'rgba(8, 20, 38, 0.4)',
         backdropFilter: navTutorialStep > 0 ? 'none' : 'blur(10px)',
         flexShrink: 0
       }}>
