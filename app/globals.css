@@ -2975,9 +2975,8 @@ textarea.form-input {
   animation: scorePulseExc 2s infinite ease-in-out;
 }
 
-<<<<<<< HEAD
 @keyframes bounceArrow { 0% { transform: translate(-50%, 0); } 100% { transform: translate(-50%, -8px); } }
-=======
+
 /* ── SKELETON LOADER ANIMATIONS ── */
 @keyframes skeletonPulse {
   0% {
@@ -2998,4 +2997,3 @@ textarea.form-input {
   border-radius: 4px;
   animation: skeletonPulse 1.5s infinite ease-in-out;
 }
->>>>>>> origin/develop

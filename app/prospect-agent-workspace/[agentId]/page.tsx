@@ -157,6 +157,11 @@ export default function AgentWorkspacePage() {
         fetch(`${API_BASE_URL}/api/agent-logs/${agentId}`, { headers, cache: 'no-store' })
       ]);
 
+      if (leadsRes.status === 403 || campaignsRes.status === 403 || logsRes.status === 403) {
+        router.push('/');
+        return;
+      }
+
       if (leadsRes.ok) {
         const data = await leadsRes.json();
         setLeads(data);

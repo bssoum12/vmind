@@ -13,12 +13,27 @@ function getVmindSessionId() {
   return sessionId;
 }
 
-const getAuthHeaders = (baseHeaders: Record<string, string> = {}) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem("vmind_session") : null;
-  return {
-    ...baseHeaders,
-    ...(token ? { "Authorization": `Bearer ${token}` } : {})
-  };
+const getAuthHeaders = (baseHeaders: Record<string, string> = {}): Record<string, string> => {
+  if (typeof window !== "undefined") {
+    try {
+      const sessionStr = localStorage.getItem("vmind_session");
+      if (sessionStr) {
+        let token = sessionStr;
+        if (sessionStr.trim().startsWith("{")) {
+          try {
+            const parsed = JSON.parse(sessionStr);
+            token = parsed?.token || parsed?.access_token || parsed?.user?.token || sessionStr;
+          } catch (e) {}
+        }
+        if (token) {
+          return { ...baseHeaders, "Authorization": `Bearer ${token}` };
+        }
+      }
+    } catch (e) {
+      console.warn("Could not retrieve session token:", e);
+    }
+  }
+  return baseHeaders;
 };
 
 /**
@@ -72,16 +87,10 @@ export async function sendVmindMessage(message: string, conversationId: string, 
 
     const response = await fetch(proxyUrl, {
       method: "POST",
-<<<<<<< HEAD
-      headers: getAuthHeaders({
-        "Content-Type": "application/json"
-      }),
-=======
       headers: {
         "Content-Type": "application/json",
         ...(mcp_token ? { "Authorization": `Bearer ${mcp_token}` } : {})
       },
->>>>>>> origin/develop
       body: JSON.stringify({
         message,
         client_id: clientId,
@@ -187,28 +196,7 @@ export async function resetReminders(invoiceRefs: string[]): Promise<any> {
  
 const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
-function getAuthHeaders(): Record<string, string> {
-  if (typeof window !== "undefined") {
-    try {
-      const sessionStr = localStorage.getItem("vmind_session");
-      if (sessionStr) {
-        let token = sessionStr;
-        if (sessionStr.trim().startsWith("{")) {
-          try {
-            const parsed = JSON.parse(sessionStr);
-            token = parsed?.token || parsed?.access_token || parsed?.user?.token || sessionStr;
-          } catch (e) {}
-        }
-        if (token) {
-          return { "Authorization": `Bearer ${token}` };
-        }
-      }
-    } catch (e) {
-      console.warn("Could not retrieve session token:", e);
-    }
-  }
-  return {};
-}
+
 
 /**
  * Fetches all deployed agents from Redis (via backend)
@@ -274,14 +262,10 @@ export async function deleteAgent(agentName: string): Promise<any> {
 export async function updateAgentConfig(agentName: string, recoveryConfig: object): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/update-agent-config/${encodeURIComponent(agentName)}`, {
     method: "PATCH",
-<<<<<<< HEAD
-    headers: getAuthHeaders({ "Content-Type": "application/json" }),
-=======
     headers: { 
       "Content-Type": "application/json",
       ...getAuthHeaders()
     },
->>>>>>> origin/develop
     body: JSON.stringify({ recovery_config: recoveryConfig }),
   });
   if (!res.ok) {
