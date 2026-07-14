@@ -38,7 +38,7 @@ interface RightPanelProps {
 import { KpiCacheProvider, useKpis } from '../../shared/contexts/KpiCacheContext';
 
 const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, activeAgentId }) => {
-  const { startDate, endDate, updateGlobalDates, error, clearError } = useKpis();
+  const { startDate, endDate, updateGlobalDates, error, clearError, fetchKpis } = useKpis();
   const [performances, setPerformances] = React.useState<Record<string, number>>({
     VDATA: 0,
     VFIN: 0,
@@ -147,8 +147,8 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
           </span>
         </div>
 
-        {/* Global Date Picker for VDATA and VFIN */}
-        {(activeAgentId === 'VDATA' || activeAgentId === 'VFIN') && (
+        {/* Global Date Picker for VDATA only */}
+        {activeAgentId === 'VDATA' && (
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
               <label style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: '4px' }}>Début</label>
@@ -210,7 +210,30 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
             alignItems: 'center'
           }}>
             <span>{error}</span>
-            <button onClick={clearError} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px' }}>✕</button>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button 
+                onClick={() => {
+                  const lowerAgent = (activeAgentId || 'VDATA').toLowerCase();
+                  fetchKpis(lowerAgent, true);
+                }} 
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: 'var(--red)', 
+                  cursor: 'pointer', 
+                  fontWeight: 'bold', 
+                  fontSize: '14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: 0,
+                  transform: 'translateY(-0.5px)'
+                }}
+                title="Réessayer"
+              >
+                ↻
+              </button>
+              <button onClick={clearError} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', padding: 0 }}>✕</button>
+            </div>
           </div>
         )}
         {activeAgentId !== 'VDATA' && activeAgentId !== 'VFIN' && (
@@ -464,7 +487,5 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
 };
 
 export const RightPanel: React.FC<RightPanelProps> = (props) => (
-  <KpiCacheProvider>
-    <RightPanelContent {...props} />
-  </KpiCacheProvider>
+  <RightPanelContent {...props} />
 );

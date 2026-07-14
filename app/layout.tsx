@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 
 import { ModeProvider } from "@/shared/contexts/ModeContext";
 import { SessionTimeoutProvider } from "@/components/vmind/SessionTimeoutProvider";
+import { KpiCacheProvider } from "@/shared/contexts/KpiCacheContext";
 
 export default function RootLayout({
   children,
@@ -21,8 +22,10 @@ export default function RootLayout({
       <body className={syne.className}>
         <ModeProvider>
           <SessionTimeoutProvider>
-            <TopBar />
-            {children}
+            <KpiCacheProvider>
+              <TopBar />
+              {children}
+            </KpiCacheProvider>
           </SessionTimeoutProvider>
         </ModeProvider>
       </body>

@@ -27,7 +27,7 @@ interface VolumeLineChartProps {
 }
 
 export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId }) => {
-  const { kpisByAgent, loadingByAgent, fetchKpis, startDate, endDate } = useKpis();
+  const { kpisByAgent, loadingByAgent, fetchKpis, startDate, endDate, error: globalError } = useKpis();
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [cardHovered, setCardHovered] = useState(false);
@@ -43,7 +43,7 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
   const totalDossiersCurrent = activeData.reduce((acc, d) => acc + d.value, 0);
 
   const loading = loadingByAgent["vdata"] && !toolData.ok;
-  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
+  const error = !loading && !toolData.ok && globalError ? globalError : "";
 
   const fetchPrevYearVolume = async () => {
     try {

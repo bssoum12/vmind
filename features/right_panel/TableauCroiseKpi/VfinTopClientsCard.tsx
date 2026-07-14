@@ -17,19 +17,21 @@ interface VfinTopClientsCardProps {
 }
 
 export const VfinTopClientsCard: React.FC<VfinTopClientsCardProps> = ({ activeAgentId }) => {
-  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const [hovered, setHovered] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
 
   // Read current active data from Context
   const agentData = kpisByAgent["vfin"] || {};
-  const toolData = agentData.get_top_clients || {};
+  const toolData = agentData.get_top_clients_revenue || agentData.get_top_clients || {};
 
-  const clients: ClientRevenue[] = toolData.data?.data || [];
-  const period = toolData.data?.period || "";
+  const clients: ClientRevenue[] = Array.isArray(toolData.data) 
+    ? toolData.data 
+    : (toolData.data?.data || []);
+  const period = toolData.period || toolData.data?.period || "";
 
   const loading = loadingByAgent["vfin"] && !toolData.ok;
-  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
+  const error = !loading && !toolData.ok && globalError ? globalError : "";
 
   // Count-up progress animation
   useEffect(() => {

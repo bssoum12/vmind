@@ -1,3 +1,5 @@
+"use client";
+
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { fetchN8nKpis } from '../api/n8n-api';
 
@@ -11,6 +13,8 @@ interface KpiCacheContextType {
   fetchKpis: (agentId: string, force?: boolean, targetTool?: string) => Promise<void>;
   error: string | null;
   clearError: () => void;
+  activeAgentId: string;
+  setActiveAgentId: (agentId: string) => void;
 }
 
 const KpiCacheContext = createContext<KpiCacheContextType | undefined>(undefined);
@@ -22,7 +26,13 @@ const formatDateToYYYYMMDD = (d: Date) => {
   return `${y}${m}${r}`;
 };
 
-export const KpiCacheProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface KpiCacheProviderProps {
+  children: React.ReactNode;
+  initialAgentId?: string;
+}
+
+export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, initialAgentId = "VDATA" }) => {
+  const [activeAgentId, setActiveAgentId] = useState<string>(initialAgentId);
   // Set default dates: Jan 1st of current year to current date
   const now = new Date();
   const defaultStart = `${now.getFullYear()}0101`;
@@ -58,12 +68,12 @@ export const KpiCacheProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       clearTimeout(debounceTimeoutRef.current);
     }
 
-    // Cooldown logic for force refresh (5 minutes backend / UI lock)
+    // Cooldown logic for force refresh (3 hours backend / UI lock)
     if (force && targetTool) {
       const cooldownKey = `${upperAgent}_${targetTool}`;
       const lastRun = cooldowns[cooldownKey] || 0;
       const nowMs = Date.now();
-      if (nowMs - lastRun < 5 * 60 * 1000) {
+      if (nowMs - lastRun < 3 * 60 * 60 * 1000) {
         console.log(`[KPI CONTEXT] Cooldown active for ${cooldownKey}. Skipping fetch.`);
         return;
       }
@@ -154,11 +164,31 @@ export const KpiCacheProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
-  // Auto-refetch when date changes or on mount
+  // Auto-refetch when date changes or when the active agent changes (with 2s debounce)
   useEffect(() => {
-    fetchKpis('vdata');
-    fetchKpis('vfin');
-  }, [startDate, endDate]);
+    const currentAgent = activeAgentId || 'VDATA';
+    const lowerAgent = currentAgent.toLowerCase();
+    if (lowerAgent !== 'vdata' && lowerAgent !== 'vfin') return;
+
+    // Clear previous debounce timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Set loading state immediately so the skeletons show up during the 2s wait
+    setLoadingByAgent(prev => ({ ...prev, [lowerAgent]: true }));
+
+    // Set new debounce timeout (2 seconds)
+    debounceTimeoutRef.current = setTimeout(() => {
+      fetchKpis(lowerAgent);
+    }, 2000);
+
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, [startDate, endDate, activeAgentId]);
 
   return (
     <KpiCacheContext.Provider
@@ -171,7 +201,9 @@ export const KpiCacheProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         cooldowns,
         fetchKpis,
         error,
-        clearError
+        clearError,
+        activeAgentId,
+        setActiveAgentId
       }}
     >
       {children}

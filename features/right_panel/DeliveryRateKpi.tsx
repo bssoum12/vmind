@@ -16,7 +16,7 @@ interface DeliveryRateKpiProps {
 }
 
 export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId }) => {
-  const { kpisByAgent, loadingByAgent, fetchKpis, startDate, endDate } = useKpis();
+  const { kpisByAgent, loadingByAgent, fetchKpis, startDate, endDate, error: globalError } = useKpis();
 
   const [prevTaux, setPrevTaux] = useState<number | null>(null);
   const [prevYear, setPrevYear] = useState<number>(new Date().getFullYear() - 1);
@@ -50,7 +50,7 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
   const lateDeliveries = tableRows;
 
   const loading = loadingByAgent["vdata"] && !toolData.ok;
-  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
+  const error = !loading && !toolData.ok && globalError ? globalError : "";
   const noData = !loading && toolData.ok && kpis.length === 0;
 
   function getAuthToken() {

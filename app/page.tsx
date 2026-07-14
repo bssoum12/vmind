@@ -12,6 +12,7 @@ import { VoiceOverlay } from "@/features/voice/VoiceOverlay";
 import { VmindChat } from "@/components/vmind/VmindChat";
 import { GlobalMaxRemindersPopup } from "@/components/vmind/GlobalMaxRemindersPopup";
 import { ConversationsProvider } from "@/shared/contexts/ConversationsContext";
+import { useKpis } from '@/shared/contexts/KpiCacheContext';
 
 // Management Mode Components
 import { ManagementSidebar } from "@/features/management/layout/ManagementSidebar";
@@ -219,7 +220,7 @@ export default function Home() {
   // Assistant Mode State
   const [voiceShow, setVoiceShow] = useState(false);
   const [insertPrompt, setInsertPrompt] = useState<string | undefined>(undefined);
-  const [activeAgentId, setActiveAgentId] = useState<string>("VMIND");
+  const { activeAgentId, setActiveAgentId } = useKpis();
   const logs: any[] = [];
 
   const handleInsertPrompt = (text: string) => {

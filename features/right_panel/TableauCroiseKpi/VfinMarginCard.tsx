@@ -10,7 +10,7 @@ interface VfinMarginCardProps {
 }
 
 export const VfinMarginCard: React.FC<VfinMarginCardProps> = ({ activeAgentId }) => {
-  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const [hovered, setHovered] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
 
@@ -39,7 +39,7 @@ export const VfinMarginCard: React.FC<VfinMarginCardProps> = ({ activeAgentId })
   const margePrecedent = detailsObj.margePrecedent ?? 0;
 
   const loading = loadingByAgent["vfin"] && !toolData.ok;
-  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
+  const error = !loading && !toolData.ok && globalError ? globalError : "";
 
   const updateCoords = () => {
     if (cardRef.current) {
