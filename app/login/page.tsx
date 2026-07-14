@@ -1090,7 +1090,7 @@ export default function LoginPage() {
                     <div style={{ position: 'relative' }}>
                       <User size={16} color={muted} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                       <input type="text" className="vmind-input" value={username} onChange={e => setUsername(e.target.value)}
-                        placeholder="Saisissez votre nom d'utilisateur" required />
+                        placeholder="Saisissez votre nom d'utilisateur" required suppressHydrationWarning={true} />
                     </div>
                   </div>
 
@@ -1101,7 +1101,7 @@ export default function LoginPage() {
                       <Lock size={16} color={muted} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                       <input type={showPassword ? 'text' : 'password'} className="vmind-input" style={{ paddingRight: '48px' }}
                         value={password} onChange={e => setPassword(e.target.value)}
-                        placeholder="Veuillez entrer ce champ" required />
+                        placeholder="Veuillez entrer ce champ" required suppressHydrationWarning={true} />
                       <div onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: muted, transition: 'color .2s' }}>
                         {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                       </div>

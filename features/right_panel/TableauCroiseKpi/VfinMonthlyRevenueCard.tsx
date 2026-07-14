@@ -9,7 +9,7 @@ interface VfinMonthlyRevenueCardProps {
 }
 
 export const VfinMonthlyRevenueCard: React.FC<VfinMonthlyRevenueCardProps> = ({ activeAgentId }) => {
-  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const [hovered, setHovered] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
 
@@ -33,11 +33,24 @@ export const VfinMonthlyRevenueCard: React.FC<VfinMonthlyRevenueCardProps> = ({ 
   const prevCaKpi = compKpis.find((k: any) => k.label.includes("précédent"));
   const evoKpi = compKpis.find((k: any) => k.label.includes("Évolution"));
 
-  const caPrecedent = prevCaKpi ? prevCaKpi.value : null;
-  const evolutionPct = evoKpi ? evoKpi.value : null;
+  // Fallback to compare_monthly_margin details if compare_monthly_revenue is missing
+  const marginToolData = agentData.compare_monthly_margin || {};
+  const marginDetails = marginToolData.data?.details || marginToolData.details || {};
+
+  let caPrecedent = prevCaKpi ? prevCaKpi.value : null;
+  let evolutionPct = evoKpi ? evoKpi.value : null;
+
+  if (caPrecedent === null && marginDetails.caPrecedent !== undefined) {
+    caPrecedent = marginDetails.caPrecedent;
+    if (caPrecedent > 0 && caTotal !== null) {
+      evolutionPct = ((caTotal - caPrecedent) / caPrecedent) * 100;
+    } else {
+      evolutionPct = 0;
+    }
+  }
 
   const loading = loadingByAgent["vfin"] && !revToolData.ok;
-  const error = !loading && !revToolData.ok && agentData.error ? agentData.error : "";
+  const error = !loading && !revToolData.ok && globalError ? globalError : "";
 
   // Count-up progress animation
   useEffect(() => {

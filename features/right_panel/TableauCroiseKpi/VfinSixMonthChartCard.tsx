@@ -17,7 +17,7 @@ interface VfinSixMonthChartCardProps {
 }
 
 export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ activeAgentId }) => {
-  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [cardHovered, setCardHovered] = useState(false);
 
@@ -25,10 +25,12 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
   const agentData = kpisByAgent["vfin"] || {};
   const toolData = agentData.get_six_month_revenue_trend || {};
 
-  const data: TrendDataPoint[] = toolData.data?.data || [];
+  const data: TrendDataPoint[] = Array.isArray(toolData.data) 
+    ? toolData.data 
+    : (toolData.data?.data || []);
 
   const loading = loadingByAgent["vfin"] && !toolData.ok;
-  const error = !loading && !toolData.ok && agentData.error ? agentData.error : "";
+  const error = !loading && !toolData.ok && globalError ? globalError : "";
 
   if (activeAgentId !== "VFIN") {
     return null;
@@ -44,8 +46,10 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
   const plotWidth = cardWidth - (paddingX * 2);
   const plotHeight = chartHeight - (paddingY * 2);
 
-  const maxCa = data.length > 0 ? Math.max(...data.map((d) => d.ca)) : 0;
-  const displayMax = maxCa === 0 ? 100000 : Math.ceil(maxCa * 1.1);
+  const allVals = data.flatMap(d => [d.ca, d.marge]);
+  const maxVal = allVals.length > 0 ? Math.max(...allVals) : 0;
+  const minVal = allVals.length > 0 ? Math.min(0, ...allVals) : 0;
+  const valRange = maxVal - minVal === 0 ? 100000 : (maxVal - minVal) * 1.15;
 
   // Short labels formatting
   const getShortLabel = (label: string) => {
@@ -55,10 +59,12 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
 
   const points = data.map((d, i) => {
     const x = paddingX + (i * (plotWidth / (data.length - 1 || 1)));
-    const yCa = paddingY + plotHeight - ((d.ca / displayMax) * plotHeight);
-    const yMarge = paddingY + plotHeight - ((d.marge / displayMax) * plotHeight);
+    const yCa = paddingY + plotHeight - (((d.ca - minVal) / valRange) * plotHeight);
+    const yMarge = paddingY + plotHeight - (((d.marge - minVal) / valRange) * plotHeight);
     return { x, yCa, yMarge, ...d };
   });
+
+  const yBaseline = paddingY + plotHeight - (((0 - minVal) / valRange) * plotHeight);
 
   const caLinePath = points.length > 0 
     ? points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.yCa.toFixed(1)}`).join(' ') 
@@ -195,7 +201,7 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
                 <span style={{ color: 'var(--muted)' }}>CA :</span> <strong style={{ color: themeColor }}>{points[hoveredIndex].ca.toLocaleString("fr-TN", { maximumFractionDigits: 0 })}</strong> TND
               </div>
               <div>
-                <span style={{ color: 'var(--muted)' }}>Marge :</span> <strong style={{ color: '#00f0ff' }}>{points[hoveredIndex].marge.toLocaleString("fr-TN", { maximumFractionDigits: 0 })}</strong> TND
+                <span style={{ color: 'var(--muted)' }}>Marge :</span> <strong style={{ color: '#ff7a00' }}>{points[hoveredIndex].marge.toLocaleString("fr-TN", { maximumFractionDigits: 0 })}</strong> TND
               </div>
             </div>
           )}
@@ -216,6 +222,19 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
             <line x1={paddingX} y1={paddingY} x2={cardWidth - paddingX} y2={paddingY} stroke="rgba(255,255,255,0.03)" strokeWidth="0.8" />
             <line x1={paddingX} y1={paddingY + plotHeight} x2={cardWidth - paddingX} y2={paddingY + plotHeight} stroke="rgba(255,255,255,0.06)" strokeWidth="0.8" />
 
+            {/* Zero Baseline Line (Dashed) */}
+            {minVal < 0 && (
+              <line 
+                x1={paddingX} 
+                y1={yBaseline} 
+                x2={cardWidth - paddingX} 
+                y2={yBaseline} 
+                stroke="rgba(255,255,255,0.18)" 
+                strokeDasharray="3 3" 
+                strokeWidth="0.8" 
+              />
+            )}
+
             {/* Hover Vertical Guide Line */}
             {hoveredIndex !== null && points[hoveredIndex] && (
               <line 
@@ -229,7 +248,19 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
               />
             )}
 
-            {/* CA Path Line (Green) */}
+            {/* Marge Path Line (Neon Orange) - Drawn first (under) */}
+            {margeLinePath && (
+              <path 
+                d={margeLinePath} 
+                fill="none" 
+                stroke="#ff7a00" 
+                strokeWidth="1.5" 
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+
+            {/* CA Path Line (Green) - Drawn second (on top) */}
             {caLinePath && (
               <path 
                 d={caLinePath} 
@@ -242,17 +273,31 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
               />
             )}
 
-            {/* Marge Path Line (Cyan/Blue) */}
-            {margeLinePath && (
-              <path 
-                d={margeLinePath} 
-                fill="none" 
-                stroke="#00f0ff" 
-                strokeWidth="1.5" 
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            {/* Marge Data Points Dots - Drawn first */}
+            {points.map((p, i) => (
+              <circle
+                key={`dot-marge-${i}`}
+                cx={p.x}
+                cy={p.yMarge}
+                r={hoveredIndex === i ? 3.5 : 2}
+                fill="#ff7a00"
+                stroke="rgba(6, 17, 31, 0.95)"
+                strokeWidth="0.8"
               />
-            )}
+            ))}
+
+            {/* CA Data Points Dots - Drawn second (on top) */}
+            {points.map((p, i) => (
+              <circle
+                key={`dot-ca-${i}`}
+                cx={p.x}
+                cy={p.yCa}
+                r={hoveredIndex === i ? 3.5 : 2}
+                fill={themeColor}
+                stroke="rgba(6, 17, 31, 0.95)"
+                strokeWidth="0.8"
+              />
+            ))}
 
             {/* Interactive invisible bars for hover triggers */}
             {points.map((p, i) => {
@@ -282,7 +327,7 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
                 <span style={{ color: "var(--muted)", textTransform: "uppercase" }}>CA</span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                <div style={{ width: "6px", height: "1.5px", backgroundColor: "#00f0ff" }} />
+                <div style={{ width: "6px", height: "1.5px", backgroundColor: "#ff7a00" }} />
                 <span style={{ color: "var(--muted)", textTransform: "uppercase" }}>Marge</span>
               </div>
             </div>
