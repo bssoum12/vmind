@@ -21,6 +21,7 @@ interface Lead {
   est_qualifie?: boolean;
   date_derniere_qualification?: string | null;
   emails_count?: number;
+  agent_emails_count?: number;
   date_envoi?: string | null;
 }
 

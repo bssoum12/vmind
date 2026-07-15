@@ -29,6 +29,7 @@ interface Lead {
   email_statut?: string | null;
   email_erreur?: string | null;
   emails_count?: number;
+  agent_emails_count?: number;
   date_envoi?: string | null;
 }
 
@@ -1028,8 +1029,8 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                       </span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <span className={`badge ${lead.emails_count && lead.emails_count > 0 ? 'badge-sent' : 'badge-new'}`}>
-                        {lead.emails_count && lead.emails_count > 0 ? `📧 ${lead.emails_count}` : '0'}
+                      <span className={`badge ${(lead.agent_emails_count ?? lead.emails_count ?? 0) > 0 ? 'badge-sent' : 'badge-new'}`}>
+                        {(lead.agent_emails_count ?? lead.emails_count ?? 0) > 0 ? `📧 ${(lead.agent_emails_count ?? lead.emails_count)}` : '0'}
                       </span>
                     </td>
                     <td>

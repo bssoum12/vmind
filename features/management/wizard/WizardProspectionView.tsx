@@ -402,10 +402,12 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
 
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const token = localStorage.getItem('vmind_session');
       const response = await fetch(`${baseUrl}/api/prospect-agent/deploy`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          ...(token && { 'Authorization': `Bearer ${token}` })
         },
         body: JSON.stringify(completePayload)
       });

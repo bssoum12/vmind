@@ -82,7 +82,7 @@ export default function GlobalLeadsModal({ isOpen, agentId, onClose, onSuccess }
 
     const debounceTimer = useRef<NodeJS.Timeout | null>(null);
     useProspectSocket((payload) => {
-        if (['agent_leads', 'agent_lead_access'].includes(payload.table)) {
+        if (['prospect_agent_leads', 'prospect_agent_lead_access'].includes(payload.table)) {
             if (debounceTimer.current) {
                 clearTimeout(debounceTimer.current);
             }
