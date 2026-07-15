@@ -100,6 +100,10 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
+          
+        // RACE CONDITION GUARD: Si l'utilisateur a cliqué sur une autre conversation pendant que le fetch tournait, on abandonne la mise à jour UI.
+        if (activeConversationIdRef.current !== activeConversationId) return;
+
         if (data.ok && data.messages.length > 0) {
            const historyMsgs = data.messages.map((m: any, i: number) => {
               if (m.role === 'human') {
@@ -119,6 +123,23 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   }, [activeConversationId]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const activeConversationIdRef = useRef<string | null>(null);
+  const abortControllersRef = useRef<Record<string, AbortController>>({});
+
+  // Keep ref in sync to avoid stale closures in async callbacks
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+    
+    // Abort pending requests for other conversations when navigating away
+    if (activeConversationId) {
+      Object.keys(abortControllersRef.current).forEach(convId => {
+        if (convId !== activeConversationId) {
+          abortControllersRef.current[convId].abort();
+          delete abortControllersRef.current[convId];
+        }
+      });
+    }
+  }, [activeConversationId]);
 
   const [messages, setMessages] = useState<VmindMessage[]>([
     {
@@ -175,10 +196,6 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       if (!targetConvId) {
          targetConvId = await createNewConversation(activeAgentId, text);
       }
-      let response = await sendVmindMessage(text, targetConvId, activeAgentId, clientId);
-
-      // Call bump
-      bumpConversation(targetConvId);
 
       // Call smart-title async if this is a new conversation (or just always call it, backend handles it, but let's only do it if the title is generic)
       const currentConv = conversations.find(c => c.conversation_id === targetConvId);
@@ -202,6 +219,15 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         .catch(err => console.error("Smart title error", err));
       }
 
+      const controller = new AbortController();
+      abortControllersRef.current[targetConvId] = controller;
+      let response = await sendVmindMessage(text, targetConvId, activeAgentId, clientId, controller.signal);
+      delete abortControllersRef.current[targetConvId];
+
+      if (activeConversationIdRef.current !== targetConvId) return;
+
+      // Call bump
+      bumpConversation(targetConvId);
 
       console.log("✅ [VmindChat] Réponse reçue de l'API:", {
         tool: response.tool_used,
@@ -251,6 +277,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       }
 
     } catch (error: any) {
+      if (error.name === 'AbortError') return;
       setMessages((prev) => prev.filter(m => !m.isThinking));
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
@@ -296,10 +323,6 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       if (!targetConvId) {
          targetConvId = await createNewConversation(activeAgentId, professionalMessage);
       }
-      let response = await sendVmindMessage(professionalMessage, targetConvId, activeAgentId, clientId);
-
-      // Call bump
-      bumpConversation(targetConvId);
 
       // Call smart-title async if this is a new conversation (or just always call it, backend handles it, but let's only do it if the title is generic)
       const currentConv = conversations.find(c => c.conversation_id === targetConvId);
@@ -323,10 +346,19 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         .catch(err => console.error("Smart title error", err));
       }
 
+        const controller = new AbortController();
+        abortControllersRef.current[targetConvId] = controller;
+        let response = await sendVmindMessage(professionalMessage, targetConvId, activeAgentId, clientId, controller.signal);
+        delete abortControllersRef.current[targetConvId];
 
-      setMessages((prev) => prev.filter(m => !m.isThinking));
+        if (activeConversationIdRef.current !== targetConvId) return;
 
-      const isOk = response && (response.ok === true || (response.ok as any) === "true");
+        // Call bump
+        bumpConversation(targetConvId);
+
+        setMessages((prev) => prev.filter(m => !m.isThinking));
+
+        const isOk = response && (response.ok === true || (response.ok as any) === "true");
 
       if (!isOk) {
         setMessages((prev) => [...prev, {

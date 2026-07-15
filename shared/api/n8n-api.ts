@@ -14,7 +14,7 @@ function getVmindSessionId() {
 /**
  * Appelle n8n via le Proxy du Backend pour éviter les problèmes de CORS
  */
-export async function sendVmindMessage(message: string, conversationId: string, agentId: string, clientId = "DEMO"): Promise<VmindN8nResponse> {
+export async function sendVmindMessage(message: string, conversationId: string, agentId: string, clientId = "DEMO", signal?: AbortSignal): Promise<VmindN8nResponse> {
   const sessionId = getVmindSessionId();
 
   // On utilise une variable d'environnement pour Vercel, ou localhost par défaut
@@ -38,7 +38,7 @@ export async function sendVmindMessage(message: string, conversationId: string, 
         }
       }
     } catch (e) {
-      console.warn("Could not parse tokens:", e);
+      console.warn("Could not retrieve token:", e);
     }
   }
 
@@ -73,7 +73,8 @@ export async function sendVmindMessage(message: string, conversationId: string, 
         conversation_id: conversationId,
         agent_id: agentId,
         mcp_token
-      })
+      }),
+      signal
     });
 
     if (!response.ok) {
@@ -102,6 +103,10 @@ export async function sendVmindMessage(message: string, conversationId: string, 
 
     return finalData;
   } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.log("🛑 [n8n-api] Fetch aborted by AbortController (user switched conversation).");
+      return { ok: false, error: 'ABORTED', message: 'Requete annulée' } as unknown as VmindN8nResponse;
+    }
     console.error("❌ [n8n-api] FETCH ERROR:", error);
     throw error;
   }
