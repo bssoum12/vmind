@@ -250,14 +250,18 @@ export default function Home() {
     setCurrentView(view);
   };
 
-  const handleDeploy = (templateId: string) => {
+  const [editingAgent, setEditingAgent] = useState<any>(null);
+
+  const handleDeploy = (templateId: string, agentToEdit?: any) => {
     setSelectedTemplate(templateId);
+    setEditingAgent(agentToEdit || null);
     setCurrentView('wizard');
   };
 
   const handleCancelWizard = () => {
     setCurrentView('market');
     setSelectedTemplate(null);
+    setEditingAgent(null);
   };
 
   const handleSelectCategory = (category: string) => {
@@ -387,6 +391,7 @@ export default function Home() {
           {currentView === 'wizard' && selectedTemplate && (
             <WizardRouter
               templateId={selectedTemplate}
+              agentToEdit={editingAgent}
               onCancel={handleCancelWizard}
             />
           )}

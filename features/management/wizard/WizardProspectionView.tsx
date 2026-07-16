@@ -11,6 +11,7 @@ import { OnboardingChat } from './components/OnboardingChat';
 interface WizardViewProps {
   templateId: string;
   onCancel: () => void;
+  agentToEdit?: any;
 }
 
 const VIRTUAL_MIND_GUIDE: Record<string, { title: string; text: string }> = {
@@ -124,15 +125,18 @@ function TagInput({
             setShowSuggestions(true);
           }}
           onFocus={(e) => {
-          setShowSuggestions(true);
-          if (onFocus) onFocus();
-        }}
-        onBlur={(e) => {
-          setTimeout(() => {
-            if (onBlur) onBlur();
-            setShowSuggestions(false);
-          }, 200);
-        }}
+            setShowSuggestions(true);
+            if (onFocus) onFocus();
+          }}
+          onBlur={(e) => {
+            setTimeout(() => {
+              if (inputValue.trim()) {
+                addTag(inputValue);
+              }
+              if (onBlur) onBlur();
+              setShowSuggestions(false);
+            }, 200);
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();
@@ -197,7 +201,7 @@ function TagInput({
   );
 }
 
-export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, onCancel }) => {
+export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, onCancel, agentToEdit }) => {
   const [step, setStep] = useState(1);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
@@ -238,48 +242,132 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
   const [deployed, setDeployed] = useState(false);
   const template = AGENT_TEMPLATES.find(t => t.id === templateId);
 
-  const [formData, setFormData] = useState({
-    agent_name: template?.name || 'Agent de Prospection',
-    run_mode: 'prospection',
-    workflow_timezone: 'Africa/Tunis',
+  interface ProspectFormData {
+    agent_name: string;
+    run_mode: string;
+    workflow_timezone: string;
     prospection_config: {
-      modele_llm: 'llama-3.3-70b-versatile',
-      agent_mission: '',
+      modele_llm: string;
+      agent_mission: string;
       icp: {
-        secteur_activite: [] as string[],
-        taille_min: 50,
-        taille_max: 500,
-        poste_contact: [] as string[],
-        zone_geo: [] as string[],
-        seuil_qualification: 70,
-        poids_secteur: 25,
-        poids_taille: 25,
-        poids_poste: 25,
-        poids_pays: 25
-      },
+        secteur_activite: string[];
+        taille_min: number;
+        taille_max: number;
+        poste_contact: string[];
+        zone_geo: string[];
+        seuil_qualification: number;
+        poids_secteur: number;
+        poids_taille: number;
+        poids_poste: number;
+        poids_pays: number;
+      };
       campaign: {
-        signature_email: '',
-        default_cc: '',
-        delai_envois: 30,
-        max_emails_jour: 50,
-        email_recap: ''
-      }
-    },
-    trigger_rules: [
-      {
-        interval: 'Days',
-        secondsBetween: 30,
-        minutesBetween: 5,
-        hoursBetween: 1,
-        daysBetween: 1,
-        weeksBetween: 1,
-        monthsBetween: 1,
-        triggerAtMinute: 0,
-        triggerAtHour: '8am',
-        triggerOnWeekdays: ['Monday'],
-        triggerAtDayOfMonth: 1
-      }
-    ] as TriggerRule[]
+        signature_email: string;
+        default_cc: string;
+        delai_envois: number;
+        max_emails_jour: number;
+        email_recap: string;
+      };
+    };
+    trigger_rules: TriggerRule[];
+  }
+
+  const [formData, setFormData] = useState<ProspectFormData>(() => {
+    if (agentToEdit && agentToEdit.config) {
+      const cfg = agentToEdit.config;
+      return {
+        agent_name: agentToEdit.agent_name || 'Agent de Prospection',
+        run_mode: agentToEdit.run_mode || 'prospection',
+        workflow_timezone: agentToEdit.workflow_timezone || 'Africa/Tunis',
+        prospection_config: {
+          modele_llm: cfg.modele_llm || 'llama-3.3-70b-versatile',
+          agent_mission: cfg.agent_mission || '',
+          icp: {
+            secteur_activite: cfg.icp?.secteur_activite || [],
+            taille_min: cfg.icp?.taille_min ?? 50,
+            taille_max: cfg.icp?.taille_max ?? 500,
+            poste_contact: cfg.icp?.poste_contact || [],
+            zone_geo: cfg.icp?.zone_geo || [],
+            seuil_qualification: cfg.seuil_qualification ?? 70,
+            poids_secteur: cfg.icp?.poids_secteur ?? 25,
+            poids_taille: cfg.icp?.poids_taille ?? 25,
+            poids_poste: cfg.icp?.poids_poste ?? 25,
+            poids_pays: cfg.icp?.poids_pays ?? 25
+          },
+          campaign: {
+            signature_email: cfg.signature_email || '',
+            default_cc: cfg.default_cc || '',
+            delai_envois: cfg.delai_envois ?? 30,
+            max_emails_jour: cfg.max_emails_jour ?? 50,
+            email_recap: cfg.email_recap || ''
+          }
+        },
+        trigger_rules: agentToEdit.trigger_rules && agentToEdit.trigger_rules.length > 0
+          ? agentToEdit.trigger_rules
+          : [
+            {
+              interval: 'Days',
+              secondsBetween: 30,
+              minutesBetween: 5,
+              hoursBetween: 1,
+              daysBetween: 1,
+              weeksBetween: 1,
+              monthsBetween: 1,
+              triggerAtMinute: 0,
+              triggerAtHour: '8am',
+              triggerOnWeekdays: ['Monday'],
+              triggerAtDayOfMonth: 1
+            }
+          ]
+      };
+    }
+
+    const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const defaultName = template?.name || 'Agent de Prospection';
+
+    return {
+      agent_name: `${defaultName} - ${randomSuffix}`,
+      run_mode: 'prospection',
+      workflow_timezone: 'Africa/Tunis',
+      prospection_config: {
+        modele_llm: 'llama-3.3-70b-versatile',
+        agent_mission: '',
+        icp: {
+          secteur_activite: [] as string[],
+          taille_min: 50,
+          taille_max: 500,
+          poste_contact: [] as string[],
+          zone_geo: [] as string[],
+          seuil_qualification: 70,
+          poids_secteur: 25,
+          poids_taille: 25,
+          poids_poste: 25,
+          poids_pays: 25
+        },
+        campaign: {
+          signature_email: '',
+          default_cc: '',
+          delai_envois: 30,
+          max_emails_jour: 50,
+          email_recap: ''
+        }
+      },
+      trigger_rules: [
+        {
+          interval: 'Days',
+          secondsBetween: 30,
+          minutesBetween: 5,
+          hoursBetween: 1,
+          daysBetween: 1,
+          weeksBetween: 1,
+          monthsBetween: 1,
+          triggerAtMinute: 0,
+          triggerAtHour: '8am',
+          triggerOnWeekdays: ['Monday'],
+          triggerAtDayOfMonth: 1
+        }
+      ] as TriggerRule[]
+    };
   });
 
   const hourOptions = [
@@ -374,7 +462,37 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     updateTriggerRuleAtIndex(index, 'triggerOnWeekdays', updatedDays);
   };
 
-  const validateAndNext = (nextStep: number) => {
+  const validateAndNext = async (nextStep: number) => {
+    if (step === 1 && nextStep === 2) {
+      if (!formData.agent_name.trim()) {
+        alert("Veuillez saisir un nom pour l'agent.");
+        return;
+      }
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
+        
+        const token = localStorage.getItem('vmind_session');
+        const res = await fetch(endpoint, {
+          headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+        });
+
+        if (!res.ok) {
+          throw new Error("Erreur serveur lors de la vérification du nom.");
+        }
+        
+        const data = await res.json();
+        if (!data.available) {
+          alert("Un agent avec ce nom existe déjà. Veuillez choisir un autre nom.");
+          return;
+        }
+      } catch (err) {
+        console.error("Failed to check agent name", err);
+        alert("Impossible de vérifier la disponibilité du nom de l'agent. Veuillez réessayer.");
+        return;
+      }
+    }
+
     if (step === 3 && nextStep === 4) {
       const sum = formData.prospection_config.icp.poids_secteur +
         formData.prospection_config.icp.poids_taille +
@@ -389,6 +507,38 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
   };
 
   const handleDeploy = async () => {
+    // Check name availability before deploying
+    if (!formData.agent_name.trim()) {
+      alert("Veuillez saisir un nom pour l'agent.");
+      if (step !== 1) setStep(1);
+      return;
+    }
+    
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
+      
+      const token = localStorage.getItem('vmind_session');
+      const res = await fetch(endpoint, {
+        headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+      });
+
+      if (!res.ok) {
+        throw new Error("Erreur serveur lors de la vérification du nom.");
+      }
+      
+      const data = await res.json();
+      if (!data.available) {
+        alert("Un agent avec ce nom existe déjà. Veuillez choisir un autre nom.");
+        if (step !== 1) setStep(1);
+        return;
+      }
+    } catch (err) {
+      console.error("Failed to check agent name", err);
+      alert("Impossible de vérifier la disponibilité du nom de l'agent. Veuillez réessayer.");
+      return;
+    }
+
     setIsDeploying(true);
 
     const now = new Date();
@@ -397,14 +547,19 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     const completePayload = {
       ...formData,
       session_id: sessionId,
-      action: 'deploy'
+      action: agentToEdit ? 'update' : 'deploy'
     };
 
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
       const token = localStorage.getItem('vmind_session');
-      const response = await fetch(`${baseUrl}/api/prospect-agent/deploy`, {
-        method: "POST",
+
+      const endpoint = agentToEdit
+        ? `${baseUrl}/api/prospect-agent/update/${agentToEdit.agent_id}`
+        : `${baseUrl}/api/prospect-agent/deploy`;
+
+      const response = await fetch(endpoint, {
+        method: agentToEdit ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token && { 'Authorization': `Bearer ${token}` })
@@ -413,7 +568,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to deploy agent: ${response.statusText}`);
+        throw new Error(`Failed to ${agentToEdit ? 'update' : 'deploy'} agent: ${response.statusText}`);
       }
 
       setDeployed(true);
@@ -534,7 +689,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                   </div>
                 </div>
 
-                
+
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <Button variant="primary" onClick={() => validateAndNext(2)}>Briefing & Objectifs →</Button>
@@ -542,7 +697,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
             </div>
           )}
 
-          
+
           {/* STEP 2: Briefing & Objectifs */}
           {step === 2 && (
             <div id="step2" className="anim">
@@ -550,7 +705,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 <div className="wcard-title">
                   <span className="dot" style={{ backgroundColor: template?.accent || '#FF4757' }}></span>
                   Briefing de l'Agent
-                  <span 
+                  <span
                     onClick={triggerStep2Guide}
                     style={{
                       display: 'inline-flex',
@@ -569,7 +724,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                   >?</span>
                 </div>
                 <p style={{ color: 'var(--text)', marginBottom: '1rem', fontSize: '0.95rem' }}>Discutez avec VirtualMind pour définir la mission de l'agent. Il vous posera quelques questions pour comprendre votre offre et vos objectifs.</p>
-                <OnboardingChat 
+                <OnboardingChat
                   initialMission={formData.prospection_config.agent_mission}
                   onConfirm={(mission) => {
                     setFormData(prev => ({
@@ -582,9 +737,12 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
                 <Button variant="secondary" onClick={() => validateAndNext(1)}>← Retour</Button>
-                {formData.prospection_config.agent_mission && (
-                   <Button variant="primary" onClick={() => validateAndNext(3)}>Profil Client (ICP) →</Button>
-                )}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <Button variant="secondary" onClick={() => setStep(3)}>Passer (Ignorer)</Button>
+                  {formData.prospection_config.agent_mission && (
+                    <Button variant="primary" onClick={() => validateAndNext(3)}>Profil Client (ICP) →</Button>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -700,10 +858,12 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                   </div>
                 </div>
               </div>
-
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
                 <Button onClick={() => validateAndNext(2)}>← Retour</Button>
-                <Button variant="primary" onClick={() => validateAndNext(4)}>Campagne & Limites →</Button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <Button variant="secondary" onClick={() => setStep(4)}>Passer (Ignorer)</Button>
+                  <Button variant="primary" onClick={() => validateAndNext(4)}>Campagne & Limites →</Button>
+                </div>
               </div>
             </div>
           )}
@@ -768,10 +928,12 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                   />
                 </div>
               </div>
-
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
                 <Button onClick={() => validateAndNext(3)}>← Retour</Button>
-                <Button variant="primary" onClick={() => validateAndNext(5)}>Planification →</Button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <Button variant="secondary" onClick={() => setStep(5)}>Passer (Ignorer)</Button>
+                  <Button variant="primary" onClick={() => validateAndNext(5)}>Planification →</Button>
+                </div>
               </div>
             </div>
           )}
@@ -1047,21 +1209,26 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
                 <Button onClick={() => validateAndNext(4)}>← Retour</Button>
-                <Button variant="primary" onClick={handleDeploy} disabled={isDeploying || formData.trigger_rules.length === 0}>
-                  {isDeploying ? 'Déploiement en cours...' : '🚀 Lancer le déploiement n8n'}
-                </Button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <Button variant="secondary" onClick={handleDeploy} disabled={isDeploying}>
+                    Passer et Déployer
+                  </Button>
+                  <Button variant="primary" onClick={handleDeploy} disabled={isDeploying || formData.trigger_rules.length === 0}>
+                    {isDeploying ? 'Déploiement en cours...' : agentToEdit ? 'Sauvegarder les modifications' : '🚀 Lancer le déploiement n8n'}
+                  </Button>
+                </div>
               </div>
             </div>
           )}
 
-        
-            {/* VirtualMind Floating Guide */}
-      <VMindGuide 
-        isOpen={!!focusedField || showStep2Guide}
-        title={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].title : showStep2Guide ? "Briefing de l'Agent" : undefined}
-        message={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].text : showStep2Guide ? "Cette section est cruciale. Les réponses que vous donnerez ici définiront le contexte global et la compréhension de l'IA. Soyez le plus précis possible, car ces informations impacteront directement la qualité des emails générés." : null}
-        mood={focusedField ? getMoodForField(focusedField) : showStep2Guide ? 'convinced' : undefined}
-      />
+
+          {/* VirtualMind Floating Guide */}
+          <VMindGuide
+            isOpen={!!focusedField || showStep2Guide}
+            title={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].title : showStep2Guide ? "Briefing de l'Agent" : undefined}
+            message={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].text : showStep2Guide ? "Cette section est cruciale. Les réponses que vous donnerez ici définiront le contexte global et la compréhension de l'IA. Soyez le plus précis possible, car ces informations impacteront directement la qualité des emails générés." : null}
+            mood={focusedField ? getMoodForField(focusedField) : showStep2Guide ? 'convinced' : undefined}
+          />
 
         </div>
       </div>

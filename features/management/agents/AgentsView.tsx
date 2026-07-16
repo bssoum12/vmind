@@ -13,7 +13,7 @@ import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide
 
 interface AgentsViewProps {
   onNavigate: (view: string) => void;
-  onConfigure: (templateId: string) => void;
+  onConfigure: (templateId: string, agent?: any) => void;
 }
 
 type AgentStatus = 'running' | 'paused' | 'stopped';
@@ -473,7 +473,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                           {/* Config */}
                           <button
                             className="row-btn"
-                            onClick={() => onConfigure(agent.run_mode === 'prospection' ? 'prospection' : 'recouvrement')}
+                            onClick={() => onConfigure(agent.run_mode === 'prospection' ? 'prospection' : 'recouvrement', agent)}
                             title="Modifier la configuration"
                             style={{ ...getBtnStyle(agent, 3) }}
                           >
