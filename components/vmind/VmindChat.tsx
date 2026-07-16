@@ -303,9 +303,6 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         }]);
       } else {
         const toolUsed = response.tool_used as string;
-        const agentId = TOOL_TO_AGENT[toolUsed] || effectiveAgentId;
-
-        if (onAgentActive) onAgentActive(agentId);
 
         setMessages((prev) => [...prev, {
           id: `vm-${Date.now()}`,
@@ -425,9 +422,6 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         }]);
       } else {
         const toolUsed = response.tool_used as string;
-        const agentId = TOOL_TO_AGENT[toolUsed] || effectiveAgentId;
-
-        if (onAgentActive) onAgentActive(agentId);
 
         setMessages((prev) => [...prev, {
           id: `vm-${Date.now()}`,
@@ -513,8 +507,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         const currentConv = conversations.find(c => c.conversation_id === activeConversationId);
         const effectiveAgentId = currentConv?.agent_id || activeAgentId;
 
-        const agentIdForTool = TOOL_TO_AGENT[result.tool_used] || effectiveAgentId;
-        if (onAgentActive && agentIdForTool) onAgentActive(agentIdForTool);
+        // No automatic agent change on tool execute
 
         setMessages((prev) => [...prev, {
           id: `vm-${Date.now()}`,
@@ -651,9 +644,8 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         )}
       </div>
 
-      <div className="vmind-chat-area flex-1 overflow-y-auto p-4 space-y-5">
-        <div className="vmind-messages">
-          {messages.map((msg, index) => {
+      <div className="messages">
+        {messages.map((msg, index) => {
             const isUser = msg.sender === 'user';
             const toolUsed = msg.tool_used as string;
             
@@ -832,7 +824,6 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           );
         })}
         <div ref={messagesEndRef} />
-        </div>
       </div>
 
       <div className="input-bar p-4 border-t border-[#1c2538] bg-[#0b101e] flex-shrink-0">
