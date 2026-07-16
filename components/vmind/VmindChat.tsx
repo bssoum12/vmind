@@ -1,11 +1,11 @@
 "use client";
-
 import React, { useEffect, useState, useRef } from 'react';
 import { VmindMessage } from '@/shared/types/vmind';
 import { sendVmindMessage } from '@/shared/api/n8n-api';
 import { ToolResultRenderer } from './renderers/ToolResultRenderer';
 import { resolveAgentFromTool, AGENTS } from '@/shared/constants/data';
 import { useConversations } from '@/shared/contexts/ConversationsContext';
+import { jwtDecode } from 'jwt-decode';
 
 interface VmindChatProps {
   initialPrompt?: string;
@@ -104,10 +104,32 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   const { activeConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle } = useConversations();
   const [input, setInput] = useState('');
 
+  const getWelcomeMessage = () => {
+    let fullName = "Utilisateur";
+    try {
+      const token = localStorage.getItem('vmind_session');
+      if (token) {
+        const decoded: any = jwtDecode(token);
+        const firstName = decoded.first_name || '';
+        const lastName = decoded.last_name || '';
+        if (firstName || lastName) {
+          fullName = `${firstName} ${lastName}`.trim();
+        } else if (decoded.username) {
+          fullName = decoded.username;
+        }
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    const agentName = activeAgentId === 'VMIND' ? 'VMIND' : activeAgentId;
+    return `Bonjour ${fullName}, je suis ${agentName}, Comment puis-je vous assister aujourd'hui ?`;
+  };
+
   // Fetch history when conversation changes
   useEffect(() => {
     if (!activeConversationId) {
-      setMessages([{ id: 'init-1', sender: 'vm', text: 'Bonjour. Je suis connecté via n8n. Que puis-je pour vous ?', time: formatTime(), rawDate: new Date().toISOString() }]);
+      setMessages([{ id: 'init-1', sender: 'vm', text: getWelcomeMessage(), time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) }]);
       return;
     }
     const fetchHistory = async () => {
@@ -138,7 +160,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
             });
            setMessages(historyMsgs);
         } else {
-           setMessages([{ id: 'init-1', sender: 'vm', text: `Nouvelle discussion.`, time: formatTime(), rawDate: new Date().toISOString() }]);
+           setMessages([{ id: 'init-1', sender: 'vm', text: getWelcomeMessage(), time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) }]);
         }
       } catch (err) { console.error("Error fetching history", err); }
       finally { setIsLoading(false); }
@@ -169,17 +191,21 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     {
       id: 'init-1',
       sender: 'vm',
-      text: 'Bonjour. Je suis connecté via n8n. Que puis-je pour vous ?',
+      text: 'Bonjour',
       time: '',
     },
   ]);
 
   useEffect(() => {
-    // Initialisation de l'heure du message de bienvenue uniquement côté client
+    // Initialisation du message et de l'heure de bienvenue uniquement côté client
     setMessages(prev => prev.map(m =>
-      m.id === 'init-1' ? { ...m, time: formatTime(), rawDate: new Date().toISOString() } : m
+      m.id === 'init-1' ? { 
+        ...m, 
+        text: getWelcomeMessage(),
+        time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) 
+      } : m
     ));
-  }, []);
+  }, [activeAgentId]);
 
   useEffect(() => {
     if (initialPrompt) {
