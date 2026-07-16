@@ -106,7 +106,10 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
 
   useEffect(() => {
     if (activeAgentId === 'VDATA' && startDate && endDate) {
-      fetchPrevYearRate();
+      const timer = setTimeout(() => {
+        fetchPrevYearRate();
+      }, 800);
+      return () => clearTimeout(timer);
     }
   }, [activeAgentId, startDate, endDate]);
 

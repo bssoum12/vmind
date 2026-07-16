@@ -96,7 +96,10 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
 
   React.useEffect(() => {
     if (activeAgentId === 'VDATA') {
-      fetchDomainPerformance();
+      const timer = setTimeout(() => {
+        fetchDomainPerformance();
+      }, 800);
+      return () => clearTimeout(timer);
     }
   }, [activeAgentId, startDate, endDate]);
 
