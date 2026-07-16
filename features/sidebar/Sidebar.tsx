@@ -159,6 +159,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
                 '--agent-border': agent.borderColor,
               } as React.CSSProperties : {}}
               onClick={() => {
+                setActiveNav('dashboard');
+                window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'chat' }));
                 if (onAgentClick) onAgentClick(agent.id);
               }}
             >
