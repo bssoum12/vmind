@@ -12,6 +12,7 @@ interface WizardViewProps {
   templateId: string;
   onCancel: () => void;
   agentToEdit?: any;
+  initialStep?: number;
 }
 
 const VIRTUAL_MIND_GUIDE: Record<string, { title: string; text: string }> = {
@@ -201,8 +202,8 @@ function TagInput({
   );
 }
 
-export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, onCancel, agentToEdit }) => {
-  const [step, setStep] = useState(1);
+export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, onCancel, agentToEdit, initialStep }) => {
+  const [step, setStep] = useState(initialStep || 1);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const [showStep2Guide, setShowStep2Guide] = useState(false);

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, LayoutDashboard, Users, Mail, Activity } from 'lucide-react';
 
 import DashboardView from '../../../features/management/prospect-workspace/components/DashboardView';
@@ -20,8 +20,16 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 export default function AgentWorkspacePage() {
   const { agentId } = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['dashboard', 'leads', 'campaigns', 'logs'].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   const [leads, setLeads] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);

@@ -8,11 +8,12 @@ interface WizardRouterProps {
   templateId: string;
   onCancel: () => void;
   agentToEdit?: any;
+  initialStep?: number;
 }
 
-export const WizardRouter: React.FC<WizardRouterProps> = ({ templateId, onCancel, agentToEdit }) => {
+export const WizardRouter: React.FC<WizardRouterProps> = ({ templateId, onCancel, agentToEdit, initialStep }) => {
   if (templateId === 'prospection') {
-    return <WizardProspectionView templateId={templateId} onCancel={onCancel} agentToEdit={agentToEdit} />;
+    return <WizardProspectionView templateId={templateId} onCancel={onCancel} agentToEdit={agentToEdit} initialStep={initialStep} />;
   }
 
   // Default to the original wizard for all other templates

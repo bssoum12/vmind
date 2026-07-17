@@ -7,18 +7,27 @@ import {
   resumeAgent,
   deleteAgent,
   runAgentNow,
+  getProspectAgentStats,
+  triggerProspectAutoMode,
+  qualifyManualProspects,
+  triggerAIQualificationAllPending,
 } from '@/shared/api/n8n-api';
+import { useProspectSocket } from '../prospect-workspace/hooks/useProspectSocket';
 import { useRouter } from 'next/navigation';
 import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Play, Brain, CheckSquare, ListChecks, SkipForward, Users, Info, ExternalLink, UploadCloud } from 'lucide-react';
+import { ProspectAgentExecutionModal } from './components/ProspectAgentExecutionModal';
+import { ProspectAgentScheduleModal } from './components/ProspectAgentScheduleModal';
 
 interface AgentsViewProps {
   onNavigate: (view: string) => void;
-  onConfigure: (templateId: string, agent?: any) => void;
+  onConfigure: (templateId: string, agent?: any, initialStep?: number) => void;
 }
 
 type AgentStatus = 'running' | 'paused' | 'stopped';
 
-interface LiveAgent {
+export interface LiveAgent {
   agent_name: string;
   run_mode: string;
   workflow_timezone: string;
@@ -66,6 +75,10 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const [actionLoading, setActionLoading] = useState<string | null>(null); // agent_name being actioned
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
 
+  // Auto Mode Modal State
+  const [runModalAgent, setRunModalAgent] = useState<LiveAgent | null>(null);
+  const [scheduleModalAgent, setScheduleModalAgent] = useState<LiveAgent | null>(null);
+
   // Tutorial state
   const [tutorialStep, setTutorialStep] = useState<number>(0);
   const [tutorialAgent, setTutorialAgent] = useState<LiveAgent | null>(null);
@@ -73,7 +86,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const startTutorial = (agent: LiveAgent) => {
     const storageKey = `vmind_tutorial_done_${agent.run_mode}`;
     if (localStorage.getItem(storageKey)) return;
-    
+
     localStorage.setItem(storageKey, 'true');
     setTutorialAgent(agent);
     setTutorialStep(1);
@@ -89,10 +102,10 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
       }
     }
     keysToRemove.forEach(k => localStorage.removeItem(k));
-    
+
     // Also remove the old generic key just in case
     localStorage.removeItem('vmind_agent_tutorial_done');
-    
+
     showToast('Tutoriels réinitialisés pour tous les types d\'agents. Survolez un agent pour commencer.', 'ok');
   };
 
@@ -119,7 +132,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
       case 2:
         return {
           title: "Activer / Désactiver",
-          message: tutorialAgent.run_mode === 'prospection' 
+          message: tutorialAgent.run_mode === 'prospection'
             ? "Le bouton Start active le mode automatique. L'agent commencera à envoyer des emails de prospection selon vos limites."
             : "Le bouton Start active la planification cron pour relancer automatiquement les impayés.",
           mood: 'convinced' as GuideMood
@@ -149,10 +162,10 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
 
   const getBtnStyle = (agent: LiveAgent, step: number) => {
     if (tutorialStep === step && tutorialAgent?.agent_name === agent.agent_name) {
-      return { 
-        position: 'relative' as any, 
-        zIndex: 10001, 
-        boxShadow: '0 0 0 4px rgba(0,229,200,0.8)', 
+      return {
+        position: 'relative' as any,
+        zIndex: 10001,
+        boxShadow: '0 0 0 4px rgba(0,229,200,0.8)',
         pointerEvents: 'none' as any,
         background: 'var(--card-bg)'
       };
@@ -221,6 +234,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     refresh();
   }, []);
 
+
+
   const handlePause = async (agent: LiveAgent) => {
     setActionLoading(agent.agent_name);
     try {
@@ -263,6 +278,17 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   };
 
   const handleRunNow = async (agent: LiveAgent) => {
+    if (agent.run_mode === 'prospection') {
+      const publicId = (agent as any).agent_id;
+      if (!publicId) {
+        showToast("Impossible de trouver l'ID public de cet agent", 'err');
+        return;
+      }
+      setRunModalAgent(agent);
+      return;
+    }
+
+    // Default behavior for recouvrement
     setActionLoading(agent.agent_name);
     try {
       await runAgentNow(agent.agent_name);
@@ -285,19 +311,19 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
 
       {/* ── Tutorial Overlay ── */}
       {tutorialStep > 0 && (
-        <div 
+        <div
           onClick={nextTutorialStep}
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(0,0,0,0.8)', zIndex: 10000,
             cursor: 'pointer'
-          }} 
+          }}
         />
       )}
 
       {/* ── VMind Guide for Tutorial ── */}
       {tutorialStep > 0 && tutorialAgent && (
-        <VMindGuide 
+        <VMindGuide
           isOpen={tutorialStep > 0}
           title={getTutorialContent()?.title}
           message={getTutorialContent()?.message || null}
@@ -461,7 +487,13 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                             <button
                               className="row-btn"
                               disabled={busy}
-                              onClick={() => handleResume(agent)}
+                              onClick={() => {
+                                if (agent.run_mode === 'prospection') {
+                                  setScheduleModalAgent(agent);
+                                } else {
+                                  handleResume(agent);
+                                }
+                              }}
                               title="Reprendre"
                               style={{ color: '#00E5A0', borderColor: 'rgba(0,229,160,0.3)', ...getBtnStyle(agent, 2) }}
                             >
@@ -648,6 +680,31 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           </div>
         )}
       </div>
+
+      {/* ── EXÉCUTION (AUTO MODE) MODAL ── */}
+      {runModalAgent && (
+        <ProspectAgentExecutionModal 
+          agent={runModalAgent} 
+          onClose={() => setRunModalAgent(null)} 
+          onToast={showToast} 
+        />
+      )}
+      {/* ── SCHEDULE MODAL ── */}
+      {scheduleModalAgent && (
+        <ProspectAgentScheduleModal
+          agent={scheduleModalAgent}
+          onClose={() => setScheduleModalAgent(null)}
+          onConfirm={async () => {
+            await handleResume(scheduleModalAgent);
+            setScheduleModalAgent(null);
+          }}
+          onEditSchedule={() => {
+            setScheduleModalAgent(null);
+            onConfigure(scheduleModalAgent.run_mode === 'prospection' ? 'prospection' : 'recouvrement', scheduleModalAgent, 5);
+          }}
+        />
+      )}
+
     </div>
   );
 };

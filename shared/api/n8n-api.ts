@@ -291,6 +291,67 @@ export async function runAgentNow(agentName: string): Promise<any> {
 }
 
 /**
+ * Get lead stats for a specific prospect agent
+ */
+export async function getProspectAgentStats(agentId: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/stats/${encodeURIComponent(agentId)}`, {
+    method: "GET",
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch agent stats (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Trigger Auto Mode for a specific prospect agent
+ */
+export async function triggerProspectAutoMode(agentId: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/start/${encodeURIComponent(agentId)}`, {
+    method: "POST",
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to trigger prospect auto mode (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Instantly qualify prospects for this agent (manually)
+ */
+export async function qualifyManualProspects(agentId: string, mode: 'pending_only' | 'all'): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/prospect-agent/qualify-manual/${encodeURIComponent(agentId)}`, {
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ mode })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to qualify prospects manually (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Trigger AI Qualification (N8N_WEBHOOK_QUALIFY) for all pending leads
+ */
+export async function triggerAIQualificationAllPending(agentId: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/prospect-agent/qualify-all-pending-ai/${encodeURIComponent(agentId)}`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to trigger AI qualification (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
  * Appelle l'agent n8n KPI via le Proxy sécurisé du Backend
  */
 export async function fetchN8nKpis(

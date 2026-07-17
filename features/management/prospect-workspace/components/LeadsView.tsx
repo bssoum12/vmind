@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import GlobalLeadsModal from './GlobalLeadsModal';
 import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
 
@@ -42,6 +42,7 @@ interface LeadsViewProps {
 
 export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: LeadsViewProps) {
   const params = useParams();
+  const searchParams = useSearchParams();
   const agentId = params.agentId;
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -305,7 +306,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+    if (searchParams.get('action') === 'import') {
+      setShowImportConsole(true);
+    }
+  }, [searchParams]);
 
   // Unified leads ingestion loop
   const importLeads = async (leadsData: any[]) => {
