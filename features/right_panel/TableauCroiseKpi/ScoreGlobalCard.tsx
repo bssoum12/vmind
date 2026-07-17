@@ -161,7 +161,10 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
 
   useEffect(() => {
     if (activeAgentId === "VDATA") {
-      fetchPrevYearData();
+      const timer = setTimeout(() => {
+        fetchPrevYearData();
+      }, 800);
+      return () => clearTimeout(timer);
     }
   }, [activeAgentId]);
 

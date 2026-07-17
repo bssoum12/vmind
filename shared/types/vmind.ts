@@ -73,6 +73,7 @@ export interface VmindMessage {
   error?: any;
   isThinking?: boolean;
   source?: string;
+  rawDate?: string;
   status?: string;
   alerts?: VmindAlert[];
   report_url?: string | null;

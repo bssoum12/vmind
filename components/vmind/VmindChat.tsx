@@ -1,11 +1,11 @@
 "use client";
-
 import React, { useEffect, useState, useRef } from 'react';
 import { VmindMessage } from '@/shared/types/vmind';
 import { sendVmindMessage } from '@/shared/api/n8n-api';
 import { ToolResultRenderer } from './renderers/ToolResultRenderer';
 import { resolveAgentFromTool, AGENTS } from '@/shared/constants/data';
 import { useConversations } from '@/shared/contexts/ConversationsContext';
+import { jwtDecode } from 'jwt-decode';
 
 interface VmindChatProps {
   initialPrompt?: string;
@@ -73,6 +73,27 @@ const FAST_TRACK_REGISTRY: Record<string, string> = {
   ...VFIN_FAST_TRACK_REGISTRY
 };
 
+const formatTime = (dateString?: string) => {
+  if (!dateString) return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  return new Date(dateString).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatDateHeader = (dateString?: string) => {
+  if (!dateString) return "Aujourd'hui";
+  const date = new Date(dateString);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  if (date.toDateString() === today.toDateString()) {
+    return "Aujourd'hui";
+  } else if (date.toDateString() === yesterday.toDateString()) {
+    return "Hier";
+  } else {
+    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+};
+
 export const VmindChat: React.FC<VmindChatProps> = ({
   initialPrompt,
   onOpenVoice,
@@ -80,13 +101,41 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   onAgentActive,
   activeAgentId = "VMIND"
 }) => {
-  const { activeConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle } = useConversations();
+  const { activeConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle, refreshConversations } = useConversations();
   const [input, setInput] = useState('');
+
+  // Ref toujours synchrone → garantit la valeur EXACTE de l'agent au moment du clic
+  const activeAgentIdRef = useRef<string>(activeAgentId);
+  useEffect(() => {
+    activeAgentIdRef.current = activeAgentId;
+  }, [activeAgentId]);
+
+  const getWelcomeMessage = () => {
+    let fullName = "Utilisateur";
+    try {
+      const token = localStorage.getItem('vmind_session');
+      if (token) {
+        const decoded: any = jwtDecode(token);
+        const firstName = decoded.first_name || '';
+        const lastName = decoded.last_name || '';
+        if (firstName || lastName) {
+          fullName = `${firstName} ${lastName}`.trim();
+        } else if (decoded.username) {
+          fullName = decoded.username;
+        }
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    const agentName = activeAgentId === 'VMIND' ? 'VMIND' : activeAgentId;
+    return `Bonjour ${fullName}, je suis ${agentName}, Comment puis-je vous assister aujourd'hui ?`;
+  };
 
   // Fetch history when conversation changes
   useEffect(() => {
     if (!activeConversationId) {
-      setMessages([{ id: 'init-1', sender: 'vm', text: 'Bonjour. Je suis connecté via n8n. Que puis-je pour vous ?', time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) }]);
+      setMessages([{ id: 'init-1', sender: 'vm', text: getWelcomeMessage(), time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) }]);
       return;
     }
     const fetchHistory = async () => {
@@ -100,17 +149,24 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
+          
+        // RACE CONDITION GUARD: Si l'utilisateur a cliqué sur une autre conversation pendant que le fetch tournait, on abandonne la mise à jour UI.
+        if (activeConversationIdRef.current !== activeConversationId) return;
+
+        // GUARD PROTECTEUR : Si un AbortController est actif, ça veut dire qu'on vient d'envoyer un message et d'ajouter une bulle de chargement. On ignore l'historique vide pour ne pas écraser l'UI.
+        if (abortControllersRef.current[activeConversationId]) return;
+
         if (data.ok && data.messages.length > 0) {
-           const historyMsgs = data.messages.map((m: any, i: number) => {
-              if (m.role === 'human') {
-                 return { id: `hist-h-${i}`, sender: 'user', text: m.text, time: '' };
-              } else {
-                 return { id: `hist-a-${i}`, sender: 'vm', text: m.message || m.text || 'Réponse', time: '', ...m };
-              }
-           });
+            const historyMsgs = data.messages.map((m: any, i: number) => {
+               if (m.role === 'human') {
+                  return { id: `hist-h-${i}`, sender: 'user', text: m.text, time: formatTime(m.created_at), rawDate: m.created_at || new Date().toISOString() };
+               } else {
+                  return { id: `hist-a-${i}`, sender: 'vm', text: m.message || m.text || 'Réponse', time: formatTime(m.created_at), rawDate: m.created_at || new Date().toISOString(), ...m };
+               }
+            });
            setMessages(historyMsgs);
         } else {
-           setMessages([{ id: 'init-1', sender: 'vm', text: `Nouvelle discussion.`, time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) }]);
+           setMessages([{ id: 'init-1', sender: 'vm', text: getWelcomeMessage(), time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) }]);
         }
       } catch (err) { console.error("Error fetching history", err); }
       finally { setIsLoading(false); }
@@ -119,22 +175,43 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   }, [activeConversationId]);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const activeConversationIdRef = useRef<string | null>(null);
+  const abortControllersRef = useRef<Record<string, AbortController>>({});
+
+  // Keep ref in sync to avoid stale closures in async callbacks
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+    
+    // Abort pending requests for other conversations when navigating away
+    if (activeConversationId) {
+      Object.keys(abortControllersRef.current).forEach(convId => {
+        if (convId !== activeConversationId) {
+          abortControllersRef.current[convId].abort();
+          delete abortControllersRef.current[convId];
+        }
+      });
+    }
+  }, [activeConversationId]);
 
   const [messages, setMessages] = useState<VmindMessage[]>([
     {
       id: 'init-1',
       sender: 'vm',
-      text: 'Bonjour. Je suis connecté via n8n. Que puis-je pour vous ?',
+      text: 'Bonjour',
       time: '',
     },
   ]);
 
   useEffect(() => {
-    // Initialisation de l'heure du message de bienvenue uniquement côté client
+    // Initialisation du message et de l'heure de bienvenue uniquement côté client
     setMessages(prev => prev.map(m =>
-      m.id === 'init-1' ? { ...m, time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) } : m
+      m.id === 'init-1' ? { 
+        ...m, 
+        text: getWelcomeMessage(),
+        time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) 
+      } : m
     ));
-  }, []);
+  }, [activeAgentId]);
 
   useEffect(() => {
     if (initialPrompt) {
@@ -157,31 +234,33 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       id: `user-${Date.now()}`,
       sender: 'user',
       text,
-      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+      time: formatTime(), rawDate: new Date().toISOString(),
     };
 
     const thinkingMessage: VmindMessage = {
       id: `thinking-${Date.now()}`,
       sender: 'vm',
       text: '',
-      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+      time: formatTime(), rawDate: new Date().toISOString(),
       isThinking: true,
     };
 
     setMessages((prev) => [...prev, userMessage, thinkingMessage]);
 
+    // Capturer l'agent IMMÉDIATEMENT au moment du clic (ref = toujours à jour, pas de stale closure)
+    const agentAtClickTime = activeAgentIdRef.current;
+
     try {
       let targetConvId = activeConversationId;
       if (!targetConvId) {
-         targetConvId = await createNewConversation(activeAgentId, text);
+         targetConvId = await createNewConversation(agentAtClickTime, text);
+         // Forcer le refresh pour avoir la nouvelle conv dans le state
+         await refreshConversations();
       }
-      let response = await sendVmindMessage(text, targetConvId, activeAgentId, clientId);
 
-      // Call bump
-      bumpConversation(targetConvId);
-
-      // Call smart-title async if this is a new conversation (or just always call it, backend handles it, but let's only do it if the title is generic)
+      // Résolution de l'agent : priorité à la base (source de vérité), fallback sur la capture du clic
       const currentConv = conversations.find(c => c.conversation_id === targetConvId);
+      const effectiveAgentId = currentConv?.agent_id || agentAtClickTime;
       if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
         // Fire and forget
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -202,6 +281,15 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         .catch(err => console.error("Smart title error", err));
       }
 
+      const controller = new AbortController();
+      abortControllersRef.current[targetConvId] = controller;
+      let response = await sendVmindMessage(text, targetConvId, effectiveAgentId, clientId, controller.signal);
+      delete abortControllersRef.current[targetConvId];
+
+      if (activeConversationIdRef.current !== targetConvId) return;
+
+      // Call bump
+      bumpConversation(targetConvId);
 
       console.log("✅ [VmindChat] Réponse reçue de l'API:", {
         tool: response.tool_used,
@@ -219,22 +307,19 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           id: `err-${Date.now()}`,
           sender: 'vm',
           text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
-          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          time: formatTime(), rawDate: new Date().toISOString(),
           error: response?.error || 'NO_RESPONSE',
           response_type: 'error',
           title: response?.title || 'Erreur n8n'
         }]);
       } else {
         const toolUsed = response.tool_used as string;
-        const agentId = TOOL_TO_AGENT[toolUsed] || 'VMIND';
-
-        if (onAgentActive) onAgentActive(agentId);
 
         setMessages((prev) => [...prev, {
           id: `vm-${Date.now()}`,
           sender: 'vm',
           text: response.message || 'Voici les informations demandées.',
-          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          time: formatTime(), rawDate: new Date().toISOString(),
           tool_used: response.tool_used,
           response_type: response.response_type || 'full',
           title: response.title,
@@ -251,12 +336,13 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       }
 
     } catch (error: any) {
+      if (error.name === 'AbortError') return;
       setMessages((prev) => prev.filter(m => !m.isThinking));
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
         sender: 'vm',
         text: `Erreur de communication avec n8n : ${error.message}`,
-        time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+        time: formatTime(), rawDate: new Date().toISOString(),
         error: error.message,
       }]);
     } finally {
@@ -277,32 +363,34 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       id: `user-${Date.now()}`,
       sender: 'user',
       text: professionalMessage,
-      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+      time: formatTime(), rawDate: new Date().toISOString(),
     };
 
     const thinkingMessage: VmindMessage = {
       id: `thinking-${Date.now()}`,
       sender: 'vm',
       text: '',
-      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+      time: formatTime(), rawDate: new Date().toISOString(),
       isThinking: true,
     };
 
     setMessages((prev) => [...prev, userMessage, thinkingMessage]);
 
+    // Capturer l'agent IMMÉDIATEMENT au moment du clic (ref = toujours à jour)
+    const agentAtClickTime = activeAgentIdRef.current;
+
     try {
       // Déclenche le Webhook n8n comme pour un message normal (via l'IA)
       let targetConvId = activeConversationId;
       if (!targetConvId) {
-         targetConvId = await createNewConversation(activeAgentId, professionalMessage);
+         targetConvId = await createNewConversation(agentAtClickTime, professionalMessage);
+         await refreshConversations();
       }
-      let response = await sendVmindMessage(professionalMessage, targetConvId, activeAgentId, clientId);
 
-      // Call bump
-      bumpConversation(targetConvId);
-
-      // Call smart-title async if this is a new conversation (or just always call it, backend handles it, but let's only do it if the title is generic)
+      // Résolution de l'agent : priorité à la base (source de vérité), fallback sur la capture du clic
       const currentConv = conversations.find(c => c.conversation_id === targetConvId);
+      const effectiveAgentId = currentConv?.agent_id || agentAtClickTime;
+
       if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
         // Fire and forget
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -323,32 +411,38 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         .catch(err => console.error("Smart title error", err));
       }
 
+        const controller = new AbortController();
+        abortControllersRef.current[targetConvId] = controller;
+        let response = await sendVmindMessage(professionalMessage, targetConvId, effectiveAgentId, clientId, controller.signal);
+        delete abortControllersRef.current[targetConvId];
 
-      setMessages((prev) => prev.filter(m => !m.isThinking));
+        if (activeConversationIdRef.current !== targetConvId) return;
 
-      const isOk = response && (response.ok === true || (response.ok as any) === "true");
+        // Call bump
+        bumpConversation(targetConvId);
+
+        setMessages((prev) => prev.filter(m => !m.isThinking));
+
+        const isOk = response && (response.ok === true || (response.ok as any) === "true");
 
       if (!isOk) {
         setMessages((prev) => [...prev, {
           id: `err-${Date.now()}`,
           sender: 'vm',
           text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
-          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          time: formatTime(), rawDate: new Date().toISOString(),
           error: response?.error || 'NO_RESPONSE',
           response_type: 'error',
           title: response?.title || 'Erreur n8n'
         }]);
       } else {
         const toolUsed = response.tool_used as string;
-        const agentId = TOOL_TO_AGENT[toolUsed] || 'VMIND';
-
-        if (onAgentActive) onAgentActive(agentId);
 
         setMessages((prev) => [...prev, {
           id: `vm-${Date.now()}`,
           sender: 'vm',
           text: response.message || 'Voici les informations demandées.',
-          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          time: formatTime(), rawDate: new Date().toISOString(),
           tool_used: response.tool_used,
           response_type: response.response_type || 'full',
           title: response.title,
@@ -369,7 +463,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         id: `err-${Date.now()}`,
         sender: 'vm',
         text: `Erreur de communication avec n8n : ${error.message}`,
-        time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+        time: formatTime(), rawDate: new Date().toISOString(),
         error: error.message,
       }]);
     } finally {
@@ -385,14 +479,14 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       id: `user-${Date.now()}`,
       sender: 'user',
       text: suggestion,
-      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+      time: formatTime(), rawDate: new Date().toISOString(),
     };
 
     const thinkingMessage: VmindMessage = {
       id: `thinking-${Date.now()}`,
       sender: 'vm',
       text: '',
-      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+      time: formatTime(), rawDate: new Date().toISOString(),
       isThinking: true,
     };
 
@@ -416,7 +510,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           id: `err-${Date.now()}`,
           sender: 'vm',
           text: wrapper.error?.message || wrapper.message || 'Erreur lors de l\'appel API direct',
-          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          time: formatTime(), rawDate: new Date().toISOString(),
           error: wrapper.error?.message || 'API_ERROR',
           response_type: 'error',
           title: 'Erreur API'
@@ -425,15 +519,16 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         // wrapper = { ok, data: { ...VmindN8nResponse } }
         // data contient le format standard identique à n8n
         const result = wrapper.data;
+        const currentConv = conversations.find(c => c.conversation_id === activeConversationId);
+        const effectiveAgentId = currentConv?.agent_id || activeAgentId;
 
-        const agentIdForTool = TOOL_TO_AGENT[result.tool_used] || activeAgentId;
-        if (onAgentActive && agentIdForTool) onAgentActive(agentIdForTool);
+        // No automatic agent change on tool execute
 
         setMessages((prev) => [...prev, {
           id: `vm-${Date.now()}`,
           sender: 'vm',
           text: result.message || 'Voici les informations demandées.',
-          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          time: formatTime(), rawDate: new Date().toISOString(),
           tool_used: result.tool_used || 'get_dossier_volume_evolution',
           response_type: result.response_type || 'full',
           title: result.title,
@@ -454,7 +549,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         id: `err-${Date.now()}`,
         sender: 'vm',
         text: `Erreur de communication : ${error.message}`,
-        time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+        time: formatTime(), rawDate: new Date().toISOString(),
         error: error.message,
       }]);
     } finally {
@@ -564,15 +659,42 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         )}
       </div>
 
-      <div className="messages flex-1 overflow-y-auto p-4 space-y-5">
-        {messages.map((msg) => {
-          const isUser = msg.sender === 'user';
-          const toolUsed = msg.tool_used as string;
-          const agentId = TOOL_TO_AGENT[toolUsed] || 'VMIND';
-          const agentData = agentId !== 'VMIND' ? (AGENTS as any)[agentId] : null;
+      <div className="messages">
+        {messages.map((msg, index) => {
+            const isUser = msg.sender === 'user';
+            const toolUsed = msg.tool_used as string;
+            
+            // Date logic
+            let showDateHeader = false;
+            let dateHeaderText = "";
+            const currentFormattedDate = formatDateHeader(msg.rawDate);
+            
+            if (index === 0) {
+              showDateHeader = true;
+              dateHeaderText = currentFormattedDate;
+            } else {
+              const prevFormattedDate = formatDateHeader(messages[index - 1].rawDate);
+              if (currentFormattedDate !== prevFormattedDate) {
+                showDateHeader = true;
+                dateHeaderText = currentFormattedDate;
+              }
+            }
+            
+            // Dynamic agent resolution based on current conversation
+            const currentConv = conversations.find(c => c.conversation_id === activeConversationId);
+            const agentId = currentConv?.agent_id || activeAgentId || 'VMIND';
+            const agentData = agentId !== 'VMIND' ? (AGENTS as any)[agentId] : null;
 
           return (
-            <div key={msg.id} style={{ display: 'flex', width: '100%', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+            <React.Fragment key={msg.id}>
+              {showDateHeader && (
+                <div style={{ display: 'flex', justifyContent: 'center', margin: '20px 0 10px 0' }}>
+                  <div style={{ background: 'rgba(255,255,255,0.05)', padding: '4px 12px', borderRadius: '12px', fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                    {dateHeaderText}
+                  </div>
+                </div>
+              )}
+              <div style={{ display: 'flex', width: '100%', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
               <div style={{ display: 'flex', gap: '10px', maxWidth: '88%', flexDirection: isUser ? 'row-reverse' : 'row' }}>
 
                 {/* Avatar */}
@@ -713,6 +835,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                 </div>
               </div>
             </div>
+            </React.Fragment>
           );
         })}
         <div ref={messagesEndRef} />

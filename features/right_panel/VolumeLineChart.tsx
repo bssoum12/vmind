@@ -81,7 +81,10 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
 
   useEffect(() => {
     if (activeAgentId === 'VDATA' && startDate && endDate) {
-      fetchPrevYearVolume();
+      const timer = setTimeout(() => {
+        fetchPrevYearVolume();
+      }, 800);
+      return () => clearTimeout(timer);
     }
   }, [activeAgentId, startDate, endDate]);
 
