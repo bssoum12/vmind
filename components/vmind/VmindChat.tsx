@@ -101,8 +101,14 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   onAgentActive,
   activeAgentId = "VMIND"
 }) => {
-  const { activeConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle } = useConversations();
+  const { activeConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle, refreshConversations } = useConversations();
   const [input, setInput] = useState('');
+
+  // Ref toujours synchrone → garantit la valeur EXACTE de l'agent au moment du clic
+  const activeAgentIdRef = useRef<string>(activeAgentId);
+  useEffect(() => {
+    activeAgentIdRef.current = activeAgentId;
+  }, [activeAgentId]);
 
   const getWelcomeMessage = () => {
     let fullName = "Utilisateur";
@@ -241,15 +247,20 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
     setMessages((prev) => [...prev, userMessage, thinkingMessage]);
 
+    // Capturer l'agent IMMÉDIATEMENT au moment du clic (ref = toujours à jour, pas de stale closure)
+    const agentAtClickTime = activeAgentIdRef.current;
+
     try {
       let targetConvId = activeConversationId;
       if (!targetConvId) {
-         targetConvId = await createNewConversation(activeAgentId, text);
+         targetConvId = await createNewConversation(agentAtClickTime, text);
+         // Forcer le refresh pour avoir la nouvelle conv dans le state
+         await refreshConversations();
       }
 
-      // Call smart-title async if this is a new conversation (or just always call it, backend handles it, but let's only do it if the title is generic)
+      // Résolution de l'agent : priorité à la base (source de vérité), fallback sur la capture du clic
       const currentConv = conversations.find(c => c.conversation_id === targetConvId);
-      const effectiveAgentId = currentConv?.agent_id || activeAgentId;
+      const effectiveAgentId = currentConv?.agent_id || agentAtClickTime;
       if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
         // Fire and forget
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
@@ -365,16 +376,20 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
     setMessages((prev) => [...prev, userMessage, thinkingMessage]);
 
+    // Capturer l'agent IMMÉDIATEMENT au moment du clic (ref = toujours à jour)
+    const agentAtClickTime = activeAgentIdRef.current;
+
     try {
       // Déclenche le Webhook n8n comme pour un message normal (via l'IA)
       let targetConvId = activeConversationId;
       if (!targetConvId) {
-         targetConvId = await createNewConversation(activeAgentId, professionalMessage);
+         targetConvId = await createNewConversation(agentAtClickTime, professionalMessage);
+         await refreshConversations();
       }
 
-      // Call smart-title async if this is a new conversation (or just always call it, backend handles it, but let's only do it if the title is generic)
+      // Résolution de l'agent : priorité à la base (source de vérité), fallback sur la capture du clic
       const currentConv = conversations.find(c => c.conversation_id === targetConvId);
-      const effectiveAgentId = currentConv?.agent_id || activeAgentId;
+      const effectiveAgentId = currentConv?.agent_id || agentAtClickTime;
 
       if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
         // Fire and forget

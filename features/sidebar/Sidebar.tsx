@@ -17,7 +17,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
   const [activeNav, setActiveNav] = useState('dashboard');
   const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
   const [username, setUsername] = useState<string>('');
-  const { conversations, activeConversationId, setActiveConversationId, createNewConversation, renameConversation, deleteConversation } = useConversations();
+  const { conversations, activeConversationId, setActiveConversationId, createNewConversation, resetToNewConversation, renameConversation, deleteConversation } = useConversations();
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
 
@@ -190,8 +190,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
                 <button
                   onClick={async (e) => {
                     e.stopPropagation();
-                    const newId = await createNewConversation(agent.id, "Nouvelle discussion");
-                    setActiveConversationId(newId);
+                    resetToNewConversation();
                     if (onAgentClick) onAgentClick(agent.id);
                     window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'chat' }));
                   }}
