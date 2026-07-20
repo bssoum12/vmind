@@ -59,7 +59,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
 
   const fetchDomainPerformance = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
       const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || 'DEMO';
 
       const response = await fetch(`${baseUrl}/api/tools/get-score-global-vdata-kpi`, {

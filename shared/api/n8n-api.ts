@@ -18,7 +18,7 @@ export async function sendVmindMessage(message: string, conversationId: string, 
   const sessionId = getVmindSessionId();
 
   // On utilise une variable d'environnement pour Vercel, ou localhost par défaut
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
   const proxyUrl = `${baseUrl}/api/n8n-proxy`;
 
   console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId });
@@ -113,7 +113,7 @@ export async function sendVmindMessage(message: string, conversationId: string, 
 }
 
 export async function deployAgent(config: any, clientId = "DEMO"): Promise<any> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
   const webhookUrl = `${baseUrl}/api/deploy-agent`;
   
   console.log("🚀 [n8n-api] DEPLOYING AGENT WITH PAYLOAD TO BACKEND SCHEDULER:", config);
@@ -151,7 +151,7 @@ export async function deployAgent(config: any, clientId = "DEMO"): Promise<any> 
  * Appelle le Backend pour réinitialiser les compteurs de relance des factures ignorées
  */
 export async function resetReminders(invoiceRefs: string[]): Promise<any> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
   const url = `${baseUrl}/api/recovery/reset-reminders`;
   
   console.log("🔄 [n8n-api] RESETTING REMINDERS FOR:", invoiceRefs);
@@ -174,7 +174,7 @@ export async function resetReminders(invoiceRefs: string[]): Promise<any> {
 
 // ─── Agent Management APIs ────────────────────────────────────────────────────
  
-const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
 
 function getAuthHeaders(): Record<string, string> {
   if (typeof window !== "undefined") {

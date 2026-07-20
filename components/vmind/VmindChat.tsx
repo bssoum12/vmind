@@ -135,7 +135,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     const fetchHistory = async () => {
       try {
         setIsLoading(true);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
         let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
         if (token && token.startsWith("{")) token = JSON.parse(token).token;
 
@@ -252,7 +252,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       const effectiveAgentId = currentConv?.agent_id || activeAgentId;
       if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
         // Fire and forget
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
         let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
         if (token && token.startsWith("{")) token = JSON.parse(token).token;
         
@@ -378,7 +378,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
       if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
         // Fire and forget
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
         let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
         if (token && token.startsWith("{")) token = JSON.parse(token).token;
         
@@ -480,7 +480,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
     try {
       // Utiliser la même base URL que n8n-api.ts
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       const response = await fetch(`${baseUrl}${toolEndpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

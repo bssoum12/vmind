@@ -489,7 +489,7 @@ export default function LoginPage() {
     setCheckingUsername(true);
     const delayDebounceFn = setTimeout(async () => {
       try {
-        const baseUrl = 'http://localhost:3001';
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
         const res = await fetch(`${baseUrl}/api/auth/vmind/check-username`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -521,7 +521,7 @@ export default function LoginPage() {
     
     setSignupLoading(true);
     try {
-      const baseUrl = 'http://localhost:3001';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
       const res = await fetch(`${baseUrl}/api/auth/vmind/signup-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -595,7 +595,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError(''); setLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/api/auth/vmind/login', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, turnstileToken }),
@@ -638,7 +638,7 @@ export default function LoginPage() {
       try {
         setForgotValidatingCode(true);
         setForgotCodeError('');
-        const res = await fetch('http://localhost:3001/api/auth/vmind/verify-code', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/verify-code`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: forgotEmail, code: forgotCode }),
@@ -669,7 +669,7 @@ export default function LoginPage() {
     setForgotSuccess('');
     setForgotLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/api/auth/vmind/forgot-password', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail, turnstileToken }),
@@ -700,7 +700,7 @@ export default function LoginPage() {
     setForgotError('');
     setForgotSuccess('');
     try {
-      const res = await fetch('http://localhost:3001/api/auth/vmind/activate-account', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/activate-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: forgotEmail, code: forgotCode, password: forgotPassword }),

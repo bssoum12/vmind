@@ -124,7 +124,7 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
 
   const fetchPrevYearData = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
       const pYear = new Date().getFullYear() - 1;
       setPrevYear(pYear);
