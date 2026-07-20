@@ -37,6 +37,7 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_lowest_margin_5clients_quarter': 'VFIN',
   'get_treasury_status_today': 'VFIN',
   'get_treasury_forecast_30_days': 'VFIN',
+  'get_top_clients_revenue': 'VSELL',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -68,9 +69,14 @@ const VFIN_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Prévision trésorerie 30J ?": "Génère la prévision de trésorerie pour les 30 prochains jours."
 };
 
+const VSELL_FAST_TRACK_REGISTRY: Record<string, string> = {
+  "Top 10 clients CA ce mois ?": "Quels sont les 10 meilleurs clients ce mois en chiffre d'affaires ?"
+};
+
 const FAST_TRACK_REGISTRY: Record<string, string> = {
   ...VDATA_FAST_TRACK_REGISTRY,
-  ...VFIN_FAST_TRACK_REGISTRY
+  ...VFIN_FAST_TRACK_REGISTRY,
+  ...VSELL_FAST_TRACK_REGISTRY
 };
 
 const formatTime = (dateString?: string) => {
@@ -639,6 +645,23 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         {activeAgentId === 'VFIN' && (
           <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
             {Object.keys(VFIN_FAST_TRACK_REGISTRY).map((label) => (
+              <button
+                key={label}
+                onClick={() => handleFastTrackClick(label)}
+                className="suggestion-chip"
+                style={{ flexShrink: 0 }}
+                disabled={isLoading}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* VSELL Suggestions */}
+        {activeAgentId === 'VSELL' && (
+          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+            {Object.keys(VSELL_FAST_TRACK_REGISTRY).map((label) => (
               <button
                 key={label}
                 onClick={() => handleFastTrackClick(label)}
