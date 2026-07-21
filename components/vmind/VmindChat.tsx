@@ -38,12 +38,17 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_treasury_status_today': 'VFIN',
   'get_treasury_forecast_30_days': 'VFIN',
   'get_top_clients_revenue': 'VSELL',
+  'Client1_get_top_clients_revenue': 'VSELL',
+  'MCP_Client1_get_top_clients_revenue': 'VSELL',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'compare_agency_performance_jan_apr': 'Analyse par agence',
   'analyze_delay_by_client_type': 'Retards par type de client',
   'generate_monthly_activity_report': 'Rapport mensuel',
+  'get_top_clients_revenue': 'Classement Chiffre d\'Affaires',
+  'Client1_get_top_clients_revenue': 'Classement Chiffre d\'Affaires',
+  'MCP_Client1_get_top_clients_revenue': 'Classement Chiffre d\'Affaires',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
