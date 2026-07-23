@@ -28,6 +28,7 @@ import { VfinOverdueCard } from './TableauCroiseKpi/VfinOverdueCard';
 import { VfinSixMonthChartCard } from './TableauCroiseKpi/VfinSixMonthChartCard';
 import { VfinMarginCard } from './TableauCroiseKpi/VfinMarginCard';
 import { VfinTopClientsCard } from './TableauCroiseKpi/VfinTopClientsCard';
+import { VsellTopClientsCard } from './TableauCroiseKpi/VsellTopClientsCard';
 import { VfinTresorerieCard } from './TableauCroiseKpi/VfinTresorerieCard';
 interface RightPanelProps {
   logs: LogEntry[];
@@ -146,7 +147,9 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
               ? 'DONNEES & ANALYTICS - Temps Réel' 
               : activeAgentId === 'VFIN' 
                 ? 'FINANCE & COMPTABILITE - Temps Réel' 
-                : 'KPIs Temps Réel'}
+                : activeAgentId === 'VSELL'
+                  ? 'COMMERCIAL - Temps Réel'
+                  : 'KPIs Temps Réel'}
           </span>
         </div>
 
@@ -239,7 +242,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
             </div>
           </div>
         )}
-        {activeAgentId !== 'VDATA' && activeAgentId !== 'VFIN' && (
+        {activeAgentId !== 'VDATA' && activeAgentId !== 'VFIN' && activeAgentId !== 'VSELL' && (
           <>
             <MiniKpi label="Trésorerie" dotColor="var(--green)" val="842K TND" delta="▲ +3.2%" deltaType="up" />
             <MiniKpi label="Impayés" dotColor="var(--red)" val="218K TND" delta="▲ +8 clients" deltaType="warning" />
@@ -264,6 +267,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
           </>
         )}
         <ScoreGlobalCard activeAgentId={activeAgentId} />
+        <VsellTopClientsCard activeAgentId={activeAgentId} />
         <VfinMonthlyRevenueCard activeAgentId={activeAgentId} />
         <VfinOverdueCard activeAgentId={activeAgentId} />
         <VfinSixMonthChartCard activeAgentId={activeAgentId} />
