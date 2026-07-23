@@ -40,6 +40,9 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_top_clients_revenue': 'VSELL',
   'Client1_get_top_clients_revenue': 'VSELL',
   'MCP_Client1_get_top_clients_revenue': 'VSELL',
+  'compare_client_revenues_monthly': 'VSELL',
+  'Client1_compare_client_revenues_monthly': 'VSELL',
+  'MCP_Client1_compare_client_revenues_monthly': 'VSELL',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -49,6 +52,9 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'get_top_clients_revenue': 'Classement Chiffre d\'Affaires',
   'Client1_get_top_clients_revenue': 'Classement Chiffre d\'Affaires',
   'MCP_Client1_get_top_clients_revenue': 'Classement Chiffre d\'Affaires',
+  'compare_client_revenues_monthly': 'Comparaison CA par Client',
+  'Client1_compare_client_revenues_monthly': 'Comparaison CA par Client',
+  'MCP_Client1_compare_client_revenues_monthly': 'Comparaison CA par Client',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -75,7 +81,8 @@ const VFIN_FAST_TRACK_REGISTRY: Record<string, string> = {
 };
 
 const VSELL_FAST_TRACK_REGISTRY: Record<string, string> = {
-  "Top 10 clients CA ce mois ?": "Quels sont les 10 meilleurs clients ce mois en chiffre d'affaires ?"
+  "Top 10 clients CA ce mois ?": "Quels sont les 10 meilleurs clients ce mois en chiffre d'affaires ?",
+  "Compare CA clients mois": "Compare les revenus par client entre ce mois et le mois dernier"
 };
 
 const FAST_TRACK_REGISTRY: Record<string, string> = {
