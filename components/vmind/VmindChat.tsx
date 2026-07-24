@@ -46,6 +46,12 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_new_clients_this_quarter': 'VSELL',
   'Client1_get_new_clients_this_quarter': 'VSELL',
   'MCP_Client1_get_new_clients_this_quarter': 'VSELL',
+  'get_idle_clients': 'VSELL',
+  'Client1_get_idle_clients': 'VSELL',
+  'MCP_Client1_get_idle_clients': 'VSELL',
+  'get_pipeline_status': 'VSELL',
+  'Client1_get_pipeline_status': 'VSELL',
+  'MCP_Client1_get_pipeline_status': 'VSELL',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -61,6 +67,12 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'get_new_clients_this_quarter': 'Nouveaux Clients Trimestre',
   'Client1_get_new_clients_this_quarter': 'Nouveaux Clients Trimestre',
   'MCP_Client1_get_new_clients_this_quarter': 'Nouveaux Clients Trimestre',
+  'get_idle_clients': 'Clients Inactifs (>60j)',
+  'Client1_get_idle_clients': 'Clients Inactifs (>60j)',
+  'MCP_Client1_get_idle_clients': 'Clients Inactifs (>60j)',
+  'get_pipeline_status': 'État du Pipeline',
+  'Client1_get_pipeline_status': 'État du Pipeline',
+  'MCP_Client1_get_pipeline_status': 'État du Pipeline',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -89,7 +101,7 @@ const VFIN_FAST_TRACK_REGISTRY: Record<string, string> = {
 const VSELL_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Top 10 clients CA ce mois ?": "Quels sont les 10 meilleurs clients ce mois en chiffre d'affaires ?",
   "Compare CA clients mois": "Compare les revenus par client entre ce mois et le mois dernier",
-  "Nouveaux clients trimestre ?": "Combien de nouveaux clients ont été acquis ce trimestre ?"
+  "État du pipeline ?": "Quel est l'état du pipeline commercial actuel ?"
 };
 
 const FAST_TRACK_REGISTRY: Record<string, string> = {
