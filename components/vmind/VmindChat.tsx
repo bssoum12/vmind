@@ -52,6 +52,9 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_pipeline_status': 'VSELL',
   'Client1_get_pipeline_status': 'VSELL',
   'MCP_Client1_get_pipeline_status': 'VSELL',
+  'get_churn_risk_clients': 'VSELL',
+  'Client1_get_churn_risk_clients': 'VSELL',
+  'MCP_Client1_get_churn_risk_clients': 'VSELL',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -73,6 +76,9 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'get_pipeline_status': 'État du Pipeline',
   'Client1_get_pipeline_status': 'État du Pipeline',
   'MCP_Client1_get_pipeline_status': 'État du Pipeline',
+  'get_churn_risk_clients': 'Risque de Départ Clients',
+  'Client1_get_churn_risk_clients': 'Risque de Départ Clients',
+  'MCP_Client1_get_churn_risk_clients': 'Risque de Départ Clients',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -103,7 +109,8 @@ const VSELL_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Compare CA clients mois": "Compare les revenus par client entre ce mois et le mois dernier",
   "Nouveaux clients trimestre ?": "Combien de nouveaux clients ont été acquis ce trimestre ?",
   "Clients inactifs > 60j ?": "Quels clients n'ont pas commandé depuis plus de 60 jours ?",
-  "État du pipeline ?": "Quel est l'état du pipeline commercial actuel ?"
+  "État du pipeline ?": "Quel est l'état du pipeline commercial actuel ?",
+  "Risque de départ ?": "Quels clients présentent un risque de départ selon leur historique ?"
 };
 
 const FAST_TRACK_REGISTRY: Record<string, string> = {
