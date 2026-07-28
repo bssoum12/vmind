@@ -470,7 +470,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
         return;
       }
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
         const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
         
         const token = localStorage.getItem('vmind_session');
@@ -516,7 +516,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     }
     
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
       
       const token = localStorage.getItem('vmind_session');
@@ -552,7 +552,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     };
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       const token = localStorage.getItem('vmind_session');
 
       const endpoint = agentToEdit
