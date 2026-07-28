@@ -37,12 +37,48 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_lowest_margin_5clients_quarter': 'VFIN',
   'get_treasury_status_today': 'VFIN',
   'get_treasury_forecast_30_days': 'VFIN',
+  'get_top_clients_revenue': 'VSELL',
+  'Client1_get_top_clients_revenue': 'VSELL',
+  'MCP_Client1_get_top_clients_revenue': 'VSELL',
+  'compare_client_revenues_monthly': 'VSELL',
+  'Client1_compare_client_revenues_monthly': 'VSELL',
+  'MCP_Client1_compare_client_revenues_monthly': 'VSELL',
+  'get_new_clients_this_quarter': 'VSELL',
+  'Client1_get_new_clients_this_quarter': 'VSELL',
+  'MCP_Client1_get_new_clients_this_quarter': 'VSELL',
+  'get_idle_clients': 'VSELL',
+  'Client1_get_idle_clients': 'VSELL',
+  'MCP_Client1_get_idle_clients': 'VSELL',
+  'get_pipeline_status': 'VSELL',
+  'Client1_get_pipeline_status': 'VSELL',
+  'MCP_Client1_get_pipeline_status': 'VSELL',
+  'get_churn_risk_clients': 'VSELL',
+  'Client1_get_churn_risk_clients': 'VSELL',
+  'MCP_Client1_get_churn_risk_clients': 'VSELL',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'compare_agency_performance_jan_apr': 'Analyse par agence',
   'analyze_delay_by_client_type': 'Retards par type de client',
   'generate_monthly_activity_report': 'Rapport mensuel',
+  'get_top_clients_revenue': 'Classement Chiffre d\'Affaires',
+  'Client1_get_top_clients_revenue': 'Classement Chiffre d\'Affaires',
+  'MCP_Client1_get_top_clients_revenue': 'Classement Chiffre d\'Affaires',
+  'compare_client_revenues_monthly': 'Comparaison CA par Client',
+  'Client1_compare_client_revenues_monthly': 'Comparaison CA par Client',
+  'MCP_Client1_compare_client_revenues_monthly': 'Comparaison CA par Client',
+  'get_new_clients_this_quarter': 'Nouveaux Clients Trimestre',
+  'Client1_get_new_clients_this_quarter': 'Nouveaux Clients Trimestre',
+  'MCP_Client1_get_new_clients_this_quarter': 'Nouveaux Clients Trimestre',
+  'get_idle_clients': 'Clients Inactifs (>60j)',
+  'Client1_get_idle_clients': 'Clients Inactifs (>60j)',
+  'MCP_Client1_get_idle_clients': 'Clients Inactifs (>60j)',
+  'get_pipeline_status': 'État du Pipeline',
+  'Client1_get_pipeline_status': 'État du Pipeline',
+  'MCP_Client1_get_pipeline_status': 'État du Pipeline',
+  'get_churn_risk_clients': 'Risque de Départ Clients',
+  'Client1_get_churn_risk_clients': 'Risque de Départ Clients',
+  'MCP_Client1_get_churn_risk_clients': 'Risque de Départ Clients',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -68,9 +104,19 @@ const VFIN_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Prévision trésorerie 30J ?": "Génère la prévision de trésorerie pour les 30 prochains jours."
 };
 
+const VSELL_FAST_TRACK_REGISTRY: Record<string, string> = {
+  "Top 10 clients CA ce mois ?": "Quels sont les 10 meilleurs clients ce mois en chiffre d'affaires ?",
+  "Compare CA clients mois": "Compare les revenus par client entre ce mois et le mois dernier",
+  "Nouveaux clients trimestre ?": "Combien de nouveaux clients ont été acquis ce trimestre ?",
+  "Clients inactifs > 60j ?": "Quels clients n'ont pas commandé depuis plus de 60 jours ?",
+  "État du pipeline ?": "Quel est l'état du pipeline commercial actuel ?",
+  "Risque de départ ?": "Quels clients présentent un risque de départ selon leur historique ?"
+};
+
 const FAST_TRACK_REGISTRY: Record<string, string> = {
   ...VDATA_FAST_TRACK_REGISTRY,
-  ...VFIN_FAST_TRACK_REGISTRY
+  ...VFIN_FAST_TRACK_REGISTRY,
+  ...VSELL_FAST_TRACK_REGISTRY
 };
 
 const formatTime = (dateString?: string) => {
@@ -639,6 +685,23 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         {activeAgentId === 'VFIN' && (
           <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
             {Object.keys(VFIN_FAST_TRACK_REGISTRY).map((label) => (
+              <button
+                key={label}
+                onClick={() => handleFastTrackClick(label)}
+                className="suggestion-chip"
+                style={{ flexShrink: 0 }}
+                disabled={isLoading}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* VSELL Suggestions */}
+        {activeAgentId === 'VSELL' && (
+          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+            {Object.keys(VSELL_FAST_TRACK_REGISTRY).map((label) => (
               <button
                 key={label}
                 onClick={() => handleFastTrackClick(label)}
