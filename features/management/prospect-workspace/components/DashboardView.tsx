@@ -14,6 +14,7 @@ interface Lead {
   pays?: string;
   source: string;
   date_collecte: string;
+  date_granted?: string;
   statut: string;
   score: number | null;
   raison: string | null;
@@ -34,13 +35,13 @@ interface DashboardViewProps {
 const DashboardView = React.memo(function DashboardView({ leads, campaigns, threshold }: DashboardViewProps) {
   // Calculations
   const totalLeads = leads.length;
-  
+
   const qualifiedLeadsList = leads.filter(l => l.est_qualifie === true);
   const totalQualified = qualifiedLeadsList.length;
   const percentQualified = totalLeads > 0 ? Math.round((totalQualified / totalLeads) * 100) : 0;
-  
+
   const totalDiscarded = leads.filter(l => l.est_qualifie === false && l.score !== null).length;
-  
+
   const totalEmailsSent = campaigns.filter(c => c.statut === 'Succès' || c.statut === 'Envoyé').length;
 
   // 1. Histogram distribution (10-point buckets)
@@ -51,7 +52,7 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
       buckets[idx]++;
     }
   });
-  
+
   const maxBucketVal = Math.max(...buckets, 1); // Avoid division by zero
 
   // 2. Timeline of leads collected over last 7 days (for simplicity and neat display)
@@ -63,14 +64,12 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
 
   const dailyCounts = last7Days.map(day => {
     return leads.filter(l => {
-      const collectDate = l.date_collecte.split('T')[0];
-      return collectDate === day;
+      const targetDate = l.date_granted ? l.date_granted.split('T')[0] : l.date_collecte.split('T')[0];
+      return targetDate === day;
     }).length;
   });
 
-  // If no leads collected in last 7 days (or just to make chart look pretty), we can use seeded values based on collection dates
-  const demoData = [3, 5, 2, 7, 4, 8, totalLeads > 0 ? totalLeads : 5];
-  const maxDailyVal = Math.max(...demoData, 1);
+  const maxDailyVal = Math.max(...dailyCounts, 1);
 
   // SVG Chart Dimensions
   const histogramWidth = 400;
@@ -131,15 +130,15 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
         {/* Line Chart: Ingestion Volume */}
         <div className="card">
           <div className="chart-header">
-            <span className="chart-title">Évolution des Collectes (7 derniers jours)</span>
+            <span className="chart-title">Nouveaux Prospects Assignés (7 derniers jours)</span>
             <span className="badge badge-sent">Volume quotidien</span>
           </div>
           <div style={{ height: '240px', width: '100%', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="100%" height="100%" viewBox="0 0 420 220" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--accent-secondary)" stopOpacity="0.4"/>
-                  <stop offset="100%" stopColor="var(--accent-secondary)" stopOpacity="0"/>
+                  <stop offset="0%" stopColor="var(--accent-secondary)" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="var(--accent-secondary)" stopOpacity="0" />
                 </linearGradient>
               </defs>
               {/* Horizontal Grid lines */}
@@ -151,26 +150,26 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
               {/* Draw area under line */}
               <path
                 d={`M 20 180 
-                    L 20 ${180 - (demoData[0]/maxDailyVal)*130} 
-                    L 83 ${180 - (demoData[1]/maxDailyVal)*130} 
-                    L 146 ${180 - (demoData[2]/maxDailyVal)*130} 
-                    L 210 ${180 - (demoData[3]/maxDailyVal)*130} 
-                    L 273 ${180 - (demoData[4]/maxDailyVal)*130} 
-                    L 336 ${180 - (demoData[5]/maxDailyVal)*130} 
-                    L 400 ${180 - (demoData[6]/maxDailyVal)*130} 
+                    L 20 ${180 - (dailyCounts[0] / maxDailyVal) * 130} 
+                    L 83 ${180 - (dailyCounts[1] / maxDailyVal) * 130} 
+                    L 146 ${180 - (dailyCounts[2] / maxDailyVal) * 130} 
+                    L 210 ${180 - (dailyCounts[3] / maxDailyVal) * 130} 
+                    L 273 ${180 - (dailyCounts[4] / maxDailyVal) * 130} 
+                    L 336 ${180 - (dailyCounts[5] / maxDailyVal) * 130} 
+                    L 400 ${180 - (dailyCounts[6] / maxDailyVal) * 130} 
                     L 400 180 Z`}
                 fill="url(#lineGrad)"
               />
 
               {/* Draw Line */}
               <path
-                d={`M 20 ${180 - (demoData[0]/maxDailyVal)*130} 
-                    L 83 ${180 - (demoData[1]/maxDailyVal)*130} 
-                    L 146 ${180 - (demoData[2]/maxDailyVal)*130} 
-                    L 210 ${180 - (demoData[3]/maxDailyVal)*130} 
-                    L 273 ${180 - (demoData[4]/maxDailyVal)*130} 
-                    L 336 ${180 - (demoData[5]/maxDailyVal)*130} 
-                    L 400 ${180 - (demoData[6]/maxDailyVal)*130}`}
+                d={`M 20 ${180 - (dailyCounts[0] / maxDailyVal) * 130} 
+                    L 83 ${180 - (dailyCounts[1] / maxDailyVal) * 130} 
+                    L 146 ${180 - (dailyCounts[2] / maxDailyVal) * 130} 
+                    L 210 ${180 - (dailyCounts[3] / maxDailyVal) * 130} 
+                    L 273 ${180 - (dailyCounts[4] / maxDailyVal) * 130} 
+                    L 336 ${180 - (dailyCounts[5] / maxDailyVal) * 130} 
+                    L 400 ${180 - (dailyCounts[6] / maxDailyVal) * 130}`}
                 fill="none"
                 stroke="var(--accent-secondary)"
                 strokeWidth="3"
@@ -178,7 +177,7 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
               />
 
               {/* Dots */}
-              {demoData.map((val, idx) => {
+              {dailyCounts.map((val, idx) => {
                 const cx = 20 + idx * 63.3;
                 const cy = 180 - (val / maxDailyVal) * 130;
                 return (

@@ -326,6 +326,21 @@ export async function triggerProspectAutoMode(agentId: string): Promise<any> {
 }
 
 /**
+ * Stop Auto Mode for a specific prospect agent
+ */
+export async function stopProspectAutoMode(agentId: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/stop/${encodeURIComponent(agentId)}`, {
+    method: "POST",
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to stop prospect auto mode (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
  * Instantly qualify prospects for this agent (manually)
  */
 export async function qualifyManualProspects(agentId: string, mode: 'pending_only' | 'all'): Promise<any> {
@@ -347,7 +362,10 @@ export async function qualifyManualProspects(agentId: string, mode: 'pending_onl
 export async function triggerAIQualificationAllPending(agentId: string): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/prospect-agent/qualify-all-pending-ai/${encodeURIComponent(agentId)}`, {
     method: "POST",
-    headers: getAuthHeaders(),
+    headers: {
+      ...getAuthHeaders(),
+      'Idempotency-Key': crypto.randomUUID()
+    },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

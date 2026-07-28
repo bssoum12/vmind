@@ -107,7 +107,10 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
     try {
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: {
+          ...getAuthHeaders(),
+          'Idempotency-Key': crypto.randomUUID()
+        },
         body: JSON.stringify({ lead_ids: [lead.id], agentId }),
       });
 
@@ -128,7 +131,10 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
     try {
       const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
+        headers: {
+          ...getAuthHeaders(),
+          'Idempotency-Key': crypto.randomUUID()
+        },
         body: JSON.stringify({
           id: lead.id,
           action: 'generate_email'

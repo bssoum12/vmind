@@ -694,6 +694,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
         <ProspectAgentScheduleModal
           agent={scheduleModalAgent}
           onClose={() => setScheduleModalAgent(null)}
+          onToast={showToast}
           onConfirm={async () => {
             await handleResume(scheduleModalAgent);
             setScheduleModalAgent(null);

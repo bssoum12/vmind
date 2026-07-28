@@ -29,7 +29,12 @@ export function OnboardingChat({ initialMission, onConfirm }: OnboardingChatProp
     scrollToBottom();
   }, [messages, summary, isLoading]);
 
+  const hasInitialized = useRef(false);
+
   useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+
     // Start conversation if empty
     if (messages.length === 0 && !initialMission) {
       handleSend('Bonjour ! Je suis prêt à configurer mon agent.');
@@ -39,7 +44,7 @@ export function OnboardingChat({ initialMission, onConfirm }: OnboardingChatProp
   }, []);
 
   const handleSend = async (text: string = input) => {
-    if (!text.trim()) return;
+    if (!text.trim() || isLoading) return;
 
     const userMsg: Message = { role: 'user', content: text };
     const newMessages = [...messages, userMsg];
@@ -136,7 +141,8 @@ export function OnboardingChat({ initialMission, onConfirm }: OnboardingChatProp
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Répondre à VirtualMind..."
-            style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0 16px', color: '#fff', outline: 'none', height: '50px', fontSize: '1rem' }}
+            disabled={isLoading}
+            style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0 16px', color: '#fff', outline: 'none', height: '50px', fontSize: '1rem', opacity: isLoading ? 0.5 : 1 }}
           />
           <Button variant="primary" onClick={() => handleSend()} disabled={!input.trim() || isLoading} style={{ width: 54, height: 48, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Send size={18} />

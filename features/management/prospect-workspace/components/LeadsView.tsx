@@ -40,6 +40,35 @@ interface LeadsViewProps {
   onRefresh: () => void;
 }
 
+const StyledCheckbox = ({ checked, onChange, isIndeterminate }: { checked: boolean, onChange: (e: any) => void, isIndeterminate?: boolean }) => (
+  <div
+    onClick={(e) => { e.stopPropagation(); onChange({ target: { checked: !checked } }); }}
+    style={{
+      width: '18px',
+      height: '18px',
+      borderRadius: '4px',
+      border: `2px solid ${checked || isIndeterminate ? 'var(--accent-secondary, #00E5C8)' : 'var(--border-color, #444)'}`,
+      backgroundColor: checked || isIndeterminate ? 'var(--accent-secondary, #00E5C8)' : 'transparent',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      margin: '0 auto',
+      boxShadow: checked || isIndeterminate ? '0 0 8px rgba(0,229,200,0.3)' : 'none'
+    }}
+  >
+    {checked && !isIndeterminate && (
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0F172A" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+    )}
+    {isIndeterminate && (
+      <div style={{ width: '8px', height: '2px', backgroundColor: '#0F172A', borderRadius: '1px' }}></div>
+    )}
+  </div>
+);
+
 export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: LeadsViewProps) {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -54,6 +83,8 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
+
+  const [selectedLeadIds, setSelectedLeadIds] = useState<number[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [csvUploading, setCsvUploading] = useState(false);
@@ -131,10 +162,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
   const getTabBtnStyle = (step: number) => {
     if (leadsTutorialStep === step) {
-      return { 
-        position: 'relative' as any, 
-        zIndex: 10001, 
-        boxShadow: '0 0 0 4px rgba(0,229,200,0.8)', 
+      return {
+        position: 'relative' as any,
+        zIndex: 10001,
+        boxShadow: '0 0 0 4px rgba(0,229,200,0.8)',
         pointerEvents: 'none' as any,
         background: 'var(--card-bg)'
       };
@@ -264,8 +295,12 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
   // Export CSV
   const exportToCSV = () => {
+    const leadsToExport = selectedLeadIds.length > 0
+      ? sortedLeads.filter(l => selectedLeadIds.includes(l.id))
+      : sortedLeads;
+
     const headers = ['Nom', 'Prénom', 'Email', 'Poste', 'Entreprise', 'Secteur', 'Taille', 'Pays', 'Source', 'Statut', 'Score', 'Potentiel', 'Date Collecte'];
-    const rows = sortedLeads.map((lead) => [
+    const rows = leadsToExport.map((lead) => [
       lead.nom,
       lead.prenom,
       lead.email,
@@ -334,7 +369,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
       try {
         const res = await fetch(`${API_BASE_URL}/api/agent-leads`, {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`
           },
@@ -394,9 +429,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
         // Forward to backend which calls n8n and normalizes the response
         const res = await fetch(`${API_BASE_URL}/api/prospect-agent/import/file`, {
           method: 'POST',
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`
+            'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`,
+            'Idempotency-Key': crypto.randomUUID()
           },
           body: JSON.stringify({
             fileContent: text,
@@ -435,9 +471,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
     try {
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/import/url`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`
+          'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`,
+          'Idempotency-Key': crypto.randomUUID()
         },
         body: JSON.stringify({ url: importUrl.trim(), agentIds: selectedAgentIds })
       });
@@ -533,9 +570,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`
+          'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`,
+          'Idempotency-Key': crypto.randomUUID()
         },
         body: JSON.stringify({ lead_ids, agentId }),
       });
@@ -561,20 +599,25 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
   };
 
   const handleBulkQualify = async () => {
-    if (filteredLeads.length === 0) return;
+    const leadsToQualify = selectedLeadIds.length > 0
+      ? filteredLeads.filter(l => selectedLeadIds.includes(l.id))
+      : filteredLeads;
+
+    if (leadsToQualify.length === 0) return;
 
     setIsBulkQualifying(true);
-    setQualifyingCount(filteredLeads.length);
+    setQualifyingCount(leadsToQualify.length);
     setUploadMessage(null);
 
     try {
-      const lead_ids = filteredLeads.map((l: Lead) => l.id);
+      const lead_ids = leadsToQualify.map((l: Lead) => l.id);
 
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`
+          'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`,
+          'Idempotency-Key': crypto.randomUUID()
         },
         body: JSON.stringify({ lead_ids, agentId }),
       });
@@ -602,19 +645,19 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
     <div className="fade-in">
       {/* ── Tutorial Overlay ── */}
       {leadsTutorialStep > 0 && (
-        <div 
+        <div
           onClick={nextTutorialStep}
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(0,0,0,0.8)', zIndex: 10000,
             cursor: 'pointer'
-          }} 
+          }}
         />
       )}
 
       {/* ── VMind Guide for Tutorial ── */}
       {leadsTutorialStep > 0 && (
-        <VMindGuide 
+        <VMindGuide
           isOpen={leadsTutorialStep > 0}
           title={getTutorialContent()?.title}
           message={getTutorialContent()?.message || null}
@@ -630,7 +673,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button className="btn btn-secondary" onClick={exportToCSV} style={{ ...getTabBtnStyle(1) }}>
             {renderTutorialArrow(1)}
-            📥 Exporter CSV ({sortedLeads.length})
+            📥 Exporter CSV ({selectedLeadIds.length > 0 ? selectedLeadIds.length : sortedLeads.length})
           </button>
           <button
             className="btn btn-secondary"
@@ -639,13 +682,13 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
             style={{ borderColor: 'var(--accent-secondary)', ...getTabBtnStyle(2) }}
           >
             {renderTutorialArrow(2)}
-            {isBulkQualifying ? '🤖 Qualification...' : `🤖 Qualifier la sélection (${filteredLeads.length})`}
+            {isBulkQualifying ? '🤖 Qualification...' : `🤖 Qualifier la sélection (${selectedLeadIds.length > 0 ? selectedLeadIds.length : filteredLeads.length})`}
           </button>
           <button className="btn btn-primary" onClick={() => setIsGlobalModalOpen(true)} style={{ ...getTabBtnStyle(3) }}>
-              {renderTutorialArrow(3)}
-              ✨ Assigner Prospect Existant
-            </button>
-            <button className="btn btn-primary" onClick={() => setShowImportConsole(!showImportConsole)} style={{ ...getTabBtnStyle(4) }}>
+            {renderTutorialArrow(3)}
+            ✨ Assigner Prospect Existant
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowImportConsole(!showImportConsole)} style={{ ...getTabBtnStyle(4) }}>
             {renderTutorialArrow(4)}
             ⚡ Ingestion Prospects {showImportConsole ? '▲' : '▼'}
           </button>
@@ -968,6 +1011,19 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
         <table className="leads-table">
           <thead>
             <tr>
+              <th style={{ width: '40px', textAlign: 'center', verticalAlign: 'middle' }}>
+                <StyledCheckbox
+                  checked={paginatedLeads.length > 0 && selectedLeadIds.length === sortedLeads.length}
+                  isIndeterminate={selectedLeadIds.length > 0 && selectedLeadIds.length < sortedLeads.length}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedLeadIds(sortedLeads.map(l => l.id));
+                    } else {
+                      setSelectedLeadIds([]);
+                    }
+                  }}
+                />
+              </th>
               <th style={{ cursor: 'pointer', width: '20%' }} onClick={() => toggleSort('nom')}>
                 Contact {sortBy === 'nom' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
               </th>
@@ -1001,9 +1057,21 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                       : 'low';
 
                 return (
-                  <tr key={lead.id}>
+                  <tr key={lead.id} className={`lead-row ${selectedLeadIds.includes(lead.id) ? 'selected-row' : ''}`} style={{ cursor: 'pointer', ...(selectedLeadIds.includes(lead.id) ? { backgroundColor: 'rgba(99, 102, 241, 0.05)' } : {}) }} onDoubleClick={() => onOpenLead(lead)}>
+                    <td style={{ textAlign: 'center', width: '40px', verticalAlign: 'middle' }}>
+                      <StyledCheckbox
+                        checked={selectedLeadIds.includes(lead.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedLeadIds(prev => [...prev, lead.id]);
+                          } else {
+                            setSelectedLeadIds(prev => prev.filter(id => id !== lead.id));
+                          }
+                        }}
+                      />
+                    </td>
                     <td>
-                      <div style={{ fontWeight: 600 }}>{lead.prenom} {lead.nom}</div>
+                      <div className="lead-name">{lead.prenom} {lead.nom}</div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{lead.email}</div>
                     </td>
                     <td>
@@ -1061,7 +1129,7 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                       <button
                         className="btn btn-secondary"
                         style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', ...(paginatedLeads.indexOf(lead) === 0 ? getTabBtnStyle(6) : {}) }}
-                        onClick={() => onOpenLead(lead)}
+                        onClick={(e) => { e.stopPropagation(); onOpenLead(lead); }}
                       >
                         {paginatedLeads.indexOf(lead) === 0 && renderTutorialArrow(6)}
                         👁️ Détail
