@@ -17,32 +17,31 @@ function getAuthToken() {
   } catch(e) { return ''; }
 }
 
-interface ClientRevenue {
+interface InactiveClientItem {
   rank: number;
   client: string;
-  caTotal: number;
-  caTotalFormatted: string;
-  nbDossiers: number;
-  variationPct?: number;
-  statutFidelite?: 'Fidèle' | 'Récents' | 'Occasionnel';
+  caTotalHistorique: number;
+  caTotalHistoriqueFormatted: string;
+  joursInactivite: number;
+  totalDossiers: number;
+  lastOpDate: string;
 }
 
-interface VsellTopClientsCardProps {
+interface VsellInactiveClientsCardProps {
   activeAgentId?: string;
 }
 
-export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ activeAgentId }) => {
+export const VsellInactiveClientsCard: React.FC<VsellInactiveClientsCardProps> = ({ activeAgentId }) => {
   const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const [hovered, setHovered] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
 
   // Read n8n context data
   const agentData = kpisByAgent["vsell"] || kpisByAgent["VSELL"] || {};
-  const toolData = agentData.get_top_clients_revenue || {};
-  const clients: ClientRevenue[] = toolData.ok && Array.isArray(toolData.data) 
+  const toolData = agentData.get_clients_inactive_60_days || {};
+  const clients: InactiveClientItem[] = toolData.ok && Array.isArray(toolData.data) 
     ? toolData.data 
-    : (Array.isArray(agentData.top_clients) ? agentData.top_clients : []);
-  const period: string = toolData.period || agentData.period || "";
+    : (Array.isArray(agentData.inactive_clients) ? agentData.inactive_clients : []);
 
   const loading = loadingByAgent["vsell"] || loadingByAgent["VSELL"] || false;
   const error = !loading && clients.length === 0 && globalError ? globalError : null;
@@ -67,6 +66,7 @@ export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ active
   }
 
   const themeColor = "#FFB800"; // Warm Amber/Gold highlight matching VSELL theme
+  const alertColor = "#ef4444"; // Red for inactivity alert
   const fmt = (n: number) => n.toLocaleString("fr-TN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
@@ -99,7 +99,7 @@ export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ active
       <div style={{ position: "absolute", top: 0, left: 0, width: "10px", height: "10px", borderTop: `2px solid ${themeColor}`, borderLeft: `2px solid ${themeColor}`, borderRadius: "2px 0 0 0", boxShadow: `0 0 5px ${themeColor}60` }} />
       <div style={{ position: "absolute", top: 0, right: 0, width: "10px", height: "10px", borderTop: `2px solid ${themeColor}`, borderRight: `2px solid ${themeColor}`, borderRadius: "0 2px 0 0", boxShadow: `0 0 5px ${themeColor}60` }} />
       <div style={{ position: "absolute", bottom: 0, left: 0, width: "10px", height: "10px", borderBottom: `2px solid ${themeColor}`, borderLeft: `2px solid ${themeColor}`, borderRadius: "0 0 0 2px", boxShadow: `0 0 5px ${themeColor}60` }} />
-      <div style={{ position: "absolute", bottom: 0, right: 0, width: "10px", height: "10px", borderBottom: `2px solid ${themeColor}`, borderRight: `2px solid ${themeColor}`, borderRadius: "0 0 2px 0", boxShadow: `0 0 2px 0` }} />
+      <div style={{ position: "absolute", bottom: 0, right: 0, width: "10px", height: "10px", borderBottom: `2px solid ${themeColor}`, borderRight: `2px solid ${themeColor}`, borderRadius: "0 0 2px 0", boxShadow: `0 0 5px ${themeColor}60` }} />
       
       {/* Scanline top */}
       <div
@@ -129,8 +129,8 @@ export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ active
           alignItems: "center",
         }}
       >
-        <span>Top 5 Clients — CA & Fidélité</span>
-        <span style={{ color: themeColor, fontSize: "8px", fontWeight: 700 }}>VSELL</span>
+        <span>Clients Inactifs &gt; 60 Jours</span>
+        <span style={{ color: alertColor, fontSize: "8px", fontWeight: 700 }}>RISQUE DE PERTE</span>
       </div>
 
       {loading ? (
@@ -163,7 +163,7 @@ export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ active
         </div>
       ) : clients.length === 0 ? (
         <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)", padding: "4px 0" }}>
-          AUCUNE DONNÉE POUR CE MOIS
+          AUCUN CLIENT INACTIF &gt; 60J TROUVÉ
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -189,7 +189,7 @@ export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ active
                 e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)";
               }}
             >
-              {/* Client Info (Rank & Name & Loyalty) */}
+              {/* Client Info (Rank & Name & Inactivity days) */}
               <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden", marginRight: "10px" }}>
                 <span
                   style={{
@@ -199,9 +199,9 @@ export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ active
                     fontSize: "8.5px",
                     fontWeight: 800,
                     fontFamily: "var(--font-mono)",
-                    color: c.rank === 1 ? "#FFD700" : (c.rank === 2 ? "#C0C0C0" : (c.rank === 3 ? "#E67E22" : (c.rank === 4 ? "#A3B1F9" : "#00D2D3"))),
-                    backgroundColor: c.rank === 1 ? "rgba(255, 215, 0, 0.1)" : (c.rank === 2 ? "rgba(192, 192, 192, 0.1)" : (c.rank === 3 ? "rgba(230, 126, 34, 0.1)" : (c.rank === 4 ? "rgba(163, 177, 249, 0.1)" : "rgba(0, 210, 211, 0.1)"))),
-                    border: c.rank === 1 ? "1px solid rgba(255, 215, 0, 0.25)" : (c.rank === 2 ? "1px solid rgba(192, 192, 192, 0.25)" : (c.rank === 3 ? "1px solid rgba(230, 126, 34, 0.25)" : (c.rank === 4 ? "1px solid rgba(163, 177, 249, 0.25)" : "1px solid rgba(0, 210, 211, 0.25)"))),
+                    color: alertColor,
+                    backgroundColor: "rgba(239, 68, 68, 0.1)",
+                    border: "1px solid rgba(239, 68, 68, 0.25)",
                     borderRadius: "6px",
                     width: "24px",
                     height: "24px",
@@ -209,7 +209,7 @@ export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ active
                     boxShadow: "inset 0 0 4px rgba(0, 0, 0, 0.5)",
                   }}
                 >
-                  #{c.rank}
+                  ⚠
                 </span>
                 <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
                   <span
@@ -226,43 +226,20 @@ export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ active
                   >
                     {c.client}
                   </span>
-                  {c.statutFidelite && (
-                    <span
-                      style={{
-                        fontSize: "7.5px",
-                        fontFamily: "var(--font-mono)",
-                        color: c.statutFidelite === 'Fidèle' ? '#10b981' : (c.statutFidelite === 'Récents' ? '#06b6d4' : '#f59e0b'),
-                        marginTop: "1px"
-                      }}
-                    >
-                      {c.statutFidelite}
-                    </span>
-                  )}
+                  <span style={{ fontSize: "7.5px", color: alertColor, fontFamily: "var(--font-mono)", fontWeight: 700, marginTop: "1px" }}>
+                    {Math.round(c.joursInactivite * animProgress)} jours d'inactivité
+                  </span>
                 </div>
               </div>
 
-              {/* Client Metric (CA Total & Count & Variation) */}
+              {/* Client Metric (Dernière date active + CA historique) */}
               <div style={{ display: "flex", flexDirection: "column", flexShrink: 0, alignItems: "flex-end" }}>
                 <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--white)", fontFamily: "var(--font-mono)" }}>
-                  {fmt(c.caTotal * animProgress)} <span style={{ fontSize: "8px", fontWeight: 500, color: "var(--muted)" }}>TND</span>
+                  {fmt(c.caTotalHistorique)} <span style={{ fontSize: "8px", fontWeight: 500, color: "var(--muted)" }}>TND</span>
                 </span>
-                <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "1px" }}>
-                  <span style={{ fontSize: "7.5px", color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
-                    {Math.round(c.nbDossiers * animProgress)} dossier{Math.round(c.nbDossiers * animProgress) > 1 ? "s" : ""}
-                  </span>
-                  {c.variationPct !== undefined && c.variationPct !== 0 && (
-                    <span
-                      style={{
-                        fontSize: "7.5px",
-                        fontFamily: "var(--font-mono)",
-                        fontWeight: 700,
-                        color: c.variationPct > 0 ? "#10b981" : "#ef4444"
-                      }}
-                    >
-                      {c.variationPct > 0 ? `+${c.variationPct}%` : `${c.variationPct}%`}
-                    </span>
-                  )}
-                </div>
+                <span style={{ fontSize: "7.5px", color: "var(--muted)", fontFamily: "var(--font-mono)", marginTop: "1px" }}>
+                  Dernier : {c.lastOpDate}
+                </span>
               </div>
             </div>
           ))}
@@ -274,7 +251,7 @@ export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ active
 
       {/* Footer */}
       <div style={{ fontSize: "8px", color: "var(--muted)", fontFamily: "var(--font-mono)", display: "flex", justifyContent: "space-between" }}>
-        <span>{period ? period.toUpperCase() : "—"}</span>
+        <span>SUIVI COMMERCIAL</span>
         <span>SUIVI DE FRET</span>
       </div>
     </div>

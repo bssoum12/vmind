@@ -23,15 +23,13 @@ interface ClientRevenue {
   caTotal: number;
   caTotalFormatted: string;
   nbDossiers: number;
-  variationPct?: number;
-  statutFidelite?: 'Fidèle' | 'Récents' | 'Occasionnel';
 }
 
-interface VsellTopClientsCardProps {
+interface VsellRevenuClientBarChartProps {
   activeAgentId?: string;
 }
 
-export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ activeAgentId }) => {
+export const VsellRevenuClientBarChart: React.FC<VsellRevenuClientBarChartProps> = ({ activeAgentId }) => {
   const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const [hovered, setHovered] = useState(false);
   const [animProgress, setAnimProgress] = useState(0);
@@ -67,7 +65,7 @@ export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ active
   }
 
   const themeColor = "#FFB800"; // Warm Amber/Gold highlight matching VSELL theme
-  const fmt = (n: number) => n.toLocaleString("fr-TN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const maxCa = clients.length > 0 ? Math.max(...clients.map(c => c.caTotal)) : 1;
 
   return (
     <div
@@ -122,22 +120,22 @@ export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ active
           fontFamily: "var(--font-mono)",
           letterSpacing: "1.5px",
           textTransform: "uppercase",
-          marginBottom: "12px",
+          marginBottom: "16px",
           fontWeight: 600,
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
         }}
       >
-        <span>Top 5 Clients — CA & Fidélité</span>
-        <span style={{ color: themeColor, fontSize: "8px", fontWeight: 700 }}>VSELL</span>
+        <span>Revenu par Client (Top 5)</span>
+        <span style={{ color: themeColor, fontSize: "8px", fontWeight: 700 }}>GRAPH</span>
       </div>
 
       {loading ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "8px 0" }}>
-          <SkeletonLoader height="36px" width="100%" />
-          <SkeletonLoader height="36px" width="100%" />
-          <SkeletonLoader height="36px" width="100%" />
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px", padding: "8px 0" }}>
+          <SkeletonLoader height="28px" width="100%" />
+          <SkeletonLoader height="28px" width="100%" />
+          <SkeletonLoader height="28px" width="100%" />
         </div>
       ) : error ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -166,106 +164,45 @@ export const VsellTopClientsCard: React.FC<VsellTopClientsCardProps> = ({ active
           AUCUNE DONNÉE POUR CE MOIS
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          {clients.map((c) => (
-            <div
-              key={c.rank}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "6px 8px",
-                background: "rgba(255,255,255,0.02)",
-                border: "1px solid rgba(255,255,255,0.04)",
-                borderRadius: "4px",
-                transition: "background 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                e.currentTarget.style.borderColor = `${themeColor}30`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)";
-              }}
-            >
-              {/* Client Info (Rank & Name & Loyalty) */}
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden", marginRight: "10px" }}>
-                <span
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "8.5px",
-                    fontWeight: 800,
-                    fontFamily: "var(--font-mono)",
-                    color: c.rank === 1 ? "#FFD700" : (c.rank === 2 ? "#C0C0C0" : (c.rank === 3 ? "#E67E22" : (c.rank === 4 ? "#A3B1F9" : "#00D2D3"))),
-                    backgroundColor: c.rank === 1 ? "rgba(255, 215, 0, 0.1)" : (c.rank === 2 ? "rgba(192, 192, 192, 0.1)" : (c.rank === 3 ? "rgba(230, 126, 34, 0.1)" : (c.rank === 4 ? "rgba(163, 177, 249, 0.1)" : "rgba(0, 210, 211, 0.1)"))),
-                    border: c.rank === 1 ? "1px solid rgba(255, 215, 0, 0.25)" : (c.rank === 2 ? "1px solid rgba(192, 192, 192, 0.25)" : (c.rank === 3 ? "1px solid rgba(230, 126, 34, 0.25)" : (c.rank === 4 ? "1px solid rgba(163, 177, 249, 0.25)" : "1px solid rgba(0, 210, 211, 0.25)"))),
-                    borderRadius: "6px",
-                    width: "24px",
-                    height: "24px",
-                    flexShrink: 0,
-                    boxShadow: "inset 0 0 4px rgba(0, 0, 0, 0.5)",
-                  }}
-                >
-                  #{c.rank}
-                </span>
-                <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                  <span
-                    style={{
-                      fontSize: "10.5px",
-                      fontWeight: 600,
-                      color: "var(--white)",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      maxWidth: "130px",
-                    }}
-                    title={c.client}
-                  >
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {clients.map((c) => {
+            const pct = maxCa > 0 ? (c.caTotal / maxCa) * 100 : 0;
+            return (
+              <div key={c.rank} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                {/* Client Label and Value */}
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", fontFamily: "var(--font-mono)" }}>
+                  <span style={{ color: "var(--white)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "160px" }} title={c.client}>
                     {c.client}
                   </span>
-                  {c.statutFidelite && (
-                    <span
-                      style={{
-                        fontSize: "7.5px",
-                        fontFamily: "var(--font-mono)",
-                        color: c.statutFidelite === 'Fidèle' ? '#10b981' : (c.statutFidelite === 'Récents' ? '#06b6d4' : '#f59e0b'),
-                        marginTop: "1px"
-                      }}
-                    >
-                      {c.statutFidelite}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Client Metric (CA Total & Count & Variation) */}
-              <div style={{ display: "flex", flexDirection: "column", flexShrink: 0, alignItems: "flex-end" }}>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--white)", fontFamily: "var(--font-mono)" }}>
-                  {fmt(c.caTotal * animProgress)} <span style={{ fontSize: "8px", fontWeight: 500, color: "var(--muted)" }}>TND</span>
-                </span>
-                <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "1px" }}>
-                  <span style={{ fontSize: "7.5px", color: "var(--muted)", fontFamily: "var(--font-mono)" }}>
-                    {Math.round(c.nbDossiers * animProgress)} dossier{Math.round(c.nbDossiers * animProgress) > 1 ? "s" : ""}
+                  <span style={{ color: themeColor, fontWeight: 700 }}>
+                    {c.caTotalFormatted} <span style={{ fontSize: "8px", color: "var(--muted)", fontWeight: 500 }}>TND</span>
                   </span>
-                  {c.variationPct !== undefined && c.variationPct !== 0 && (
-                    <span
-                      style={{
-                        fontSize: "7.5px",
-                        fontFamily: "var(--font-mono)",
-                        fontWeight: 700,
-                        color: c.variationPct > 0 ? "#10b981" : "#ef4444"
-                      }}
-                    >
-                      {c.variationPct > 0 ? `+${c.variationPct}%` : `${c.variationPct}%`}
-                    </span>
-                  )}
+                </div>
+                {/* Bar line */}
+                <div 
+                  style={{ 
+                    height: "6px", 
+                    background: "rgba(255,255,255,0.03)", 
+                    borderRadius: "3px", 
+                    overflow: "hidden", 
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    position: "relative" 
+                  }}
+                >
+                  <div 
+                    style={{ 
+                      height: "100%", 
+                      width: `${pct * animProgress}%`, 
+                      background: `linear-gradient(90deg, ${themeColor}10, ${themeColor})`, 
+                      borderRadius: "3px",
+                      boxShadow: `0 0 6px ${themeColor}40`,
+                      transition: "width 0.1s ease-out"
+                    }} 
+                  />
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

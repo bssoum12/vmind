@@ -183,7 +183,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
     const currentAgent = activeAgentId || 'VDATA';
     const lowerAgent = currentAgent.toLowerCase();
-    if (lowerAgent !== 'vdata' && lowerAgent !== 'vfin') return;
+    if (lowerAgent !== 'vdata' && lowerAgent !== 'vfin' && lowerAgent !== 'vsell') return;
 
     // Clear previous debounce timeout
     if (debounceTimeoutRef.current) {

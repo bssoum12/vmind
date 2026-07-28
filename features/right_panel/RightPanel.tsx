@@ -29,6 +29,11 @@ import { VfinSixMonthChartCard } from './TableauCroiseKpi/VfinSixMonthChartCard'
 import { VfinMarginCard } from './TableauCroiseKpi/VfinMarginCard';
 import { VfinTopClientsCard } from './TableauCroiseKpi/VfinTopClientsCard';
 import { VsellTopClientsCard } from './TableauCroiseKpi/VsellTopClientsCard';
+import { VsellNewClientsCard } from './TableauCroiseKpi/VsellNewClientsCard';
+import { VsellInactiveClientsCard } from './TableauCroiseKpi/VsellInactiveClientsCard';
+import { VsellRevenuClientBarChart } from './TableauCroiseKpi/VsellRevenuClientBarChart';
+import { VsellFidelisationChartCard } from './TableauCroiseKpi/VsellFidelisationChartCard';
+import { VsellPipelineFunnelCard } from './TableauCroiseKpi/VsellPipelineFunnelCard';
 import { VfinTresorerieCard } from './TableauCroiseKpi/VfinTresorerieCard';
 interface RightPanelProps {
   logs: LogEntry[];
@@ -268,6 +273,11 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
         )}
         <ScoreGlobalCard activeAgentId={activeAgentId} />
         <VsellTopClientsCard activeAgentId={activeAgentId} />
+        <VsellNewClientsCard activeAgentId={activeAgentId} />
+        <VsellInactiveClientsCard activeAgentId={activeAgentId} />
+        <VsellRevenuClientBarChart activeAgentId={activeAgentId} />
+        <VsellFidelisationChartCard activeAgentId={activeAgentId} />
+        <VsellPipelineFunnelCard activeAgentId={activeAgentId} />
         <VfinMonthlyRevenueCard activeAgentId={activeAgentId} />
         <VfinOverdueCard activeAgentId={activeAgentId} />
         <VfinSixMonthChartCard activeAgentId={activeAgentId} />
