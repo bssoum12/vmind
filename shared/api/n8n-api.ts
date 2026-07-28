@@ -1,15 +1,40 @@
 import { VmindN8nResponse } from '../types/vmind';
 
 function getVmindSessionId() {
-  let sessionId = sessionStorage.getItem("vmind_session_id");
+  let sessionId = typeof window !== 'undefined' ? sessionStorage.getItem("vmind_session_id") : null;
 
   if (!sessionId) {
     sessionId = crypto.randomUUID();
-    sessionStorage.setItem("vmind_session_id", sessionId);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem("vmind_session_id", sessionId);
+    }
   }
 
   return sessionId;
 }
+
+const getAuthHeaders = (baseHeaders: Record<string, string> = {}): Record<string, string> => {
+  if (typeof window !== "undefined") {
+    try {
+      const sessionStr = localStorage.getItem("vmind_session");
+      if (sessionStr) {
+        let token = sessionStr;
+        if (sessionStr.trim().startsWith("{")) {
+          try {
+            const parsed = JSON.parse(sessionStr);
+            token = parsed?.token || parsed?.access_token || parsed?.user?.token || sessionStr;
+          } catch (e) {}
+        }
+        if (token) {
+          return { ...baseHeaders, "Authorization": `Bearer ${token}` };
+        }
+      }
+    } catch (e) {
+      console.warn("Could not retrieve session token:", e);
+    }
+  }
+  return baseHeaders;
+};
 
 /**
  * Appelle n8n via le Proxy du Backend pour éviter les problèmes de CORS
@@ -129,9 +154,9 @@ export async function deployAgent(config: any, clientId = "DEMO"): Promise<any> 
 
   const response = await fetch(webhookUrl, {
     method: "POST",
-    headers: {
+    headers: getAuthHeaders({
       "Content-Type": "application/json"
-    },
+    }),
     body: JSON.stringify(payloadArray)
   });
 
@@ -158,9 +183,9 @@ export async function resetReminders(invoiceRefs: string[]): Promise<any> {
 
   const response = await fetch(url, {
     method: "POST",
-    headers: {
+    headers: getAuthHeaders({
       "Content-Type": "application/json"
-    },
+    }),
     body: JSON.stringify({ invoice_refs: invoiceRefs })
   });
 
@@ -176,28 +201,7 @@ export async function resetReminders(invoiceRefs: string[]): Promise<any> {
  
 const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
 
-function getAuthHeaders(): Record<string, string> {
-  if (typeof window !== "undefined") {
-    try {
-      const sessionStr = localStorage.getItem("vmind_session");
-      if (sessionStr) {
-        let token = sessionStr;
-        if (sessionStr.trim().startsWith("{")) {
-          try {
-            const parsed = JSON.parse(sessionStr);
-            token = parsed?.token || parsed?.access_token || parsed?.user?.token || sessionStr;
-          } catch (e) {}
-        }
-        if (token) {
-          return { "Authorization": `Bearer ${token}` };
-        }
-      }
-    } catch (e) {
-      console.warn("Could not retrieve session token:", e);
-    }
-  }
-  return {};
-}
+
 
 /**
  * Fetches all deployed agents from Redis (via backend)
@@ -287,6 +291,67 @@ export async function runAgentNow(agentName: string): Promise<any> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Failed to trigger agent run (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Get lead stats for a specific prospect agent
+ */
+export async function getProspectAgentStats(agentId: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/stats/${encodeURIComponent(agentId)}`, {
+    method: "GET",
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch agent stats (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Trigger Auto Mode for a specific prospect agent
+ */
+export async function triggerProspectAutoMode(agentId: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/start/${encodeURIComponent(agentId)}`, {
+    method: "POST",
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to trigger prospect auto mode (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Instantly qualify prospects for this agent (manually)
+ */
+export async function qualifyManualProspects(agentId: string, mode: 'pending_only' | 'all'): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/prospect-agent/qualify-manual/${encodeURIComponent(agentId)}`, {
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ mode })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to qualify prospects manually (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Trigger AI Qualification (N8N_WEBHOOK_QUALIFY) for all pending leads
+ */
+export async function triggerAIQualificationAllPending(agentId: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/prospect-agent/qualify-all-pending-ai/${encodeURIComponent(agentId)}`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to trigger AI qualification (${res.status})`);
   }
   return res.json();
 }

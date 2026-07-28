@@ -18,6 +18,7 @@ interface ConversationsContextType {
   renameConversation: (conversationId: string, newTitle: string) => Promise<void>;
   deleteConversation: (conversationId: string) => Promise<void>;
   refreshConversations: () => Promise<void>;
+  resetToNewConversation: () => void;
   bumpConversation: (conversationId: string) => void;
   updateConversationTitle: (conversationId: string, newTitle: string) => void;
   isLoading: boolean;
@@ -144,6 +145,10 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     }
   };
 
+  const resetToNewConversation = () => {
+    setActiveConversationId(null);
+  };
+
   return (
     <ConversationsContext.Provider value={{
       conversations,
@@ -153,6 +158,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
       renameConversation,
       deleteConversation,
       refreshConversations: fetchConversations,
+      resetToNewConversation,
       bumpConversation,
       updateConversationTitle,
       isLoading

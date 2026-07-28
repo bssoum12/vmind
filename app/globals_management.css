@@ -1,4 +1,4 @@
-﻿.shell {
+.shell {
   display: flex;
   height: calc(100vh - 52px);
 }
@@ -488,6 +488,7 @@
   flex: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0;
   position: relative;
 }
@@ -497,7 +498,7 @@
   position: absolute;
   left: calc(50% + 20px);
   top: 18px;
-  right: 0;
+  width: calc(100% - 40px);
   height: 1px;
   background: var(--border);
   z-index: 0;

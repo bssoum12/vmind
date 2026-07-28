@@ -1618,6 +1618,7 @@ body {
   flex: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0;
   position: relative;
 }
@@ -1627,7 +1628,7 @@ body {
   position: absolute;
   left: calc(50% + 20px);
   top: 18px;
-  right: 0;
+  width: calc(100% - 40px);
   height: 1px;
   background: var(--border);
   z-index: 0;
@@ -2973,6 +2974,8 @@ textarea.form-input {
 .pulse-text-green {
   animation: scorePulseExc 2s infinite ease-in-out;
 }
+
+@keyframes bounceArrow { 0% { transform: translate(-50%, 0); } 100% { transform: translate(-50%, -8px); } }
 
 /* ── SKELETON LOADER ANIMATIONS ── */
 @keyframes skeletonPulse {

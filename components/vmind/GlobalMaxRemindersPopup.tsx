@@ -23,7 +23,9 @@ export const GlobalMaxRemindersPopup: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   useEffect(() => {
-    const sse = new EventSource(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/recovery/sse`);
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+    const token = typeof window !== 'undefined' ? (localStorage.getItem("vmind_session") || "") : "";
+    const sse = new EventSource(`${baseUrl}/api/recovery/sse?token=${encodeURIComponent(token)}`);
 
     sse.onmessage = (event) => {
       try {

@@ -8,6 +8,7 @@ import { deployAgent } from '@/shared/api/n8n-api';
 interface WizardViewProps {
   templateId: string;
   onCancel: () => void;
+  agentToEdit?: any;
 }
 
 interface TriggerRule {
@@ -84,10 +85,11 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel }) 
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployed, setDeployed] = useState(false);
   const template = AGENT_TEMPLATES.find(t => t.id === templateId);
+  const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
 
   // Unified form state mapping exactly to the n8n JSON expectations
   const [formData, setFormData] = useState({
-    agent_name: template?.name || 'Yasmine',
+    agent_name: `${template?.name || 'Assistant'} - ${randomSuffix}`,
     run_mode: 'daily_recovery_check',
     workflow_timezone: 'Africa/Tunis',
     recovery_config: {

@@ -1,3 +1,10 @@
 node_modules/
 .next/
 .env
+
+*.tsbuildinfos
+tsconfig.tsbuildinfo 
+"tsconfig.tsbuildinfo" 
+.agents/
+
+"tsconfig.tsbuildinfo" 
