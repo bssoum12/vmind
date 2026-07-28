@@ -6,7 +6,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import GlobalLeadsModal from './GlobalLeadsModal';
 import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
 interface Lead {
   id: number;

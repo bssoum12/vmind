@@ -15,7 +15,7 @@ import { useProspectSocket } from '../../../features/management/prospect-workspa
 
 import '../../../features/management/prospect-workspace/workspace.scss';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
 export default function AgentWorkspacePage() {
   const { agentId } = useParams();

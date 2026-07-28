@@ -271,7 +271,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   const [loginError, setLoginError]       = useState('');
   const [errorMessage]                    = useState('Impossible de joindre le serveur MCP.');
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
   // Convenience aliases
   const userInfo           = session?.user ?? null;

@@ -34,7 +34,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const fetchConversations = async () => {
     try {
       setIsLoading(true);
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
       if (token && token.startsWith("{")) token = JSON.parse(token).token;
 
@@ -60,7 +60,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
 
   const createNewConversation = async (agentId: string, firstMessageText: string): Promise<string> => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
       if (token && token.startsWith("{")) token = JSON.parse(token).token;
       
@@ -105,7 +105,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
 
   const renameConversation = async (conversationId: string, newTitle: string) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
       if (token && token.startsWith("{")) token = JSON.parse(token).token;
 
@@ -125,7 +125,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
 
   const deleteConversation = async (conversationId: string) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
       if (token && token.startsWith("{")) token = JSON.parse(token).token;
 

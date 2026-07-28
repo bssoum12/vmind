@@ -22,7 +22,7 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
       .catch(() => setAgentCount(0));
 
     // Fetch pending signup requests count
-    fetch('http://localhost:3001/api/auth/vmind/signup-requests')
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/signup-requests`)
       .then(res => res.json())
       .then(data => {
         if (data.ok) {

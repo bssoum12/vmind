@@ -28,6 +28,12 @@ import { VfinOverdueCard } from './TableauCroiseKpi/VfinOverdueCard';
 import { VfinSixMonthChartCard } from './TableauCroiseKpi/VfinSixMonthChartCard';
 import { VfinMarginCard } from './TableauCroiseKpi/VfinMarginCard';
 import { VfinTopClientsCard } from './TableauCroiseKpi/VfinTopClientsCard';
+import { VsellTopClientsCard } from './TableauCroiseKpi/VsellTopClientsCard';
+import { VsellNewClientsCard } from './TableauCroiseKpi/VsellNewClientsCard';
+import { VsellInactiveClientsCard } from './TableauCroiseKpi/VsellInactiveClientsCard';
+import { VsellRevenuClientBarChart } from './TableauCroiseKpi/VsellRevenuClientBarChart';
+import { VsellFidelisationChartCard } from './TableauCroiseKpi/VsellFidelisationChartCard';
+import { VsellPipelineFunnelCard } from './TableauCroiseKpi/VsellPipelineFunnelCard';
 import { VfinTresorerieCard } from './TableauCroiseKpi/VfinTresorerieCard';
 interface RightPanelProps {
   logs: LogEntry[];
@@ -59,7 +65,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
 
   const fetchDomainPerformance = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
       const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || 'DEMO';
 
       const response = await fetch(`${baseUrl}/api/tools/get-score-global-vdata-kpi`, {
@@ -146,7 +152,9 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
               ? 'DONNEES & ANALYTICS - Temps Réel' 
               : activeAgentId === 'VFIN' 
                 ? 'FINANCE & COMPTABILITE - Temps Réel' 
-                : 'KPIs Temps Réel'}
+                : activeAgentId === 'VSELL'
+                  ? 'COMMERCIAL - Temps Réel'
+                  : 'KPIs Temps Réel'}
           </span>
         </div>
 
@@ -239,7 +247,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
             </div>
           </div>
         )}
-        {activeAgentId !== 'VDATA' && activeAgentId !== 'VFIN' && (
+        {activeAgentId !== 'VDATA' && activeAgentId !== 'VFIN' && activeAgentId !== 'VSELL' && (
           <>
             <MiniKpi label="Trésorerie" dotColor="var(--green)" val="842K TND" delta="▲ +3.2%" deltaType="up" />
             <MiniKpi label="Impayés" dotColor="var(--red)" val="218K TND" delta="▲ +8 clients" deltaType="warning" />
@@ -264,6 +272,12 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
           </>
         )}
         <ScoreGlobalCard activeAgentId={activeAgentId} />
+        <VsellTopClientsCard activeAgentId={activeAgentId} />
+        <VsellNewClientsCard activeAgentId={activeAgentId} />
+        <VsellInactiveClientsCard activeAgentId={activeAgentId} />
+        <VsellRevenuClientBarChart activeAgentId={activeAgentId} />
+        <VsellFidelisationChartCard activeAgentId={activeAgentId} />
+        <VsellPipelineFunnelCard activeAgentId={activeAgentId} />
         <VfinMonthlyRevenueCard activeAgentId={activeAgentId} />
         <VfinOverdueCard activeAgentId={activeAgentId} />
         <VfinSixMonthChartCard activeAgentId={activeAgentId} />

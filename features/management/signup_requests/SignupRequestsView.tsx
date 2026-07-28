@@ -38,7 +38,7 @@ export const SignupRequestsView: React.FC = () => {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:3001/api/auth/vmind/signup-requests');
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/signup-requests`);
       const data = await res.json();
       if (data.ok) {
         setRequests(data.requests);
@@ -61,7 +61,7 @@ export const SignupRequestsView: React.FC = () => {
     if (!selectedReq) return;
     try {
       setActionLoading(true);
-      const res = await fetch('http://localhost:3001/api/auth/vmind/approve-request', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/approve-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -89,7 +89,7 @@ export const SignupRequestsView: React.FC = () => {
     if (!rejectReq) return;
     try {
       setActionLoading(true);
-      const res = await fetch('http://localhost:3001/api/auth/vmind/reject-request', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/reject-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId: rejectReq.id })
@@ -112,7 +112,7 @@ export const SignupRequestsView: React.FC = () => {
     const targetStatus = currentStatus === 'deactivated' ? 'active' : 'deactivated';
     try {
       setActionLoading(true);
-      const res = await fetch('http://localhost:3001/api/auth/vmind/toggle-user-status', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/toggle-user-status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, status: targetStatus })
