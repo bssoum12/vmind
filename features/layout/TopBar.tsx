@@ -14,55 +14,70 @@ export const TopBar: React.FC = () => {
   const [username, setUsername] = useState('');
   const [roleLabel, setRoleLabel] = useState('');
   const [avatarInitials, setAvatarInitials] = useState('VM');
+  const [isErpConnected, setIsErpConnected] = useState(false);
 
   useEffect(() => {
-    try {
-      const token = localStorage.getItem('vmind_session');
-      if (token) {
-        const decoded: any = jwtDecode(token);
-        if (decoded.username) {
-          setUsername(decoded.username);
-          
-          // Get initials
-          const parts = decoded.username.trim().split(/\s+/);
-          if (parts.length >= 2) {
-            setAvatarInitials((parts[0][0] + parts[1][0]).toUpperCase());
-          } else if (parts[0]) {
-            setAvatarInitials(parts[0].substring(0, 2).toUpperCase());
-          }
-        }
+    const checkTokens = () => {
+      try {
+        const token = localStorage.getItem('vmind_session');
+        const mcpToken = localStorage.getItem('vmind_mcp_token');
         
-        if (decoded.roles) {
-          const roles = Array.isArray(decoded.roles)
-            ? decoded.roles
-            : typeof decoded.roles === 'string'
-              ? [decoded.roles]
-              : [];
-          // Mapping exact des noms de rôles DNN → label français affiché
-          if (roles.includes('Administrators') || roles.includes('Administrator') || roles.includes('Superusers')) {
-            setRoleLabel('Administrateur');
-          } else if (roles.some((r: string) => ['usersFinances','Service Comptabilité','usersCompta','usersDecaissement','usersEncaissements','usersReglementDivers'].includes(r))) {
-            setRoleLabel('Finance & Comptabilité');
-          } else if (roles.some((r: string) => ['usersVentes','UsersCRM','GestionnaireVente','usersClaims'].includes(r))) {
-            setRoleLabel('Commercial');
-          } else if (roles.some((r: string) => ['usersAchats'].includes(r))) {
-            setRoleLabel('Achats');
-          } else if (roles.some((r: string) => ['usersStock','usersArticles','usersStore'].includes(r))) {
-            setRoleLabel('Stock & Magasin');
-          } else if (roles.some((r: string) => ['usersExploitation','usersOMC','usersEDI'].includes(r))) {
-            setRoleLabel('Exploitation');
-          } else if (roles.some((r: string) => ['usersTiers','usersSettings'].includes(r))) {
-            setRoleLabel('Paramétrage');
-          } else if (roles.some((r: string) => ['LecteurSeulement','Extranet'].includes(r))) {
-            setRoleLabel('Lecture seule');
-          } else {
-            setRoleLabel(roles[0] || 'Utilisateur');
+        if (mcpToken) {
+          setIsErpConnected(true);
+        } else {
+          setIsErpConnected(false);
+        }
+
+        if (token) {
+          const decoded: any = jwtDecode(token);
+          if (decoded.username) {
+            setUsername(decoded.username);
+            
+            // Get initials
+            const parts = decoded.username.trim().split(/\s+/);
+            if (parts.length >= 2) {
+              setAvatarInitials((parts[0][0] + parts[1][0]).toUpperCase());
+            } else if (parts[0]) {
+              setAvatarInitials(parts[0].substring(0, 2).toUpperCase());
+            }
+          }
+          
+          if (decoded.roles) {
+            const roles = Array.isArray(decoded.roles)
+              ? decoded.roles
+              : typeof decoded.roles === 'string'
+                ? [decoded.roles]
+                : [];
+            // Mapping exact des noms de rôles DNN → label français affiché
+            if (roles.includes('Administrators') || roles.includes('Administrator') || roles.includes('Superusers')) {
+              setRoleLabel('Administrateur');
+            } else if (roles.some((r: string) => ['usersFinances','Service Comptabilité','usersCompta','usersDecaissement','usersEncaissements','usersReglementDivers'].includes(r))) {
+              setRoleLabel('Finance & Comptabilité');
+            } else if (roles.some((r: string) => ['usersVentes','UsersCRM','GestionnaireVente','usersClaims'].includes(r))) {
+              setRoleLabel('Commercial');
+            } else if (roles.some((r: string) => ['usersAchats'].includes(r))) {
+              setRoleLabel('Achats');
+            } else if (roles.some((r: string) => ['usersStock','usersArticles','usersStore'].includes(r))) {
+              setRoleLabel('Stock & Magasin');
+            } else if (roles.some((r: string) => ['usersExploitation','usersOMC','usersEDI'].includes(r))) {
+              setRoleLabel('Exploitation');
+            } else if (roles.some((r: string) => ['usersTiers','usersSettings'].includes(r))) {
+              setRoleLabel('Paramétrage');
+            } else if (roles.some((r: string) => ['LecteurSeulement','Extranet'].includes(r))) {
+              setRoleLabel('Lecture seule');
+            } else {
+              setRoleLabel(roles[0] || 'Utilisateur');
+            }
           }
         }
+      } catch (e) {
+        console.error("Erreur de lecture du token dans TopBar", e);
       }
-    } catch (e) {
-      console.error("Erreur de lecture du token dans TopBar", e);
-    }
+    };
+
+    checkTokens();
+    window.addEventListener('mcp-session-updated', checkTokens);
+    return () => window.removeEventListener('mcp-session-updated', checkTokens);
   }, []);
 
   const handleLogout = () => {
@@ -76,15 +91,14 @@ export const TopBar: React.FC = () => {
       <div className="topbar-brand">
         <div>
           <div className="brand-logo">VMIND</div>
-          <div className="brand-tag">Intelligence Entreprise</div>
         </div>
       </div>
       <div className="topbar-center">
         <div className="topbar-status">
-          <StatusDot />
-          <span>ERP CONNECTÉ</span>
-          <span style={{ color: 'var(--border2)', margin: '0 6px' }}>|</span>
-          <span>TraLIS v3.2</span>
+          <StatusDot style={{ backgroundColor: isErpConnected ? '#00e5c8' : '#8FA3B8' }} />
+          <span style={{ color: isErpConnected ? '#fff' : '#8FA3B8' }}>
+            {isErpConnected ? 'ERP CONNECTÉ' : 'ERP DÉCONNECTÉ'}
+          </span>
           <span style={{ color: 'var(--border2)', margin: '0 6px' }}>|</span>
           <span>{clock}</span>
         </div>

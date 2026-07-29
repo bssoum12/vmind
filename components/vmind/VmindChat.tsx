@@ -715,11 +715,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           </div>
         )}
 
-        {isLoading && (
-          <div className="text-[10px] text-cyan-500 animate-pulse mt-2">
-            Analyse en cours...
-          </div>
-        )}
+
       </div>
 
       <div className="messages">
@@ -879,6 +875,47 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                   >
                     {isUser ? (
                       <div className="whitespace-pre-wrap">{msg.text}</div>
+                    ) : msg.isThinking ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '2px 4px' }}>
+                        <style>{`
+                          @keyframes premium-bounce {
+                            0%, 80%, 100% { 
+                              transform: translateY(0) scale(0.8); 
+                              opacity: 0.4;
+                              box-shadow: 0 0 0 rgba(0, 229, 200, 0);
+                            }
+                            40% { 
+                              transform: translateY(-4px) scale(1.1); 
+                              opacity: 1;
+                              box-shadow: 0 0 8px rgba(0, 229, 200, 0.8);
+                            }
+                          }
+                          .premium-dot {
+                            width: 5px;
+                            height: 5px;
+                            background-color: #00E5C8;
+                            border-radius: 50%;
+                            animation: premium-bounce 1.4s infinite ease-in-out both;
+                          }
+                          .premium-dot:nth-child(1) { animation-delay: -0.32s; }
+                          .premium-dot:nth-child(2) { animation-delay: -0.16s; }
+                          .premium-dot:nth-child(3) { animation-delay: 0s; }
+                        `}</style>
+                        <span style={{ 
+                          color: '#00E5C8', 
+                          fontSize: '13px', 
+                          fontWeight: 500, 
+                          letterSpacing: '0.5px',
+                          textShadow: '0 0 10px rgba(0, 229, 200, 0.4)'
+                        }} className="animate-pulse">
+                          L'agent réfléchit
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <div className="premium-dot"></div>
+                          <div className="premium-dot"></div>
+                          <div className="premium-dot"></div>
+                        </div>
+                      </div>
                     ) : (
                       <ToolResultRenderer message={msg} />
                     )}
