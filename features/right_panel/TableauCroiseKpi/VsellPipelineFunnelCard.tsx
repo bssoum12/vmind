@@ -137,7 +137,7 @@ export const VsellPipelineFunnelCard: React.FC<VsellPipelineFunnelCardProps> = (
           alignItems: "center",
         }}
       >
-        <span>Pipeline Commercial (TND)</span>
+        <span>Pipeline Commercial des opportunités</span>
         <span style={{ color: themeColor, fontSize: "8px", fontWeight: 700 }}>VSELL</span>
       </div>
 

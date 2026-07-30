@@ -5,7 +5,7 @@ import { StatusDot } from '../../components/ui/StatusDot';
 import { useClock } from '../../shared/hooks/useClock';
 import { useMode } from '@/shared/contexts/ModeContext';
 import { jwtDecode } from 'jwt-decode';
-import { LogOut } from 'lucide-react';
+import { LogOut, User } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
   const clock = useClock();
@@ -71,6 +71,12 @@ export const TopBar: React.FC = () => {
     window.location.href = '/login';
   };
 
+  const handleGoToProfile = () => {
+    setMenuOpen(false);
+    setMode('MANAGEMENT');
+    window.dispatchEvent(new CustomEvent('switch-management-view', { detail: 'profile' }));
+  };
+
   return (
     <div className="topbar">
       <div className="topbar-brand">
@@ -106,7 +112,7 @@ export const TopBar: React.FC = () => {
       </div>
       <div className="topbar-right">
         <div className="tb-btn" title="Notifications">🔔</div>
-        <div className="tb-btn" title="Paramètres">⚙</div>
+        <div className="tb-btn" title="Paramètres du profil" onClick={handleGoToProfile} style={{ cursor: 'pointer' }}>⚙</div>
         <div style={{ position: 'relative' }}>
           <div 
             className="user-badge" 
@@ -131,8 +137,28 @@ export const TopBar: React.FC = () => {
               boxShadow: '0 4px 20px rgba(0, 229, 200, 0.15)',
               padding: '6px 0',
               zIndex: 1000,
-              minWidth: '150px',
+              minWidth: '165px',
             }}>
+              <div 
+                onClick={handleGoToProfile}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '12px',
+                  color: '#00E5C8',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontWeight: 600,
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 229, 200, 0.08)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <User size={13} />
+                Modifier le profil
+              </div>
+
               <div 
                 onClick={handleLogout}
                 style={{
