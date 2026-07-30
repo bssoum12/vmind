@@ -83,11 +83,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           />
 
           <div className="input-actions">
-            <button type="button" className="voice-btn" onClick={onOpenVoice}>
-              🎤
+            <button type="button" className="voice-btn flex items-center justify-center rounded-full border border-cyan-400/50 p-2 text-cyan-400 hover:border-cyan-400 transition-colors" onClick={onOpenVoice}>
+              <svg
+                viewBox="0 0 24 24"
+                className="w-4 h-4"
+                style={{ fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }}
+              >
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" fill="currentColor" fillOpacity="0.2" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="22" />
+              </svg>
             </button>
-            <button type="button" className="send-btn" onClick={handleSend}>
-              ➤
+            <button type="button" className="send-btn flex items-center justify-center" onClick={handleSend}>
+              <svg
+                viewBox="0 0 24 24"
+                className="w-5 h-5 fill-current stroke-current"
+                style={{ strokeWidth: '1.2px', strokeLinejoin: 'round', strokeLinecap: 'round' }}
+              >
+                <path d="M 3.5 20.5 L 21.5 12 L 3.5 3.5 L 7.5 12 Z" />
+              </svg>
             </button>
           </div>
         </div>
