@@ -7,6 +7,26 @@ import {
   Shield, Eye, EyeOff, Server, Cpu
 } from 'lucide-react';
 
+interface ConnectorInfo {
+  connector_type: string;
+  client_id: string;
+  is_default?: boolean;
+  is_active?: boolean;
+}
+
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('vmind_session') || localStorage.getItem('vmind_mcp_token');
+  if (!raw) return null;
+  if (raw.startsWith('eyJ')) return raw;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed?.token || parsed?.access_token || parsed?.user?.token || raw;
+  } catch (e) {
+    return raw;
+  }
+}
+
 export const ProfileView: React.FC = () => {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -15,6 +35,8 @@ export const ProfileView: React.FC = () => {
   const [phone, setPhone] = useState('');
   const [roleLabel, setRoleLabel] = useState('');
   const [avatarInitials, setAvatarInitials] = useState('HA');
+  const [connectors, setConnectors] = useState<ConnectorInfo[]>([]);
+  const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -37,8 +59,7 @@ export const ProfileView: React.FC = () => {
       try {
         setIsLoading(true);
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-        let token = localStorage.getItem('vmind_mcp_token') || localStorage.getItem('vmind_session');
-        if (token && token.startsWith('{')) token = JSON.parse(token).token;
+        const token = getAuthToken();
         if (!token) return;
 
         try {
@@ -49,6 +70,17 @@ export const ProfileView: React.FC = () => {
           if (decoded.email) setEmail(decoded.email);
           if (decoded.phone_number) setPhone(decoded.phone_number);
           if (decoded.roles) setRoleLabel(Array.isArray(decoded.roles) ? decoded.roles[0] : decoded.roles);
+          if (Array.isArray(decoded.allowedAgents)) {
+            setAllowedAgents(decoded.allowedAgents.map((a: string) => a.toUpperCase()));
+          }
+          if (decoded.connector_type && decoded.client_id) {
+            setConnectors([{
+              connector_type: decoded.connector_type,
+              client_id: decoded.client_id,
+              is_active: true,
+              is_default: true
+            }]);
+          }
         } catch (e) {}
 
         const res = await fetch(`${baseUrl}/api/auth/vmind/profile`, {
@@ -63,6 +95,12 @@ export const ProfileView: React.FC = () => {
           setEmail(data.user.email || '');
           setPhone(data.user.phone_number || '');
           setRoleLabel(data.user.role || 'Administrateur');
+          if (Array.isArray(data.user.allowed_agents)) {
+            setAllowedAgents(data.user.allowed_agents.map((a: string) => a.toUpperCase()));
+          }
+          if (Array.isArray(data.user.connectors) && data.user.connectors.length > 0) {
+            setConnectors(data.user.connectors);
+          }
           const fn = data.user.first_name || '';
           const ln = data.user.last_name || '';
           if (fn || ln) {
@@ -90,8 +128,7 @@ export const ProfileView: React.FC = () => {
       try {
         setVerifyingCurrentPassword(true);
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-        let token = localStorage.getItem('vmind_mcp_token') || localStorage.getItem('vmind_session');
-        if (token && token.startsWith('{')) token = JSON.parse(token).token;
+        const token = getAuthToken();
         const res = await fetch(`${baseUrl}/api/auth/vmind/verify-current-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -129,8 +166,7 @@ export const ProfileView: React.FC = () => {
     try {
       setIsSaving(true);
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-      let token = localStorage.getItem('vmind_mcp_token') || localStorage.getItem('vmind_session');
-      if (token && token.startsWith('{')) token = JSON.parse(token).token;
+      const token = getAuthToken();
 
       const res = await fetch(`${baseUrl}/api/auth/vmind/profile`, {
         method: 'PUT',
@@ -340,16 +376,22 @@ export const ProfileView: React.FC = () => {
               </div>
               <div style={{ height: '1px', background: 'rgba(0,229,200,0.1)' }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Server size={12} color={cyan} />
-                <span style={{ fontSize: '10px', color: '#8FA3B8' }}>TraLIS ERP</span>
-                <span style={{ fontSize: '9px', color: '#00E676', marginLeft: 'auto', fontWeight: 700 }}>⚡ 12ms</span>
+                <Server size={12} color={connectors.length > 0 ? cyan : '#6B85A0'} />
+                <span style={{ fontSize: '10px', color: '#8FA3B8' }}>
+                  {connectors.length > 0
+                    ? `${connectors[0].connector_type.toUpperCase()} (${connectors[0].client_id})`
+                    : 'Aucun ERP'}
+                </span>
+                <span style={{ fontSize: '9px', color: connectors.length > 0 ? '#00E676' : '#6B85A0', marginLeft: 'auto', fontWeight: 700 }}>
+                  {connectors.length > 0 ? 'ACTIF' : 'INACTIF'}
+                </span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Cpu size={12} color={cyan} />
-                <span style={{ fontSize: '10px', color: '#8FA3B8' }}>6 Agents</span>
+                <span style={{ fontSize: '10px', color: '#8FA3B8' }}>{allowedAgents.length} Agents</span>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '3px' }}>
-                  {['V', 'D', 'F', 'S', 'B', 'M'].map((l, i) => (
-                    <div key={i} style={{ width: '6px', height: '6px', borderRadius: '50%', background: cyan, opacity: 0.6 + i * 0.05, boxShadow: `0 0 4px ${cyan}` }} />
+                  {allowedAgents.map((ag, i) => (
+                    <div key={i} title={ag} style={{ width: '6px', height: '6px', borderRadius: '50%', background: cyan, opacity: 0.6 + (i % 6) * 0.07, boxShadow: `0 0 4px ${cyan}` }} />
                   ))}
                 </div>
               </div>
@@ -595,23 +637,39 @@ export const ProfileView: React.FC = () => {
           <div style={{
             background: 'rgba(5,14,28,0.88)', border: '1px solid rgba(0,229,200,0.26)',
             borderRadius: '14px', padding: '18px 20px',
-            backdropFilter: 'blur(12px)', boxShadow: '0 8px 30px rgba(0,0,0,0.45)'
+            backdropFilter: 'blur(12px)', boxShadow: '0 8px 30px rgba(0,0,0,0.45)',
+            display: 'flex', flexDirection: 'column', gap: '12px'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '9.5px', fontWeight: 800, color: cyan, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
-                CONNECTEUR ERP
+                CONNECTEUR ERP ({connectors.length})
               </span>
-              <span style={{ fontSize: '9.5px', fontWeight: 800, color: '#00E676', background: 'rgba(0,230,118,0.1)', border: '1px solid rgba(0,230,118,0.25)', padding: '2px 7px', borderRadius: '5px' }}>
-                12ms
+              <span style={{
+                fontSize: '9.5px', fontWeight: 800,
+                color: connectors.length > 0 ? '#00E676' : '#6B85A0',
+                background: connectors.length > 0 ? 'rgba(0,230,118,0.1)' : 'rgba(107,133,160,0.1)',
+                border: `1px solid ${connectors.length > 0 ? 'rgba(0,230,118,0.25)' : 'rgba(107,133,160,0.25)'}`,
+                padding: '2px 7px', borderRadius: '5px'
+              }}>
+                {connectors.length > 0 ? 'CONNECTÉ' : 'AUCUN'}
               </span>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Server size={16} color={cyan} />
-              <div>
-                <div style={{ fontSize: '13.5px', fontWeight: 800, color: '#FFFFFF' }}>TraLIS ERP v3.2</div>
-                <div style={{ fontSize: '10.5px', color: '#6B85A0', marginTop: '1px' }}>Synchronisation active</div>
+
+            {connectors.length > 0 ? (
+              connectors.map((c, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', borderTop: i > 0 ? '1px solid rgba(0,229,200,0.1)' : 'none', paddingTop: i > 0 ? '10px' : '0' }}>
+                  <Server size={16} color={cyan} />
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#FFFFFF' }}>
+                    {c.connector_type.toUpperCase()}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Server size={16} color="#6B85A0" />
+                <div style={{ fontSize: '13px', fontWeight: 800, color: '#8FA3B8' }}>Aucun connecteur ERP</div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Agents autorisés */}
@@ -624,18 +682,32 @@ export const ProfileView: React.FC = () => {
               <span style={{ fontSize: '9.5px', fontWeight: 800, color: cyan, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
                 AGENTS AUTORISÉS
               </span>
-              <span style={{ fontSize: '9.5px', fontWeight: 800, color: cyan }}>6 ACTIFS</span>
+              <span style={{
+                fontSize: '9.5px', fontWeight: 800,
+                color: allowedAgents.length > 0 ? cyan : '#6B85A0',
+                background: allowedAgents.length > 0 ? 'rgba(0,229,200,0.1)' : 'rgba(107,133,160,0.1)',
+                border: `1px solid ${allowedAgents.length > 0 ? 'rgba(0,229,200,0.25)' : 'rgba(107,133,160,0.25)'}`,
+                padding: '2px 7px', borderRadius: '5px'
+              }}>
+                {allowedAgents.length} {allowedAgents.length === 1 ? 'ACTIF' : 'ACTIFS'}
+              </span>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'].map(ag => (
-                <span key={ag} style={{
-                  fontSize: '9.5px', fontWeight: 800, color: cyan,
-                  background: 'rgba(0,229,200,0.09)', border: '1px solid rgba(0,229,200,0.28)',
-                  padding: '3px 8px', borderRadius: '6px'
-                }}>
-                  {ag}
+              {allowedAgents.length > 0 ? (
+                allowedAgents.map(ag => (
+                  <span key={ag} style={{
+                    fontSize: '9.5px', fontWeight: 800, color: cyan,
+                    background: 'rgba(0,229,200,0.09)', border: '1px solid rgba(0,229,200,0.28)',
+                    padding: '3px 8px', borderRadius: '6px'
+                  }}>
+                    {ag}
+                  </span>
+                ))
+              ) : (
+                <span style={{ fontSize: '11px', color: '#6B85A0', fontStyle: 'italic' }}>
+                  Aucun agent autorisé
                 </span>
-              ))}
+              )}
             </div>
           </div>
 
