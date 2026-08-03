@@ -242,21 +242,30 @@ export default function Home() {
   }, []);
 
   // Management Mode State
-  const [currentView, setCurrentView] = useState('market');
+  const [currentView, setCurrentView] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('vmind_current_view') || 'market';
+    }
+    return 'market';
+  });
+  
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('all');
 
   const handleNavigate = (view: string) => {
     setCurrentView(view);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('vmind_current_view', view);
+    }
   };
 
   const [editingAgent, setEditingAgent] = useState<any>(null);
 
   const [initialWizardStep, setInitialWizardStep] = useState<number | undefined>(undefined);
 
-  const handleDeploy = (templateId: string, agentToEdit?: any, initialStep?: number) => {
+  const handleDeploy = (templateId: string, agent?: any, initialStep: number = 1) => {
     setSelectedTemplate(templateId);
-    setEditingAgent(agentToEdit || null);
+    setEditingAgent(agent);
     setInitialWizardStep(initialStep);
     setCurrentView('wizard');
   };
@@ -368,7 +377,7 @@ export default function Home() {
           {currentView === 'agents' && (
             <AgentsView
               onNavigate={setCurrentView}
-              onConfigure={handleDeploy}
+              onConfigure={(templateId, agent, step) => handleDeploy(templateId, agent, step)}
             />
           )}
 

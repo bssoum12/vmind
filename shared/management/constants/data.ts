@@ -25,6 +25,18 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     deployments: 0,
     connections: ['tralis', 'Email', 'odoo']
   },
+  {
+    id: 'sourcing',
+    name: 'Agent de Sourcing',
+    description: 'Scrape et cherche de manière 100% autonome de nouveaux prospects sur Internet, puis engage le contact avec des emails hyper-personnalisés.',
+    category: 'Commercial · Sourcing',
+    icon: '🕵️',
+    accent: '#00D1B2',
+    iconBg: 'rgba(0, 209, 178, 0.12)',
+    tag: 'new',
+    deployments: 0,
+    connections: ['LinkedIn', 'Email', 'Google']
+  },
   //**************************
 
   {

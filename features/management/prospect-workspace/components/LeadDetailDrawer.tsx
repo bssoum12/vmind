@@ -351,7 +351,7 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
                   onClick={handleGenerateEmail}
                   disabled={isGeneratingEmail}
                 >
-                  {isGeneratingEmail ? 'Génération...' : '✉ Générer (n8n)'}
+                  {isGeneratingEmail ? 'Génération...' : '✉ Générer'}
                 </button>
               </div>
               <div className="email-editor">

@@ -12,14 +12,16 @@ interface Message {
 interface OnboardingChatProps {
   initialMission: string;
   onConfirm: (mission: string) => void;
+  apiEndpoint?: string;
 }
 
-export function OnboardingChat({ initialMission, onConfirm }: OnboardingChatProps) {
+export function OnboardingChat({ initialMission, onConfirm, apiEndpoint }: OnboardingChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [summary, setSummary] = useState<string | null>(initialMission || null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -28,6 +30,12 @@ export function OnboardingChat({ initialMission, onConfirm }: OnboardingChatProp
   useEffect(() => {
     scrollToBottom();
   }, [messages, summary, isLoading]);
+
+  useEffect(() => {
+    if (!isLoading && inputRef.current) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [isLoading]);
 
   const hasInitialized = useRef(false);
 
@@ -55,7 +63,8 @@ export function OnboardingChat({ initialMission, onConfirm }: OnboardingChatProp
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const token = localStorage.getItem('vmind_session');
-      const res = await fetch(`${API_BASE_URL}/api/prospect-agent/onboarding-chat`, {
+      const endpoint = apiEndpoint || '/api/prospect-agent/onboarding-chat';
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -136,11 +145,12 @@ export function OnboardingChat({ initialMission, onConfirm }: OnboardingChatProp
       ) : (
         <div style={{ padding: '1.2rem', borderTop: '1px solid var(--border)', background: 'rgba(0,0,0,0.2)', display: 'flex', gap: '12px' }}>
           <input
+            ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Répondre à VirtualMind..."
+            placeholder="Répondre à VMind..."
             disabled={isLoading}
             style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0 16px', color: '#fff', outline: 'none', height: '50px', fontSize: '1rem', opacity: isLoading ? 0.5 : 1 }}
           />

@@ -16,16 +16,10 @@ interface WizardViewProps {
 }
 
 const VIRTUAL_MIND_GUIDE: Record<string, { title: string; text: string }> = {
-  agent_name: { title: "Identité de l'Agent", text: "Donnez un nom unique à votre agent. Ce nom vous aidera à l'identifier facilement dans votre espace de travail et dans les logs de prospection." },
+  agent_name: { title: "Identité de l'Agent", text: "Donnez un nom unique à votre agent. Ce nom vous aidera à l'identifier facilement dans votre espace de travail et dans les logs de sourcing." },
   modele_llm: { title: "Cerveau de l'Agent (LLM)", text: "Le modèle sélectionné définit l'intelligence de votre agent. Llama 3.3 est recommandé pour sa rapidité et son rapport coût/performance." },
-  secteur_activite: { title: "Secteur d'Activité", text: "Ciblez précisément les secteurs pertinents. VMind analysera le site web du prospect pour vérifier s'il correspond à cette liste." },
-  taille_entreprise: { title: "Taille de l'Entreprise", text: "Filtrez par effectif. Les TPE/PME réagissent différemment des Grands Comptes." },
-  poste_contact: { title: "Cible Décisionnaire", text: "Qui souhaitez-vous contacter ? VMind identifiera la personne la plus proche de ce poste (CEO, DAF, CTO...)." },
-  zone_geo: { title: "Zone Géographique", text: "Où se situent vos prospects idéaux ? L'agent adaptera sa recherche et la langue de contact en conséquence." },
-  seuil_qualification: { title: "Seuil de Qualification", text: "Le score minimal sur 100 requis pour qu'un lead soit considéré comme qualifié et contacté automatiquement par l'agent." },
-  ponderations: { title: "Pondérations ICP", text: "Répartissez l'importance (sur 100) entre le secteur, la taille, le poste et le pays. Cela dicte la formule de scoring IA." },
   signature_email: { title: "Signature d'Email", text: "Cette signature sera insérée automatiquement à la fin de tous les emails générés par VMind. Soyez professionnel !" },
-  default_cc: { title: "Copie Conforme (CC)", text: "Ajoutez votre adresse email ou celle d'un manager pour recevoir une copie des emails envoyés aux prospects." },
+  default_cc: { title: "Copie Conforme (CC)", text: "Ajoutez votre adresse email ou celle d'un manager pour recevoir une copie des emails envoyés aux candidats sourcés." },
   email_limits: { title: "Cadence d'Envoi", text: "Configurez le délai entre chaque email pour éviter d'être marqué comme spam. Les limites journalières protègent la réputation de votre domaine." },
   trigger_rules: { title: "Planification Autonome", text: "Définissez quand votre agent doit s'activer de manière autonome (ex: tous les lundis à 8h). N8N gère cette orchestration." }
 };
@@ -202,7 +196,7 @@ function TagInput({
   );
 }
 
-export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, onCancel, agentToEdit, initialStep }) => {
+export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCancel, agentToEdit, initialStep }) => {
   const [step, setStep] = useState(initialStep || 1);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
@@ -247,21 +241,9 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     agent_name: string;
     run_mode: string;
     workflow_timezone: string;
-    prospection_config: {
+    sourcing_config: {
       modele_llm: string;
       agent_mission: string;
-      icp: {
-        secteur_activite: string[];
-        taille_min: number;
-        taille_max: number;
-        poste_contact: string[];
-        zone_geo: string[];
-        seuil_qualification: number;
-        poids_secteur: number;
-        poids_taille: number;
-        poids_poste: number;
-        poids_pays: number;
-      };
       campaign: {
         signature_email: string;
         default_cc: string;
@@ -277,24 +259,13 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     if (agentToEdit && agentToEdit.config) {
       const cfg = agentToEdit.config;
       return {
-        agent_name: agentToEdit.agent_name || 'Agent de Prospection',
-        run_mode: agentToEdit.run_mode || 'prospection',
+        agent_name: agentToEdit.agent_name || 'Agent de Sourcing',
+        run_mode: agentToEdit.run_mode || 'sourcing',
         workflow_timezone: agentToEdit.workflow_timezone || 'Africa/Tunis',
-        prospection_config: {
+        sourcing_config: {
           modele_llm: cfg.modele_llm || 'llama-3.3-70b-versatile',
           agent_mission: cfg.agent_mission || '',
-          icp: {
-            secteur_activite: cfg.icp?.secteur_activite || [],
-            taille_min: cfg.icp?.taille_min ?? 50,
-            taille_max: cfg.icp?.taille_max ?? 500,
-            poste_contact: cfg.icp?.poste_contact || [],
-            zone_geo: cfg.icp?.zone_geo || [],
-            seuil_qualification: cfg.seuil_qualification ?? 70,
-            poids_secteur: cfg.icp?.poids_secteur ?? 25,
-            poids_taille: cfg.icp?.poids_taille ?? 25,
-            poids_poste: cfg.icp?.poids_poste ?? 25,
-            poids_pays: cfg.icp?.poids_pays ?? 25
-          },
+          
           campaign: {
             signature_email: cfg.signature_email || '',
             default_cc: cfg.default_cc || '',
@@ -328,23 +299,12 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
 
     return {
       agent_name: `${defaultName} - ${randomSuffix}`,
-      run_mode: 'prospection',
+      run_mode: 'sourcing',
       workflow_timezone: 'Africa/Tunis',
-      prospection_config: {
+      sourcing_config: {
         modele_llm: 'llama-3.3-70b-versatile',
         agent_mission: '',
-        icp: {
-          secteur_activite: [] as string[],
-          taille_min: 50,
-          taille_max: 500,
-          poste_contact: [] as string[],
-          zone_geo: [] as string[],
-          seuil_qualification: 70,
-          poids_secteur: 25,
-          poids_taille: 25,
-          poids_poste: 25,
-          poids_pays: 25
-        },
+        
         campaign: {
           signature_email: '',
           default_cc: '',
@@ -380,26 +340,13 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
   ];
 
-  const updateIcp = (key: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      prospection_config: {
-        ...prev.prospection_config,
-        icp: {
-          ...prev.prospection_config.icp,
-          [key]: value
-        }
-      }
-    }));
-  };
-
   const updateCampaign = (key: string, value: any) => {
     setFormData(prev => ({
       ...prev,
-      prospection_config: {
-        ...prev.prospection_config,
+      sourcing_config: {
+        ...prev.sourcing_config,
         campaign: {
-          ...prev.prospection_config.campaign,
+          ...prev.sourcing_config.campaign,
           [key]: value
         }
       }
@@ -471,7 +418,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       }
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-        const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
+        const endpoint = `${baseUrl}/api/sourcing-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
         
         const token = localStorage.getItem('vmind_session');
         const res = await fetch(endpoint, {
@@ -494,16 +441,6 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       }
     }
 
-    if (step === 3 && nextStep === 4) {
-      const sum = formData.prospection_config.icp.poids_secteur +
-        formData.prospection_config.icp.poids_taille +
-        formData.prospection_config.icp.poids_poste +
-        formData.prospection_config.icp.poids_pays;
-      if (sum !== 100) {
-        alert(`La somme des pondérations de score ICP doit être exactement de 100 (actuellement: ${sum}).`);
-        return;
-      }
-    }
     setStep(nextStep);
   };
 
@@ -517,7 +454,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
+      const endpoint = `${baseUrl}/api/sourcing-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
       
       const token = localStorage.getItem('vmind_session');
       const res = await fetch(endpoint, {
@@ -556,8 +493,8 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       const token = localStorage.getItem('vmind_session');
 
       const endpoint = agentToEdit
-        ? `${baseUrl}/api/prospect-agent/update/${agentToEdit.agent_id}`
-        : `${baseUrl}/api/prospect-agent/deploy`;
+        ? `${baseUrl}/api/sourcing-agent/update/${agentToEdit.agent_id}`
+        : `${baseUrl}/api/sourcing-agent/deploy`;
 
       const response = await fetch(endpoint, {
         method: agentToEdit ? "PUT" : "POST",
@@ -614,7 +551,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
           <div className="page-title" id="wiz-title">
             Configuration: {template ? template.name : 'Nouvel Agent sur mesure'}
           </div>
-          <div className="page-sub">Configurez votre agent de prospection en 4 étapes</div>
+          <div className="page-sub">Configurez votre agent de sourcing en 3 étapes</div>
         </div>
         <div className="page-actions">
           <Button onClick={onCancel}>← Retour Marketplace</Button>
@@ -636,21 +573,16 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 <div className="wstep-label">Briefing</div>
               </div>
             </div>
+            
             <div className={`wstep ${step === 3 ? 'active' : step > 3 ? 'done' : ''}`}>
               <div className="wstep-inner">
                 <div className="wstep-num">3</div>
-                <div className="wstep-label">ICP</div>
+                <div className="wstep-label">Campagne</div>
               </div>
             </div>
             <div className={`wstep ${step === 4 ? 'active' : step > 4 ? 'done' : ''}`}>
               <div className="wstep-inner">
                 <div className="wstep-num">4</div>
-                <div className="wstep-label">Campagne</div>
-              </div>
-            </div>
-            <div className={`wstep ${step === 5 ? 'active' : step > 5 ? 'done' : ''}`}>
-              <div className="wstep-inner">
-                <div className="wstep-num">5</div>
                 <div className="wstep-label">Planification</div>
               </div>
             </div>
@@ -676,10 +608,10 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <label className="form-label">Modèle de Langage (LLM)</label>
                     <select
                       className="form-input"
-                      value={formData.prospection_config.modele_llm} onFocus={() => setFocusedField('modele_llm')} onBlur={() => setFocusedField(null)}
+                      value={formData.sourcing_config.modele_llm} onFocus={() => setFocusedField('modele_llm')} onBlur={() => setFocusedField(null)}
                       onChange={(e) => setFormData({
                         ...formData,
-                        prospection_config: { ...formData.prospection_config, modele_llm: e.target.value }
+                        sourcing_config: { ...formData.sourcing_config, modele_llm: e.target.value }
                       })}
                     >
                       <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
@@ -726,11 +658,12 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 </div>
                 <p style={{ color: 'var(--text)', marginBottom: '1rem', fontSize: '0.95rem' }}>Discutez avec VMind pour définir la mission de l'agent. Il vous posera quelques questions pour comprendre votre offre et vos objectifs.</p>
                 <OnboardingChat
-                  initialMission={formData.prospection_config.agent_mission}
+                  apiEndpoint="/api/sourcing-agent/onboarding-chat"
+                  initialMission={formData.sourcing_config.agent_mission}
                   onConfirm={(mission) => {
                     setFormData(prev => ({
                       ...prev,
-                      prospection_config: { ...prev.prospection_config, agent_mission: mission }
+                      sourcing_config: { ...prev.sourcing_config, agent_mission: mission }
                     }));
                     validateAndNext(3);
                   }}
@@ -740,138 +673,17 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 <Button variant="secondary" onClick={() => validateAndNext(1)}>← Retour</Button>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <Button variant="secondary" onClick={() => setStep(3)}>Passer (Ignorer)</Button>
-                  {formData.prospection_config.agent_mission && (
-                    <Button variant="primary" onClick={() => validateAndNext(3)}>Profil Client (ICP) →</Button>
+                  {formData.sourcing_config.agent_mission && (
+                    <Button variant="primary" onClick={() => validateAndNext(3)}>Campagne & Limites →</Button>
                   )}
                 </div>
               </div>
             </div>
           )}
 
-          {/* STEP 3: Cibles ICP */}
-
+          {/* STEP 3: Campagne & Limites */}
           {step === 3 && (
             <div id="step3" className="anim">
-              <div className="wcard">
-                <div className="wcard-title"><span className="dot" style={{ backgroundColor: template?.accent || '#FF4757' }}></span>Critères ICP (Valeurs Cibles)</div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Secteur d'activité</label>
-                    <TagInput
-                      tags={formData.prospection_config.icp.secteur_activite}
-                      onChange={(t) => updateIcp('secteur_activite', t)} onFocus={() => setFocusedField('secteur_activite')} onBlur={() => setFocusedField(null)}
-                      placeholder="Ajouter un secteur..."
-                      suggestions={['Transport', 'Logistique', 'Industrie', 'Commerce', 'BTP', 'Santé', 'IT', 'Finance', 'E-commerce', 'Energie', 'Services']}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Taille de l'entreprise (Min - Max)</label>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <input
-                        type="number"
-                        className="form-input"
-                        style={{ flex: 1 }}
-                        value={formData.prospection_config.icp.taille_min} onFocus={() => setFocusedField('taille_entreprise')} onBlur={() => setFocusedField(null)}
-                        onChange={(e) => updateIcp('taille_min', Number(e.target.value))}
-                      />
-                      <input
-                        type="number"
-                        className="form-input"
-                        style={{ flex: 1 }}
-                        value={formData.prospection_config.icp.taille_max} onFocus={() => setFocusedField('taille_entreprise')} onBlur={() => setFocusedField(null)}
-                        onChange={(e) => updateIcp('taille_max', Number(e.target.value))}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="form-row" style={{ marginTop: '10px' }}>
-                  <div className="form-group">
-                    <label className="form-label">Poste du contact</label>
-                    <TagInput
-                      tags={formData.prospection_config.icp.poste_contact}
-                      onChange={(t) => updateIcp('poste_contact', t)} onFocus={() => setFocusedField('poste_contact')} onBlur={() => setFocusedField(null)}
-                      placeholder="Ajouter un poste..."
-                      suggestions={['DAF', 'DSI', 'Directeur Ops', 'DG', 'PDG', 'Responsable Logistique', 'Directeur Commercial', 'CEO', 'CTO', 'Directeur Marketing', 'Responsable Achats']}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Zone géographique</label>
-                    <TagInput
-                      tags={formData.prospection_config.icp.zone_geo}
-                      onChange={(t) => updateIcp('zone_geo', t)} onFocus={() => setFocusedField('zone_geo')} onBlur={() => setFocusedField(null)}
-                      placeholder="Ajouter un pays..."
-                      suggestions={['Tunisie', 'Maroc', 'Belgique', 'France', 'Suisse', 'Canada', 'Sénégal', 'Côte d\'Ivoire', 'Algérie', 'Monaco', 'Luxembourg']}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="wcard" style={{ marginTop: '20px' }}>
-                <div className="wcard-title"><span className="dot" style={{ backgroundColor: template?.accent || '#FF4757' }}></span>Pondérations ICP (Total = 100)</div>
-                <div className="form-group">
-                  <label className="form-label">Seuil de Qualification de Lead ({formData.prospection_config.icp.seuil_qualification} pts)</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    style={{ width: '100%', marginBottom: '10px' }}
-                    value={formData.prospection_config.icp.seuil_qualification} onFocus={() => setFocusedField('seuil_qualification')} onBlur={() => setFocusedField(null)}
-                    onChange={(e) => updateIcp('seuil_qualification', parseInt(e.target.value))}
-                  />
-                </div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Secteur (pts)</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={formData.prospection_config.icp.poids_secteur} onFocus={() => setFocusedField('ponderations')} onBlur={() => setFocusedField(null)}
-                      onChange={(e) => updateIcp('poids_secteur', Number(e.target.value))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Taille (pts)</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={formData.prospection_config.icp.poids_taille} onFocus={() => setFocusedField('ponderations')} onBlur={() => setFocusedField(null)}
-                      onChange={(e) => updateIcp('poids_taille', Number(e.target.value))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Poste (pts)</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={formData.prospection_config.icp.poids_poste} onFocus={() => setFocusedField('ponderations')} onBlur={() => setFocusedField(null)}
-                      onChange={(e) => updateIcp('poids_poste', Number(e.target.value))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Zone Geo (pts)</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={formData.prospection_config.icp.poids_pays} onFocus={() => setFocusedField('ponderations')} onBlur={() => setFocusedField(null)}
-                      onChange={(e) => updateIcp('poids_pays', Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-                <Button onClick={() => validateAndNext(2)}>← Retour</Button>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <Button variant="secondary" onClick={() => setStep(4)}>Passer (Ignorer)</Button>
-                  <Button variant="primary" onClick={() => validateAndNext(4)}>Campagne & Limites →</Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: Campagne & Limites */}
-          {step === 4 && (
-            <div id="step4" className="anim">
               <div className="wcard">
                 <div className="wcard-title"><span className="dot" style={{ backgroundColor: template?.accent || '#00e5c8' }}></span>Signature & Copie Conforme</div>
                 <div className="form-group" style={{ marginBottom: '20px' }}>
@@ -879,7 +691,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                   <textarea
                     className="form-input"
                     style={{ minHeight: '100px', fontSize: '13px', lineHeight: '1.5' }}
-                    value={formData.prospection_config.campaign.signature_email} onFocus={() => setFocusedField('signature_email')} onBlur={() => setFocusedField(null)}
+                    value={formData.sourcing_config.campaign.signature_email} onFocus={() => setFocusedField('signature_email')} onBlur={() => setFocusedField(null)}
                     onChange={(e) => updateCampaign('signature_email', e.target.value)}
                     placeholder="Cordialement,&#10;L'équipe Commerciale..."
                   />
@@ -888,7 +700,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 <div className="form-group" style={{ marginBottom: '20px' }}>
                   <label className="form-label">Copie conforme (CC) par défaut</label>
                   <TagInput
-                    tags={formData.prospection_config.campaign.default_cc ? formData.prospection_config.campaign.default_cc.split(/[,;]+/).map(s => s.trim()).filter(Boolean) : []}
+                    tags={formData.sourcing_config.campaign.default_cc ? formData.sourcing_config.campaign.default_cc.split(/[,;]+/).map(s => s.trim()).filter(Boolean) : []}
                     onChange={(tags) => updateCampaign('default_cc', tags.join(','))} onFocus={() => setFocusedField('default_cc')} onBlur={() => setFocusedField(null)}
                     placeholder="Ajouter une adresse email..."
                     suggestions={[]}
@@ -904,7 +716,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <input
                       type="number"
                       className="form-input"
-                      value={formData.prospection_config.campaign.delai_envois} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
+                      value={formData.sourcing_config.campaign.delai_envois} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
                       onChange={(e) => updateCampaign('delai_envois', Number(e.target.value))}
                     />
                   </div>
@@ -913,7 +725,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <input
                       type="number"
                       className="form-input"
-                      value={formData.prospection_config.campaign.max_emails_jour} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
+                      value={formData.sourcing_config.campaign.max_emails_jour} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
                       onChange={(e) => updateCampaign('max_emails_jour', Number(e.target.value))}
                     />
                   </div>
@@ -922,7 +734,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 <div className="form-group" style={{ marginTop: '10px' }}>
                   <label className="form-label">Email de récapitulatif quotidien</label>
                   <TagInput
-                    tags={formData.prospection_config.campaign.email_recap ? formData.prospection_config.campaign.email_recap.split(',').map(s => s.trim()).filter(Boolean) : []}
+                    tags={formData.sourcing_config.campaign.email_recap ? formData.sourcing_config.campaign.email_recap.split(',').map(s => s.trim()).filter(Boolean) : []}
                     onChange={(tags) => updateCampaign('email_recap', tags.join(','))} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
                     placeholder="Ajouter une adresse email..."
                     suggestions={[]}
@@ -930,18 +742,18 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-                <Button onClick={() => validateAndNext(3)}>← Retour</Button>
+                <Button onClick={() => validateAndNext(2)}>← Retour</Button>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                  <Button variant="secondary" onClick={() => setStep(5)}>Passer (Ignorer)</Button>
-                  <Button variant="primary" onClick={() => validateAndNext(5)}>Planification →</Button>
+                  <Button variant="secondary" onClick={() => setStep(4)}>Passer (Ignorer)</Button>
+                  <Button variant="primary" onClick={() => validateAndNext(4)}>Planification →</Button>
                 </div>
               </div>
             </div>
           )}
 
           {/* STEP 4: Planification */}
-          {step === 5 && (
-            <div id="step5" className="anim">
+          {step === 4 && (
+            <div id="step4" className="anim">
               <div className="wcard">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <div className="wcard-title" style={{ margin: 0 }}>
@@ -1209,7 +1021,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 )}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-                <Button onClick={() => validateAndNext(4)}>← Retour</Button>
+                <Button onClick={() => validateAndNext(3)}>← Retour</Button>
                 <div style={{ display: 'flex', gap: '10px' }}>
                   <Button variant="secondary" onClick={handleDeploy} disabled={isDeploying}>
                     Passer et Déployer
