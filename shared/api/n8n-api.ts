@@ -311,36 +311,6 @@ export async function getProspectAgentStats(agentId: string): Promise<any> {
 }
 
 /**
- * Trigger Auto Mode for a specific prospect agent
- */
-export async function triggerProspectAutoMode(agentId: string): Promise<any> {
-  const res = await fetch(`${getBaseUrl()}/api/start/${encodeURIComponent(agentId)}`, {
-    method: "POST",
-    headers: getAuthHeaders()
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to trigger prospect auto mode (${res.status})`);
-  }
-  return res.json();
-}
-
-/**
- * Stop Auto Mode for a specific prospect agent
- */
-export async function stopProspectAutoMode(agentId: string): Promise<any> {
-  const res = await fetch(`${getBaseUrl()}/api/stop/${encodeURIComponent(agentId)}`, {
-    method: "POST",
-    headers: getAuthHeaders()
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to stop prospect auto mode (${res.status})`);
-  }
-  return res.json();
-}
-
-/**
  * Instantly qualify prospects for this agent (manually)
  */
 export async function qualifyManualProspects(agentId: string, mode: 'pending_only' | 'all'): Promise<any> {
@@ -420,5 +390,24 @@ export async function fetchN8nKpis(
     console.warn("[KPI API] Response from proxy is not valid JSON:", text);
     return {};
   }
+}
+
+/**
+ * Trigger immediate execution for Sourcing Agent
+ */
+export async function triggerSourcingRun(
+  agentId: string, 
+  params: { sourcingSummary: string; totalLeads: number; leadsPerCompany: number; ignoreDuplicates: boolean }
+): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/sourcing-agent/run/${encodeURIComponent(agentId)}`, {
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(params)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to trigger sourcing agent (${res.status})`);
+  }
+  return res.json();
 }
 

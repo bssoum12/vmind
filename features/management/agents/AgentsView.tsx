@@ -8,7 +8,6 @@ import {
   deleteAgent,
   runAgentNow,
   getProspectAgentStats,
-  triggerProspectAutoMode,
   qualifyManualProspects,
   triggerAIQualificationAllPending,
 } from '@/shared/api/n8n-api';
@@ -18,8 +17,9 @@ import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Brain, CheckSquare, ListChecks, SkipForward, Users, Info, ExternalLink, UploadCloud } from 'lucide-react';
 import { ProspectAgentExecutionModal } from './components/ProspectAgentExecutionModal';
+import { SourcingAgentExecutionModal } from './components/SourcingAgentExecutionModal';
 import { ProspectAgentScheduleModal } from './components/ProspectAgentScheduleModal';
-
+import { SourcingAgentScheduleModal } from './components/SourcingAgentScheduleModal';
 interface AgentsViewProps {
   onNavigate: (view: string) => void;
   onConfigure: (templateId: string, agent?: any, initialStep?: number) => void;
@@ -38,6 +38,8 @@ export interface LiveAgent {
   deployed_at?: number;
   status?: AgentStatus;
   schedule_id?: string;
+  agent_id?: number | string;
+  uuid?: string;
 }
 
 function deriveStatus(agent: LiveAgent): AgentStatus {
@@ -278,7 +280,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   };
 
   const handleRunNow = async (agent: LiveAgent) => {
-    if (agent.run_mode === 'prospection') {
+    if (agent.run_mode === 'prospection' || agent.run_mode === 'sourcing') {
       const publicId = (agent as any).agent_id;
       if (!publicId) {
         showToast("Impossible de trouver l'ID public de cet agent", 'err');
@@ -488,7 +490,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                               className="row-btn"
                               disabled={busy}
                               onClick={() => {
-                                if (agent.run_mode === 'prospection') {
+                                if (agent.run_mode === 'prospection' || agent.run_mode === 'sourcing') {
                                   setScheduleModalAgent(agent);
                                 } else {
                                   handleResume(agent);
@@ -505,7 +507,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                           {/* Config */}
                           <button
                             className="row-btn"
-                            onClick={() => onConfigure(agent.run_mode === 'prospection' ? 'prospection' : 'recouvrement', agent)}
+                            onClick={() => onConfigure(agent.run_mode || 'recouvrement', agent)}
                             title="Modifier la configuration"
                             style={{ ...getBtnStyle(agent, 3) }}
                           >
@@ -513,11 +515,16 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                             ⚙️
                           </button>
 
-                          {/* Open Workspace (Only for Prospect Agents) */}
-                          {agent.run_mode === 'prospection' && (
+                          {/* Open Workspace (Prospect and Sourcing) */}
+                          {(agent.run_mode === 'prospection' || agent.run_mode === 'sourcing') && (
                             <button
                               className="row-btn"
-                              onClick={() => router.push(`/prospect-agent-workspace/${(agent as any).agent_id || 1}`)}
+                              onClick={() => {
+                                const route = agent.run_mode === 'sourcing' 
+                                  ? `/sourcing-agent-workspace/${agent.uuid || (agent as any).agent_id}`
+                                  : `/prospect-agent-workspace/${agent.uuid || (agent as any).agent_id || 1}`;
+                                router.push(route);
+                              }}
                               title="Ouvrir l'espace de travail"
                               style={{ color: '#00E5C8', borderColor: 'rgba(0,229,200,0.3)', ...getBtnStyle(agent, 4) }}
                             >
@@ -672,7 +679,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
               <button
                 className="row-btn"
                 style={{ fontSize: 12 }}
-                onClick={() => onConfigure('recouvrement')}
+                onClick={() => onConfigure(selected.run_mode || 'recouvrement', selected)}
               >
                 ⚙️ Modifier config
               </button>
@@ -682,15 +689,22 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
       </div>
 
       {/* ── EXÉCUTION (AUTO MODE) MODAL ── */}
-      {runModalAgent && (
+      {runModalAgent && (runModalAgent.run_mode !== 'sourcing') && (
         <ProspectAgentExecutionModal 
           agent={runModalAgent} 
           onClose={() => setRunModalAgent(null)} 
           onToast={showToast} 
         />
       )}
+      {runModalAgent && runModalAgent.run_mode === 'sourcing' && (
+        <SourcingAgentExecutionModal 
+          agent={runModalAgent} 
+          onClose={() => setRunModalAgent(null)} 
+          onToast={showToast} 
+        />
+      )}
       {/* ── SCHEDULE MODAL ── */}
-      {scheduleModalAgent && (
+      {scheduleModalAgent && scheduleModalAgent.run_mode === 'prospection' && (
         <ProspectAgentScheduleModal
           agent={scheduleModalAgent}
           onClose={() => setScheduleModalAgent(null)}
@@ -701,7 +715,22 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           }}
           onEditSchedule={() => {
             setScheduleModalAgent(null);
-            onConfigure(scheduleModalAgent.run_mode === 'prospection' ? 'prospection' : 'recouvrement', scheduleModalAgent, 5);
+            onConfigure(scheduleModalAgent.run_mode || 'recouvrement', scheduleModalAgent, 5);
+          }}
+        />
+      )}
+      {scheduleModalAgent && scheduleModalAgent.run_mode === 'sourcing' && (
+        <SourcingAgentScheduleModal
+          agent={scheduleModalAgent}
+          onClose={() => setScheduleModalAgent(null)}
+          onToast={showToast}
+          onConfirm={async () => {
+            await handleResume(scheduleModalAgent);
+            setScheduleModalAgent(null);
+          }}
+          onEditSchedule={() => {
+            setScheduleModalAgent(null);
+            onConfigure(scheduleModalAgent.run_mode || 'recouvrement', scheduleModalAgent, 4);
           }}
         />
       )}
