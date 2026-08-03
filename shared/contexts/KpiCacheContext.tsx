@@ -60,6 +60,10 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   const clearError = () => setError(null);
 
   const fetchKpis = async (agentId: string, force = false, targetTool?: string) => {
+    if (!isAuthenticated()) {
+      return;
+    }
+
     const upperAgent = agentId.toUpperCase();
     activeAgentRef.current = upperAgent;
 
@@ -164,11 +168,22 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     }
   };
 
+  // Helper to check if user is authenticated before fetching KPIs
+  const isAuthenticated = () => {
+    if (typeof window === "undefined") return false;
+    const token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
+    return Boolean(token && token !== "null");
+  };
+
   // Auto-refetch when date changes or when the active agent changes (with 2s debounce)
   useEffect(() => {
+    if (!isAuthenticated()) {
+      return;
+    }
+
     const currentAgent = activeAgentId || 'VDATA';
     const lowerAgent = currentAgent.toLowerCase();
-    if (lowerAgent !== 'vdata' && lowerAgent !== 'vfin') return;
+    if (lowerAgent !== 'vdata' && lowerAgent !== 'vfin' && lowerAgent !== 'vsell') return;
 
     // Clear previous debounce timeout
     if (debounceTimeoutRef.current) {

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, AlertTriangle, Link2, Shield, X, Database, ChevronDown, ChevronUp, Eye, FileEdit, Zap } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Link2, Shield, X, Database, ChevronDown, ChevronUp, Eye, EyeOff, FileEdit, Zap } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -266,12 +266,13 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   const [showModal, setShowModal]         = useState(false);
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showPassword, setShowPassword]   = useState(false);
   const [loginClientId, setLoginClientId] = useState('DEMO');
   const [loginLoading, setLoginLoading]   = useState(false);
   const [loginError, setLoginError]       = useState('');
   const [errorMessage]                    = useState('Impossible de joindre le serveur MCP.');
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
   // Convenience aliases
   const userInfo           = session?.user ?? null;
@@ -308,7 +309,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
       }
     } catch (err) {
       console.error('[Connectors] Erreur réseau lors de la validation:', err);
-      setLoginError('Serveur MCP indisponible. Vérifiez que le backend est démarré.');
+      setLoginError("Connexion impossible : le serveur ne répond pas ou le certificat de sécurité HTTPS n'est pas accepté. Essayez d'ouvrir https://localhost:3001/health dans un nouvel onglet pour accepter le risque.");
     } finally {
       setLoginLoading(false);
     }
@@ -344,7 +345,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
         setLoginError(data?.error || 'Identifiants invalides.');
       }
     } catch (err) {
-      setLoginError('Serveur indisponible. Vérifiez que le backend est démarré.');
+      setLoginError("Connexion impossible : le serveur ne répond pas ou le certificat de sécurité HTTPS n'est pas accepté. Essayez d'ouvrir https://localhost:3001/health dans un nouvel onglet pour accepter le risque.");
     } finally {
       setLoginLoading(false);
     }
@@ -573,25 +574,43 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
               {[
                 { label: 'Identifiant', type: 'text', value: loginUsername, onChange: setLoginUsername, placeholder: 'Username ou Email', required: true },
                 { label: 'Mot de passe', type: 'password', value: loginPassword, onChange: setLoginPassword, placeholder: '••••••••', required: true },
-              ].map(field => (
+              ].map(field => {
+                const isPassword = field.label === 'Mot de passe';
+                return (
                 <div key={field.label}>
                   <label style={{ display: 'block', fontSize: '12px', color: '#8FA3B8', marginBottom: '6px', fontWeight: 600 }}>
                     {field.label}
                   </label>
-                  <input
-                    type={field.type}
-                    value={field.value}
-                    onChange={e => field.onChange(e.target.value)}
-                    placeholder={field.placeholder}
-                    required={field.required}
-                    style={{
-                      width: '100%', padding: '11px 14px', boxSizing: 'border-box',
-                      background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none',
-                    }}
-                  />
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={isPassword && showPassword ? 'text' : field.type}
+                      value={field.value}
+                      onChange={e => field.onChange(e.target.value)}
+                      placeholder={field.placeholder}
+                      required={field.required}
+                      style={{
+                        width: '100%', padding: '11px 14px', boxSizing: 'border-box',
+                        background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '10px', color: '#fff', fontSize: '14px', outline: 'none',
+                        paddingRight: isPassword ? '40px' : '14px'
+                      }}
+                    />
+                    {isPassword && (
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                          background: 'none', border: 'none', color: '#6A7E95', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0
+                        }}
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    )}
+                  </div>
                 </div>
-              ))}
+              )})}
 
               {loginError && (
                 <div style={{

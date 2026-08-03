@@ -5,7 +5,7 @@ import { StatusDot } from '../../components/ui/StatusDot';
 import { useClock } from '../../shared/hooks/useClock';
 import { useMode } from '@/shared/contexts/ModeContext';
 import { jwtDecode } from 'jwt-decode';
-import { LogOut } from 'lucide-react';
+import { LogOut, User } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
   const clock = useClock();
@@ -14,55 +14,70 @@ export const TopBar: React.FC = () => {
   const [username, setUsername] = useState('');
   const [roleLabel, setRoleLabel] = useState('');
   const [avatarInitials, setAvatarInitials] = useState('VM');
+  const [isErpConnected, setIsErpConnected] = useState(false);
 
   useEffect(() => {
-    try {
-      const token = localStorage.getItem('vmind_session');
-      if (token) {
-        const decoded: any = jwtDecode(token);
-        if (decoded.username) {
-          setUsername(decoded.username);
-          
-          // Get initials
-          const parts = decoded.username.trim().split(/\s+/);
-          if (parts.length >= 2) {
-            setAvatarInitials((parts[0][0] + parts[1][0]).toUpperCase());
-          } else if (parts[0]) {
-            setAvatarInitials(parts[0].substring(0, 2).toUpperCase());
-          }
-        }
+    const checkTokens = () => {
+      try {
+        const token = localStorage.getItem('vmind_session');
+        const mcpToken = localStorage.getItem('vmind_mcp_token');
         
-        if (decoded.roles) {
-          const roles = Array.isArray(decoded.roles)
-            ? decoded.roles
-            : typeof decoded.roles === 'string'
-              ? [decoded.roles]
-              : [];
-          // Mapping exact des noms de rôles DNN → label français affiché
-          if (roles.includes('Administrators') || roles.includes('Administrator') || roles.includes('Superusers')) {
-            setRoleLabel('Administrateur');
-          } else if (roles.some((r: string) => ['usersFinances','Service Comptabilité','usersCompta','usersDecaissement','usersEncaissements','usersReglementDivers'].includes(r))) {
-            setRoleLabel('Finance & Comptabilité');
-          } else if (roles.some((r: string) => ['usersVentes','UsersCRM','GestionnaireVente','usersClaims'].includes(r))) {
-            setRoleLabel('Commercial');
-          } else if (roles.some((r: string) => ['usersAchats'].includes(r))) {
-            setRoleLabel('Achats');
-          } else if (roles.some((r: string) => ['usersStock','usersArticles','usersStore'].includes(r))) {
-            setRoleLabel('Stock & Magasin');
-          } else if (roles.some((r: string) => ['usersExploitation','usersOMC','usersEDI'].includes(r))) {
-            setRoleLabel('Exploitation');
-          } else if (roles.some((r: string) => ['usersTiers','usersSettings'].includes(r))) {
-            setRoleLabel('Paramétrage');
-          } else if (roles.some((r: string) => ['LecteurSeulement','Extranet'].includes(r))) {
-            setRoleLabel('Lecture seule');
-          } else {
-            setRoleLabel(roles[0] || 'Utilisateur');
+        if (mcpToken) {
+          setIsErpConnected(true);
+        } else {
+          setIsErpConnected(false);
+        }
+
+        if (token) {
+          const decoded: any = jwtDecode(token);
+          if (decoded.username) {
+            setUsername(decoded.username);
+            
+            // Get initials
+            const parts = decoded.username.trim().split(/\s+/);
+            if (parts.length >= 2) {
+              setAvatarInitials((parts[0][0] + parts[1][0]).toUpperCase());
+            } else if (parts[0]) {
+              setAvatarInitials(parts[0].substring(0, 2).toUpperCase());
+            }
+          }
+          
+          if (decoded.roles) {
+            const roles = Array.isArray(decoded.roles)
+              ? decoded.roles
+              : typeof decoded.roles === 'string'
+                ? [decoded.roles]
+                : [];
+            // Mapping exact des noms de rôles DNN → label français affiché
+            if (roles.includes('Administrators') || roles.includes('Administrator') || roles.includes('Superusers')) {
+              setRoleLabel('Administrateur');
+            } else if (roles.some((r: string) => ['usersFinances','Service Comptabilité','usersCompta','usersDecaissement','usersEncaissements','usersReglementDivers'].includes(r))) {
+              setRoleLabel('Finance & Comptabilité');
+            } else if (roles.some((r: string) => ['usersVentes','UsersCRM','GestionnaireVente','usersClaims'].includes(r))) {
+              setRoleLabel('Commercial');
+            } else if (roles.some((r: string) => ['usersAchats'].includes(r))) {
+              setRoleLabel('Achats');
+            } else if (roles.some((r: string) => ['usersStock','usersArticles','usersStore'].includes(r))) {
+              setRoleLabel('Stock & Magasin');
+            } else if (roles.some((r: string) => ['usersExploitation','usersOMC','usersEDI'].includes(r))) {
+              setRoleLabel('Exploitation');
+            } else if (roles.some((r: string) => ['usersTiers','usersSettings'].includes(r))) {
+              setRoleLabel('Paramétrage');
+            } else if (roles.some((r: string) => ['LecteurSeulement','Extranet'].includes(r))) {
+              setRoleLabel('Lecture seule');
+            } else {
+              setRoleLabel(roles[0] || 'Utilisateur');
+            }
           }
         }
+      } catch (e) {
+        console.error("Erreur de lecture du token dans TopBar", e);
       }
-    } catch (e) {
-      console.error("Erreur de lecture du token dans TopBar", e);
-    }
+    };
+
+    checkTokens();
+    window.addEventListener('mcp-session-updated', checkTokens);
+    return () => window.removeEventListener('mcp-session-updated', checkTokens);
   }, []);
 
   const handleLogout = () => {
@@ -71,20 +86,25 @@ export const TopBar: React.FC = () => {
     window.location.href = '/login';
   };
 
+  const handleGoToProfile = () => {
+    setMenuOpen(false);
+    setMode('MANAGEMENT');
+    window.dispatchEvent(new CustomEvent('switch-management-view', { detail: 'profile' }));
+  };
+
   return (
     <div className="topbar">
       <div className="topbar-brand">
         <div>
           <div className="brand-logo">VMIND</div>
-          <div className="brand-tag">Intelligence Entreprise</div>
         </div>
       </div>
       <div className="topbar-center">
         <div className="topbar-status">
-          <StatusDot />
-          <span>ERP CONNECTÉ</span>
-          <span style={{ color: 'var(--border2)', margin: '0 6px' }}>|</span>
-          <span>TraLIS v3.2</span>
+          <StatusDot style={{ backgroundColor: isErpConnected ? '#00e5c8' : '#8FA3B8' }} />
+          <span style={{ color: isErpConnected ? '#fff' : '#8FA3B8' }}>
+            {isErpConnected ? 'ERP CONNECTÉ' : 'ERP DÉCONNECTÉ'}
+          </span>
           <span style={{ color: 'var(--border2)', margin: '0 6px' }}>|</span>
           <span>{clock}</span>
         </div>
@@ -106,7 +126,7 @@ export const TopBar: React.FC = () => {
       </div>
       <div className="topbar-right">
         <div className="tb-btn" title="Notifications">🔔</div>
-        <div className="tb-btn" title="Paramètres">⚙</div>
+        <div className="tb-btn" title="Paramètres du profil" onClick={handleGoToProfile} style={{ cursor: 'pointer' }}>⚙</div>
         <div style={{ position: 'relative' }}>
           <div 
             className="user-badge" 
@@ -131,8 +151,28 @@ export const TopBar: React.FC = () => {
               boxShadow: '0 4px 20px rgba(0, 229, 200, 0.15)',
               padding: '6px 0',
               zIndex: 1000,
-              minWidth: '150px',
+              minWidth: '165px',
             }}>
+              <div 
+                onClick={handleGoToProfile}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: '12px',
+                  color: '#00E5C8',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontWeight: 600,
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 229, 200, 0.08)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                <User size={13} />
+                Modifier le profil
+              </div>
+
               <div 
                 onClick={handleLogout}
                 style={{

@@ -187,7 +187,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     const fetchHistory = async () => {
       try {
         setIsLoading(true);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
         let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
         if (token && token.startsWith("{")) token = JSON.parse(token).token;
 
@@ -309,7 +309,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       const effectiveAgentId = currentConv?.agent_id || agentAtClickTime;
       if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
         // Fire and forget
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
         let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
         if (token && token.startsWith("{")) token = JSON.parse(token).token;
         
@@ -439,7 +439,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
       if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
         // Fire and forget
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
         let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
         if (token && token.startsWith("{")) token = JSON.parse(token).token;
         
@@ -541,7 +541,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
     try {
       // Utiliser la même base URL que n8n-api.ts
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       const response = await fetch(`${baseUrl}${toolEndpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -611,6 +611,9 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   };
 
   const currentAgentData = activeAgentId !== 'VMIND' ? (AGENTS as any)[activeAgentId] : null;
+  const agentColor = currentAgentData ? currentAgentData.color : '#00f0ff';
+  const agentBgColor = currentAgentData ? currentAgentData.bgColor : 'rgba(0, 240, 255, 0.08)';
+  const agentBorderColor = currentAgentData ? currentAgentData.borderColor : 'rgba(0, 240, 255, 0.25)';
 
   return (
     <div className="chat-panel flex flex-col h-full bg-[#0b101e]">
@@ -622,8 +625,8 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           {/* Status dot */}
           <div style={{
             width: '7px', height: '7px', borderRadius: '50%',
-            background: currentAgentData ? currentAgentData.color : '#00f0ff',
-            boxShadow: `0 0 8px ${currentAgentData ? currentAgentData.color : '#00f0ff'}`,
+            background: agentColor,
+            boxShadow: `0 0 8px ${agentColor}`,
             flexShrink: 0,
           }} />
 
@@ -632,7 +635,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
             fontSize: '13px',
             fontWeight: 700,
             letterSpacing: '0.08em',
-            color: currentAgentData ? currentAgentData.color : '#00f0ff',
+            color: agentColor,
             textTransform: 'uppercase',
           }}>
             {currentAgentData ? `${currentAgentData.name}` : 'VMIND'}
@@ -654,9 +657,9 @@ export const VmindChat: React.FC<VmindChatProps> = ({
             letterSpacing: '0.1em',
             padding: '2px 8px',
             borderRadius: '99px',
-            background: currentAgentData ? `${currentAgentData.bgColor}` : 'rgba(0,240,255,0.08)',
-            color: currentAgentData ? currentAgentData.color : '#00f0ff',
-            border: `1px solid ${currentAgentData ? currentAgentData.borderColor : 'rgba(0,240,255,0.2)'}`,
+            background: agentBgColor,
+            color: agentColor,
+            border: `1px solid ${agentBorderColor}`,
             textTransform: 'uppercase',
           }}>
             ASSISTANT
@@ -672,7 +675,13 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                 key={label}
                 onClick={() => handleFastTrackClick(label)}
                 className="suggestion-chip"
-                style={{ flexShrink: 0 }}
+                style={{
+                  flexShrink: 0,
+                  background: agentBgColor,
+                  color: agentColor,
+                  borderColor: agentBorderColor,
+                  boxShadow: `0 0 10px ${agentColor}20`,
+                }}
                 disabled={isLoading}
               >
                 {label}
@@ -689,7 +698,13 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                 key={label}
                 onClick={() => handleFastTrackClick(label)}
                 className="suggestion-chip"
-                style={{ flexShrink: 0 }}
+                style={{
+                  flexShrink: 0,
+                  background: agentBgColor,
+                  color: agentColor,
+                  borderColor: agentBorderColor,
+                  boxShadow: `0 0 10px ${agentColor}20`,
+                }}
                 disabled={isLoading}
               >
                 {label}
@@ -706,7 +721,13 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                 key={label}
                 onClick={() => handleFastTrackClick(label)}
                 className="suggestion-chip"
-                style={{ flexShrink: 0 }}
+                style={{
+                  flexShrink: 0,
+                  background: agentBgColor,
+                  color: agentColor,
+                  borderColor: agentBorderColor,
+                  boxShadow: `0 0 10px ${agentColor}20`,
+                }}
                 disabled={isLoading}
               >
                 {label}
@@ -716,7 +737,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         )}
 
         {isLoading && (
-          <div className="text-[10px] text-cyan-500 animate-pulse mt-2">
+          <div className="text-[10px] animate-pulse mt-2 font-medium tracking-wide" style={{ color: agentColor }}>
             Analyse en cours...
           </div>
         )}
@@ -791,10 +812,10 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                           justifyContent: 'center',
                           fontSize: '10px',
                           fontWeight: 700,
-                          background: 'rgba(0,229,200,0.1)',
-                          color: '#00E5C8',
-                          boxShadow: '0 0 12px rgba(0,229,200,0.25)',
-                          border: '1px solid rgba(0,229,200,0.4)',
+                          background: agentData.bgColor || 'rgba(0,240,255,0.08)',
+                          color: agentData.color || '#00f0ff',
+                          boxShadow: `0 0 12px ${agentData.color ? agentData.color + '40' : 'rgba(0,240,255,0.2)'}`,
+                          border: `1px solid ${agentData.color ? agentData.color + '60' : 'rgba(0,240,255,0.3)'}`,
                         }
                       : {
                           alignSelf: 'flex-start',
@@ -822,7 +843,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
                   {/* Agent label */}
                   {msg.tool_used && (
-                    <div className={`text-[9px] uppercase tracking-widest font-bold px-1 ${agentData ? 'text-[#00E5C8]' : 'text-cyan-600'}`}>
+                    <div className="text-[9px] uppercase tracking-widest font-bold px-1" style={{ color: agentData ? agentData.color : '#00f0ff' }}>
                       AGENT ACTIF : {agentId} — {getToolDisplayName(toolUsed)}
                     </div>
                   )}
@@ -855,13 +876,13 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                         : agentData
                           ? {
                               background: 'linear-gradient(135deg, rgba(8,20,36,0.92) 0%, rgba(4,12,24,0.95) 100%)',
-                              border: '1px solid rgba(0,229,200,0.3)',
+                              border: `1px solid ${agentData.color ? agentData.color + '50' : 'rgba(0,240,255,0.25)'}`,
                               borderRadius: '4px 16px 16px 16px',
                               padding: '10px 14px',
                               color: '#d1faf6',
                               fontSize: '13px',
                               lineHeight: '1.55',
-                              boxShadow: '0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,229,200,0.08), inset 0 0 16px rgba(0,229,200,0.04)',
+                              boxShadow: `0 4px 24px rgba(0,0,0,0.5), 0 0 0 1px ${agentData.color ? agentData.color + '18' : 'rgba(0,240,255,0.08)'}, inset 0 0 16px ${agentData.color ? agentData.color + '0a' : 'rgba(0,240,255,0.04)'}`,
                               backdropFilter: 'blur(10px)',
                             }
                           : {
@@ -879,6 +900,47 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                   >
                     {isUser ? (
                       <div className="whitespace-pre-wrap">{msg.text}</div>
+                    ) : msg.isThinking ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '2px 4px' }}>
+                        <style>{`
+                          @keyframes premium-bounce {
+                            0%, 80%, 100% { 
+                              transform: translateY(0) scale(0.8); 
+                              opacity: 0.4;
+                              box-shadow: 0 0 0 rgba(0, 229, 200, 0);
+                            }
+                            40% { 
+                              transform: translateY(-4px) scale(1.1); 
+                              opacity: 1;
+                              box-shadow: 0 0 8px rgba(0, 229, 200, 0.8);
+                            }
+                          }
+                          .premium-dot {
+                            width: 5px;
+                            height: 5px;
+                            background-color: #00E5C8;
+                            border-radius: 50%;
+                            animation: premium-bounce 1.4s infinite ease-in-out both;
+                          }
+                          .premium-dot:nth-child(1) { animation-delay: -0.32s; }
+                          .premium-dot:nth-child(2) { animation-delay: -0.16s; }
+                          .premium-dot:nth-child(3) { animation-delay: 0s; }
+                        `}</style>
+                        <span style={{ 
+                          color: '#00E5C8', 
+                          fontSize: '13px', 
+                          fontWeight: 500, 
+                          letterSpacing: '0.5px',
+                          textShadow: '0 0 10px rgba(0, 229, 200, 0.4)'
+                        }} className="animate-pulse">
+                          L'agent réfléchit
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <div className="premium-dot"></div>
+                          <div className="premium-dot"></div>
+                          <div className="premium-dot"></div>
+                        </div>
+                      </div>
                     ) : (
                       <ToolResultRenderer message={msg} />
                     )}
@@ -889,7 +951,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                     className="font-mono px-1"
                     style={{
                       fontSize: '9px',
-                      color: isUser ? 'rgba(139,92,246,0.5)' : 'rgba(0,240,255,0.3)',
+                      color: isUser ? 'rgba(139,92,246,0.5)' : (agentData ? `${agentData.color}80` : 'rgba(0,240,255,0.3)'),
                       textAlign: isUser ? 'right' : 'left',
                     }}
                   >
@@ -905,7 +967,13 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       </div>
 
       <div className="input-bar p-4 border-t border-[#1c2538] bg-[#0b101e] flex-shrink-0">
-        <div className="input-wrap relative flex items-center bg-[#151b2b] rounded-lg border border-[#2a3441] focus-within:border-cyan-500/50 transition-colors">
+        <div
+          className="input-wrap relative flex items-center bg-[#151b2b] rounded-xl border transition-all duration-200"
+          style={{
+            borderColor: input.trim() ? `${agentColor}60` : `${agentColor}30`,
+            boxShadow: input.trim() ? `0 0 12px ${agentColor}20` : 'none',
+          }}
+        >
           <textarea
             className="input-field w-full bg-transparent p-3 pr-24 text-sm text-gray-200 placeholder-gray-500 outline-none resize-none max-h-32"
             rows={1}
@@ -916,25 +984,77 @@ export const VmindChat: React.FC<VmindChatProps> = ({
             disabled={isLoading}
           />
 
-          <div className="input-actions absolute right-2 flex items-center gap-1">
+          <div className="input-actions absolute right-2 flex items-center gap-1.5">
             <button
               type="button"
-              className="voice-btn p-2 text-gray-400 hover:text-cyan-400 transition-colors"
+              className="voice-btn relative flex items-center justify-center transition-all duration-200"
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: `linear-gradient(135deg, ${agentColor}15 0%, rgba(10,14,23,0.85) 100%)`,
+                border: `1.5px solid ${agentColor}`,
+                boxShadow: `0 0 10px ${agentColor}35, inset 0 0 8px ${agentColor}15`,
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                opacity: isLoading ? 0.45 : 1,
+              }}
               onClick={onOpenVoice}
               disabled={isLoading}
             >
-              🎤
+              <svg
+                viewBox="0 0 24 24"
+                style={{
+                  width: '18px',
+                  height: '18px',
+                  fill: 'none',
+                  stroke: agentColor,
+                  strokeWidth: '2',
+                  strokeLinecap: 'round',
+                  strokeLinejoin: 'round',
+                  filter: `drop-shadow(0 0 4px ${agentColor}80)`
+                }}
+              >
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" fill={`${agentColor}35`} />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="22" />
+              </svg>
             </button>
             <button
               type="button"
-              className={`send-btn p-2 rounded flex items-center justify-center transition-colors ${input.trim() && !isLoading
-                ? 'bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600/40'
-                : 'text-gray-600 cursor-not-allowed'
-                }`}
+              className="send-btn relative flex items-center justify-center transition-all duration-200"
+              style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '10px',
+                background: input.trim() && !isLoading
+                  ? `linear-gradient(135deg, ${agentColor}25 0%, rgba(10,14,23,0.9) 100%)`
+                  : 'rgba(10, 14, 23, 0.7)',
+                border: `1.5px solid ${input.trim() && !isLoading ? agentColor : `${agentColor}40`}`,
+                boxShadow: input.trim() && !isLoading
+                  ? `0 0 14px ${agentColor}45, inset 0 0 10px ${agentColor}20`
+                  : `0 0 6px ${agentColor}15`,
+                cursor: input.trim() && !isLoading ? 'pointer' : 'not-allowed',
+                opacity: input.trim() && !isLoading ? 1 : 0.45,
+              }}
               onClick={handleSend}
               disabled={!input.trim() || isLoading}
             >
-              ➤
+              <svg
+                viewBox="0 0 24 24"
+                style={{
+                  width: '20px',
+                  height: '20px',
+                  fill: agentColor,
+                  stroke: agentColor,
+                  strokeWidth: '1.2px',
+                  strokeLinejoin: 'round',
+                  strokeLinecap: 'round',
+                  filter: input.trim() && !isLoading ? `drop-shadow(0 0 5px ${agentColor}90)` : 'none',
+                  transform: 'rotate(-5deg) translateY(-1px)',
+                }}
+              >
+                <path d="M 3.5 20.5 L 21.5 12 L 3.5 3.5 L 7.5 12 Z" />
+              </svg>
             </button>
           </div>
         </div>

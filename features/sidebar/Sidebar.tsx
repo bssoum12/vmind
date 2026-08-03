@@ -90,18 +90,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
 
   return (
     <div className="sidebar">
-      <div className="nav-section">Navigation</div>
+      <div className="nav-section">Menu Principal</div>
 
-      <div
-        className={`nav-item ${activeNav === 'dashboard' ? 'active' : ''}`}
-        onClick={() => {
-          setActiveNav('dashboard');
-          window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'chat' }));
-        }}
-      >
-        <div className="nav-icon">🏠</div>
-        <span>Dashboard</span>
-      </div>
+
 
       <div
         className={`nav-item ${activeNav === 'history' ? 'active' : ''}`}
@@ -111,8 +102,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
         }}
       >
         <div className="nav-icon">💬</div>
-        <span>Conversations</span>
-        <span className="nav-badge">12</span>
+        <span>Chat</span>
+        {conversations.length > 0 && (
+          <span className="nav-badge">{conversations.length}</span>
+        )}
       </div>
 
       <div
@@ -303,19 +296,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
         })
 
       )}
-
-      <div className="sidebar-footer">
-        <div className="erp-tag">
-          <span style={{ fontSize: '10px' }}>🔗</span>
-          <div className="erp-name">TraLIS ERP</div>
-          <div className="erp-status">● LIVE</div>
-        </div>
-        <div className="erp-tag">
-          <span style={{ fontSize: '10px' }}>🧠</span>
-          <div className="erp-name">LLM Engine</div>
-          <div className="erp-status">● OK</div>
-        </div>
-      </div>
     </div>
   );
 };

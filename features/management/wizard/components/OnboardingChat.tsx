@@ -61,7 +61,7 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint }: Onboa
     setIsLoading(true);
 
     try {
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
       const token = localStorage.getItem('vmind_session');
       const endpoint = apiEndpoint || '/api/prospect-agent/onboarding-chat';
       const res = await fetch(`${API_BASE_URL}${endpoint}`, {

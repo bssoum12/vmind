@@ -5,7 +5,7 @@
  * Utilise la variable d'environnement NEXT_PUBLIC_API_URL ou une valeur par défaut.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
 // ─── TYPES ───
 

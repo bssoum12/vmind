@@ -47,7 +47,7 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
 
   const fetchPrevYearVolume = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
       const pYear = parseInt(startDate.substring(0, 4)) - 1;
       setPrevYear(pYear);

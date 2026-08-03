@@ -1,5 +1,9 @@
 import React from 'react';
 
-export const StatusDot: React.FC = () => {
-  return <span className="status-dot"></span>;
+interface StatusDotProps {
+  style?: React.CSSProperties;
+}
+
+export const StatusDot: React.FC<StatusDotProps> = ({ style }) => {
+  return <span className="status-dot" style={style}></span>;
 };

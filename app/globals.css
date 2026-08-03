@@ -2997,3 +2997,64 @@ textarea.form-input {
   border-radius: 4px;
   animation: skeletonPulse 1.5s infinite ease-in-out;
 }
+
+/* === NEW UI/UX PREMIUM ANIMATIONS === */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+
+/* Enhanced hover effects for fast-track chips */
+.suggestion-chip {
+  transition: all 0.2s ease-in-out;
+}
+.suggestion-chip:hover {
+  transform: scale(1.03) translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 229, 200, 0.2);
+  filter: brightness(1.2);
+}
+
+/* Beautiful custom scrollbars for tables & specific divs */
+.premium-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.premium-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+.premium-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 229, 200, 0.3);
+  border-radius: 4px;
+}
+.premium-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 229, 200, 0.6);
+}
+
+/* Glassmorphism generic error bubble */
+.glass-error-bubble {
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.4) 0%, rgba(100, 20, 20, 0.3) 100%) !important;
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 24px rgba(220, 38, 38, 0.1), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Glassmorphism info bubble */
+.glass-bubble {
+  backdrop-filter: blur(8px);
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.05) 0%, rgba(0, 0, 0, 0.2) 100%);
+}

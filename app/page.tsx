@@ -242,13 +242,30 @@ export default function Home() {
   }, []);
 
   // Management Mode State
+
   const [currentView, setCurrentView] = useState(() => {
     if (typeof window !== 'undefined') {
       return sessionStorage.getItem('vmind_current_view') || 'market';
     }
     return 'market';
   });
-  
+
+  useEffect(() => {
+    const handleSwitchManagementView = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail) {
+        setMode('MANAGEMENT');
+        setCurrentView(customEvent.detail);
+      }
+    };
+    window.addEventListener('switch-management-view', handleSwitchManagementView);
+    return () => window.removeEventListener('switch-management-view', handleSwitchManagementView);
+  }, [setMode]);
+
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState('all');
+
+
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('all');
 

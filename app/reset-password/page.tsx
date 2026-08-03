@@ -61,7 +61,7 @@ function ResetPasswordForm() {
       try {
         setIsValidatingCode(true);
         setCodeError('');
-        const res = await fetch('http://localhost:3001/api/auth/vmind/verify-code', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/verify-code`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, code })
@@ -115,7 +115,7 @@ function ResetPasswordForm() {
     try {
       setLoading(true);
       setError('');
-      const res = await fetch('http://localhost:3001/api/auth/vmind/activate-account', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/activate-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code, password, turnstileToken })
