@@ -265,10 +265,6 @@ export default function Home() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('all');
 
-
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState('all');
-
   const handleNavigate = (view: string) => {
     setCurrentView(view);
     if (typeof window !== 'undefined') {

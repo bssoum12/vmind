@@ -233,10 +233,11 @@ export async function pauseAgent(agentName: string): Promise<any> {
 /**
  * Resumes a paused agent — recreates its QStash schedule from stored trigger_rules
  */
-export async function resumeAgent(agentName: string): Promise<any> {
+export async function resumeAgent(agentName: string, params?: any): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/resume-agent/${encodeURIComponent(agentName)}`, {
     method: "POST",
-    headers: getAuthHeaders()
+    headers: getAuthHeaders(params ? { "Content-Type": "application/json" } : {}),
+    body: params ? JSON.stringify(params) : undefined
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

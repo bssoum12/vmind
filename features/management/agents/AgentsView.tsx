@@ -20,6 +20,8 @@ import { ProspectAgentExecutionModal } from './components/ProspectAgentExecution
 import { SourcingAgentExecutionModal } from './components/SourcingAgentExecutionModal';
 import { ProspectAgentScheduleModal } from './components/ProspectAgentScheduleModal';
 import { SourcingAgentScheduleModal } from './components/SourcingAgentScheduleModal';
+import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
+
 interface AgentsViewProps {
   onNavigate: (view: string) => void;
   onConfigure: (templateId: string, agent?: any, initialStep?: number) => void;
@@ -251,10 +253,10 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     }
   };
 
-  const handleResume = async (agent: LiveAgent) => {
+  const handleResume = async (agent: LiveAgent, params?: any) => {
     setActionLoading(agent.agent_name);
     try {
-      await resumeAgent(agent.agent_name);
+      await resumeAgent(agent.agent_name, params);
       showToast(`Agent "${agent.agent_name}" relancé.`);
       await refresh();
     } catch (e: any) {
@@ -428,8 +430,10 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                           <div style={{
                             width: 36, height: 36, borderRadius: 8, display: 'flex',
                             alignItems: 'center', justifyContent: 'center', fontSize: 18,
-                            background: 'rgba(255,71,87,0.12)',
-                          }}>💳</div>
+                            background: AGENT_TEMPLATES.find(t => t.id === agent.run_mode)?.iconBg || 'rgba(255,255,255,0.05)',
+                          }}>
+                            {AGENT_TEMPLATES.find(t => t.id === agent.run_mode)?.icon || '🤖'}
+                          </div>
                           <div>
                             <div className="agent-row-name">{agent.agent_name}</div>
                             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{agent.run_mode}</div>
@@ -724,8 +728,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           agent={scheduleModalAgent}
           onClose={() => setScheduleModalAgent(null)}
           onToast={showToast}
-          onConfirm={async () => {
-            await handleResume(scheduleModalAgent);
+          onConfirm={async (params?: any) => {
+            await handleResume(scheduleModalAgent, params);
             setScheduleModalAgent(null);
           }}
           onEditSchedule={() => {

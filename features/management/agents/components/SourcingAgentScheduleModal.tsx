@@ -8,7 +8,7 @@ import { VMindGuide } from '@/shared/management/components/VMindGuide';
 interface SourcingAgentScheduleModalProps {
   agent: LiveAgent;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (params?: any) => void;
   onEditSchedule: () => void;
   onToast: (msg: string, type?: 'ok' | 'err') => void;
 }
@@ -44,7 +44,12 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
   const handleConfirm = async () => {
     setIsSubmitting(true);
     try {
-      await onConfirm();
+      await onConfirm({
+        sourcingSummary,
+        totalLeads: leadsToFind,
+        leadsPerCompany,
+        ignoreDuplicates: allowExistingCompanies
+      });
     } finally {
       setIsSubmitting(false);
       onClose();
