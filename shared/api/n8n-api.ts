@@ -412,3 +412,32 @@ export async function triggerSourcingRun(
   return res.json();
 }
 
+/**
+ * Appelle l'outil VBUY KPI #1 (Factures à régler) directement depuis le Backend HTTP (sans passer par n8n)
+ */
+export async function getVbuyKpiFacturesARegler(
+  clientId = "DEMO",
+  horizon?: '1d' | '1w' | '1m' | '3m' | '6m'
+): Promise<any> {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-factures-a-regler`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      client_id: clientId,
+      horizon
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur VBUY KPI (${response.status})`);
+  }
+
+  const json = await response.json();
+  return json?.data || json;
+}
+
