@@ -78,6 +78,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const [selected, setSelected] = useState<LiveAgent | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null); // agent_name being actioned
   const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
 
   // Auto Mode Modal State
   const [runModalAgent, setRunModalAgent] = useState<LiveAgent | null>(null);
@@ -221,7 +222,13 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
       setLoading(true);
       setError(null);
       const data = await getAgents();
-      setAgents(data);
+      const sortedData = data.sort((a: LiveAgent, b: LiveAgent) => {
+        const timeA = a.deployed_at || 0;
+        const timeB = b.deployed_at || 0;
+        if (timeA !== timeB) return timeB - timeA;
+        return a.agent_name.localeCompare(b.agent_name);
+      });
+      setAgents(sortedData);
       // Keep selected in sync
       if (selected) {
         const updated = data.find((a: LiveAgent) => a.agent_name === selected.agent_name);
@@ -524,6 +531,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                             <button
                               className="row-btn"
                               onClick={() => {
+                                setNavigatingTo(agent.agent_name);
                                 const route = agent.run_mode === 'sourcing' 
                                   ? `/sourcing-agent-workspace/${agent.uuid || (agent as any).agent_id}`
                                   : `/prospect-agent-workspace/${agent.uuid || (agent as any).agent_id || 1}`;
@@ -533,7 +541,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                               style={{ color: '#00E5C8', borderColor: 'rgba(0,229,200,0.3)', ...getBtnStyle(agent, 4) }}
                             >
                               {renderTutorialArrow(agent, 4)}
-                              🚀 Espace
+                              {navigatingTo === agent.agent_name ? '⏳ Ouverture...' : '🚀 Espace'}
                             </button>
                           )}
 

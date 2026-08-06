@@ -412,3 +412,21 @@ export async function triggerSourcingRun(
   return res.json();
 }
 
+
+
+/**
+ * Trigger immediate execution for Prospect Agent (Auto Mode)
+ */
+export async function triggerProspectAutoMode(agentId: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/run/${encodeURIComponent(agentId)}`, {
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ mode: "auto" })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to trigger prospect agent (${res.status})`);
+  }
+  return res.json();
+}
+
