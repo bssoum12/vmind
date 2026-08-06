@@ -55,8 +55,11 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'MCP_Client1_get_pipeline_status': 'VSELL',
   'get_churn_risk_clients': 'VSELL',
   'Client1_get_churn_risk_clients': 'VSELL',
-  'MCP_Client1_get_churn_risk_clients': 'VSELL',
-  'get_vbuy_kpi_factures_a_regler_cette_semaine': 'VBUY',
+  'Client1_get_vbuy_kpi_factures_a_regler_cette_semaine': 'VBUY',
+  'MCP_Client1_get_vbuy_kpi_factures_a_regler_cette_semaine': 'VBUY',
+  'get_vbuy_kpi_montant_total_achats_ce_mois': 'VBUY',
+  'Client1_get_vbuy_kpi_montant_total_achats_ce_mois': 'VBUY',
+  'MCP_Client1_get_vbuy_kpi_montant_total_achats_ce_mois': 'VBUY',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -80,8 +83,12 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'MCP_Client1_get_pipeline_status': 'État du Pipeline',
   'get_churn_risk_clients': 'Risque de Départ Clients',
   'Client1_get_churn_risk_clients': 'Risque de Départ Clients',
-  'MCP_Client1_get_churn_risk_clients': 'Risque de Départ Clients',
-  'get_vbuy_kpi_factures_a_regler_cette_semaine': 'Factures à régler (VBUY)',
+  'get_vbuy_kpi_factures_a_regler_cette_semaine': 'Factures à régler cette semaine',
+  'Client1_get_vbuy_kpi_factures_a_regler_cette_semaine': 'Factures à régler cette semaine',
+  'MCP_Client1_get_vbuy_kpi_factures_a_regler_cette_semaine': 'Factures à régler cette semaine',
+  'get_vbuy_kpi_montant_total_achats_ce_mois': 'Montant Achats Ce Mois',
+  'Client1_get_vbuy_kpi_montant_total_achats_ce_mois': 'Montant Achats Ce Mois',
+  'MCP_Client1_get_vbuy_kpi_montant_total_achats_ce_mois': 'Montant Achats Ce Mois',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -117,7 +124,8 @@ const VSELL_FAST_TRACK_REGISTRY: Record<string, string> = {
 };
 
 const VBUY_FAST_TRACK_REGISTRY: Record<string, string> = {
-  "Factures à régler (7j) ?": "Combien de factures fournisseurs sont à régler cette semaine ?"
+  "Factures à régler (7j) ?": "Combien de factures fournisseurs sont à régler cette semaine ?",
+  "Montant achats ce mois ?": "Quel est le montant total des achats ce mois ?"
 };
 
 const FAST_TRACK_REGISTRY: Record<string, string> = {
