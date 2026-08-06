@@ -56,6 +56,7 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_churn_risk_clients': 'VSELL',
   'Client1_get_churn_risk_clients': 'VSELL',
   'MCP_Client1_get_churn_risk_clients': 'VSELL',
+  'get_vbuy_kpi_factures_a_regler_cette_semaine': 'VBUY',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -80,6 +81,7 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'get_churn_risk_clients': 'Risque de Départ Clients',
   'Client1_get_churn_risk_clients': 'Risque de Départ Clients',
   'MCP_Client1_get_churn_risk_clients': 'Risque de Départ Clients',
+  'get_vbuy_kpi_factures_a_regler_cette_semaine': 'Factures à régler (VBUY)',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -114,10 +116,15 @@ const VSELL_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Risque de départ ?": "Quels clients présentent un risque de départ selon leur historique ?"
 };
 
+const VBUY_FAST_TRACK_REGISTRY: Record<string, string> = {
+  "Factures à régler (7j) ?": "Combien de factures fournisseurs sont à régler cette semaine ?"
+};
+
 const FAST_TRACK_REGISTRY: Record<string, string> = {
   ...VDATA_FAST_TRACK_REGISTRY,
   ...VFIN_FAST_TRACK_REGISTRY,
-  ...VSELL_FAST_TRACK_REGISTRY
+  ...VSELL_FAST_TRACK_REGISTRY,
+  ...VBUY_FAST_TRACK_REGISTRY
 };
 
 const formatTime = (dateString?: string) => {
@@ -718,6 +725,29 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         {activeAgentId === 'VSELL' && (
           <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
             {Object.keys(VSELL_FAST_TRACK_REGISTRY).map((label) => (
+              <button
+                key={label}
+                onClick={() => handleFastTrackClick(label)}
+                className="suggestion-chip"
+                style={{
+                  flexShrink: 0,
+                  background: agentBgColor,
+                  color: agentColor,
+                  borderColor: agentBorderColor,
+                  boxShadow: `0 0 10px ${agentColor}20`,
+                }}
+                disabled={isLoading}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* VBUY Suggestions */}
+        {activeAgentId === 'VBUY' && (
+          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+            {Object.keys(VBUY_FAST_TRACK_REGISTRY).map((label) => (
               <button
                 key={label}
                 onClick={() => handleFastTrackClick(label)}
