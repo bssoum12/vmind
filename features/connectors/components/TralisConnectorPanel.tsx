@@ -309,7 +309,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
       }
     } catch (err) {
       console.error('[Connectors] Erreur réseau lors de la validation:', err);
-      setLoginError("Connexion impossible : le serveur ne répond pas ou le certificat de sécurité HTTPS n'est pas accepté. Essayez d'ouvrir https://localhost:3001/health dans un nouvel onglet pour accepter le risque.");
+      setLoginError((err as any)?.message || "Connexion impossible : le serveur backend (https://localhost:3001) ne répond pas. Vérifiez que le serveur est démarré.");
     } finally {
       setLoginLoading(false);
     }
@@ -345,7 +345,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
         setLoginError(data?.error || 'Identifiants invalides.');
       }
     } catch (err) {
-      setLoginError("Connexion impossible : le serveur ne répond pas ou le certificat de sécurité HTTPS n'est pas accepté. Essayez d'ouvrir https://localhost:3001/health dans un nouvel onglet pour accepter le risque.");
+      setLoginError((err as any)?.message || "Connexion impossible : le serveur backend (https://localhost:3001) ne répond pas. Vérifiez que le serveur est démarré.");
     } finally {
       setLoginLoading(false);
     }

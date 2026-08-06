@@ -254,7 +254,7 @@ export const VsellFidelisationChartCard: React.FC<VsellFidelisationChartCardProp
                   gap: '2px',
                 }}
               >
-                <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', pb: '2px', mb: '2px' }}>
+                <div style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '2px', marginBottom: '2px' }}>
                   <strong style={{ color: 'var(--white)' }}>{points[hoveredIndex].label}</strong>
                 </div>
                  <div>
@@ -270,7 +270,7 @@ export const VsellFidelisationChartCard: React.FC<VsellFidelisationChartCardProp
                   <span style={{ color: 'var(--muted)', fontSize: '7.5px' }}> ({points[hoveredIndex].activeClientsPrev}/{points[hoveredIndex].totalClientsPrev})</span>
                 </div>
                 {points[hoveredIndex].ratePrev !== undefined && (
-                  <div style={{ color: (points[hoveredIndex].rate - points[hoveredIndex].ratePrev) >= 0 ? '#10b981' : '#ef4444', fontWeight: 700, mt: '1px' }}>
+                  <div style={{ color: (points[hoveredIndex].rate - points[hoveredIndex].ratePrev) >= 0 ? '#10b981' : '#ef4444', fontWeight: 700, marginTop: '1px' }}>
                     Evolution : {(points[hoveredIndex].rate - points[hoveredIndex].ratePrev) >= 0 ? '▲ +' : '▼ '}{Math.abs(points[hoveredIndex].rate - points[hoveredIndex].ratePrev).toFixed(2)}%
                   </div>
                 )}

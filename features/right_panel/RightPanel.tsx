@@ -35,6 +35,8 @@ import { VsellRevenuClientBarChart } from './TableauCroiseKpi/VsellRevenuClientB
 import { VsellFidelisationChartCard } from './TableauCroiseKpi/VsellFidelisationChartCard';
 import { VsellPipelineFunnelCard } from './TableauCroiseKpi/VsellPipelineFunnelCard';
 import { VfinTresorerieCard } from './TableauCroiseKpi/VfinTresorerieCard';
+import { VbuyFacturesAReglerCard } from './TableauCroiseKpi/VbuyFacturesAReglerCard';
+import { VbuyAchatsDuMoisCard } from './TableauCroiseKpi/VbuyAchatsDuMoisCard';
 interface RightPanelProps {
   logs: LogEntry[];
   onInsertPrompt: (text: string) => void;
@@ -247,7 +249,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
             </div>
           </div>
         )}
-        {activeAgentId !== 'VDATA' && activeAgentId !== 'VFIN' && activeAgentId !== 'VSELL' && (
+        {activeAgentId !== 'VDATA' && activeAgentId !== 'VFIN' && activeAgentId !== 'VSELL' && activeAgentId !== 'VBUY' && (
           <>
             <MiniKpi label="Trésorerie" dotColor="var(--green)" val="842K TND" delta="▲ +3.2%" deltaType="up" />
             <MiniKpi label="Impayés" dotColor="var(--red)" val="218K TND" delta="▲ +8 clients" deltaType="warning" />
@@ -284,6 +286,8 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
         <VfinMarginCard activeAgentId={activeAgentId} />
         <VfinTopClientsCard activeAgentId={activeAgentId} />
         <VfinTresorerieCard activeAgentId={activeAgentId} />
+        <VbuyFacturesAReglerCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VbuyAchatsDuMoisCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
         <VolumeLineChart activeAgentId={activeAgentId} />
         <DeliveryRateKpi activeAgentId={activeAgentId} /> 
         <MultiIndicatorsCard activeAgentId={activeAgentId} />
