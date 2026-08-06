@@ -1,4 +1,4 @@
-﻿.shell {
+.shell {
   display: flex;
   height: calc(100vh - 52px);
 }
@@ -131,7 +131,7 @@
 }
 .right-panel {
   overflow-y: auto;
-  overflow-x: visible;
+  overflow-x: hidden;
 }
 .rp-section {
   position: relative;
@@ -1217,6 +1217,10 @@ textarea.form-input {
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   display: inline-block;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
 
 @keyframes fadeIn {

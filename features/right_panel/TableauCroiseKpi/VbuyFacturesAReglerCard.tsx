@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { getVbuyKpiFacturesARegler } from '@/shared/api/n8n-api';
-import { AlertTriangle, Clock, RefreshCw, DollarSign, Building2, CheckCircle2, ChevronRight, Info } from 'lucide-react';
+import { AlertTriangle, Clock, RefreshCw, Building2, ChevronRight, Info } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 
 interface VbuyFacturesAReglerCardProps {
@@ -18,11 +19,40 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
 }) => {
   const isVisible = !activeAgentId || activeAgentId.toUpperCase() === 'VBUY' || activeAgentId.toUpperCase() === 'VMIND';
 
-  const [horizon, setHorizon] = useState<'1d' | '1w' | '1m' | '3m' | '6m' | undefined>(undefined);
+  const [horizon, setHorizon] = useState<'1d' | '1w' | '1m' | '3m' | '6m'>('1d');
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isCardHovered, setIsCardHovered] = useState<boolean>(false);
+  const [cardCoords, setCardCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [mounted, setMounted] = useState<boolean>(false);
+  const [expandedSection, setExpandedSection] = useState<'proches' | 'echues' | null>(null);
+  const [pageProches, setPageProches] = useState<number>(1);
+  const [pageEchues, setPageEchues] = useState<number>(1);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnterCard = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    setCardCoords({ top: rect.top, left: rect.left });
+    setIsCardHovered(true);
+  };
+
+  const handleMouseLeaveCard = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsCardHovered(false);
+    }, 150);
+  };
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const loadKpi = async () => {
     try {
@@ -60,8 +90,25 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
     count_echue: payload?.summary?.count_echue ?? 0,
     count_proche: payload?.summary?.count_proche ?? 0,
   };
-  const byHorizon = payload?.by_horizon || [];
+  const rawByHorizon = payload?.by_horizon || [];
+  const byHorizon = rawByHorizon.length > 0 
+    ? rawByHorizon 
+    : [
+        { key: 'echues', label: 'Factures Échues', amount: summary.total_echue_tnd, count: summary.count_echue },
+        { key: 'proches', label: 'À Échéance Proche', amount: summary.total_echeance_proche_tnd, count: summary.count_proche }
+      ].filter(h => h.count > 0 || h.amount > 0);
+
   const topSuppliers = payload?.top_suppliers_a_regler || [];
+  const facturesProches: any[] = payload?.factures_proches || [];
+  const facturesEchues: any[] = payload?.factures_echues || [];
+
+  const pageSize = 5;
+
+  const totalPagesProches = Math.max(1, Math.ceil(facturesProches.length / pageSize));
+  const paginatedProches = facturesProches.slice((pageProches - 1) * pageSize, pageProches * pageSize);
+
+  const totalPagesEchues = Math.max(1, Math.ceil(facturesEchues.length / pageSize));
+  const paginatedEchues = facturesEchues.slice((pageEchues - 1) * pageSize, pageEchues * pageSize);
 
   const formatTND = (val: any) => {
     const num = typeof val === 'number' ? val : parseFloat(val) || 0;
@@ -71,13 +118,13 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
 
   return (
     <div style={{
-      background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 27, 75, 0.6) 100%)',
-      border: '1px solid rgba(255, 71, 87, 0.35)',
-      borderRadius: '12px',
-      padding: '16px',
+      background: 'linear-gradient(145deg, rgba(13, 17, 26, 0.96) 0%, rgba(22, 10, 24, 0.96) 100%)',
+      border: '1px solid rgba(255, 71, 87, 0.3)',
+      borderRadius: '16px',
+      padding: '16px 18px',
       color: '#fff',
-      boxShadow: '0 8px 32px rgba(255, 71, 87, 0.15)',
-      backdropFilter: 'blur(12px)',
+      boxShadow: '0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 20px rgba(255, 71, 87, 0.05)',
+      backdropFilter: 'blur(16px)',
       position: 'relative',
       overflow: 'visible',
       marginBottom: '16px'
@@ -94,73 +141,72 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
           }
         }
       `}</style>
+      
       {/* Ambient background glow */}
       <div style={{
         position: 'absolute',
         top: '-40px',
         right: '-40px',
-        width: '120px',
-        height: '120px',
-        background: 'radial-gradient(circle, rgba(255,71,87,0.2) 0%, rgba(0,0,0,0) 70%)',
+        width: '140px',
+        height: '140px',
+        background: 'radial-gradient(circle, rgba(255, 71, 87, 0.22) 0%, rgba(0,0,0,0) 70%)',
         pointerEvents: 'none'
       }} />
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: '34px',
-            height: '34px',
-            borderRadius: '8px',
-            background: 'rgba(255, 71, 87, 0.15)',
-            border: '1px solid rgba(255, 71, 87, 0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#FF4757'
-          }}>
-            <DollarSign size={18} />
-          </div>
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: 800, color: '#F8FAFC', letterSpacing: '0.3px' }}>
-              VBUY — Factures Fournisseurs à Régler
-            </div>
-            <div style={{ fontSize: '10px', color: '#94A3B8', fontFamily: 'monospace' }}>
-              Direct SQL • Exécution sans n8n
-            </div>
-          </div>
+      <div
+        style={{
+          fontSize: "9px",
+          color: "var(--muted)",
+          fontFamily: "var(--font-mono)",
+          letterSpacing: "1.5px",
+          textTransform: "uppercase",
+          marginBottom: "12px",
+          fontWeight: 600,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <span>Factures Fournisseurs à Régler</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ color: "#FF4757", fontSize: "9px", fontWeight: 800, letterSpacing: '0.5px' }}>VBUY</span>
+          <button
+            onClick={loadKpi}
+            disabled={loading}
+            style={{
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '8px',
+              padding: '4px 7px',
+              color: '#94A3B8',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center'
+            }}
+            title="Rafraîchir KPI"
+          >
+            <RefreshCw 
+              size={12} 
+              className={loading ? "animate-spin" : ""} 
+              style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} 
+            />
+          </button>
         </div>
-
-        <button
-          onClick={loadKpi}
-          disabled={loading}
-          style={{
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '6px',
-            padding: '6px',
-            color: '#94A3B8',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            transition: 'all 0.2s'
-          }}
-          title="Rafraîchir KPI"
-        >
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-        </button>
       </div>
 
       {/* Horizon Filter Bar */}
       <div style={{
         display: 'flex',
         gap: '4px',
-        background: 'rgba(15, 23, 42, 0.6)',
+        background: 'rgba(11, 15, 25, 0.8)',
         padding: '3px',
-        borderRadius: '8px',
-        border: '1px solid rgba(255, 255, 255, 0.05)',
+        borderRadius: '10px',
+        border: '1px solid rgba(255, 255, 255, 0.06)',
         marginBottom: '14px'
       }}>
         {[
-          { label: 'Tous', value: undefined },
           { label: '24h', value: '1d' },
           { label: '7j', value: '1w' },
           { label: '30j', value: '1m' },
@@ -173,16 +219,20 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
               key={item.label}
               onClick={() => setHorizon(item.value as any)}
               style={{
-                flex: 1,
-                padding: '4px 2px',
+                flex: '1 1 0px',
+                minWidth: 0,
+                padding: '5px 1px',
                 fontSize: '10px',
                 fontWeight: isSelected ? 700 : 500,
                 color: isSelected ? '#FFFFFF' : '#94A3B8',
-                background: isSelected ? 'rgba(255, 71, 87, 0.3)' : 'transparent',
-                border: isSelected ? '1px solid rgba(255, 71, 87, 0.5)' : '1px solid transparent',
-                borderRadius: '6px',
+                background: isSelected 
+                  ? 'linear-gradient(135deg, rgba(255, 71, 87, 0.35) 0%, rgba(255, 71, 87, 0.15) 100%)' 
+                  : 'transparent',
+                border: isSelected ? '1px solid #FF4757' : '1px solid transparent',
+                boxShadow: isSelected ? '0 0 12px rgba(255, 71, 87, 0.4)' : 'none',
+                borderRadius: '7px',
                 cursor: 'pointer',
-                transition: 'all 0.15s'
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)'
               }}
             >
               {item.label}
@@ -192,9 +242,21 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
       </div>
 
       {loading ? (
-        <div style={{ padding: '24px', textAlign: 'center', color: '#94A3B8', fontSize: '11px' }}>
-          <RefreshCw size={18} className="animate-spin" style={{ margin: '0 auto 8px', color: '#FF4757' }} />
-          Calcul du solde des factures fournisseurs...
+        <div style={{
+          padding: '28px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '10px',
+          color: '#94A3B8',
+          fontSize: '11px'
+        }}>
+          <RefreshCw 
+            size={18} 
+            className="animate-spin" 
+            style={{ color: '#FF4757', flexShrink: 0, animation: 'spin 1s linear infinite' }} 
+          />
+          <span>Calcul du solde des factures fournisseurs...</span>
         </div>
       ) : error ? (
         <div style={{
@@ -211,182 +273,565 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
         <>
           {/* Main KPI Card (Total à Régler) with Floating Hover Details to the Left */}
           <div
-            onMouseEnter={() => setIsCardHovered(true)}
-            onMouseLeave={() => setIsCardHovered(false)}
+            onMouseEnter={handleMouseEnterCard}
+            onMouseMove={(e) => {
+              if (hoverTimeoutRef.current) {
+                clearTimeout(hoverTimeoutRef.current);
+                hoverTimeoutRef.current = null;
+              }
+              const rect = e.currentTarget.getBoundingClientRect();
+              setCardCoords({ top: rect.top, left: rect.left });
+            }}
+            onMouseLeave={handleMouseLeaveCard}
             style={{
               background: isCardHovered
-                ? 'linear-gradient(135deg, rgba(255, 71, 87, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%)'
-                : 'rgba(255, 255, 255, 0.03)',
+                ? 'linear-gradient(135deg, rgba(255, 71, 87, 0.1) 0%, rgba(245, 158, 11, 0.06) 100%)'
+                : 'rgba(255, 255, 255, 0.02)',
               border: isCardHovered
-                ? '1px solid rgba(255, 71, 87, 0.35)'
-                : '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '10px',
-              padding: '12px 14px',
+                ? '1px solid rgba(255, 71, 87, 0.4)'
+                : '1px solid rgba(255, 255, 255, 0.07)',
+              borderRadius: '14px',
+              padding: '14px 16px',
               marginBottom: '14px',
               transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
               cursor: 'pointer',
-              boxShadow: isCardHovered ? '0 4px 20px rgba(255, 71, 87, 0.12)' : 'none',
+              boxShadow: isCardHovered ? '0 6px 24px rgba(255, 71, 87, 0.15)' : 'none',
               position: 'relative'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span style={{ fontSize: '10px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 700 }}>
-                Total à Régler
-              </span>
-              <span style={{
-                fontSize: '9px',
-                color: isCardHovered ? '#FF808B' : '#64748B',
-                background: isCardHovered ? 'rgba(255, 71, 87, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                padding: '2px 8px',
-                borderRadius: '10px',
+            {/* Split row: Metrics on Left, 3D Glowing Invoice Graphic on Right */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+              
+              {/* Left Column: Metrics */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Header subtext & Details pill */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', minWidth: 0 }}>
+                  <span style={{ fontSize: '9px', color: '#64748B', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    TOTAL À RÉGLER
+                  </span>
+                  <span style={{
+                    fontSize: '9px',
+                    color: isCardHovered ? '#FF808B' : '#64748B',
+                    background: isCardHovered ? 'rgba(255, 71, 87, 0.18)' : 'rgba(255, 255, 255, 0.04)',
+                    border: isCardHovered ? '1px solid rgba(255, 71, 87, 0.35)' : '1px solid rgba(255, 71, 87, 0.08)',
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0
+                  }}>
+                    <Info size={10} style={{ color: isCardHovered ? '#FF4757' : '#94A3B8' }} />
+                    {isCardHovered ? 'Détails actifs' : 'Détails'}
+                  </span>
+                </div>
+
+                {/* Main Total Amount */}
+                <div style={{
+                  fontSize: '16px',
+                  fontWeight: 900,
+                  color: '#FFFFFF',
+                  fontFamily: 'monospace',
+                  letterSpacing: '-0.4px',
+                  marginBottom: '10px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  <AnimatedNumber value={summary.total_a_regler_tnd} formatter={formatTND} />
+                </div>
+
+                {/* 3-Column Metric Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', alignItems: 'flex-start' }}>
+                  {/* Col 1: Total En Attente */}
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.2 }}>
+                      <AnimatedNumber value={summary.count_total} />
+                    </div>
+                    <div style={{ fontSize: '9px', color: '#64748B', lineHeight: 1.2, marginTop: '2px' }}>
+                      facture(s)<br />en attente
+                    </div>
+                  </div>
+
+                  {/* Col 2: En Retard */}
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#FF4757', lineHeight: 1.2 }}>
+                      +{summary.count_echue}
+                    </div>
+                    <div style={{ fontSize: '9px', color: '#FF4757', fontWeight: 600, lineHeight: 1.2, marginTop: '2px' }}>
+                      en retard
+                    </div>
+                  </div>
+
+                  {/* Col 3: Proche(s) */}
+                  <div>
+                    <div style={{ fontSize: '15px', fontWeight: 800, color: '#F59E0B', lineHeight: 1.2 }}>
+                      +{summary.count_proche}
+                    </div>
+                    <div style={{ fontSize: '9px', color: '#F59E0B', fontWeight: 600, lineHeight: 1.2, marginTop: '2px' }}>
+                      proche(s)
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Right Column: 3D Glowing Red Invoice Graphic */}
+              <div style={{
+                position: 'relative',
+                width: '68px',
+                height: '68px',
+                flexShrink: 0,
+                marginTop: '10px',
+                alignSelf: 'flex-end',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '4px',
-                transition: 'all 0.2s'
-              }}>
-                <Info size={10} />
-                {isCardHovered ? 'Détails actifs' : 'Survoler pour détails'}
-              </span>
-            </div>
-
-            <div style={{ fontSize: '19px', fontWeight: 900, color: '#F8FAFC', fontFamily: 'monospace', letterSpacing: '-0.3px' }}>
-              <AnimatedNumber value={summary.total_a_regler_tnd} formatter={formatTND} />
-            </div>
-
-            <div style={{ fontSize: '9px', color: '#64748B', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span><AnimatedNumber value={summary.count_total} /> facture(s) en attente</span>
-              {summary.count_echue > 0 && (
-                <span style={{ color: '#FF4757', fontWeight: 600 }}>• <AnimatedNumber value={summary.count_echue} /> en retard</span>
-              )}
-            </div>
-
-            {/* Floating Popover Widget Opening to the Left */}
-            {isCardHovered && (
-              <div style={{
-                position: 'absolute',
-                right: 'calc(100% + 14px)',
-                top: 0,
-                width: '260px',
-                background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.98) 0%, rgba(26, 26, 46, 0.98) 100%)',
-                border: '1px solid rgba(255, 71, 87, 0.45)',
+                justifyContent: 'center',
                 borderRadius: '12px',
-                padding: '14px',
-                boxShadow: '-8px 12px 32px rgba(0, 0, 0, 0.6), 0 0 24px rgba(255, 71, 87, 0.2)',
-                backdropFilter: 'blur(16px)',
-                zIndex: 9999,
-                animation: 'popoverSlideLeft 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-                pointerEvents: 'none'
+                background: 'radial-gradient(circle, rgba(255, 71, 87, 0.25) 0%, transparent 70%)',
+                overflow: 'hidden'
               }}>
+                <img 
+                  src="/glowing_invoice_3d.jpg" 
+                  alt="Factures Fournisseurs" 
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    filter: 'drop-shadow(0 0 12px rgba(255, 71, 87, 0.6))',
+                    transform: isCardHovered ? 'scale(1.08)' : 'scale(1)',
+                    transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                  }} 
+                />
+              </div>
+
+            </div>
+
+            {/* Floating Popover Widget Opening to the Left (Matches Image 2 reference) */}
+            {isCardHovered && mounted && createPortal(
+              <div 
+                onMouseEnter={handleMouseEnterCard}
+                onMouseLeave={handleMouseLeaveCard}
+                style={{
+                  position: 'fixed',
+                  left: `${Math.max(10, cardCoords.left - 290)}px`,
+                  top: `${Math.max(10, cardCoords.top)}px`,
+                  width: '275px',
+                  background: 'linear-gradient(145deg, rgba(11, 15, 25, 0.98) 0%, rgba(22, 12, 26, 0.98) 100%)',
+                  border: '1px solid rgba(255, 71, 87, 0.4)',
+                  borderRadius: '16px',
+                  padding: '14px 16px',
+                  boxShadow: '-10px 14px 36px rgba(0, 0, 0, 0.75), 0 0 24px rgba(255, 71, 87, 0.25)',
+                  backdropFilter: 'blur(20px)',
+                  zIndex: 999999,
+                  animation: 'popoverSlideLeft 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                  pointerEvents: 'auto'
+                }}>
                 {/* Pointer Arrow pointing to the card on right */}
                 <div style={{
                   position: 'absolute',
                   right: '-6px',
-                  top: '20px',
+                  top: '22px',
                   width: '10px',
                   height: '10px',
-                  background: '#1A1A2E',
-                  borderRight: '1px solid rgba(255, 71, 87, 0.45)',
-                  borderTop: '1px solid rgba(255, 71, 87, 0.45)',
+                  background: '#160C1A',
+                  borderRight: '1px solid rgba(255, 71, 87, 0.4)',
+                  borderTop: '1px solid rgba(255, 71, 87, 0.4)',
                   transform: 'rotate(45deg)'
                 }} />
 
+                {/* Popover Header with glowing right accent line */}
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
                   fontSize: '11px',
                   fontWeight: 800,
                   color: '#F8FAFC',
-                  marginBottom: '10px',
+                  marginBottom: '12px',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.4px',
-                  borderBottom: '1px dashed rgba(255, 255, 255, 0.12)',
-                  paddingBottom: '8px'
+                  letterSpacing: '0.5px'
                 }}>
-                  <Info size={13} style={{ color: '#FF4757' }} />
-                  Détails du Solde
+                  <Info size={13} style={{ color: '#FF4757', marginRight: '6px' }} />
+                  DÉTAILS DU SOLDE
+                  <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(255, 71, 87, 0.4), transparent)', marginLeft: '8px' }} />
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {/* Factures Échues */}
-                  <div style={{
-                    background: summary.count_echue > 0 ? 'rgba(255, 71, 87, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                    border: summary.count_echue > 0 ? '1px solid rgba(255, 71, 87, 0.4)' : '1px solid rgba(16, 185, 129, 0.4)',
-                    borderRadius: '8px',
-                    padding: '10px 12px'
-                  }}>
-                    <div style={{ fontSize: '10px', color: summary.count_echue > 0 ? '#FF808B' : '#6EE7B7', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
-                      {summary.count_echue > 0 ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}
-                      Factures Échues
+                  
+                  {/* Box 1: Factures Échues (Red Theme) */}
+                  <div 
+                    onClick={() => {
+                      setExpandedSection(prev => prev === 'echues' ? null : 'echues');
+                      if (onInsertPrompt && facturesEchues.length > 0) {
+                        const refs = facturesEchues.map((f: any) => f.reference || f.reference_fournisseur).filter(Boolean);
+                        onInsertPrompt(`Factures fournisseurs échues (${refs.length}): ${refs.join(', ')}`);
+                      }
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(255, 71, 87, 0.12) 0%, rgba(20, 10, 15, 0.9) 100%)',
+                      border: '1px solid rgba(255, 71, 87, 0.45)',
+                      borderRadius: '12px',
+                      padding: '12px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
+                      {/* Left Round Avatar Icon */}
+                      <div style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle, rgba(255, 71, 87, 0.3) 0%, rgba(255, 71, 87, 0.1) 100%)',
+                        border: '1px solid rgba(255, 71, 87, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <AlertTriangle size={18} style={{ color: '#FF4757' }} />
+                      </div>
+
+                      {/* Middle Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '9px', fontWeight: 800, color: '#FF808B', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
+                          FACTURES ÉCHUES
+                        </div>
+                        <div style={{ fontSize: '14px', fontWeight: 900, color: '#FF4757', fontFamily: 'monospace', lineHeight: 1.1 }}>
+                          <AnimatedNumber value={summary.total_echue_tnd} formatter={formatTND} />
+                        </div>
+                        <div style={{ fontSize: '9px', color: '#FFA8B0', marginTop: '2px' }}>
+                          <AnimatedNumber value={summary.count_echue} /> facture(s) en retard
+                        </div>
+                      </div>
+
+                      {/* Right Chevron Arrow */}
+                      <ChevronRight 
+                        size={16} 
+                        style={{ 
+                          color: '#FF4757', 
+                          flexShrink: 0,
+                          transform: expandedSection === 'echues' ? 'rotate(90deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s'
+                        }} 
+                      />
                     </div>
-                    <div style={{ fontSize: '13px', fontWeight: 900, color: summary.count_echue > 0 ? '#FF4757' : '#10B981', fontFamily: 'monospace' }}>
-                      <AnimatedNumber value={summary.total_echue_tnd} formatter={formatTND} />
-                    </div>
-                    <div style={{ fontSize: '9px', color: summary.count_echue > 0 ? '#FFA8B0' : '#A7F3D0', marginTop: '2px' }}>
-                      <AnimatedNumber value={summary.count_echue} /> facture(s) en retard
-                    </div>
+
+                    {/* Expandable Real Invoices References List */}
+                    {expandedSection === 'echues' && (
+                      <div style={{
+                        marginTop: '4px',
+                        paddingTop: '8px',
+                        borderTop: '1px dashed rgba(255, 71, 87, 0.3)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px'
+                      }}>
+                        <div style={{ fontSize: '9px', fontWeight: 800, color: '#FF808B', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                          Références des factures échues ({summary.count_echue || facturesEchues.length}) :
+                        </div>
+                        {paginatedEchues.length > 0 ? (
+                          paginatedEchues.map((f: any, i: number) => (
+                            <div
+                              key={i}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onInsertPrompt) {
+                                  onInsertPrompt(`Détails facture fournisseur Réf: ${f.reference || f.reference_fournisseur}`);
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '6px 8px',
+                                background: 'rgba(255, 71, 87, 0.1)',
+                                border: '1px solid rgba(255, 71, 87, 0.25)',
+                                borderRadius: '6px',
+                                fontSize: '10px',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <span style={{ fontWeight: 800, color: '#FF808B', fontFamily: 'monospace' }}>
+                                  {f.reference || f.reference_fournisseur}
+                                </span>
+                                <span style={{ fontSize: '8px', color: '#E2E8F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {f.fournisseur}
+                                </span>
+                              </div>
+                              <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '6px' }}>
+                                <div style={{ fontWeight: 800, color: '#FF4757', fontFamily: 'monospace' }}>
+                                  {formatTND(f.montant_tnd)}
+                                </div>
+                                <div style={{ fontSize: '8px', color: '#CBD5E1' }}>
+                                  Échéance: {f.date_echeance || 'N/A'}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ fontSize: '10px', color: '#FFA8B0', fontStyle: 'italic', padding: '4px' }}>
+                            Aucune facture échue trouvée.
+                          </div>
+                        )}
+
+                        {/* Pagination Bar for Factures Échues */}
+                        {totalPagesEchues > 1 && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginTop: '4px',
+                            paddingTop: '6px',
+                            borderTop: '1px solid rgba(255, 71, 87, 0.2)',
+                            fontSize: '9px'
+                          }}>
+                            <button
+                              disabled={pageEchues === 1}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPageEchues(p => Math.max(1, p - 1));
+                              }}
+                              style={{
+                                background: pageEchues === 1 ? 'rgba(255,255,255,0.03)' : 'rgba(255, 71, 87, 0.2)',
+                                border: '1px solid rgba(255, 71, 87, 0.35)',
+                                color: pageEchues === 1 ? '#64748B' : '#FF808B',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                cursor: pageEchues === 1 ? 'not-allowed' : 'pointer',
+                                fontSize: '9px',
+                                fontWeight: 700
+                              }}
+                            >
+                              ‹ Préc.
+                            </button>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#FFA8B0' }}>
+                              Page {pageEchues} / {totalPagesEchues}
+                            </span>
+                            <button
+                              disabled={pageEchues >= totalPagesEchues}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPageEchues(p => Math.min(totalPagesEchues, p + 1));
+                              }}
+                              style={{
+                                background: pageEchues >= totalPagesEchues ? 'rgba(255,255,255,0.03)' : 'rgba(255, 71, 87, 0.2)',
+                                border: '1px solid rgba(255, 71, 87, 0.35)',
+                                color: pageEchues >= totalPagesEchues ? '#64748B' : '#FF808B',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                cursor: pageEchues >= totalPagesEchues ? 'not-allowed' : 'pointer',
+                                fontSize: '9px',
+                                fontWeight: 700
+                              }}
+                            >
+                              Suiv. ›
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  {/* À Échéance Proche */}
-                  {summary.total_echeance_proche_tnd > 0 && (
-                    <div style={{
-                      background: 'rgba(245, 158, 11, 0.15)',
-                      border: '1px solid rgba(245, 158, 11, 0.4)',
-                      borderRadius: '8px',
-                      padding: '10px 12px'
-                    }}>
-                      <div style={{ fontSize: '10px', color: '#FCD34D', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
-                        <Clock size={12} style={{ color: '#F59E0B' }} />
-                        À Échéance Proche
+                  {/* Box 2: À Échéance Proche (Amber Theme) */}
+                  <div 
+                    onClick={() => {
+                      setExpandedSection(prev => prev === 'proches' ? null : 'proches');
+                      if (onInsertPrompt && facturesProches.length > 0) {
+                        const refs = facturesProches.map((f: any) => f.reference || f.reference_fournisseur).filter(Boolean);
+                        onInsertPrompt(`Factures fournisseurs à échéance proche (${refs.length}): ${refs.join(', ')}`);
+                      }
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(25, 20, 10, 0.9) 100%)',
+                      border: '1px solid rgba(245, 158, 11, 0.45)',
+                      borderRadius: '12px',
+                      padding: '12px 14px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}>
+                      {/* Left Round Avatar Icon */}
+                      <div style={{
+                        width: '36px',
+                        height: '36px',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle, rgba(245, 158, 11, 0.3) 0%, rgba(245, 158, 11, 0.1) 100%)',
+                        border: '1px solid rgba(245, 158, 11, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0
+                      }}>
+                        <Clock size={18} style={{ color: '#F59E0B' }} />
                       </div>
-                      <div style={{ fontSize: '13px', fontWeight: 900, color: '#F59E0B', fontFamily: 'monospace' }}>
-                        <AnimatedNumber value={summary.total_echeance_proche_tnd} formatter={formatTND} />
+
+                      {/* Middle Info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '9px', fontWeight: 800, color: '#FCD34D', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
+                          À ÉCHÉANCE PROCHE
+                        </div>
+                        <div style={{ fontSize: '14px', fontWeight: 900, color: '#F59E0B', fontFamily: 'monospace', lineHeight: 1.1 }}>
+                          <AnimatedNumber value={summary.total_echeance_proche_tnd} formatter={formatTND} />
+                        </div>
+                        <div style={{ fontSize: '9px', color: '#FDE68A', marginTop: '2px' }}>
+                          <AnimatedNumber value={summary.count_proche} /> facture(s) proche(s)
+                        </div>
                       </div>
-                      <div style={{ fontSize: '9px', color: '#FDE68A', marginTop: '2px' }}>
-                        <AnimatedNumber value={summary.count_proche} /> facture(s) proche(s)
-                      </div>
+
+                      {/* Right Chevron Arrow */}
+                      <ChevronRight 
+                        size={16} 
+                        style={{ 
+                          color: '#F59E0B', 
+                          flexShrink: 0,
+                          transform: expandedSection === 'proches' ? 'rotate(90deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s'
+                        }} 
+                      />
                     </div>
-                  )}
+
+                    {/* Expandable Real Invoices References List */}
+                    {expandedSection === 'proches' && (
+                      <div style={{
+                        marginTop: '4px',
+                        paddingTop: '8px',
+                        borderTop: '1px dashed rgba(245, 158, 11, 0.3)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px'
+                      }}>
+                        <div style={{ fontSize: '9px', fontWeight: 800, color: '#FCD34D', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                          Références des factures ({summary.count_proche || facturesProches.length}) :
+                        </div>
+                        {paginatedProches.length > 0 ? (
+                          paginatedProches.map((f: any, i: number) => (
+                            <div
+                              key={i}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onInsertPrompt) {
+                                  onInsertPrompt(`Détails facture fournisseur Réf: ${f.reference || f.reference_fournisseur}`);
+                                }
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '6px 8px',
+                                background: 'rgba(245, 158, 11, 0.1)',
+                                border: '1px solid rgba(245, 158, 11, 0.25)',
+                                borderRadius: '6px',
+                                fontSize: '10px',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s'
+                              }}
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <span style={{ fontWeight: 800, color: '#FCD34D', fontFamily: 'monospace' }}>
+                                  {f.reference || f.reference_fournisseur}
+                                </span>
+                                <span style={{ fontSize: '8px', color: '#E2E8F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {f.fournisseur}
+                                </span>
+                              </div>
+                              <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: '6px' }}>
+                                <div style={{ fontWeight: 800, color: '#F59E0B', fontFamily: 'monospace' }}>
+                                  {formatTND(f.montant_tnd)}
+                                </div>
+                                <div style={{ fontSize: '8px', color: '#CBD5E1' }}>
+                                  Échéance: {f.date_echeance || 'N/A'}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ fontSize: '10px', color: '#FDE68A', fontStyle: 'italic', padding: '4px' }}>
+                            Aucune facture à échéance proche trouvée.
+                          </div>
+                        )}
+
+                        {/* Pagination Bar for À Échéance Proche */}
+                        {totalPagesProches > 1 && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginTop: '4px',
+                            paddingTop: '6px',
+                            borderTop: '1px solid rgba(245, 158, 11, 0.2)',
+                            fontSize: '9px'
+                          }}>
+                            <button
+                              disabled={pageProches === 1}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPageProches(p => Math.max(1, p - 1));
+                              }}
+                              style={{
+                                background: pageProches === 1 ? 'rgba(255,255,255,0.03)' : 'rgba(245, 158, 11, 0.2)',
+                                border: '1px solid rgba(245, 158, 11, 0.35)',
+                                color: pageProches === 1 ? '#64748B' : '#FCD34D',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                cursor: pageProches === 1 ? 'not-allowed' : 'pointer',
+                                fontSize: '9px',
+                                fontWeight: 700
+                              }}
+                            >
+                              ‹ Préc.
+                            </button>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#FDE68A' }}>
+                              Page {pageProches} / {totalPagesProches}
+                            </span>
+                            <button
+                              disabled={pageProches >= totalPagesProches}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPageProches(p => Math.min(totalPagesProches, p + 1));
+                              }}
+                              style={{
+                                background: pageProches >= totalPagesProches ? 'rgba(255,255,255,0.03)' : 'rgba(245, 158, 11, 0.2)',
+                                border: '1px solid rgba(245, 158, 11, 0.35)',
+                                color: pageProches >= totalPagesProches ? '#64748B' : '#FCD34D',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                cursor: pageProches >= totalPagesProches ? 'not-allowed' : 'pointer',
+                                fontSize: '9px',
+                                fontWeight: 700
+                              }}
+                            >
+                              Suiv. ›
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
 
-          {/* Breakdown by Horizon */}
-          {byHorizon.length > 0 && (
-            <div style={{ marginBottom: '14px' }}>
-              <div style={{ fontSize: '10px', fontWeight: 700, color: '#CBD5E1', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-                Échéancier de Paiement
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {byHorizon.map((h: any) => (
-                  <div key={h.key} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '6px 8px',
-                    background: h.key === 'echues' ? 'rgba(255, 71, 87, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                    border: '1px solid rgba(255, 255, 255, 0.04)',
-                    borderRadius: '6px',
-                    fontSize: '11px'
-                  }}>
-                    <span style={{ color: h.key === 'echues' ? '#FF808B' : '#E2E8F0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Clock size={12} style={{ color: h.key === 'echues' ? '#FF4757' : '#94A3B8' }} />
-                      {h.label} (<AnimatedNumber value={h.count} />)
-                    </span>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: h.key === 'echues' ? '#FF4757' : '#F8FAFC' }}>
-                      <AnimatedNumber value={h.amount} formatter={formatTND} />
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+
 
           {/* Top Suppliers */}
           {topSuppliers.length > 0 && (
             <div>
-              <div style={{ fontSize: '10px', fontWeight: 700, color: '#CBD5E1', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+              <div style={{ fontSize: '9px', fontWeight: 700, color: '#CBD5E1', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Top Fournisseurs à Régler
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -409,9 +854,9 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
                     onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 71, 87, 0.1)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'}
                   >
-                    <span style={{ color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Building2 size={12} style={{ color: '#FF4757' }} />
-                      {sup.supplier_name}
+                    <span style={{ color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+                      <Building2 size={12} style={{ color: '#FF4757', flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sup.supplier_name}</span>
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'monospace', fontWeight: 700, color: '#F8FAFC' }}>
                       <AnimatedNumber value={sup.total_tnd} formatter={formatTND} />

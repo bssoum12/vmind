@@ -36,6 +36,7 @@ import { VsellFidelisationChartCard } from './TableauCroiseKpi/VsellFidelisation
 import { VsellPipelineFunnelCard } from './TableauCroiseKpi/VsellPipelineFunnelCard';
 import { VfinTresorerieCard } from './TableauCroiseKpi/VfinTresorerieCard';
 import { VbuyFacturesAReglerCard } from './TableauCroiseKpi/VbuyFacturesAReglerCard';
+import { VbuyAchatsDuMoisCard } from './TableauCroiseKpi/VbuyAchatsDuMoisCard';
 interface RightPanelProps {
   logs: LogEntry[];
   onInsertPrompt: (text: string) => void;
@@ -286,6 +287,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
         <VfinTopClientsCard activeAgentId={activeAgentId} />
         <VfinTresorerieCard activeAgentId={activeAgentId} />
         <VbuyFacturesAReglerCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VbuyAchatsDuMoisCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
         <VolumeLineChart activeAgentId={activeAgentId} />
         <DeliveryRateKpi activeAgentId={activeAgentId} /> 
         <MultiIndicatorsCard activeAgentId={activeAgentId} />

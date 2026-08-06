@@ -346,6 +346,21 @@ export async function triggerAIQualificationAllPending(agentId: string): Promise
 }
 
 /**
+ * Trigger Prospect Auto Mode
+ */
+export async function triggerProspectAutoMode(agentId: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/prospect-agent/auto-mode/${encodeURIComponent(agentId)}`, {
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to trigger prospect auto mode (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
  * Appelle l'agent n8n KPI via le Proxy sécurisé du Backend
  */
 export async function fetchN8nKpis(
@@ -435,6 +450,33 @@ export async function getVbuyKpiFacturesARegler(
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
     throw new Error(errData.message || `Erreur VBUY KPI (${response.status})`);
+  }
+
+  const json = await response.json();
+  return json?.data || json;
+}
+
+/**
+ * Récupère le KPI VBUY #2 : Achats du mois (TND)
+ */
+export async function getVbuyKpiAchatsDuMois(
+  clientId: string = "DEMO"
+): Promise<any> {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-achats-du-mois`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      client_id: clientId
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur VBUY KPI Achats (${response.status})`);
   }
 
   const json = await response.json();
