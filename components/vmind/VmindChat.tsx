@@ -60,6 +60,9 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_vbuy_kpi_montant_total_achats_ce_mois': 'VBUY',
   'Client1_get_vbuy_kpi_montant_total_achats_ce_mois': 'VBUY',
   'MCP_Client1_get_vbuy_kpi_montant_total_achats_ce_mois': 'VBUY',
+  'get_vbuy_top_fournisseurs': 'VBUY',
+  'Client1_get_vbuy_top_fournisseurs': 'VBUY',
+  'MCP_Client1_get_vbuy_top_fournisseurs': 'VBUY',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -89,6 +92,9 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'get_vbuy_kpi_montant_total_achats_ce_mois': 'Montant Achats Ce Mois',
   'Client1_get_vbuy_kpi_montant_total_achats_ce_mois': 'Montant Achats Ce Mois',
   'MCP_Client1_get_vbuy_kpi_montant_total_achats_ce_mois': 'Montant Achats Ce Mois',
+  'get_vbuy_top_fournisseurs': 'Top 5 Fournisseurs (VBUY)',
+  'Client1_get_vbuy_top_fournisseurs': 'Top 5 Fournisseurs (VBUY)',
+  'MCP_Client1_get_vbuy_top_fournisseurs': 'Top 5 Fournisseurs (VBUY)',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -125,7 +131,8 @@ const VSELL_FAST_TRACK_REGISTRY: Record<string, string> = {
 
 const VBUY_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Factures à régler (7j) ?": "Combien de factures fournisseurs sont à régler cette semaine ?",
-  "Montant achats ce mois ?": "Quel est le montant total des achats ce mois ?"
+  "Montant achats ce mois ?": "Quel est le montant total des achats ce mois ?",
+  "Top 5 fournisseurs ?": "Quels sont les 5 principaux fournisseurs par volume d'achat ?"
 };
 
 const FAST_TRACK_REGISTRY: Record<string, string> = {
