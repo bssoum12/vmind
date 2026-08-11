@@ -483,3 +483,84 @@ export async function getVbuyKpiAchatsDuMois(
   return json?.data || json;
 }
 
+/**
+ * Récupère le KPI VBUY #3 : Fournisseurs en retard de livraison
+ */
+export async function getVbuyKpiFournisseursEnRetardLivraison(
+  clientId: string = "DEMO"
+): Promise<any> {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-fournisseurs-en-retard-livraison`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      client_id: clientId
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur VBUY KPI Fournisseurs en retard (${response.status})`);
+  }
+
+  const json = await response.json();
+  return json?.data || json;
+}
+
+/**
+ * Récupère le KPI VBUY #4 : Commandes en attente de réception
+ */
+export async function getVbuyKpiCommandesEnAttente(
+  clientId: string = "DEMO"
+): Promise<any> {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-commandes-en-attente`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      client_id: clientId
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur VBUY KPI Commandes en attente (${response.status})`);
+  }
+
+  const json = await response.json();
+  return json?.data || json;
+}
+
+/**
+ * Récupère le KPI VBUY #5 : Répartition des dépenses par catégorie (Pie Chart)
+ */
+export async function getVbuyKpiRepartitionParCategorie(
+  clientId: string = "DEMO"
+): Promise<any> {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-repartition-par-categorie`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      client_id: clientId
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur VBUY KPI Répartition Catégorie (${response.status})`);
+  }
+
+  const json = await response.json();
+  return json?.data || json;
+}
+
