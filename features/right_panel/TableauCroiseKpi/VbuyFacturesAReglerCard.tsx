@@ -116,6 +116,12 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
     return new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(truncated) + ' TND';
   };
 
+  const formatNumberOnly = (val: any) => {
+    const num = typeof val === 'number' ? val : parseFloat(val) || 0;
+    const truncated = Math.trunc(num * 1000) / 1000;
+    return new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(truncated);
+  };
+
   return (
     <div style={{
       background: 'linear-gradient(145deg, rgba(13, 17, 26, 0.96) 0%, rgba(22, 10, 24, 0.96) 100%)',
@@ -358,7 +364,7 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
                   {/* Col 2: En Retard */}
                   <div>
                     <div style={{ fontSize: '15px', fontWeight: 800, color: '#FF4757', lineHeight: 1.2 }}>
-                      +{summary.count_echue}
+                      {summary.count_echue}
                     </div>
                     <div style={{ fontSize: '9px', color: '#FF4757', fontWeight: 600, lineHeight: 1.2, marginTop: '2px' }}>
                       en retard
@@ -368,7 +374,7 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
                   {/* Col 3: Proche(s) */}
                   <div>
                     <div style={{ fontSize: '15px', fontWeight: 800, color: '#F59E0B', lineHeight: 1.2 }}>
-                      +{summary.count_proche}
+                      {summary.count_proche}
                     </div>
                     <div style={{ fontSize: '9px', color: '#F59E0B', fontWeight: 600, lineHeight: 1.2, marginTop: '2px' }}>
                       proche(s)
@@ -832,10 +838,10 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
           {topSuppliers.length > 0 && (
             <div>
               <div style={{ fontSize: '9px', fontWeight: 700, color: '#CBD5E1', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Top Fournisseurs à Régler
+                Top Fournisseurs à Régler (TND)
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {topSuppliers.slice(0, 3).map((sup: any, idx: number) => (
+                {topSuppliers.slice(0, 5).map((sup: any, idx: number) => (
                   <div
                     key={idx}
                     onClick={() => onInsertPrompt && onInsertPrompt(`Détails factures fournisseur ${sup.supplier_name}`)}
@@ -854,12 +860,12 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
                     onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 71, 87, 0.1)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'}
                   >
-                    <span style={{ color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+                    <span style={{ color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1, marginRight: '8px', overflow: 'hidden' }}>
                       <Building2 size={12} style={{ color: '#FF4757', flexShrink: 0 }} />
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sup.supplier_name}</span>
                     </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'monospace', fontWeight: 700, color: '#F8FAFC' }}>
-                      <AnimatedNumber value={sup.total_tnd} formatter={formatTND} />
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontFamily: 'monospace', fontWeight: 700, color: '#F8FAFC', flexShrink: 0 }}>
+                      <AnimatedNumber value={sup.total_tnd} formatter={formatNumberOnly} />
                       {onInsertPrompt && <ChevronRight size={12} style={{ color: '#94A3B8' }} />}
                     </span>
                   </div>
