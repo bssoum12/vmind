@@ -104,7 +104,13 @@ export async function sendVmindMessage(message: string, conversationId: string, 
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.message || `Erreur Proxy (${response.status})`);
+      let rawMsg = errData.message || `Erreur de communication (${response.status})`;
+      if (rawMsg.includes("n8n responded with status") || rawMsg.includes("status 500") || response.status === 500) {
+        rawMsg = "Erreur de traitement. Veuillez relancer la demande d'analyse.";
+      } else if (rawMsg.toLowerCase().includes("fetch failed") || rawMsg.toLowerCase().includes("failed to fetch") || rawMsg.toLowerCase().includes("econnrefused")) {
+        rawMsg = "Erreur de connexion. Le service d'analyse est temporairement inaccessible.";
+      }
+      throw new Error(rawMsg);
     }
 
     const data = await response.json();
@@ -133,6 +139,10 @@ export async function sendVmindMessage(message: string, conversationId: string, 
       return { ok: false, error: 'ABORTED', message: 'Requete annulée' } as unknown as VmindN8nResponse;
     }
     console.error("❌ [n8n-api] FETCH ERROR:", error);
+    let msg = error?.message || "";
+    if (msg.toLowerCase().includes("fetch failed") || msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("econnrefused")) {
+      throw new Error("Erreur de connexion. Le service d'analyse est temporairement inaccessible.");
+    }
     throw error;
   }
 }
@@ -432,11 +442,13 @@ export async function triggerProspectAutoMode(agentId: string): Promise<any> {
 
 
 /**
- * Appelle l'outil VBUY KPI #1 (Factures à régler) directement depuis le Backend HTTP (sans passer par n8n)
+ * Récupère le KPI VBUY #1 : Factures à régler (TND)
  */
 export async function getVbuyKpiFacturesARegler(
-  clientId = "DEMO",
-  horizon?: '1d' | '1w' | '1m' | '3m' | '6m'
+  clientId: string = "DEMO",
+  horizon: string = "1m",
+  startDate?: string,
+  endDate?: string
 ): Promise<any> {
   const baseUrl = getBaseUrl();
   const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-factures-a-regler`, {
@@ -447,7 +459,9 @@ export async function getVbuyKpiFacturesARegler(
     },
     body: JSON.stringify({
       client_id: clientId,
-      horizon
+      horizon,
+      startDate,
+      endDate
     })
   });
 
@@ -464,7 +478,9 @@ export async function getVbuyKpiFacturesARegler(
  * Récupère le KPI VBUY #2 : Achats du mois (TND)
  */
 export async function getVbuyKpiAchatsDuMois(
-  clientId: string = "DEMO"
+  clientId: string = "DEMO",
+  startDate?: string,
+  endDate?: string
 ): Promise<any> {
   const baseUrl = getBaseUrl();
   const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-achats-du-mois`, {
@@ -474,7 +490,9 @@ export async function getVbuyKpiAchatsDuMois(
       ...getAuthHeaders()
     },
     body: JSON.stringify({
-      client_id: clientId
+      client_id: clientId,
+      startDate,
+      endDate
     })
   });
 
@@ -491,7 +509,9 @@ export async function getVbuyKpiAchatsDuMois(
  * Récupère le KPI VBUY #3 : Fournisseurs en retard de livraison
  */
 export async function getVbuyKpiFournisseursEnRetardLivraison(
-  clientId: string = "DEMO"
+  clientId: string = "DEMO",
+  startDate?: string,
+  endDate?: string
 ): Promise<any> {
   const baseUrl = getBaseUrl();
   const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-fournisseurs-en-retard-livraison`, {
@@ -501,7 +521,9 @@ export async function getVbuyKpiFournisseursEnRetardLivraison(
       ...getAuthHeaders()
     },
     body: JSON.stringify({
-      client_id: clientId
+      client_id: clientId,
+      startDate,
+      endDate
     })
   });
 
@@ -518,7 +540,9 @@ export async function getVbuyKpiFournisseursEnRetardLivraison(
  * Récupère le KPI VBUY #4 : Commandes en attente de réception
  */
 export async function getVbuyKpiCommandesEnAttente(
-  clientId: string = "DEMO"
+  clientId: string = "DEMO",
+  startDate?: string,
+  endDate?: string
 ): Promise<any> {
   const baseUrl = getBaseUrl();
   const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-commandes-en-attente`, {
@@ -528,7 +552,9 @@ export async function getVbuyKpiCommandesEnAttente(
       ...getAuthHeaders()
     },
     body: JSON.stringify({
-      client_id: clientId
+      client_id: clientId,
+      startDate,
+      endDate
     })
   });
 
@@ -545,7 +571,9 @@ export async function getVbuyKpiCommandesEnAttente(
  * Récupère le KPI VBUY #5 : Répartition des dépenses par catégorie (Pie Chart)
  */
 export async function getVbuyKpiRepartitionParCategorie(
-  clientId: string = "DEMO"
+  clientId: string = "DEMO",
+  startDate?: string,
+  endDate?: string
 ): Promise<any> {
   const baseUrl = getBaseUrl();
   const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-repartition-par-categorie`, {
@@ -555,7 +583,9 @@ export async function getVbuyKpiRepartitionParCategorie(
       ...getAuthHeaders()
     },
     body: JSON.stringify({
-      client_id: clientId
+      client_id: clientId,
+      startDate,
+      endDate
     })
   });
 
@@ -567,4 +597,3 @@ export async function getVbuyKpiRepartitionParCategorie(
   const json = await response.json();
   return json?.data || json;
 }
-

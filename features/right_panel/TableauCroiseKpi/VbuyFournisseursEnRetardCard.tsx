@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { getVbuyKpiFournisseursEnRetardLivraison } from '@/shared/api/n8n-api';
+import { useKpis } from '@/shared/contexts/KpiCacheContext';
 import { AlertTriangle, Clock, RefreshCw, Building2, ChevronRight, ChevronDown, Info, Truck } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 
@@ -18,35 +18,18 @@ export const VbuyFournisseursEnRetardCard: React.FC<VbuyFournisseursEnRetardCard
 }) => {
   const isVisible = !activeAgentId || activeAgentId.toUpperCase() === 'VBUY' || activeAgentId.toUpperCase() === 'VMIND';
 
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
+  const agentData = kpisByAgent["vbuy"] || kpisByAgent["VBUY"] || {};
+  const n8nToolData = agentData.get_vbuy_kpi_fournisseurs_en_retard_livraison;
+
   const [expandedDetails, setExpandedDetails] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
 
-  const loadKpi = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await getVbuyKpiFournisseursEnRetardLivraison(clientId);
-      setData(res);
-    } catch (err: any) {
-      console.error("[VBUY RETARD LIVRAISON CARD] Error:", err);
-      setError(err?.message || "Erreur lors du chargement du KPI Fournisseurs en Retard");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isVisible) {
-      loadKpi();
-    }
-  }, [clientId, isVisible]);
-
   if (!isVisible) return null;
 
-  const payload = data?.data || data || {};
+  const effectiveLoading = (loadingByAgent["vbuy"] || loadingByAgent["VBUY"]) && !n8nToolData;
+  const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
+  const payload = n8nToolData?.data || n8nToolData || {};
   const summary = payload?.summary || {
     nb_fournisseurs_en_retard: 0,
     nb_commandes_en_retard: 0,
@@ -129,8 +112,8 @@ export const VbuyFournisseursEnRetardCard: React.FC<VbuyFournisseursEnRetardCard
             VBUY
           </span>
           <button
-            onClick={loadKpi}
-            disabled={loading}
+            onClick={() => fetchKpis('vbuy', true, 'get_vbuy_kpi_fournisseurs_en_retard_livraison')}
+            disabled={effectiveLoading}
             style={{
               background: 'transparent',
               border: 'none',
@@ -140,14 +123,14 @@ export const VbuyFournisseursEnRetardCard: React.FC<VbuyFournisseursEnRetardCard
               display: 'flex',
               alignItems: 'center'
             }}
-            title="Rafraîchir les données"
+            title="Rafraîchir les données via n8n"
           >
-            <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+            <RefreshCw size={13} style={{ animation: effectiveLoading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
         </div>
       </div>
 
-      {loading ? (
+      {effectiveLoading ? (
         <div style={{ padding: '24px 0', textAlign: 'center', color: '#94A3B8', fontSize: '11px' }}>
           Chargement des retards fournisseurs...
         </div>

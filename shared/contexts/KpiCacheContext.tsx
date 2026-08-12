@@ -159,7 +159,11 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
         return; // Don't trigger error or clear loading for aborted requests
       }
       console.error(`[KPI CONTEXT] Error fetching KPIs:`, err);
-      setError(err.message || "Impossible de charger les indicateurs.");
+      let msg = err?.message || "Impossible de charger les indicateurs.";
+      if (msg.toLowerCase().includes("fetch failed") || msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("econnrefused")) {
+        msg = "Erreur de connexion. Le service d'analyse est temporairement inaccessible.";
+      }
+      setError(msg);
     } finally {
       // Only reset loading if this remains the active agent
       if (activeAgentRef.current === upperAgent) {
@@ -183,7 +187,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
     const currentAgent = activeAgentId || 'VDATA';
     const lowerAgent = currentAgent.toLowerCase();
-    if (lowerAgent !== 'vdata' && lowerAgent !== 'vfin' && lowerAgent !== 'vsell') return;
+    if (lowerAgent !== 'vdata' && lowerAgent !== 'vfin' && lowerAgent !== 'vsell' && lowerAgent !== 'vbuy') return;
 
     // Clear previous debounce timeout
     if (debounceTimeoutRef.current) {
