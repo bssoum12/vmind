@@ -101,6 +101,12 @@ export const VbuyAchatsDuMoisCard: React.FC<VbuyAchatsDuMoisCardProps> = ({
     return new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(truncated) + ' TND';
   };
 
+  const formatNumberOnly = (val: any) => {
+    const num = typeof val === 'number' ? val : parseFloat(val) || 0;
+    const truncated = Math.trunc(num * 1000) / 1000;
+    return new Intl.NumberFormat('fr-TN', { minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(truncated);
+  };
+
   return (
     <div style={{
       background: 'linear-gradient(145deg, rgba(13, 17, 26, 0.96) 0%, rgba(10, 24, 22, 0.96) 100%)',
@@ -580,10 +586,10 @@ export const VbuyAchatsDuMoisCard: React.FC<VbuyAchatsDuMoisCardProps> = ({
           {topSuppliers.length > 0 && (
             <div>
               <div style={{ fontSize: '9px', fontWeight: 700, color: '#CBD5E1', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                Top Fournisseurs du Mois
+                Top Fournisseurs du Mois (TND)
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {topSuppliers.slice(0, 3).map((sup: any, idx: number) => (
+                {topSuppliers.slice(0, 5).map((sup: any, idx: number) => (
                   <div
                     key={idx}
                     onClick={() => onInsertPrompt && onInsertPrompt(`Détails achats fournisseur ${sup.supplier_name}`)}
@@ -602,13 +608,31 @@ export const VbuyAchatsDuMoisCard: React.FC<VbuyAchatsDuMoisCardProps> = ({
                     onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'}
                   >
-                    <span style={{ color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, overflow: 'hidden' }}>
+                    <span style={{ color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flex: 1, marginRight: '8px', overflow: 'hidden' }}>
                       <Building2 size={12} style={{ color: '#10B981', flexShrink: 0 }} />
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sup.supplier_name}</span>
                     </span>
-                    <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#F8FAFC', flexShrink: 0, marginLeft: '8px' }}>
-                      <AnimatedNumber value={sup.total_tnd} formatter={formatTND} />
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                      {typeof sup.variation_pct === 'number' && (
+                        <span style={{
+                          fontSize: '9px',
+                          fontWeight: 700,
+                          color: sup.variation_pct >= 0 ? '#10B981' : '#FF4757',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                          background: sup.variation_pct >= 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(255, 71, 87, 0.12)',
+                          padding: '1px 5px',
+                          borderRadius: '4px'
+                        }}>
+                          {sup.variation_pct >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                          <span>{sup.variation_pct >= 0 ? '+' : ''}{sup.variation_pct}%</span>
+                        </span>
+                      )}
+                      <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#F8FAFC' }}>
+                        <AnimatedNumber value={sup.total_tnd} formatter={formatNumberOnly} />
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
