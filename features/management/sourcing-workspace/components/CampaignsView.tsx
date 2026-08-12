@@ -101,12 +101,6 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
     if (!selectedEmail) return;
     setIsSending(true);
     try {
-      // Construct mailto link and redirect to open client (Outlook/Mail) with CC
-      const ccPart = cc ? `&cc=${encodeURIComponent(cc)}` : '';
-      const mailtoUrl = `mailto:${encodeURIComponent(selectedEmail.email)}?subject=${encodeURIComponent(sujet)}&body=${encodeURIComponent(corps)}${ccPart}`;
-      window.location.href = mailtoUrl;
-
-      // Record sending result in SQL Server
       const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vmind_session')}` },

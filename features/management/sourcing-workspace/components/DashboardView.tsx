@@ -198,7 +198,6 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, logs
              </div>
              <div>
                 <h3 style={{ fontSize: '15px', color: 'var(--text)', margin: 0, fontWeight: 600 }}>Cerveau Sourcing IA</h3>
-                <span style={{ fontSize: '11px', color: 'var(--cyan)', fontFamily: 'var(--font-mono)' }}>{agent?.config?.modele_llm || 'llama-3.3-70b-versatile'}</span>
              </div>
           </div>
 

@@ -159,12 +159,6 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
   const handleSendEmail = async () => {
     setIsSending(true);
     try {
-      // Construct mailto link and redirect to open client (Outlook/Mail)
-      const ccPart = cc ? `&cc=${encodeURIComponent(cc)}` : '';
-      const mailtoUrl = `mailto:${encodeURIComponent(lead.email)}?subject=${encodeURIComponent(sujet)}&body=${encodeURIComponent(corps)}${ccPart}`;
-      window.location.href = mailtoUrl;
-
-      // Record in DB with Success status (statut of lead remains unchanged)
       const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
@@ -180,8 +174,15 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, thr
       });
 
       if (res.ok) {
-        onRefresh();
-        onClose();
+        const data = await res.json();
+        if (data.success) {
+          onRefresh();
+          onClose();
+        } else {
+          alert(`Erreur d'envoi: ${data.error || "Erreur inconnue"}`);
+        }
+      } else {
+        alert("Erreur serveur lors de l'envoi.");
       }
     } catch (error) {
       console.error('Email sending error:', error);

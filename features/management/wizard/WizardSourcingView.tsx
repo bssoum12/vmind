@@ -17,7 +17,7 @@ interface WizardViewProps {
 
 const VIRTUAL_MIND_GUIDE: Record<string, { title: string; text: string }> = {
   agent_name: { title: "Identité de l'Agent", text: "Donnez un nom unique à votre agent. Ce nom vous aidera à l'identifier facilement dans votre espace de travail et dans les logs de sourcing." },
-  modele_llm: { title: "Cerveau de l'Agent (LLM)", text: "Le modèle sélectionné définit l'intelligence de votre agent. Llama 3.3 est recommandé pour sa rapidité et son rapport coût/performance." },
+  agent_mission: { title: "Mission de l'Agent", text: "Définissez ce que l'agent doit accomplir. Soyez clair sur le produit/service à promouvoir et les objectifs." },
   signature_email: { title: "Signature d'Email", text: "Cette signature sera insérée automatiquement à la fin de tous les emails générés par VMind. Soyez professionnel !" },
   default_cc: { title: "Copie Conforme (CC)", text: "Ajoutez votre adresse email ou celle d'un manager pour recevoir une copie des emails envoyés aux candidats sourcés." },
   email_limits: { title: "Cadence d'Envoi", text: "Configurez le délai entre chaque email pour éviter d'être marqué comme spam. Les limites journalières protègent la réputation de votre domaine." },
@@ -227,9 +227,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
 
   const getMoodForField = (field: string | null): GuideMood => {
     if (!field) return 'curious';
-    const curiousFields = ['agent_name', 'zone_geo', 'taille_entreprise'];
-    const convincedFields = ['modele_llm', 'seuil_qualification', 'ponderations'];
-    if (curiousFields.includes(field)) return 'curious';
+    const convincedFields = ['seuil_qualification', 'ponderations'];
     if (convincedFields.includes(field)) return 'convinced';
     return 'focused';
   };
@@ -242,13 +240,11 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
     run_mode: string;
     workflow_timezone: string;
     sourcing_config: {
-      modele_llm: string;
       agent_mission: string;
       campaign: {
         signature_email: string;
         default_cc: string;
         delai_envois: number;
-        max_emails_jour: number;
         email_recap: string;
       };
     };
@@ -263,14 +259,12 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
         run_mode: agentToEdit.run_mode || 'sourcing',
         workflow_timezone: agentToEdit.workflow_timezone || 'Africa/Tunis',
         sourcing_config: {
-          modele_llm: cfg.modele_llm || 'llama-3.3-70b-versatile',
           agent_mission: cfg.agent_mission || '',
           
           campaign: {
             signature_email: cfg.signature_email || '',
             default_cc: cfg.default_cc || '',
             delai_envois: cfg.delai_envois ?? 30,
-            max_emails_jour: cfg.max_emails_jour ?? 50,
             email_recap: cfg.email_recap || ''
           }
         },
@@ -302,14 +296,12 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       run_mode: 'sourcing',
       workflow_timezone: 'Africa/Tunis',
       sourcing_config: {
-        modele_llm: 'llama-3.3-70b-versatile',
         agent_mission: '',
         
         campaign: {
           signature_email: '',
           default_cc: '',
           delai_envois: 30,
-          max_emails_jour: 50,
           email_recap: ''
         }
       },
@@ -604,22 +596,6 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
                     />
                     <div className="form-hint">Ce nom sera affiché en interne pour identifier l'agent.</div>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Modèle de Langage (LLM)</label>
-                    <select
-                      className="form-input"
-                      value={formData.sourcing_config.modele_llm} onFocus={() => setFocusedField('modele_llm')} onBlur={() => setFocusedField(null)}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        sourcing_config: { ...formData.sourcing_config, modele_llm: e.target.value }
-                      })}
-                    >
-                      <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
-                      <option value="openai/gpt-oss-120b">openai/gpt-oss-120b</option>
-                      <option value="Claude 3.5 Sonnet">Claude 3.5 Sonnet (Anthropic Cloud)</option>
-                      <option value="Llama 3 (Ollama Local)">Llama 3 (Local Ollama Engine)</option>
-                    </select>
-                  </div>
                 </div>
 
 
@@ -718,15 +694,6 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
                       className="form-input"
                       value={formData.sourcing_config.campaign.delai_envois} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
                       onChange={(e) => updateCampaign('delai_envois', Number(e.target.value))}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Emails max / jour</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={formData.sourcing_config.campaign.max_emails_jour} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
-                      onChange={(e) => updateCampaign('max_emails_jour', Number(e.target.value))}
                     />
                   </div>
                 </div>

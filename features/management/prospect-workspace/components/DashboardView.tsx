@@ -30,9 +30,10 @@ interface DashboardViewProps {
   leads: Lead[];
   campaigns: any[];
   threshold: number;
+  agent?: any;
 }
 
-const DashboardView = React.memo(function DashboardView({ leads, campaigns, threshold }: DashboardViewProps) {
+const DashboardView = React.memo(function DashboardView({ leads, campaigns, threshold, agent }: DashboardViewProps) {
   // Calculations
   const totalLeads = leads.length;
 
@@ -235,61 +236,155 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
         </div>
       </div>
 
-      {/* Recents Leads Section */}
-      <div className="card">
-        <h3 style={{ marginBottom: '1.25rem', fontSize: '1.1rem', fontWeight: 600 }}>Dernières Activités & Leads Reçus</h3>
-        <div className="table-container" style={{ margin: 0, boxShadow: 'none', border: 'none' }}>
-          <table className="leads-table">
-            <thead>
-              <tr>
-                <th>Contact</th>
-                <th>Entreprise</th>
-                <th>Score</th>
-                <th>Statut</th>
-                <th>Source</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leads.slice(0, 5).map((lead) => {
-                const isQualified = lead.score !== null && lead.score >= threshold;
-                return (
-                  <tr key={lead.id}>
-                    <td>
-                      <div style={{ fontWeight: 600 }}>{lead.prenom} {lead.nom}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{lead.email}</div>
-                    </td>
-                    <td>
-                      <div>{lead.entreprise}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{lead.secteur} • {lead.pays}</div>
-                    </td>
-                    <td>
-                      {lead.score !== null ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontWeight: 'bold', color: isQualified ? 'var(--success)' : 'var(--danger)' }}>
-                            {lead.score}
-                          </span>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>/100</span>
+       {/* Full Width ICP Configuration Card */}
+      <div className="icp-config-container">
+        {(() => {
+          const agentConfig = agent?.config || {};
+          const icp = agentConfig.icp || {};
+          const mission = agentConfig.agent_mission || '';
+
+          const poids = [
+            { label: 'Secteur d\'Activité', value: icp.poids_secteur || 25, color: '#3B82F6', icon: '🏢' },
+            { label: 'Poste du Contact', value: icp.poids_poste || 25, color: '#10B981', icon: '👤' },
+            { label: 'Taille d\'Entreprise', value: icp.poids_taille || 25, color: '#F59E0B', icon: '📊' },
+            { label: 'Zone Géographique', value: icp.poids_pays || 25, color: '#8B5CF6', icon: '🌍' }
+          ];
+
+          return (
+            <div className="icp-card">
+              {/* Header */}
+              <div className="icp-header">
+                <div className="icp-header-title">
+                  <div className="icp-icon">🎯</div>
+                  <div>
+                    <h3>Configuration & Algorithme de Ciblage (ICP)</h3>
+                    <p>Règles et pondérations utilisées par l'intelligence artificielle pour évaluer les prospects</p>
+                  </div>
+                </div>
+
+                <div className="icp-badge">
+                  <span className="dot"></span>
+                  Algorithme Actif
+                </div>
+              </div>
+
+              {/* Top Key Metrics Row */}
+              <div className="icp-metrics-grid">
+                {/* Metric 1: Threshold */}
+                <div className="icp-metric-box">
+                  <div className="label">Seuil d'Exigence Minimum</div>
+                  <div className="value-container">
+                    <span className="value-cyan">{agentConfig.seuil_qualification || threshold}</span>
+                    <span className="unit">/ 100 pts</span>
+                  </div>
+                  <div className="desc">Score minimal pour qu'un prospect soit qualifié par l'IA</div>
+                </div>
+
+                {/* Metric 2: Company Size */}
+                <div className="icp-metric-box">
+                  <div className="label">Taille d'Entreprise Cible</div>
+                  <div className="value-container">
+                    <span className="value-white">{icp.taille_min || 50} - {icp.taille_max || 500}</span>
+                    <span className="unit">employés</span>
+                  </div>
+                  <div className="desc">Tranche d'effectifs priorisée pour l'analyse</div>
+                </div>
+
+                {/* Metric 3: Total Criteria Evaluated */}
+                <div className="icp-metric-box">
+                  <div className="label">Filtres Spécifiques Actifs</div>
+                  <div className="value-container">
+                    <span className="value-blue">
+                      {(icp.poste_contact?.length || 0) + (icp.secteur_activite?.length || 0) + (icp.zone_geo?.length || 0)}
+                    </span>
+                    <span className="unit">règles de ciblage</span>
+                  </div>
+                  <div className="desc">Postes, secteurs et zones géographiques configurés</div>
+                </div>
+              </div>
+
+              {/* Criteria Weights Section */}
+              <div>
+                <div className="icp-section-title">Pondération des Critères de Qualification</div>
+                <div className="icp-weights-grid">
+                  {poids.map(p => (
+                    <div key={p.label} className="icp-weight-card">
+                      <div className="weight-header">
+                        <div className="weight-label">
+                          <span>{p.icon}</span>
+                          <span>{p.label}</span>
                         </div>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Non qualifié</span>
-                      )}
-                    </td>
-                    <td>
-                      <span className={`badge badge-${lead.statut === 'Qualifié' ? 'qualified' : lead.statut === 'Écarté' ? 'discarded' : lead.statut === 'Erreur' ? 'error' : 'new'}`}>
-                        {lead.statut}
-                      </span>
-                    </td>
-                    <td>
-                      <span style={{ fontSize: '0.85rem' }}>
-                        {lead.source === 'CSV' ? '📁 CSV' : lead.source === 'Webhook' ? '⚡ Webhook' : '🔗 API'}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                        <span className="weight-val" style={{ color: p.color }}>{p.value}%</span>
+                      </div>
+                      <div className="bar-bg">
+                        <div className="bar-fill" style={{ width: `${p.value}%`, backgroundColor: p.color }}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Targeting Details & Mission Grid */}
+              <div className="icp-targets-grid">
+                {/* Postes */}
+                <div className="icp-target-box">
+                  <div className="target-title green">
+                    <span>👤</span> Postes Ciblés
+                  </div>
+                  {icp.poste_contact && icp.poste_contact.length > 0 ? (
+                    <div className="tags-wrapper">
+                      {icp.poste_contact.map((p: string, i: number) => (
+                        <span key={i} className="tag tag-green">{p}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="empty-fallback">Tous les postes décisionnaires</div>
+                  )}
+                </div>
+
+                {/* Secteurs */}
+                <div className="icp-target-box">
+                  <div className="target-title blue">
+                    <span>🏢</span> Secteurs d'Activité
+                  </div>
+                  {icp.secteur_activite && icp.secteur_activite.length > 0 ? (
+                    <div className="tags-wrapper">
+                      {icp.secteur_activite.map((s: string, i: number) => (
+                        <span key={i} className="tag tag-blue">{s}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="empty-fallback">Tous les secteurs d'activité</div>
+                  )}
+                </div>
+
+                {/* Zones Geo */}
+                <div className="icp-target-box">
+                  <div className="target-title purple">
+                    <span>🌍</span> Zones Géographiques
+                  </div>
+                  {icp.zone_geo && icp.zone_geo.length > 0 ? (
+                    <div className="tags-wrapper">
+                      {icp.zone_geo.map((z: string, i: number) => (
+                        <span key={i} className="tag tag-purple">{z}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="empty-fallback">Toutes les zones géographiques</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Agent Mission Box if present */}
+              {mission && (
+                <div className="icp-mission-box">
+                  <div className="mission-title">📜 Mission Spécifique & Directive du Prompt</div>
+                  <div className="mission-text">"{mission}"</div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

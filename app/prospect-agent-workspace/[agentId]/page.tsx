@@ -40,6 +40,7 @@ export default function AgentWorkspacePage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [agentName, setAgentName] = useState<string>('Chargement...');
+  const [agentData, setAgentData] = useState<any>(null);
 
   // Tutorial state
   const [navTutorialStep, setNavTutorialStep] = useState<number>(0);
@@ -56,12 +57,15 @@ export default function AgentWorkspacePage() {
         const currentAgent = agents.find(a => a.agent_id === agentId);
         if (currentAgent) {
           setAgentName(currentAgent.agent_name);
+          setAgentData(currentAgent);
         } else {
           setAgentName('Agent Inconnu');
+          setAgentData(null);
         }
       } catch (err) {
         console.error(err);
         setAgentName('Agent');
+        setAgentData(null);
       }
     }
     fetchAgentName();
@@ -312,7 +316,7 @@ export default function AgentWorkspacePage() {
           </div>
         ) : (
           <div style={{ padding: '2.5rem', maxWidth: '1600px', margin: '0 auto' }}>
-            {activeTab === 'dashboard' && <DashboardView leads={leads} campaigns={campaigns} threshold={60} />}
+            {activeTab === 'dashboard' && <DashboardView leads={leads} campaigns={campaigns} threshold={60} agent={agentData} />}
             {activeTab === 'leads' && <LeadsView leads={leads} threshold={60} onOpenLead={handleOpenLead} onRefresh={fetchData} />}
             {activeTab === 'outbox' && <CampaignsView campaigns={campaigns} onRefresh={fetchData} defaultCc="" onOpenLeadById={handleOpenLeadById} />}
             {activeTab === 'logs' && <LogsView logs={logs} />}
