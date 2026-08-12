@@ -389,11 +389,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         setMessages((prev) => [...prev, {
           id: `err-${Date.now()}`,
           sender: 'vm',
-          text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
+          text: response?.message || 'Erreur de traitement. Veuillez relancer la demande d\'analyse.',
           time: formatTime(), rawDate: new Date().toISOString(),
           error: response?.error || 'NO_RESPONSE',
           response_type: 'error',
-          title: response?.title || 'Erreur n8n'
+          title: response?.title || 'Erreur d\'analyse'
         }]);
       } else {
         const toolUsed = response.tool_used as string;
@@ -424,7 +424,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
         sender: 'vm',
-        text: `Erreur de communication avec n8n : ${error.message}`,
+        text: error?.message || 'Erreur de connexion. Le service d\'analyse est temporairement inaccessible.',
         time: formatTime(), rawDate: new Date().toISOString(),
         error: error.message,
       }]);
@@ -512,11 +512,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         setMessages((prev) => [...prev, {
           id: `err-${Date.now()}`,
           sender: 'vm',
-          text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
+          text: response?.message || 'Erreur de traitement. Veuillez relancer la demande d\'analyse.',
           time: formatTime(), rawDate: new Date().toISOString(),
           error: response?.error || 'NO_RESPONSE',
           response_type: 'error',
-          title: response?.title || 'Erreur n8n'
+          title: response?.title || 'Erreur d\'analyse'
         }]);
       } else {
         const toolUsed = response.tool_used as string;
@@ -545,7 +545,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
         sender: 'vm',
-        text: `Erreur de communication avec n8n : ${error.message}`,
+        text: error?.message || 'Erreur de connexion. Le service d\'analyse est temporairement inaccessible.',
         time: formatTime(), rawDate: new Date().toISOString(),
         error: error.message,
       }]);

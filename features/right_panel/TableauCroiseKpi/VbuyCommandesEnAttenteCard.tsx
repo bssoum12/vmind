@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { getVbuyKpiCommandesEnAttente } from '@/shared/api/n8n-api';
+import { useKpis } from '@/shared/contexts/KpiCacheContext';
 import { RefreshCw, Building2, ChevronRight, ChevronDown, Info, ShoppingBag } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 
@@ -18,35 +18,18 @@ export const VbuyCommandesEnAttenteCard: React.FC<VbuyCommandesEnAttenteCardProp
 }) => {
   const isVisible = !activeAgentId || activeAgentId.toUpperCase() === 'VBUY' || activeAgentId.toUpperCase() === 'VMIND';
 
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
+  const agentData = kpisByAgent["vbuy"] || kpisByAgent["VBUY"] || {};
+  const n8nToolData = agentData.get_vbuy_kpi_commandes_en_attente;
+
   const [expandedDetails, setExpandedDetails] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
 
-  const loadKpi = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await getVbuyKpiCommandesEnAttente(clientId);
-      setData(res);
-    } catch (err: any) {
-      console.error("[VBUY COMMANDES EN ATTENTE CARD] Error:", err);
-      setError(err?.message || "Erreur lors du chargement des Commandes en Attente");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isVisible) {
-      loadKpi();
-    }
-  }, [clientId, isVisible]);
-
   if (!isVisible) return null;
 
-  const payload = data?.data || data || {};
+  const effectiveLoading = (loadingByAgent["vbuy"] || loadingByAgent["VBUY"]) && !n8nToolData;
+  const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
+  const payload = n8nToolData?.data || n8nToolData || {};
   const summary = payload?.summary || {
     nb_commandes_en_attente: 0,
     nb_fournisseurs_concernes: 0,
@@ -67,7 +50,7 @@ export const VbuyCommandesEnAttenteCard: React.FC<VbuyCommandesEnAttenteCardProp
 
   return (
     <div style={{
-      background: 'linear-gradient(145deg, rgba(13, 17, 26, 0.96) 0%, rgba(10, 20, 30, 0.96) 100%)',
+      background: 'linear-gradient(145deg, rgba(13, 17, 26, 0.96) 0%, rgba(10, 20, 32, 0.96) 100%)',
       border: '1px solid rgba(59, 130, 246, 0.35)',
       borderRadius: '16px',
       padding: '16px 18px',
@@ -110,7 +93,7 @@ export const VbuyCommandesEnAttenteCard: React.FC<VbuyCommandesEnAttenteCardProp
               COMMANDES EN ATTENTE
             </div>
             <div style={{ fontSize: '9px', color: '#94A3B8', fontWeight: 500 }}>
-              Commandes fournisseurs non encore reçues (Août 2023)
+              Commandes non encore reçues ({summary.mois || 'Août 2023'})
             </div>
           </div>
         </div>
@@ -128,8 +111,8 @@ export const VbuyCommandesEnAttenteCard: React.FC<VbuyCommandesEnAttenteCardProp
             VBUY
           </span>
           <button
-            onClick={loadKpi}
-            disabled={loading}
+            onClick={() => fetchKpis('vbuy', true, 'get_vbuy_kpi_commandes_en_attente')}
+            disabled={effectiveLoading}
             style={{
               background: 'transparent',
               border: 'none',
@@ -139,14 +122,14 @@ export const VbuyCommandesEnAttenteCard: React.FC<VbuyCommandesEnAttenteCardProp
               display: 'flex',
               alignItems: 'center'
             }}
-            title="Rafraîchir les données"
+            title="Rafraîchir les données via n8n"
           >
-            <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+            <RefreshCw size={13} style={{ animation: effectiveLoading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
         </div>
       </div>
 
-      {loading ? (
+      {effectiveLoading ? (
         <div style={{ padding: '24px 0', textAlign: 'center', color: '#94A3B8', fontSize: '11px' }}>
           Chargement des commandes en attente...
         </div>

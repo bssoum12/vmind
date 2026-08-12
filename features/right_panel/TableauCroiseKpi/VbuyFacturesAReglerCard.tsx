@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { getVbuyKpiFacturesARegler } from '@/shared/api/n8n-api';
+import { useKpis } from '@/shared/contexts/KpiCacheContext';
 import { AlertTriangle, Clock, RefreshCw, Building2, ChevronRight, Info } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 
@@ -19,10 +19,11 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
 }) => {
   const isVisible = !activeAgentId || activeAgentId.toUpperCase() === 'VBUY' || activeAgentId.toUpperCase() === 'VMIND';
 
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
+  const agentData = kpisByAgent["vbuy"] || kpisByAgent["VBUY"] || {};
+  const n8nToolData = agentData.get_vbuy_kpi_factures_a_regler;
+
   const [horizon, setHorizon] = useState<'1d' | '1w' | '1m' | '3m' | '6m'>('1d');
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const [isCardHovered, setIsCardHovered] = useState<boolean>(false);
   const [cardCoords, setCardCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [mounted, setMounted] = useState<boolean>(false);
@@ -54,29 +55,11 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
     setMounted(true);
   }, []);
 
-  const loadKpi = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await getVbuyKpiFacturesARegler(clientId, horizon);
-      setData(res);
-    } catch (err: any) {
-      console.error("[VBUY KPI CARD] Error:", err);
-      setError(err?.message || "Erreur lors du chargement des KPIs VBUY");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isVisible) {
-      loadKpi();
-    }
-  }, [horizon, clientId, isVisible]);
-
   if (!isVisible) return null;
 
-  const payload = data?.data || data;
+  const effectiveLoading = (loadingByAgent["vbuy"] || loadingByAgent["VBUY"]) && !n8nToolData;
+  const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
+  const payload = n8nToolData?.data || n8nToolData;
   const kpis = payload?.kpis || [];
   const kpiTotal = kpis.find((k: any) => k.label === 'Factures à régler');
   const kpiEchue = kpis.find((k: any) => k.label === 'Factures échues');
@@ -178,25 +161,25 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ color: "#FF4757", fontSize: "9px", fontWeight: 800, letterSpacing: '0.5px' }}>VBUY</span>
           <button
-            onClick={loadKpi}
-            disabled={loading}
+            onClick={() => fetchKpis('vbuy', true, 'get_vbuy_kpi_factures_a_regler')}
+            disabled={effectiveLoading}
             style={{
               background: 'rgba(255, 255, 255, 0.04)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '8px',
               padding: '4px 7px',
               color: '#94A3B8',
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: effectiveLoading ? 'not-allowed' : 'pointer',
               transition: 'all 0.2s',
               display: 'flex',
               alignItems: 'center'
             }}
-            title="Rafraîchir KPI"
+            title="Rafraîchir KPI via n8n"
           >
             <RefreshCw 
               size={12} 
-              className={loading ? "animate-spin" : ""} 
-              style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} 
+              className={effectiveLoading ? "animate-spin" : ""} 
+              style={{ animation: effectiveLoading ? 'spin 1s linear infinite' : 'none' }} 
             />
           </button>
         </div>
@@ -247,7 +230,7 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
         })}
       </div>
 
-      {loading ? (
+      {effectiveLoading ? (
         <div style={{
           padding: '28px 24px',
           display: 'flex',

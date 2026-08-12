@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { getVbuyKpiAchatsDuMois } from '@/shared/api/n8n-api';
+import { useKpis } from '@/shared/contexts/KpiCacheContext';
 import { TrendingUp, TrendingDown, RefreshCw, Building2, ChevronRight, Info, ShoppingCart } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 
@@ -19,9 +19,10 @@ export const VbuyAchatsDuMoisCard: React.FC<VbuyAchatsDuMoisCardProps> = ({
 }) => {
   const isVisible = !activeAgentId || activeAgentId.toUpperCase() === 'VBUY' || activeAgentId.toUpperCase() === 'VMIND';
 
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
+  const agentData = kpisByAgent["vbuy"] || kpisByAgent["VBUY"] || {};
+  const n8nToolData = agentData.get_vbuy_kpi_achats_du_mois;
+
   const [isCardHovered, setIsCardHovered] = useState<boolean>(false);
   const [cardCoords, setCardCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [mounted, setMounted] = useState<boolean>(false);
@@ -53,29 +54,11 @@ export const VbuyAchatsDuMoisCard: React.FC<VbuyAchatsDuMoisCardProps> = ({
     setMounted(true);
   }, []);
 
-  const loadKpi = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await getVbuyKpiAchatsDuMois(clientId);
-      setData(res);
-    } catch (err: any) {
-      console.error("[VBUY ACHATS CARD] Error:", err);
-      setError(err?.message || "Erreur lors du chargement du KPI Achats du mois");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (isVisible) {
-      loadKpi();
-    }
-  }, [clientId, isVisible]);
-
   if (!isVisible) return null;
 
-  const payload = data?.data || data;
+  const effectiveLoading = (loadingByAgent["vbuy"] || loadingByAgent["VBUY"]) && !n8nToolData;
+  const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
+  const payload = n8nToolData?.data || n8nToolData;
   const summary = {
     total_achats_mois_actuel_tnd: payload?.summary?.total_achats_mois_actuel_tnd ?? 0,
     nb_factures_mois_actuel: payload?.summary?.nb_factures_mois_actuel ?? 0,
@@ -153,9 +136,9 @@ export const VbuyAchatsDuMoisCard: React.FC<VbuyAchatsDuMoisCardProps> = ({
         </div>
 
         <button
-          onClick={loadKpi}
-          title="Rafraîchir KPI"
-          disabled={loading}
+          onClick={() => fetchKpis('vbuy', true, 'get_vbuy_kpi_achats_du_mois')}
+          title="Rafraîchir KPI via n8n"
+          disabled={effectiveLoading}
           style={{
             background: 'transparent',
             border: 'none',
@@ -170,11 +153,11 @@ export const VbuyAchatsDuMoisCard: React.FC<VbuyAchatsDuMoisCardProps> = ({
           onMouseEnter={(e) => e.currentTarget.style.color = '#10B981'}
           onMouseLeave={(e) => e.currentTarget.style.color = '#64748B'}
         >
-          <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={12} className={effectiveLoading ? 'animate-spin' : ''} />
         </button>
       </div>
 
-      {loading ? (
+      {effectiveLoading ? (
         <div style={{
           padding: '24px',
           display: 'flex',
