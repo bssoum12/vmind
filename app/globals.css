@@ -21,10 +21,13 @@
   --FM: var(--font-mono);
 }
 
-* {
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  caret-color: transparent;
 }
 
 html,
@@ -39,6 +42,26 @@ body {
   color: var(--white);
   display: flex;
   flex-direction: column;
+}
+
+body,
+body * {
+  cursor: default;
+}
+
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  cursor: text;
+  caret-color: var(--cyan, #00E5C8);
+}
+
+button,
+a,
+.btn,
+[role="button"] {
+  cursor: pointer;
 }
 
 /* ── TOP BAR ── */

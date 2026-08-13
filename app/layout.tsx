@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 import { ModeProvider } from "@/shared/contexts/ModeContext";
 import { SessionTimeoutProvider } from "@/components/vmind/SessionTimeoutProvider";
 import { KpiCacheProvider } from "@/shared/contexts/KpiCacheContext";
+import { ToastProvider } from "@/shared/contexts/ToastContext";
 
 export default function RootLayout({
   children,
@@ -20,14 +21,16 @@ export default function RootLayout({
   return (
     <html lang="fr" className={`${orbitron.variable} ${syne.variable} ${jetBrainsMono.variable}`}>
       <body className={syne.className}>
-        <ModeProvider>
-          <SessionTimeoutProvider>
-            <KpiCacheProvider>
-              <TopBar />
-              {children}
-            </KpiCacheProvider>
-          </SessionTimeoutProvider>
-        </ModeProvider>
+        <ToastProvider>
+          <ModeProvider>
+            <SessionTimeoutProvider>
+              <KpiCacheProvider>
+                <TopBar />
+                {children}
+              </KpiCacheProvider>
+            </SessionTimeoutProvider>
+          </ModeProvider>
+        </ToastProvider>
       </body>
     </html>
   );

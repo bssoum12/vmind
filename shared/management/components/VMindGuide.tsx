@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export type GuideMood = 'curious' | 'focused' | 'convinced' | 'settled';
@@ -17,7 +18,12 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
   mood = 'focused'
 }) => {
   const [displayedText, setDisplayedText] = useState('');
-  
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Debounce state to handle rapid field swapping
   const [activeMessage, setActiveMessage] = useState(message);
   const [activeTitle, setActiveTitle] = useState(title);
@@ -46,11 +52,11 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
       setDisplayedText('');
       return;
     }
-    
+
     // Reset typing index when active message changes
     let currentIndex = 0;
     setDisplayedText('');
-    
+
     const interval = setInterval(() => {
       if (currentIndex < activeMessage.length) {
         setDisplayedText(activeMessage.slice(0, currentIndex + 1));
@@ -59,7 +65,7 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
         clearInterval(interval);
       }
     }, 15); // Fast, efficient typing
-    
+
     return () => clearInterval(interval);
   }, [activeMessage, internalIsOpen]);
 
@@ -115,7 +121,7 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
 
   const moodStyle = getMoodStyles(activeMood);
 
-  return (
+  const guideContent = (
     <AnimatePresence>
       {internalIsOpen && activeMessage && (
         <motion.div
@@ -135,7 +141,7 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
             borderRadius: '12px',
             padding: '1.25rem 1.5rem',
             boxShadow: `0 10px 40px rgba(0, 0, 0, 0.8), ${moodStyle.glow}`,
-            zIndex: 99999,
+            zIndex: 999999,
             overflow: 'hidden',
             fontFamily: 'var(--font-sans, system-ui, sans-serif)',
             transition: 'all 0.5s ease-in-out'
@@ -221,4 +227,7 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
       )}
     </AnimatePresence>
   );
+
+  if (!mounted) return null;
+  return createPortal(guideContent, document.body);
 };

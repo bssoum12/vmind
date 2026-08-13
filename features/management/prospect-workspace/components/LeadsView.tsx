@@ -644,7 +644,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
   return (
     <div className="fade-in">
       {/* ── Tutorial Overlay ── */}
-      {leadsTutorialStep > 0 && (
+      {leadsTutorialStep > 0 && typeof document !== 'undefined' && createPortal(
         <div
           onClick={nextTutorialStep}
           style={{
@@ -652,7 +652,8 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
             background: 'rgba(0,0,0,0.8)', zIndex: 10000,
             cursor: 'pointer'
           }}
-        />
+        />,
+        document.body
       )}
 
       {/* ── VMind Guide for Tutorial ── */}

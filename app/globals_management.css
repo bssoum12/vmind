@@ -1,3 +1,27 @@
+.shell,
+.shell * {
+  cursor: default;
+  caret-color: transparent;
+}
+
+.shell input,
+.shell textarea,
+.shell select,
+.shell [contenteditable="true"] {
+  cursor: text;
+  caret-color: var(--cyan, #00E5C8);
+}
+
+.shell button,
+.shell a,
+.shell .btn,
+.shell [role="button"],
+.shell .aside-item,
+.shell .row-btn,
+.shell .filter-select {
+  cursor: pointer;
+}
+
 .shell {
   display: flex;
   height: calc(100vh - 52px);

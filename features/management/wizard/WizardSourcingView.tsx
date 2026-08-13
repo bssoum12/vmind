@@ -16,10 +16,13 @@ interface WizardViewProps {
 }
 
 const VIRTUAL_MIND_GUIDE: Record<string, { title: string; text: string }> = {
+  nom: { title: "Nom de l'Agent", text: "Donnez un nom unique à votre agent de sourcing." },
   agent_name: { title: "Identité de l'Agent", text: "Donnez un nom unique à votre agent. Ce nom vous aidera à l'identifier facilement dans votre espace de travail et dans les logs de sourcing." },
   agent_mission: { title: "Mission de l'Agent", text: "Définissez ce que l'agent doit accomplir. Soyez clair sur le produit/service à promouvoir et les objectifs." },
   signature_email: { title: "Signature d'Email", text: "Cette signature sera insérée automatiquement à la fin de tous les emails générés par VMind. Soyez professionnel !" },
   default_cc: { title: "Copie Conforme (CC)", text: "Ajoutez votre adresse email ou celle d'un manager pour recevoir une copie des emails envoyés aux candidats sourcés." },
+  email_recap: { title: "Email Récapitulatif", text: "Adresse email sur laquelle vous recevrez le bilan quotidien du sourcing." },
+  delai_envois: { title: "Délai entre les envois", text: "Délais en secondes entre deux envois successifs." },
   email_limits: { title: "Cadence d'Envoi", text: "Configurez le délai entre chaque email pour éviter d'être marqué comme spam. Les limites journalières protègent la réputation de votre domaine." },
   trigger_rules: { title: "Planification Autonome", text: "Définissez quand votre agent doit s'activer de manière autonome (ex: tous les lundis à 8h). N8N gère cette orchestration." }
 };
@@ -1004,10 +1007,10 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
 
           {/* VirtualMind Floating Guide */}
           <VMindGuide
-            isOpen={!!focusedField || showStep2Guide}
-            title={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].title : showStep2Guide ? "Briefing de l'Agent" : undefined}
-            message={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].text : showStep2Guide ? "Cette section est cruciale. Les réponses que vous donnerez ici définiront le contexte global et la compréhension de l'IA. Soyez le plus précis possible, car ces informations impacteront directement la qualité des emails générés." : null}
-            mood={focusedField ? getMoodForField(focusedField) : showStep2Guide ? 'convinced' : undefined}
+            isOpen={!!(focusedField && VIRTUAL_MIND_GUIDE[focusedField]) || step === 2}
+            title={focusedField && VIRTUAL_MIND_GUIDE[focusedField] ? VIRTUAL_MIND_GUIDE[focusedField].title : step === 2 ? "Briefing de l'Agent" : undefined}
+            message={focusedField && VIRTUAL_MIND_GUIDE[focusedField] ? VIRTUAL_MIND_GUIDE[focusedField].text : step === 2 ? "Cette section est cruciale. Les réponses que vous donnerez ici définiront le contexte global et la compréhension de l'IA. Soyez le plus précis possible, car ces informations impacteront directement la qualité des emails générés." : null}
+            mood={focusedField && VIRTUAL_MIND_GUIDE[focusedField] ? getMoodForField(focusedField) : step === 2 ? 'convinced' : undefined}
           />
 
         </div>

@@ -21,6 +21,7 @@ import { SourcingAgentExecutionModal } from './components/SourcingAgentExecution
 import { ProspectAgentScheduleModal } from './components/ProspectAgentScheduleModal';
 import { SourcingAgentScheduleModal } from './components/SourcingAgentScheduleModal';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
+import { useToast } from '@/shared/contexts/ToastContext';
 
 interface AgentsViewProps {
   onNavigate: (view: string) => void;
@@ -72,13 +73,18 @@ function triggerRuleSummary(rules: any[]): string {
 
 export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const router = useRouter();
+  const { showToast: globalShowToast } = useToast();
   const [agents, setAgents] = useState<LiveAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<LiveAgent | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null); // agent_name being actioned
-  const [toast, setToast] = useState<{ msg: string; type: 'ok' | 'err' } | null>(null);
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+
+  const showToast = useCallback((msg: string, type: 'ok' | 'err' | 'success' | 'error' = 'ok') => {
+    const normalizedType = type === 'ok' ? 'success' : type === 'err' ? 'error' : type;
+    globalShowToast(msg, normalizedType);
+  }, [globalShowToast]);
 
   // Auto Mode Modal State
   const [runModalAgent, setRunModalAgent] = useState<LiveAgent | null>(null);
@@ -212,11 +218,6 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     return null;
   };
 
-  const showToast = (msg: string, type: 'ok' | 'err' = 'ok') => {
-    setToast({ msg, type });
-    setTimeout(() => setToast(null), 3500);
-  };
-
   const refresh = useCallback(async () => {
     try {
       setLoading(true);
@@ -340,21 +341,6 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           message={getTutorialContent()?.message || null}
           mood={getTutorialContent()?.mood}
         />
-      )}
-
-      {/* ── Toast ── */}
-      {toast && (
-        <div style={{
-          position: 'fixed', top: '24px', right: '24px', zIndex: 9999,
-          padding: '12px 20px', borderRadius: '10px', fontWeight: 600,
-          background: toast.type === 'ok' ? 'rgba(0,229,160,0.15)' : 'rgba(255,71,87,0.15)',
-          border: `1px solid ${toast.type === 'ok' ? '#00E5A0' : '#FF4757'}`,
-          color: toast.type === 'ok' ? '#00E5A0' : '#FF4757',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-          animation: 'fadeIn .2s ease',
-        }}>
-          {toast.type === 'ok' ? '✅' : '❌'} {toast.msg}
-        </div>
       )}
 
       {/* ── Header ── */}
