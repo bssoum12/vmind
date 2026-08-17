@@ -69,6 +69,9 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_vbuy_commandes_en_attente': 'VBUY',
   'Client1_get_vbuy_commandes_en_attente': 'VBUY',
   'MCP_Client1_get_vbuy_commandes_en_attente': 'VBUY',
+  'get_vbuy_repartition_categories': 'VBUY',
+  'Client1_get_vbuy_repartition_categories': 'VBUY',
+  'MCP_Client1_get_vbuy_repartition_categories': 'VBUY',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -107,6 +110,9 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'get_vbuy_commandes_en_attente': 'Commandes en attente (VBUY)',
   'Client1_get_vbuy_commandes_en_attente': 'Commandes en attente (VBUY)',
   'MCP_Client1_get_vbuy_commandes_en_attente': 'Commandes en attente (VBUY)',
+  'get_vbuy_repartition_categories': 'Catégories d\'Achats (VBUY)',
+  'Client1_get_vbuy_repartition_categories': 'Catégories d\'Achats (VBUY)',
+  'MCP_Client1_get_vbuy_repartition_categories': 'Catégories d\'Achats (VBUY)',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -146,7 +152,8 @@ const VBUY_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Montant achats ce mois ?": "Quel est le montant total des achats ce mois ?",
   "Top 5 fournisseurs ?": "Quels sont les 5 principaux fournisseurs par volume d'achat ?",
   "Délais de livraison dépassés ?": "Quels fournisseurs ont des délais de livraison dépassés ?",
-  "Commandes en attente de réception ?": "Quelles commandes fournisseurs sont en attente de réception ?"
+  "Commandes en attente de réception ?": "Quelles commandes fournisseurs sont en attente de réception ?",
+  "Répartition par catégorie (Trimestre) ?": "Quelle est la répartition des achats par catégorie ce trimestre ?"
 };
 
 const FAST_TRACK_REGISTRY: Record<string, string> = {
