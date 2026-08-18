@@ -33,6 +33,13 @@ export const VbuyRepartitionCategoriePieCard: React.FC<VbuyRepartitionCategorieP
   const agentData = kpisByAgent["vbuy"] || kpisByAgent["VBUY"] || {};
   const n8nToolData = agentData.get_vbuy_kpi_repartition_par_categorie;
 
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [isMounted, setIsMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const [hoveredCategory, setHoveredCategory] = useState<any | null>(null);
 
   if (!isVisible) return null;
@@ -173,7 +180,8 @@ export const VbuyRepartitionCategoriePieCard: React.FC<VbuyRepartitionCategorieP
           }}>
             {/* Pie Donut Chart */}
             <div style={{ width: '130px', height: '130px', position: 'relative', flexShrink: 0 }}>
-              <ResponsiveContainer width="100%" height="100%">
+              {isMounted && (
+                <ResponsiveContainer width="100%" height={130} minWidth={0} minHeight={0}>
                 <PieChart>
                   <Pie
                     data={chartData}
@@ -205,6 +213,7 @@ export const VbuyRepartitionCategoriePieCard: React.FC<VbuyRepartitionCategorieP
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
+              )}
 
               {/* Dynamic Clean Center Donut Label */}
               <div style={{
