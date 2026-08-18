@@ -273,8 +273,24 @@ export default function Home() {
   };
 
   const [editingAgent, setEditingAgent] = useState<any>(null);
-
   const [initialWizardStep, setInitialWizardStep] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedAgentStr = sessionStorage.getItem('vmind_editing_agent');
+      if (savedAgentStr) {
+        try {
+          const agentObj = JSON.parse(savedAgentStr);
+          setEditingAgent(agentObj);
+          setSelectedTemplate(agentObj.run_mode || 'prospection');
+          setCurrentView('wizard');
+          sessionStorage.removeItem('vmind_editing_agent');
+        } catch (e) {
+          console.error("Failed to parse saved editing agent:", e);
+        }
+      }
+    }
+  }, []);
 
   const handleDeploy = (templateId: string, agent?: any, initialStep: number = 1) => {
     setSelectedTemplate(templateId);

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 
 interface Lead {
   id: number;
@@ -31,9 +32,23 @@ interface DashboardViewProps {
   campaigns: any[];
   threshold: number;
   agent?: any;
+  onConfigure?: (agent: any) => void;
 }
 
-const DashboardView = React.memo(function DashboardView({ leads, campaigns, threshold, agent }: DashboardViewProps) {
+const DashboardView = React.memo(function DashboardView({ leads, campaigns, threshold, agent, onConfigure }: DashboardViewProps) {
+  const router = useRouter();
+
+  const handleModifyConfig = () => {
+    if (onConfigure) {
+      onConfigure(agent);
+      return;
+    }
+    if (agent) {
+      sessionStorage.setItem('vmind_editing_agent', JSON.stringify(agent));
+    }
+    sessionStorage.setItem('vmind_current_view', 'wizard');
+    router.push('/');
+  };
   // Calculations
   const totalLeads = leads.length;
 
@@ -253,7 +268,7 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
           return (
             <div className="icp-card">
               {/* Header */}
-              <div className="icp-header">
+              <div className="icp-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div className="icp-header-title">
                   <div className="icp-icon">🎯</div>
                   <div>
@@ -262,9 +277,33 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
                   </div>
                 </div>
 
-                <div className="icp-badge">
-                  <span className="dot"></span>
-                  Algorithme Actif
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div className="icp-badge">
+                    <span className="dot"></span>
+                    Algorithme Actif
+                  </div>
+                  <button
+                    onClick={handleModifyConfig}
+                    className="btn"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'rgba(0, 229, 200, 0.12)',
+                      color: '#00E5C8',
+                      border: '1px solid rgba(0, 229, 200, 0.35)',
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      fontWeight: 600,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 2px 10px rgba(0, 229, 200, 0.15)'
+                    }}
+                    title="Modifier la configuration et l'algorithme ICP de cet agent"
+                  >
+                    ⚙️ Modifier la configuration
+                  </button>
                 </div>
               </div>
 
