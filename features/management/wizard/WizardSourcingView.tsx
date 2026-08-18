@@ -498,7 +498,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to ${agentToEdit ? 'update' : 'deploy'} agent: ${response.statusText}`);
+        throw new Error(`Impossible de ${agentToEdit ? 'mettre à jour' : 'déployer'} l'agent (${response.statusText})`);
       }
 
       setDeployed(true);

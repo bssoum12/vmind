@@ -560,7 +560,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to ${agentToEdit ? 'update' : 'deploy'} agent: ${response.statusText}`);
+        throw new Error(`Impossible de ${agentToEdit ? 'mettre à jour' : 'déployer'} l'agent (${response.statusText})`);
       }
 
       setDeployed(true);

@@ -73,7 +73,7 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint }: Onboa
         body: JSON.stringify({ messages: newMessages.filter(m => m.role !== 'system') })
       });
 
-      if (!res.ok) throw new Error('API Error');
+      if (!res.ok) throw new Error('Erreur de communication avec le service d\'assistance');
       const data = await res.json();
       const assistantMessage = data.choices[0].message.content;
 

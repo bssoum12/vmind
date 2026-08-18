@@ -221,7 +221,7 @@ export async function getAgents(): Promise<any[]> {
   const res = await fetch(`${getBaseUrl()}/api/list-agents`, {
     headers: getAuthHeaders()
   });
-  if (!res.ok) throw new Error(`Failed to fetch agents (${res.status})`);
+  if (!res.ok) throw new Error(`Impossible de récupérer la liste des agents (${res.status})`);
   const data = await res.json();
   return data.agents || [];
 }
@@ -236,7 +236,7 @@ export async function pauseAgent(agentName: string): Promise<any> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to pause agent (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la mise en pause de l'agent (${res.status})`);
   }
   return res.json();
 }
@@ -252,7 +252,7 @@ export async function resumeAgent(agentName: string, params?: any): Promise<any>
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to resume agent (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la reprise de l'agent (${res.status})`);
   }
   return res.json();
 }
@@ -267,7 +267,7 @@ export async function deleteAgent(agentName: string): Promise<any> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to delete agent (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la suppression de l'agent (${res.status})`);
   }
   return res.json();
 }
@@ -287,7 +287,7 @@ export async function updateAgentConfig(agentName: string, recoveryConfig: objec
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to update agent config (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la mise à jour de la configuration (${res.status})`);
   }
   return res.json();
 }
@@ -302,7 +302,7 @@ export async function runAgentNow(agentName: string): Promise<any> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to trigger agent run (${res.status})`);
+    throw new Error(err.error || `Erreur lors du lancement de l'agent (${res.status})`);
   }
   return res.json();
 }
@@ -317,7 +317,7 @@ export async function getProspectAgentStats(agentId: string): Promise<any> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to fetch agent stats (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la récupération des statistiques (${res.status})`);
   }
   return res.json();
 }
@@ -333,7 +333,7 @@ export async function qualifyManualProspects(agentId: string, mode: 'pending_onl
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to qualify prospects manually (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la qualification manuelle des prospects (${res.status})`);
   }
   return res.json();
 }
@@ -351,7 +351,7 @@ export async function triggerAIQualificationAllPending(agentId: string): Promise
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to trigger AI qualification (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la qualification automatique des prospects (${res.status})`);
   }
   return res.json();
 }
@@ -420,7 +420,7 @@ export async function triggerSourcingRun(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to trigger sourcing agent (${res.status})`);
+    throw new Error(err.error || `Erreur lors du déclenchement de l'agent de sourcing (${res.status})`);
   }
   return res.json();
 }
@@ -436,7 +436,7 @@ export async function triggerProspectAutoMode(agentId: string): Promise<any> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to trigger prospect agent (${res.status})`);
+    throw new Error(err.error || `Erreur lors du déclenchement de l'agent de prospection (${res.status})`);
   }
   return res.json();
 }
