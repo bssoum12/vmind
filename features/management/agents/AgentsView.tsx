@@ -384,7 +384,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
             }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🤖</div>
               <div style={{ fontWeight: 600, marginBottom: 6, color: 'var(--text)' }}>Aucun agent déployé</div>
-              <div>Déployez un agent depuis la <button className="row-btn" onClick={() => onNavigate('deploy')}>page de déploiement</button></div>
+              <div>Déployez un agent depuis la <button className="row-btn" onClick={() => onNavigate('market')}>page de déploiement</button></div>
             </div>
           )}
 

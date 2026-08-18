@@ -19,6 +19,8 @@ export const JournalView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isForbidden, setIsForbidden] = useState(false);
+  const [forbiddenReason, setForbiddenReason] = useState('');
 
   // Pagination states
   const [page, setPage] = useState(1);
@@ -28,6 +30,7 @@ export const JournalView: React.FC = () => {
 
   const fetchJournalLogs = useCallback(async (targetPage = page, targetTab = activeTab, search = searchQuery, targetLimit = limit) => {
     setIsLoading(true);
+    setIsForbidden(false);
     try {
       let headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (typeof window !== 'undefined') {
@@ -51,6 +54,12 @@ export const JournalView: React.FC = () => {
       });
 
       const res = await fetch(`${API_BASE_URL}/api/journal-logs?${queryParams.toString()}`, { headers, cache: 'no-store' });
+      if (res.status === 403) {
+        const data = await res.json().catch(() => ({}));
+        setIsForbidden(true);
+        setForbiddenReason(data.message || 'Accès refusé : Seuls les administrateurs ont l\'autorisation de consulter le journal d\'activité.');
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         if (data && Array.isArray(data.logs)) {
@@ -148,6 +157,97 @@ export const JournalView: React.FC = () => {
 
   const startCount = (page - 1) * limit + (logs.length > 0 ? 1 : 0);
   const endCount = Math.min(page * limit, total);
+
+  if (isForbidden) {
+    return (
+      <div id="view-journal" className="anim" style={{ position: 'relative', minHeight: '600px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            maxWidth: '520px',
+            background: 'linear-gradient(160deg, rgba(8, 20, 38, 0.98) 0%, rgba(4, 12, 24, 0.99) 100%)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255, 71, 87, 0.45)',
+            borderRadius: '20px',
+            padding: '40px 36px 32px',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 35px rgba(255, 71, 87, 0.2)',
+            textAlign: 'center'
+          }}
+        >
+          {/* Accent corners */}
+          <div style={{ position: 'absolute', top: 0, left: 0, width: '36px', height: '36px', borderTop: '2px solid #FF4757', borderLeft: '2px solid #FF4757', borderRadius: '20px 0 0 0', opacity: 0.8 }} />
+          <div style={{ position: 'absolute', top: 0, right: 0, width: '36px', height: '36px', borderTop: '2px solid #FF4757', borderRight: '2px solid #FF4757', borderRadius: '0 20px 0 0', opacity: 0.8 }} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, width: '36px', height: '36px', borderBottom: '2px solid #FF4757', borderLeft: '2px solid #FF4757', borderRadius: '0 0 0 20px', opacity: 0.4 }} />
+          <div style={{ position: 'absolute', bottom: 0, right: 0, width: '36px', height: '36px', borderBottom: '2px solid #FF4757', borderRight: '2px solid #FF4757', borderRadius: '0 0 20px 0', opacity: 0.4 }} />
+
+          {/* Lock Icon */}
+          <div style={{
+            width: '76px', height: '76px',
+            borderRadius: '50%',
+            background: 'rgba(255, 71, 87, 0.12)',
+            border: '1px solid rgba(255, 71, 87, 0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 24px',
+            fontSize: '34px',
+            boxShadow: '0 0 25px rgba(255, 71, 87, 0.25)'
+          }}>
+            🔒
+          </div>
+
+          <h2 style={{
+            fontSize: '1.25rem',
+            fontWeight: 800,
+            color: '#FFFFFF',
+            letterSpacing: '0.05em',
+            marginBottom: '12px',
+            textTransform: 'uppercase'
+          }}>
+            Accès Réservé aux Administrateurs
+          </h2>
+
+          <p style={{
+            fontSize: '0.9rem',
+            color: '#94A3B8',
+            lineHeight: 1.6,
+            marginBottom: '30px'
+          }}>
+            {forbiddenReason || "Vous ne disposez pas des privilèges suffisants pour consulter le journal d'activité. Cette section est strictement réservée aux comptes administrateurs. Veuillez contacter votre responsable système si vous estimez qu'il s'agit d'une erreur."}
+          </p>
+
+          <button
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('switch-management-view', { detail: 'agents' }));
+              }
+            }}
+            style={{
+              width: '100%',
+              height: '48px',
+              borderRadius: '10px',
+              background: 'linear-gradient(90deg, #FF4757 0%, #FF6B81 100%)',
+              color: '#FFFFFF',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+              fontWeight: 800,
+              letterSpacing: '0.05em',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: '0 0 20px rgba(255, 71, 87, 0.35)',
+              transition: 'all 0.2s ease',
+              fontFamily: 'inherit'
+            }}
+          >
+            RETOUR AU DASHBOARD
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div id="view-journal" className="anim">
