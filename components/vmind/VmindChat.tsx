@@ -75,6 +75,12 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_vmove_dossiers_actifs': 'VMOVE',
   'Client1_get_vmove_dossiers_actifs': 'VMOVE',
   'MCP_Client1_get_vmove_dossiers_actifs': 'VMOVE',
+  'get_vmove_dossiers_retard': 'VMOVE',
+  'Client1_get_vmove_dossiers_retard': 'VMOVE',
+  'MCP_Client1_get_vmove_dossiers_retard': 'VMOVE',
+  'get_vmove_dossiers_en_cours_client': 'VMOVE',
+  'Client1_get_vmove_dossiers_en_cours_client': 'VMOVE',
+  'MCP_Client1_get_vmove_dossiers_en_cours_client': 'VMOVE',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -119,6 +125,12 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'get_vmove_dossiers_actifs': 'Dossiers Actifs (Exploitation)',
   'Client1_get_vmove_dossiers_actifs': 'Dossiers Actifs (Exploitation)',
   'MCP_Client1_get_vmove_dossiers_actifs': 'Dossiers Actifs (Exploitation)',
+  'get_vmove_dossiers_retard': 'Dossiers en retard (Exploitation)',
+  'Client1_get_vmove_dossiers_retard': 'Dossiers en retard (Exploitation)',
+  'MCP_Client1_get_vmove_dossiers_retard': 'Dossiers en retard (Exploitation)',
+  'get_vmove_dossiers_en_cours_client': 'Dossiers actifs par client (Exploitation)',
+  'Client1_get_vmove_dossiers_en_cours_client': 'Dossiers actifs par client (Exploitation)',
+  'MCP_Client1_get_vmove_dossiers_en_cours_client': 'Dossiers actifs par client (Exploitation)',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -163,7 +175,9 @@ const VBUY_FAST_TRACK_REGISTRY: Record<string, string> = {
 };
 
 const VMOVE_FAST_TRACK_REGISTRY: Record<string, string> = {
-  "Dossiers en acheminement ?": "Combien de dossiers sont en cours d'acheminement ?"
+  "Dossiers en acheminement ?": "Combien de dossiers sont en cours d'acheminement ?",
+  "Dossiers en retard ETA ?": "Quels dossiers sont en retard par rapport à la date ETA ?",
+  "Dossiers clients en cours ?": "Affiche les dossiers en cours par client"
 };
 
 const FAST_TRACK_REGISTRY: Record<string, string> = {
