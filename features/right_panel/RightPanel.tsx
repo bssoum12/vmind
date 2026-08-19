@@ -41,6 +41,8 @@ import { VbuyFournisseursEnRetardCard } from './TableauCroiseKpi/VbuyFournisseur
 import { VbuyCommandesEnAttenteCard } from './TableauCroiseKpi/VbuyCommandesEnAttenteCard';
 import { VbuyRepartitionCategoriePieCard } from './TableauCroiseKpi/VbuyRepartitionCategoriePieCard';
 import { VmoveDossiersOuvertsCard } from './TableauCroiseKpi/VmoveDossiersOuvertsCard';
+import { VmoveDossiersEnRetardCard } from './TableauCroiseKpi/VmoveDossiersEnRetardCard';
+import { VmoveVolumeTransporteurCard } from './TableauCroiseKpi/VmoveVolumeTransporteurCard';
 interface RightPanelProps {
   logs: LogEntry[];
   onInsertPrompt: (text: string) => void;
@@ -272,6 +274,8 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
         <VbuyCommandesEnAttenteCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
         <VbuyRepartitionCategoriePieCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
         <VmoveDossiersOuvertsCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VmoveDossiersEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VmoveVolumeTransporteurCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
         <VolumeLineChart activeAgentId={activeAgentId} />
         <DeliveryRateKpi activeAgentId={activeAgentId} /> 
         <MultiIndicatorsCard activeAgentId={activeAgentId} />
