@@ -69,6 +69,12 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_vbuy_commandes_en_attente': 'VBUY',
   'Client1_get_vbuy_commandes_en_attente': 'VBUY',
   'MCP_Client1_get_vbuy_commandes_en_attente': 'VBUY',
+  'get_vbuy_repartition_categories': 'VBUY',
+  'Client1_get_vbuy_repartition_categories': 'VBUY',
+  'MCP_Client1_get_vbuy_repartition_categories': 'VBUY',
+  'get_vmove_dossiers_actifs': 'VMOVE',
+  'Client1_get_vmove_dossiers_actifs': 'VMOVE',
+  'MCP_Client1_get_vmove_dossiers_actifs': 'VMOVE',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -107,6 +113,12 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'get_vbuy_commandes_en_attente': 'Commandes en attente (VBUY)',
   'Client1_get_vbuy_commandes_en_attente': 'Commandes en attente (VBUY)',
   'MCP_Client1_get_vbuy_commandes_en_attente': 'Commandes en attente (VBUY)',
+  'get_vbuy_repartition_categories': 'Catégories d\'Achats (VBUY)',
+  'Client1_get_vbuy_repartition_categories': 'Catégories d\'Achats (VBUY)',
+  'MCP_Client1_get_vbuy_repartition_categories': 'Catégories d\'Achats (VBUY)',
+  'get_vmove_dossiers_actifs': 'Dossiers Actifs (Exploitation)',
+  'Client1_get_vmove_dossiers_actifs': 'Dossiers Actifs (Exploitation)',
+  'MCP_Client1_get_vmove_dossiers_actifs': 'Dossiers Actifs (Exploitation)',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -146,14 +158,20 @@ const VBUY_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Montant achats ce mois ?": "Quel est le montant total des achats ce mois ?",
   "Top 5 fournisseurs ?": "Quels sont les 5 principaux fournisseurs par volume d'achat ?",
   "Délais de livraison dépassés ?": "Quels fournisseurs ont des délais de livraison dépassés ?",
-  "Commandes en attente de réception ?": "Quelles commandes fournisseurs sont en attente de réception ?"
+  "Commandes en attente de réception ?": "Quelles commandes fournisseurs sont en attente de réception ?",
+  "Rpartition par catgorie (Trimestre) ?": "Quelle est la rpartition des achats par catgorie ce trimestre ?"
+};
+
+const VMOVE_FAST_TRACK_REGISTRY: Record<string, string> = {
+  "Dossiers en acheminement ?": "Combien de dossiers sont en cours d'acheminement ?"
 };
 
 const FAST_TRACK_REGISTRY: Record<string, string> = {
   ...VDATA_FAST_TRACK_REGISTRY,
   ...VFIN_FAST_TRACK_REGISTRY,
   ...VSELL_FAST_TRACK_REGISTRY,
-  ...VBUY_FAST_TRACK_REGISTRY
+  ...VBUY_FAST_TRACK_REGISTRY,
+  ...VMOVE_FAST_TRACK_REGISTRY
 };
 
 const formatTime = (dateString?: string) => {
@@ -389,11 +407,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         setMessages((prev) => [...prev, {
           id: `err-${Date.now()}`,
           sender: 'vm',
-          text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
+          text: response?.message || 'Erreur de traitement. Veuillez relancer la demande d\'analyse.',
           time: formatTime(), rawDate: new Date().toISOString(),
           error: response?.error || 'NO_RESPONSE',
           response_type: 'error',
-          title: response?.title || 'Erreur n8n'
+          title: response?.title || 'Erreur d\'analyse'
         }]);
       } else {
         const toolUsed = response.tool_used as string;
@@ -424,7 +442,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
         sender: 'vm',
-        text: `Erreur de communication avec n8n : ${error.message}`,
+        text: error?.message || 'Erreur de connexion. Le service d\'analyse est temporairement inaccessible.',
         time: formatTime(), rawDate: new Date().toISOString(),
         error: error.message,
       }]);
@@ -512,11 +530,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         setMessages((prev) => [...prev, {
           id: `err-${Date.now()}`,
           sender: 'vm',
-          text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
+          text: response?.message || 'Erreur de traitement. Veuillez relancer la demande d\'analyse.',
           time: formatTime(), rawDate: new Date().toISOString(),
           error: response?.error || 'NO_RESPONSE',
           response_type: 'error',
-          title: response?.title || 'Erreur n8n'
+          title: response?.title || 'Erreur d\'analyse'
         }]);
       } else {
         const toolUsed = response.tool_used as string;
@@ -545,7 +563,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
         sender: 'vm',
-        text: `Erreur de communication avec n8n : ${error.message}`,
+        text: error?.message || 'Erreur de connexion. Le service d\'analyse est temporairement inaccessible.',
         time: formatTime(), rawDate: new Date().toISOString(),
         error: error.message,
       }]);
@@ -777,6 +795,29 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         {activeAgentId === 'VBUY' && (
           <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
             {Object.keys(VBUY_FAST_TRACK_REGISTRY).map((label) => (
+              <button
+                key={label}
+                onClick={() => handleFastTrackClick(label)}
+                className="suggestion-chip"
+                style={{
+                  flexShrink: 0,
+                  background: agentBgColor,
+                  color: agentColor,
+                  borderColor: agentBorderColor,
+                  boxShadow: `0 0 10px ${agentColor}20`,
+                }}
+                disabled={isLoading}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* VMOVE Suggestions */}
+        {activeAgentId === 'VMOVE' && (
+          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+            {Object.keys(VMOVE_FAST_TRACK_REGISTRY).map((label) => (
               <button
                 key={label}
                 onClick={() => handleFastTrackClick(label)}

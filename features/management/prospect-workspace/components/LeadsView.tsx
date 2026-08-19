@@ -385,7 +385,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
           failCount++;
         }
       } catch (err: any) {
-        lastError = err.message || 'Network error';
+        lastError = err.message || 'Erreur réseau';
         failCount++;
       }
       setImportProgress({ current: i + 1, total: leadsData.length });

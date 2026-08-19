@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { getVbuyKpiRepartitionParCategorie } from '@/shared/api/n8n-api';
+import { useKpis } from '@/shared/contexts/KpiCacheContext';
 import { PieChart as PieIcon, RefreshCw } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
@@ -29,34 +29,24 @@ export const VbuyRepartitionCategoriePieCard: React.FC<VbuyRepartitionCategorieP
 }) => {
   const isVisible = !activeAgentId || activeAgentId.toUpperCase() === 'VBUY' || activeAgentId.toUpperCase() === 'VMIND';
 
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hoveredCategory, setHoveredCategory] = useState<any | null>(null);
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
+  const agentData = kpisByAgent["vbuy"] || kpisByAgent["VBUY"] || {};
+  const n8nToolData = agentData.get_vbuy_kpi_repartition_par_categorie;
 
-  const loadKpi = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await getVbuyKpiRepartitionParCategorie(clientId);
-      setData(res);
-    } catch (err: any) {
-      console.error("[VBUY REPARTITION CATEGORIE CARD] Error:", err);
-      setError(err?.message || "Erreur lors du chargement de la répartition par catégorie");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [isMounted, setIsMounted] = useState<boolean>(false);
 
   useEffect(() => {
-    if (isVisible) {
-      loadKpi();
-    }
-  }, [clientId, isVisible]);
+    setIsMounted(true);
+  }, []);
+
+  const [hoveredCategory, setHoveredCategory] = useState<any | null>(null);
 
   if (!isVisible) return null;
 
-  const payload = data?.data || data || {};
+  const effectiveLoading = (loadingByAgent["vbuy"] || loadingByAgent["VBUY"]) && !n8nToolData;
+  const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
+  const payload = n8nToolData?.data || n8nToolData || {};
   const summary = payload?.summary || {
     total_depenses_tnd: 0,
     total_factures: 0,
@@ -148,8 +138,8 @@ export const VbuyRepartitionCategoriePieCard: React.FC<VbuyRepartitionCategorieP
             VBUY
           </span>
           <button
-            onClick={loadKpi}
-            disabled={loading}
+            onClick={() => fetchKpis('vbuy', true, 'get_vbuy_kpi_repartition_par_categorie')}
+            disabled={effectiveLoading}
             style={{
               background: 'transparent',
               border: 'none',
@@ -159,14 +149,14 @@ export const VbuyRepartitionCategoriePieCard: React.FC<VbuyRepartitionCategorieP
               display: 'flex',
               alignItems: 'center'
             }}
-            title="Rafraîchir les données"
+            title="Rafraîchir les données via n8n"
           >
-            <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
+            <RefreshCw size={13} style={{ animation: effectiveLoading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
         </div>
       </div>
 
-      {loading ? (
+      {effectiveLoading ? (
         <div style={{ padding: '24px 0', textAlign: 'center', color: '#94A3B8', fontSize: '11px' }}>
           Chargement de la répartition par catégorie...
         </div>
@@ -190,7 +180,8 @@ export const VbuyRepartitionCategoriePieCard: React.FC<VbuyRepartitionCategorieP
           }}>
             {/* Pie Donut Chart */}
             <div style={{ width: '130px', height: '130px', position: 'relative', flexShrink: 0 }}>
-              <ResponsiveContainer width="100%" height="100%">
+              {isMounted && (
+                <ResponsiveContainer width="100%" height={130} minWidth={0} minHeight={0}>
                 <PieChart>
                   <Pie
                     data={chartData}
@@ -222,6 +213,7 @@ export const VbuyRepartitionCategoriePieCard: React.FC<VbuyRepartitionCategorieP
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
+              )}
 
               {/* Dynamic Clean Center Donut Label */}
               <div style={{

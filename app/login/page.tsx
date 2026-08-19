@@ -442,6 +442,23 @@ export default function LoginPage() {
   const [time, setTime] = useState('');
   const router = useRouter();
 
+  const formatUserFriendlyError = (err: any, fallbackMessage: string = "Une erreur est survenue."): string => {
+    const rawMsg = (err?.message || "").toString();
+    const lower = rawMsg.toLowerCase();
+    
+    if (lower.includes("failed to fetch") || lower.includes("fetch failed") || lower.includes("econnrefused") || lower.includes("networkerror")) {
+      return "Impossible de contacter le serveur VMIND. Veuillez vérifier votre connexion ou que le serveur est démarré.";
+    }
+    if (lower.includes("invalid credentials") || lower.includes("identifiants invalides") || lower.includes("unauthorized")) {
+      return "Identifiant ou mot de passe incorrect.";
+    }
+    if (lower.includes("jwt malformed") || lower.includes("invalid token")) {
+      return "Session expirée ou invalide. Veuillez vous reconnecter.";
+    }
+    
+    return rawMsg || fallbackMessage;
+  };
+
   // Signup State
   const [showSignup, setShowSignup] = useState(false);
   const [signupFirstName, setSignupFirstName] = useState('');
@@ -546,7 +563,7 @@ export default function LoginPage() {
       setSignupPhone('');
       setIsUsernameAvailable(null);
     } catch (err: any) {
-      setSignupError(err.message);
+      setSignupError(formatUserFriendlyError(err, "Une erreur s'est produite lors de l'inscription."));
     } finally {
       setSignupLoading(false);
     }
@@ -621,7 +638,7 @@ export default function LoginPage() {
 
       window.location.href = '/';
     } catch (err: any) {
-      setError(err.message);
+      setError(formatUserFriendlyError(err, "Identifiant ou mot de passe incorrect."));
     } finally {
       setLoading(false);
     }
@@ -679,7 +696,7 @@ export default function LoginPage() {
       setForgotSuccess(data.message);
       setForgotPasswordStep(2);
     } catch (err: any) {
-      setForgotError(err.message);
+      setForgotError(formatUserFriendlyError(err, "Erreur lors de l'envoi de la demande."));
     } finally {
       setForgotLoading(false);
     }
@@ -719,7 +736,7 @@ export default function LoginPage() {
         setForgotError('');
       }, 2000);
     } catch (err: any) {
-      setForgotError(err.message);
+      setForgotError(formatUserFriendlyError(err, "Erreur de réinitialisation."));
     } finally {
       setForgotLoading(false);
     }
