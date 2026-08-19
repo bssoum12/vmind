@@ -13,7 +13,7 @@ import {
 } from '@/shared/api/n8n-api';
 import { useProspectSocket } from '../prospect-workspace/hooks/useProspectSocket';
 import { useRouter } from 'next/navigation';
-import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
+import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Play, Brain, CheckSquare, ListChecks, SkipForward, Users, Info, ExternalLink, UploadCloud } from 'lucide-react';
 import { ProspectAgentExecutionModal } from './components/ProspectAgentExecutionModal';
@@ -187,32 +187,16 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const renderTutorialArrow = (agent: LiveAgent, step: number) => {
     if (tutorialStep === step && tutorialAgent?.agent_name === agent.agent_name) {
       return (
-        <div style={{
-          position: 'absolute',
-          top: '-45px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          animation: 'bounceArrow 1.5s infinite ease-in-out',
-          pointerEvents: 'none',
-          zIndex: 10002
-        }}>
-          {[0.2, 0.6, 1].map((opacity, i) => (
-            <div key={i} style={{
-              width: '16px',
-              height: '16px',
-              borderBottom: '4px solid #00E5C8',
-              borderRight: '4px solid #00E5C8',
-              transform: 'rotate(45deg)',
-              opacity: opacity,
-              filter: 'drop-shadow(2px 2px 4px rgba(0, 229, 200, 0.6))',
-              borderRadius: '2px',
-              marginBottom: '-8px' // overlaps them slightly
-            }} />
-          ))}
-        </div>
+        <VMindGuideArrow
+          direction="down"
+          color="#00E5C8"
+          style={{
+            position: 'absolute',
+            top: '-45px',
+            left: '50%',
+            transform: 'translateX(-50%)'
+          }}
+        />
       );
     }
     return null;
@@ -340,6 +324,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           title={getTutorialContent()?.title}
           message={getTutorialContent()?.message || null}
           mood={getTutorialContent()?.mood}
+          showBackdrop={true}
+          onClose={() => setTutorialStep(0)}
         />
       )}
 
@@ -405,6 +391,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                   const meta = statusMeta[status];
                   const busy = actionLoading === agent.agent_name;
                   const isSelected = selected?.agent_name === agent.agent_name;
+                  const isTutorialActive = tutorialStep > 0 && tutorialAgent?.agent_name === agent.agent_name;
 
                   return (
                     <tr
@@ -416,6 +403,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         background: isSelected ? 'rgba(0,229,160,0.06)' : undefined,
                         borderLeft: isSelected ? '3px solid #00E5A0' : '3px solid transparent',
                         transition: 'all .15s',
+                        position: isTutorialActive ? 'relative' : undefined,
+                        zIndex: isTutorialActive ? 10000 : undefined,
                       }}
                     >
                       <td>

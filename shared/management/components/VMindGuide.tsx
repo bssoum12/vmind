@@ -1,21 +1,70 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import './VMindGuide.scss';
 
 export type GuideMood = 'curious' | 'focused' | 'convinced' | 'settled';
+
+export interface VMindGuideArrowProps {
+  direction?: 'up' | 'down' | 'left' | 'right';
+  color?: string;
+  style?: React.CSSProperties;
+  className?: string;
+}
+
+/**
+ * Reusable VMind Pointing Arrow Component
+ * Renders stacked glowing chevron bars animated towards a target element.
+ */
+export const VMindGuideArrow: React.FC<VMindGuideArrowProps> = ({
+  direction = 'down',
+  color = '#00E5C8',
+  style,
+  className = ''
+}) => {
+  return (
+    <div
+      className={`vmind-guide-arrow direction-${direction} ${className}`}
+      style={style}
+    >
+      {[0.2, 0.6, 1.0].map((opacity, i) => (
+        <div
+          key={i}
+          className="chevron-item"
+          style={{
+            borderBottomColor: color,
+            borderRightColor: color,
+            opacity: opacity,
+            filter: `drop-shadow(2px 2px 4px ${color}A0)`
+          }}
+        />
+      ))}
+    </div>
+  );
+};
 
 export interface VMindGuideProps {
   title?: string;
   message: string | null;
   isOpen: boolean;
   mood?: GuideMood;
+  showBackdrop?: boolean;
+  backdropOpacity?: number;
+  backdropBlur?: number;
+  onBackdropClick?: () => void;
+  onClose?: () => void;
 }
 
 export const VMindGuide: React.FC<VMindGuideProps> = ({
   title,
   message,
   isOpen,
-  mood = 'focused'
+  mood = 'focused',
+  showBackdrop = false,
+  backdropOpacity = 0.12,
+  backdropBlur = 1,
+  onBackdropClick,
+  onClose
 }) => {
   const [displayedText, setDisplayedText] = useState('');
   const [mounted, setMounted] = useState(false);
@@ -120,31 +169,39 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
   };
 
   const moodStyle = getMoodStyles(activeMood);
+  const handleBackdropClick = onBackdropClick || onClose;
 
   const guideContent = (
     <AnimatePresence>
+      {/* Light Translucent Backdrop Overlay when showBackdrop is true */}
+      {showBackdrop && internalIsOpen && (
+        <motion.div
+          key="vmind-guide-backdrop"
+          className="vmind-guide-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3 }}
+          style={{
+            background: `rgba(4, 9, 18, ${backdropOpacity})`,
+            backdropFilter: `blur(${backdropBlur}px)`,
+            WebkitBackdropFilter: `blur(${backdropBlur}px)`
+          }}
+          onClick={handleBackdropClick}
+        />
+      )}
+
       {internalIsOpen && activeMessage && (
         <motion.div
           key="vmind-guide-panel"
+          className="vmind-guide-panel"
           initial={{ opacity: 0, y: 30, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
           style={{
-            position: 'fixed',
-            bottom: '2rem',
-            right: '2rem',
-            width: '360px',
-            backgroundColor: 'rgba(9, 13, 20, 0.90)',
-            backdropFilter: 'blur(24px)',
             border: `1px solid ${moodStyle.borderColor}`,
-            borderRadius: '12px',
-            padding: '1.25rem 1.5rem',
-            boxShadow: `0 10px 40px rgba(0, 0, 0, 0.8), ${moodStyle.glow}`,
-            zIndex: 999999,
-            overflow: 'hidden',
-            fontFamily: 'var(--font-sans, system-ui, sans-serif)',
-            transition: 'all 0.5s ease-in-out'
+            boxShadow: `0 10px 40px rgba(0, 0, 0, 0.8), ${moodStyle.glow}`
           }}
         >
           <div style={{
@@ -192,7 +249,7 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
                 fontSize: '0.9rem', 
                 lineHeight: 1.6,
                 fontWeight: 400,
-                minHeight: '40px' // Prevent layout shift while typing
+                minHeight: '40px'
               }}>
                 {displayedText}
                 <motion.span
@@ -212,17 +269,6 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
               </p>
             </div>
           </div>
-          <style dangerouslySetInnerHTML={{__html: `
-            @keyframes vmindPulseLine {
-              0% { opacity: 0.1; transform: translateX(-20%); }
-              50% { opacity: 0.8; transform: translateX(20%); }
-              100% { opacity: 0.1; transform: translateX(-20%); }
-            }
-            @keyframes vmindAvatarPulse {
-              0% { filter: brightness(0.9); transform: scale(1); }
-              100% { filter: brightness(1.3); transform: scale(1.05); }
-            }
-          `}} />
         </motion.div>
       )}
     </AnimatePresence>

@@ -1,0 +1,150 @@
+/* VMindGuide.scss - Guide & Pointing Arrow Stylesheet */
+
+@keyframes bounceArrowDown {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes bounceArrowUp {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(8px);
+  }
+}
+
+@keyframes bounceArrowLeft {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(8px);
+  }
+}
+
+@keyframes bounceArrowRight {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-8px);
+  }
+}
+
+@keyframes vmindPulseLine {
+  0% {
+    opacity: 0.1;
+    transform: translateX(-20%);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateX(20%);
+  }
+  100% {
+    opacity: 0.1;
+    transform: translateX(-20%);
+  }
+}
+
+@keyframes vmindAvatarPulse {
+  0% {
+    filter: brightness(0.9);
+    transform: scale(1);
+  }
+  100% {
+    filter: brightness(1.3);
+    transform: scale(1.05);
+  }
+}
+
+/* Very Light & Subtle Translucent Overlay */
+.vmind-guide-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 9, 18, 0.12);
+  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(1px);
+  z-index: 9990;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+/* Guide Floating Panel - Highest stacking level */
+.vmind-guide-panel {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 360px;
+  background-color: rgba(9, 13, 20, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  z-index: 10005;
+  overflow: hidden;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  transition: all 0.5s ease-in-out;
+}
+
+/* Reusable Chevron Arrow Container */
+.vmind-guide-arrow {
+  display: flex;
+  pointer-events: none;
+  z-index: 10002;
+
+  &.direction-down {
+    flex-direction: column;
+    align-items: center;
+    animation: bounceArrowDown 1.5s infinite ease-in-out;
+    .chevron-item {
+      transform: rotate(45deg);
+      margin-bottom: -8px;
+    }
+  }
+
+  &.direction-up {
+    flex-direction: column-reverse;
+    align-items: center;
+    animation: bounceArrowUp 1.5s infinite ease-in-out;
+    .chevron-item {
+      transform: rotate(-135deg);
+      margin-top: -8px;
+    }
+  }
+
+  &.direction-left {
+    flex-direction: row-reverse;
+    align-items: center;
+    animation: bounceArrowLeft 1.5s infinite ease-in-out;
+    .chevron-item {
+      transform: rotate(135deg);
+      margin-left: -8px;
+    }
+  }
+
+  &.direction-right {
+    flex-direction: row;
+    align-items: center;
+    animation: bounceArrowRight 1.5s infinite ease-in-out;
+    .chevron-item {
+      transform: rotate(-45deg);
+      margin-right: -8px;
+    }
+  }
+
+  .chevron-item {
+    width: 16px;
+    height: 16px;
+    border-bottom-style: solid;
+    border-bottom-width: 4px;
+    border-right-style: solid;
+    border-right-width: 4px;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+  }
+}

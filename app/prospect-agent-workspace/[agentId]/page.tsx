@@ -10,7 +10,7 @@ import LeadsView from '../../../features/management/prospect-workspace/component
 import CampaignsView from '../../../features/management/prospect-workspace/components/CampaignsView';
 import LogsView from '../../../features/management/prospect-workspace/components/LogsView';
 import LeadDetailDrawer from '../../../features/management/prospect-workspace/components/LeadDetailDrawer';
-import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
+import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
 import { getAgents } from '@/shared/api/n8n-api';
 import { useProspectSocket } from '../../../features/management/prospect-workspace/hooks/useProspectSocket';
 
@@ -127,32 +127,16 @@ export default function AgentWorkspacePage() {
   const renderTutorialArrow = (step: number) => {
     if (navTutorialStep === step) {
       return (
-        <div style={{
-          position: 'absolute',
-          top: '-45px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          animation: 'bounceArrow 1.5s infinite ease-in-out',
-          pointerEvents: 'none',
-          zIndex: 10002
-        }}>
-          {[0.2, 0.6, 1].map((opacity, i) => (
-            <div key={i} style={{
-              width: '16px',
-              height: '16px',
-              borderBottom: '4px solid #00E5C8',
-              borderRight: '4px solid #00E5C8',
-              transform: 'rotate(45deg)',
-              opacity: opacity,
-              filter: 'drop-shadow(2px 2px 4px rgba(0, 229, 200, 0.6))',
-              borderRadius: '2px',
-              marginBottom: '-8px'
-            }} />
-          ))}
-        </div>
+        <VMindGuideArrow
+          direction="down"
+          color="#00E5C8"
+          style={{
+            position: 'absolute',
+            top: '-45px',
+            left: '50%',
+            transform: 'translateX(-50%)'
+          }}
+        />
       );
     }
     return null;
@@ -250,6 +234,8 @@ export default function AgentWorkspacePage() {
           title={getTutorialContent()?.title}
           message={getTutorialContent()?.message || null}
           mood={getTutorialContent()?.mood}
+          showBackdrop={true}
+          onClose={() => setNavTutorialStep(0)}
         />
       )}
 
@@ -259,7 +245,9 @@ export default function AgentWorkspacePage() {
         padding: '20px 32px', borderBottom: '1px solid var(--border)',
         background: 'rgba(8, 20, 38, 0.4)',
         backdropFilter: navTutorialStep > 0 ? 'none' : 'blur(10px)',
-        flexShrink: 0
+        flexShrink: 0,
+        position: navTutorialStep > 0 ? 'relative' : undefined,
+        zIndex: navTutorialStep > 0 ? 10000 : undefined
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <button
@@ -282,7 +270,7 @@ export default function AgentWorkspacePage() {
         </div>
 
         {/* TABS */}
-        <div style={{ display: 'flex', background: 'var(--navy2)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', background: 'var(--navy2)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)', position: 'relative', zIndex: 10001 }}>
           {[
             { id: 'dashboard', label: 'Vue d\'ensemble', icon: LayoutDashboard, step: 1 },
             { id: 'leads', label: 'Prospects', icon: Users, step: 2 },
