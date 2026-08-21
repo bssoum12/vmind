@@ -81,6 +81,12 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_vmove_dossiers_en_cours_client': 'VMOVE',
   'Client1_get_vmove_dossiers_en_cours_client': 'VMOVE',
   'MCP_Client1_get_vmove_dossiers_en_cours_client': 'VMOVE',
+  'get_vmove_top_transporteurs_ponctualite': 'VMOVE',
+  'Client1_get_vmove_top_transporteurs_ponctualite': 'VMOVE',
+  'MCP_Client1_get_vmove_top_transporteurs_ponctualite': 'VMOVE',
+  'get_vmove_top_ports_retards': 'VMOVE',
+  'Client1_get_vmove_top_ports_retards': 'VMOVE',
+  'MCP_Client1_get_vmove_top_ports_retards': 'VMOVE',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -131,6 +137,12 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'get_vmove_dossiers_en_cours_client': 'Dossiers actifs par client (Exploitation)',
   'Client1_get_vmove_dossiers_en_cours_client': 'Dossiers actifs par client (Exploitation)',
   'MCP_Client1_get_vmove_dossiers_en_cours_client': 'Dossiers actifs par client (Exploitation)',
+  'get_vmove_top_transporteurs_ponctualite': 'Top transporteurs (Ponctualité)',
+  'Client1_get_vmove_top_transporteurs_ponctualite': 'Top transporteurs (Ponctualité)',
+  'MCP_Client1_get_vmove_top_transporteurs_ponctualite': 'Top transporteurs (Ponctualité)',
+  'get_vmove_top_ports_retards': 'Top ports (Retards)',
+  'Client1_get_vmove_top_ports_retards': 'Top ports (Retards)',
+  'MCP_Client1_get_vmove_top_ports_retards': 'Top ports (Retards)',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -177,7 +189,9 @@ const VBUY_FAST_TRACK_REGISTRY: Record<string, string> = {
 const VMOVE_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Dossiers en acheminement ?": "Combien de dossiers sont en cours d'acheminement ?",
   "Dossiers en retard ETA ?": "Quels dossiers sont en retard par rapport à la date ETA ?",
-  "Dossiers clients en cours ?": "Affiche les dossiers en cours par client"
+  "Dossiers clients en cours ?": "Affiche les dossiers en cours par client",
+  "Top transporteurs (Ponctualité) ?": "Quel transporteur a le meilleur taux de ponctualité ce mois ?",
+  "Top ports (Retards) ?": "Quels sont les ports avec le plus de retards ce trimestre ?"
 };
 
 const FAST_TRACK_REGISTRY: Record<string, string> = {
