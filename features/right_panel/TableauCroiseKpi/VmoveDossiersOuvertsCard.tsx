@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { PieChart as PieIcon, RefreshCw, Layers, Calendar, FileText, ChevronRight, ChevronLeft, X, Ship, Loader2, TrendingUp, Package, Filter } from 'lucide-react';
+import { PieChart as PieIcon, RefreshCw, Layers, Calendar, FileText, ChevronRight, ChevronLeft, X, Ship, Loader2, TrendingUp, Package, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -77,6 +77,9 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
   // Hover states for dynamic chart -> list interaction
   const [hoveredSens, setHoveredSens] = useState<string | null>(null);
   const [hoveredNature, setHoveredNature] = useState<string | null>(null);
+
+  // Collapsible Charts Toggle State
+  const [isChartsExpanded, setIsChartsExpanded] = useState<boolean>(false);
 
   // Pagination State (5 items per page)
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -476,258 +479,285 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
         </div>
       </div>
 
-      {/* Loading Skeleton */}
-      {loading && !dbData ? (
-        <div style={{
+      {/* Collapsible Chart Accordion Header */}
+      <button
+        onClick={() => setIsChartsExpanded(prev => !prev)}
+        style={{
+          width: '100%',
           display: 'flex',
-          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '220px',
-          gap: '12px',
-          color: '#38BDF8'
-        }}>
-          <Loader2 size={26} className="animate-spin" />
-          <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Chargement SQL Server en cours...</span>
-        </div>
-      ) : (
+          justifyContent: 'space-between',
+          padding: '6px 10px',
+          background: 'rgba(56, 189, 248, 0.08)',
+          border: '1px solid rgba(56, 189, 248, 0.25)',
+          borderRadius: '8px',
+          color: '#38BDF8',
+          fontSize: '10px',
+          fontWeight: 700,
+          cursor: 'pointer',
+          marginBottom: isChartsExpanded ? '12px' : '0px',
+          transition: 'all 0.2s ease'
+        }}
+      >
+        <span>{isChartsExpanded ? "Masquer les graphiques de répartition" : "Afficher les graphiques de répartition (Sens & Nature)"}</span>
+        {isChartsExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+      </button>
+
+      {isChartsExpanded && (
         <>
-          {/* 4. PIE CHART #1: REPARTITION PAR SENS (WITH LIVE HOVER INTERACTION) */}
-          <div style={{ marginBottom: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Layers size={13} color="#38BDF8" /> 1. Répartition par Sens
-              </span>
-              <span style={{ fontSize: '9px', color: '#64748B', fontWeight: 600 }}>Import / Export / National</span>
+          {loading && !dbData ? (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '220px',
+              gap: '12px',
+              color: '#38BDF8'
+            }}>
+              <Loader2 size={26} className="animate-spin" />
+              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Chargement SQL Server en cours...</span>
             </div>
-
-            <div style={{ height: '150px', width: '100%', position: 'relative' }}>
-              {isMounted && rawBySens.length > 0 ? (
-                <ResponsiveContainer width="100%" height={150} minWidth={0} minHeight={0}>
-                  <PieChart>
-                    <Pie
-                      data={rawBySens}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={38}
-                      outerRadius={62}
-                      paddingAngle={5}
-                      dataKey="value"
-                      onMouseEnter={(_, index) => setHoveredSens(rawBySens[index]?.name || null)}
-                      onMouseLeave={() => setHoveredSens(null)}
-                    >
-                      {rawBySens.map((entry: any, index: number) => {
-                        const styleConfig = SENS_COLORS[entry.name] || SENS_COLORS['N/A'];
-                        const isHovered = hoveredSens === entry.name;
-                        return (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={styleConfig.main}
-                            stroke={isHovered ? '#FFFFFF' : 'rgba(15, 23, 42, 0.9)'}
-                            strokeWidth={isHovered ? 3 : 2}
-                            style={{
-                              filter: isHovered ? `drop-shadow(0 0 10px ${styleConfig.glow})` : 'none',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease'
-                            }}
-                          />
-                        );
-                      })}
-                    </Pie>
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          const pct = totalActifs > 0 ? ((data.value / totalActifs) * 100).toFixed(1) : '0';
-                          const styleConfig = SENS_COLORS[data.name] || SENS_COLORS['N/A'];
-                          return (
-                            <div style={{
-                              background: 'rgba(15, 23, 42, 0.95)',
-                              border: `1px solid ${styleConfig.main}`,
-                              padding: '8px 12px',
-                              borderRadius: '10px',
-                              fontSize: '11px',
-                              color: '#FFF',
-                              boxShadow: `0 4px 20px ${styleConfig.glow}`
-                            }}>
-                              <strong style={{ color: styleConfig.main }}>{data.name}</strong>
-                              <div>Dossiers Actifs: <b>{data.value}</b> ({pct}%)</div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748B', fontSize: '11px' }}>
-                  Aucun dossier pour ce mois/année
+          ) : (
+            <>
+              {/* 4. PIE CHART #1: REPARTITION PAR SENS (WITH LIVE HOVER INTERACTION) */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Layers size={13} color="#38BDF8" /> 1. Répartition par Sens
+                  </span>
+                  <span style={{ fontSize: '9px', color: '#64748B', fontWeight: 600 }}>Import / Export / National</span>
                 </div>
-              )}
-            </div>
 
-            {/* Interactive Legend Pills with Quantity Details */}
-            {rawBySens.length > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
-                {rawBySens.map((s: any) => {
-                  const pct = totalActifs > 0 ? ((s.value / totalActifs) * 100).toFixed(0) : '0';
-                  const styleConfig = SENS_COLORS[s.name] || SENS_COLORS['N/A'];
-                  const isSelected = selectedSensFilter === s.name;
-                  const isHovered = hoveredSens === s.name;
-                  return (
-                    <div
-                      key={s.name}
-                      onMouseEnter={() => setHoveredSens(s.name)}
-                      onMouseLeave={() => setHoveredSens(null)}
-                      onClick={() => setSelectedSensFilter(isSelected ? "ALL" : s.name)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        fontSize: '10px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        padding: '3px 8px',
-                        borderRadius: '16px',
-                        background: (isSelected || isHovered) ? styleConfig.bg : 'rgba(30, 41, 59, 0.6)',
-                        border: `1px solid ${(isSelected || isHovered) ? styleConfig.main : 'rgba(148, 163, 184, 0.2)'}`,
-                        transition: 'all 0.2s ease',
-                        boxShadow: (isSelected || isHovered) ? `0 0 10px ${styleConfig.glow}` : 'none'
-                      }}
-                    >
-                      <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: styleConfig.main }} />
-                      <span style={{ color: '#F1F5F9' }}>{s.name}</span>
-                      <span style={{ color: styleConfig.main, fontWeight: 700 }}>{s.value}</span>
-                      <span style={{ color: '#64748B', fontSize: '9px' }}>({pct}%)</span>
+                <div style={{ height: '150px', width: '100%', position: 'relative' }}>
+                  {isMounted && rawBySens.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={150} minWidth={0} minHeight={0}>
+                      <PieChart>
+                        <Pie
+                          data={rawBySens}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={38}
+                          outerRadius={62}
+                          paddingAngle={5}
+                          dataKey="value"
+                          onMouseEnter={(_, index) => setHoveredSens(rawBySens[index]?.name || null)}
+                          onMouseLeave={() => setHoveredSens(null)}
+                        >
+                          {rawBySens.map((entry: any, index: number) => {
+                            const styleConfig = SENS_COLORS[entry.name] || SENS_COLORS['N/A'];
+                            const isHovered = hoveredSens === entry.name;
+                            return (
+                              <Cell
+                                key={`cell-${index}`}
+                                fill={styleConfig.main}
+                                stroke={isHovered ? '#FFFFFF' : 'rgba(15, 23, 42, 0.9)'}
+                                strokeWidth={isHovered ? 3 : 2}
+                                style={{
+                                  filter: isHovered ? `drop-shadow(0 0 10px ${styleConfig.glow})` : 'none',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease'
+                                }}
+                              />
+                            );
+                          })}
+                        </Pie>
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              const pct = totalActifs > 0 ? ((data.value / totalActifs) * 100).toFixed(1) : '0';
+                              const styleConfig = SENS_COLORS[data.name] || SENS_COLORS['N/A'];
+                              return (
+                                <div style={{
+                                  background: 'rgba(15, 23, 42, 0.95)',
+                                  border: `1px solid ${styleConfig.main}`,
+                                  padding: '8px 12px',
+                                  borderRadius: '10px',
+                                  fontSize: '11px',
+                                  color: '#FFF',
+                                  boxShadow: `0 4px 20px ${styleConfig.glow}`
+                                }}>
+                                  <strong style={{ color: styleConfig.main }}>{data.name}</strong>
+                                  <div>Dossiers actifs: <b>{data.value}</b> ({pct}%)</div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748B', fontSize: '11px' }}>
+                      Aucun dossier actif pour cette période
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* 5. PIE CHART #2: DETAIL PAR NATURE DE TRANSPORT (WITH LIVE HOVER INTERACTION) */}
-          <div style={{
-            background: 'rgba(15, 23, 42, 0.65)',
-            border: '1px solid rgba(56, 189, 248, 0.2)',
-            borderRadius: '12px',
-            padding: '12px',
-            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, color: '#38BDF8', letterSpacing: '0.2px' }}>
-                2. Détail par Nature ({selectedSensFilter === "ALL" ? "Tous les Sens" : selectedSensFilter})
-              </span>
-              {selectedSensFilter !== "ALL" && (
-                <button
-                  onClick={() => setSelectedSensFilter("ALL")}
-                  style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: '10px', cursor: 'pointer', textDecoration: 'underline' }}
-                >
-                  Réinitialiser
-                </button>
-              )}
-            </div>
-
-            <div style={{ height: '130px', width: '100%', position: 'relative' }}>
-              {isMounted && naturePieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={130} minWidth={0} minHeight={0}>
-                  <PieChart>
-                    <Pie
-                      data={naturePieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={30}
-                      outerRadius={50}
-                      paddingAngle={4}
-                      dataKey="value"
-                      onMouseEnter={(_, index) => setHoveredNature(naturePieData[index]?.name || null)}
-                      onMouseLeave={() => setHoveredNature(null)}
-                    >
-                      {naturePieData.map((entry: any, index: number) => {
-                        const styleConfig = NATURE_COLORS[entry.name] || NATURE_COLORS['N/A'];
-                        const isHovered = hoveredNature === entry.name;
-                        return (
-                          <Cell
-                            key={`nat-cell-${index}`}
-                            fill={styleConfig.main}
-                            stroke={isHovered ? '#FFFFFF' : 'rgba(15, 23, 42, 0.9)'}
-                            strokeWidth={isHovered ? 3 : 2}
-                            style={{
-                              filter: isHovered ? `drop-shadow(0 0 10px ${styleConfig.glow})` : 'none',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease'
-                            }}
-                          />
-                        );
-                      })}
-                    </Pie>
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const data = payload[0].payload;
-                          const styleConfig = NATURE_COLORS[data.name] || NATURE_COLORS['N/A'];
-                          return (
-                            <div style={{
-                              background: 'rgba(15, 23, 42, 0.95)',
-                              border: `1px solid ${styleConfig.main}`,
-                              padding: '6px 10px',
-                              borderRadius: '8px',
-                              fontSize: '11px',
-                              color: '#FFF',
-                              boxShadow: `0 4px 15px ${styleConfig.glow}`
-                            }}>
-                              <strong style={{ color: styleConfig.main }}>{data.name}</strong>
-                              <div>Dossiers: <b>{data.value}</b></div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748B', fontSize: '11px' }}>
-                  Aucune donnée nature
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Legend for Pie #2 with Quantity Highlights */}
-            {naturePieData.length > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
-                {naturePieData.map((n: any) => {
-                  const styleConfig = NATURE_COLORS[n.name] || NATURE_COLORS['N/A'];
-                  const isHovered = hoveredNature === n.name;
-                  return (
-                    <div
-                      key={n.name}
-                      onMouseEnter={() => setHoveredNature(n.name)}
-                      onMouseLeave={() => setHoveredNature(null)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        fontSize: '10px',
-                        color: isHovered ? styleConfig.main : '#CBD5E1',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        padding: '2px 6px',
-                        borderRadius: '12px',
-                        background: isHovered ? `${styleConfig.main}20` : 'transparent',
-                        border: `1px solid ${isHovered ? styleConfig.main : 'transparent'}`,
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: styleConfig.main }} />
-                      <span>{n.name}: <b style={{ color: '#FFF' }}>{n.value}</b></span>
-                    </div>
-                  );
-                })}
+                {/* Interactive Legend Pills */}
+                {rawBySens.length > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+                    {rawBySens.map((s: any) => {
+                      const pct = totalActifs > 0 ? ((s.value / totalActifs) * 100).toFixed(0) : '0';
+                      const styleConfig = SENS_COLORS[s.name] || SENS_COLORS['N/A'];
+                      const isSelected = selectedSensFilter === s.name;
+                      const isHovered = hoveredSens === s.name;
+                      return (
+                        <div
+                          key={s.name}
+                          onMouseEnter={() => setHoveredSens(s.name)}
+                          onMouseLeave={() => setHoveredSens(null)}
+                          onClick={() => setSelectedSensFilter(isSelected ? "ALL" : s.name)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            padding: '3px 8px',
+                            borderRadius: '16px',
+                            background: (isSelected || isHovered) ? styleConfig.bg : 'rgba(30, 41, 59, 0.6)',
+                            border: `1px solid ${(isSelected || isHovered) ? styleConfig.main : 'rgba(148, 163, 184, 0.2)'}`,
+                            transition: 'all 0.2s ease',
+                            boxShadow: (isSelected || isHovered) ? `0 0 10px ${styleConfig.glow}` : 'none'
+                          }}
+                        >
+                          <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: styleConfig.main }} />
+                          <span style={{ color: '#F1F5F9' }}>{s.name}</span>
+                          <span style={{ color: styleConfig.main, fontWeight: 700 }}>{s.value}</span>
+                          <span style={{ color: '#64748B', fontSize: '9px' }}>({pct}%)</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+
+              {/* 5. PIE CHART #2: DETAIL PAR NATURE DE TRANSPORT */}
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.65)',
+                border: '1px solid rgba(56, 189, 248, 0.2)',
+                borderRadius: '12px',
+                padding: '12px',
+                boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#38BDF8', letterSpacing: '0.2px' }}>
+                    2. Répartition par Nature ({selectedSensFilter === "ALL" ? "Tous les Sens" : selectedSensFilter})
+                  </span>
+                  {selectedSensFilter !== "ALL" && (
+                    <button
+                      onClick={() => setSelectedSensFilter("ALL")}
+                      style={{ background: 'none', border: 'none', color: '#94A3B8', fontSize: '10px', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Réinitialiser
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ height: '130px', width: '100%', position: 'relative' }}>
+                  {isMounted && naturePieData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={130} minWidth={0} minHeight={0}>
+                      <PieChart>
+                        <Pie
+                          data={naturePieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={30}
+                          outerRadius={50}
+                          paddingAngle={4}
+                          dataKey="value"
+                          onMouseEnter={(_, index) => setHoveredNature(naturePieData[index]?.name || null)}
+                          onMouseLeave={() => setHoveredNature(null)}
+                        >
+                          {naturePieData.map((entry: any, index: number) => {
+                            const styleConfig = NATURE_COLORS[entry.name] || NATURE_COLORS['N/A'];
+                            const isHovered = hoveredNature === entry.name;
+                            return (
+                              <Cell
+                                key={`cell-nat-${index}`}
+                                fill={styleConfig.main}
+                                stroke={isHovered ? '#FFFFFF' : 'rgba(15, 23, 42, 0.9)'}
+                                strokeWidth={isHovered ? 3 : 2}
+                                style={{
+                                  filter: isHovered ? `drop-shadow(0 0 10px ${styleConfig.glow})` : 'none',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease'
+                                }}
+                              />
+                            );
+                          })}
+                        </Pie>
+                        <Tooltip
+                          content={({ active, payload }) => {
+                            if (active && payload && payload.length) {
+                              const data = payload[0].payload;
+                              const styleConfig = NATURE_COLORS[data.name] || NATURE_COLORS['N/A'];
+                              return (
+                                <div style={{
+                                  background: 'rgba(15, 23, 42, 0.95)',
+                                  border: `1px solid ${styleConfig.main}`,
+                                  padding: '6px 10px',
+                                  borderRadius: '8px',
+                                  fontSize: '11px',
+                                  color: '#FFF',
+                                  boxShadow: `0 4px 15px ${styleConfig.glow}`
+                                }}>
+                                  <strong style={{ color: styleConfig.main }}>{data.name}</strong>
+                                  <div>Dossiers: <b>{data.value}</b></div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748B', fontSize: '11px' }}>
+                      Aucune donnée nature
+                    </div>
+                  )}
+                </div>
+
+                {/* Legend for Pie #2 */}
+                {naturePieData.length > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
+                    {naturePieData.map((n: any) => {
+                      const styleConfig = NATURE_COLORS[n.name] || NATURE_COLORS['N/A'];
+                      const isHovered = hoveredNature === n.name;
+                      return (
+                        <div
+                          key={n.name}
+                          onMouseEnter={() => setHoveredNature(n.name)}
+                          onMouseLeave={() => setHoveredNature(null)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '10px',
+                            color: isHovered ? styleConfig.main : '#CBD5E1',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            padding: '2px 6px',
+                            borderRadius: '12px',
+                            background: isHovered ? `${styleConfig.main}20` : 'transparent',
+                            border: `1px solid ${isHovered ? styleConfig.main : 'transparent'}`,
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: styleConfig.main }} />
+                          <span>{n.name}: <b style={{ color: '#FFF' }}>{n.value}</b></span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </>
       )}
 
