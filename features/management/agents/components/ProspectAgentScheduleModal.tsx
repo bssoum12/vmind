@@ -23,7 +23,7 @@ export function ProspectAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
   const [isAIEvaluating, setIsAIEvaluating] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const publicId = (agent as any).agent_id;
+  const publicId = agent.uuid || (agent as any).agent_id;
 
   const fetchStats = async () => {
     try {
@@ -101,11 +101,32 @@ export function ProspectAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
     if (!agent.trigger_rules || agent.trigger_rules.length === 0) return 'Aucune planification définie';
     const r = agent.trigger_rules[0];
     const interval = r.interval;
-    if (interval === 'Minutes') return `Toutes les ${r.minutesBetween || '?'} min`;
-    if (interval === 'Hours') return `Toutes les ${r.hoursBetween || '?'} h`;
-    if (interval === 'Days') return `Chaque ${r.daysBetween > 1 ? r.daysBetween + ' jours' : 'jour'} à ${r.triggerAtHour || '08'}h`;
-    if (interval === 'Weeks') return `Hebdo (${(r.triggerOnWeekdays || []).join(', ')}) à ${r.triggerAtHour || '08'}h`;
-    if (interval === 'Months') return `Mensuel le ${r.triggerAtDayOfMonth || 1} à ${r.triggerAtHour || '08'}h`;
+    const minPad = String(r.triggerAtMinute ?? 0).padStart(2, '0');
+    
+    if (interval === 'Minutes') {
+      const step = Number(r.minutesBetween) || 5;
+      return step <= 1 ? 'Toutes les minutes' : `Toutes les ${step} min`;
+    }
+    if (interval === 'Hours') {
+      const step = Number(r.hoursBetween) || 1;
+      const minInfo = r.triggerAtMinute !== undefined && r.triggerAtMinute !== null ? ` (à min ${minPad})` : '';
+      return step <= 1 ? `Chaque heure${minInfo}` : `Toutes les ${step} h${minInfo}`;
+    }
+    if (interval === 'Days') {
+      const step = Number(r.daysBetween) || 1;
+      const hour = r.triggerAtHour || '08';
+      return step <= 1 ? `Chaque jour à ${hour}h${minPad}` : `Tous les ${step} jours à ${hour}h${minPad}`;
+    }
+    if (interval === 'Weeks') {
+      const days = (r.triggerOnWeekdays || ['Monday']).join(', ');
+      const hour = r.triggerAtHour || '08';
+      return `Hebdo (${days}) à ${hour}h${minPad}`;
+    }
+    if (interval === 'Months') {
+      const dom = r.triggerAtDayOfMonth || 1;
+      const hour = r.triggerAtHour || '08';
+      return `Mensuel (le ${dom}) à ${hour}h${minPad}`;
+    }
     return interval;
   };
 

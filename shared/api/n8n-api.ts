@@ -411,7 +411,15 @@ export async function fetchN8nKpis(
  */
 export async function triggerSourcingRun(
   agentId: string, 
-  params: { sourcingSummary: string; totalLeads: number; leadsPerCompany: number; ignoreDuplicates: boolean }
+  params: {
+    sourcingSummary?: string;
+    totalLeads?: number;
+    leadsPerCompany?: number;
+    ignoreDuplicates?: boolean;
+    target_agent_ids?: (string | number)[];
+    update_defaults?: boolean;
+    [key: string]: any;
+  }
 ): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/sourcing-agent/run/${encodeURIComponent(agentId)}`, {
     method: "POST",

@@ -48,8 +48,26 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint }: Onboa
       handleSend('Bonjour ! Je suis prêt à configurer mon agent.');
     } else if (initialMission && messages.length === 0) {
       setSummary(initialMission);
+      setMessages([
+        {
+          role: 'assistant',
+          content: `Voici le ciblage actuellement configuré pour votre agent :\n\n${initialMission}\n\nVous pouvez valider ce ciblage directement ou m'indiquer vos modifications dans le chat ci-dessous.`
+        }
+      ]);
     }
   }, []);
+
+  useEffect(() => {
+    if (initialMission && !summary && messages.length === 0) {
+      setSummary(initialMission);
+      setMessages([
+        {
+          role: 'assistant',
+          content: `Voici le ciblage actuellement configuré pour votre agent :\n\n${initialMission}\n\nVous pouvez valider ce ciblage directement ou m'indiquer vos modifications dans le chat ci-dessous.`
+        }
+      ]);
+    }
+  }, [initialMission]);
 
   const handleSend = async (text: string = input) => {
     if (!text.trim() || isLoading) return;
@@ -79,7 +97,10 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint }: Onboa
 
       // Check if it's the final summary
       if (assistantMessage.includes('[SUMMARY_COMPLETE]')) {
-        const cleanSummary = assistantMessage.replace('[SUMMARY_COMPLETE]', '').trim();
+        let cleanSummary = assistantMessage.replace('[SUMMARY_COMPLETE]', '').trim();
+        if (cleanSummary.includes('COMPANY_TARGET:')) {
+          cleanSummary = cleanSummary.substring(cleanSummary.indexOf('COMPANY_TARGET:')).trim();
+        }
         setSummary(cleanSummary);
         setMessages(prev => [...prev, { role: 'assistant', content: cleanSummary }]);
       } else {
@@ -91,6 +112,21 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint }: Onboa
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleModifyClick = () => {
+    setSummary(null);
+    const modifyPrompt = "Bien sûr ! Quels éléments souhaitez-vous modifier ou affiner dans ce ciblage ? (Ex : pays/région, secteur d'activité, intitulé du poste, département, seniorité ou rôle de décideur)";
+    setMessages(prev => [
+      ...prev,
+      {
+        role: 'assistant',
+        content: modifyPrompt
+      }
+    ]);
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
   };
 
   return (
@@ -137,7 +173,7 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint }: Onboa
             <Button variant="primary" onClick={() => onConfirm(summary)} style={{ flex: 1 }}>
               Confirmer & Continuer
             </Button>
-            <Button variant="secondary" onClick={() => setSummary(null)} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Button variant="secondary" onClick={handleModifyClick} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Edit2 size={16} /> Modifier
             </Button>
           </div>

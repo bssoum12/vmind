@@ -343,7 +343,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel }) 
           <div className="text-3xl font-black text-cyan-400 mb-4 tracking-tighter">AGENT EN COURS DE DÉPLOIEMENT...</div>
           <p className="text-gray-300 mb-8 leading-relaxed">
             L'agent <strong>{formData.agent_name}</strong> est en cours d'activation.<br/>
-            Le workflow n8n a été configuré avec les règles d'exécution et les seuils définis.
+            L'agent a été configuré avec les règles d'exécution et les seuils définis.
           </p>
           <div className="status-pill sp-running inline-flex items-center gap-2 px-6 py-3 text-sm font-bold bg-cyan-950/40 border border-cyan-500/30 text-cyan-400 rounded-full">
             <span className="status-dot w-2 h-2 bg-cyan-400 rounded-full animate-ping" />
@@ -627,7 +627,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel }) 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <div className="wcard-title" style={{ margin: 0 }}>
                     <span className="dot" style={{ backgroundColor: template?.accent || '#FF4757' }}></span>
-                    Règles de Déclenchement (Trigger Rules n8n)
+                    Règles de Planification Automatique
                   </div>
                   <button
                     type="button"
@@ -946,7 +946,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel }) 
                 )}
 
                 <div className="info-box" style={{ marginTop: '15px' }}>
-                  ⚡ En cliquant sur déployer, l'agent de recouvrement commencera à s'exécuter sur n8n selon la planification configurée.
+                  ⚡ En cliquant sur déployer, l'agent de recouvrement commencera à s'exécuter selon la planification configurée.
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>

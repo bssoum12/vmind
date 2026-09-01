@@ -30,7 +30,7 @@ const VIRTUAL_MIND_GUIDE: Record<string, { title: string; text: string }> = {
   email_recap: { title: "Email Récapitulatif", text: "Adresse email sur laquelle vous recevrez le bilan quotidien des performances." },
   delai_envois: { title: "Délai entre les envois", text: "Délais en secondes entre deux envois successifs." },
   email_limits: { title: "Cadence d'Envoi", text: "Configurez le délai entre chaque email pour éviter d'être marqué comme spam. Les limites journalières protègent la réputation de votre domaine." },
-  trigger_rules: { title: "Planification Autonome", text: "Définissez quand votre agent doit s'activer de manière autonome (ex: tous les lundis à 8h). N8N gère cette orchestration." }
+  trigger_rules: { title: "Planification Autonome", text: "Définissez quand votre agent doit s'activer de manière autonome (ex: tous les lundis à 8h)." }
 };
 
 interface TriggerRule {
@@ -466,8 +466,9 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       }
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
-        
+        const editUuid = agentToEdit?.uuid || agentToEdit?.agent_id;
+        const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (editUuid ? `?excludeUuid=${editUuid}` : '');
+
         const token = localStorage.getItem('vmind_session');
         const res = await fetch(endpoint, {
           headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
@@ -476,7 +477,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
         if (!res.ok) {
           throw new Error("Erreur serveur lors de la vérification du nom.");
         }
-        
+
         const data = await res.json();
         if (!data.available) {
           alert("Un agent avec ce nom existe déjà. Veuillez choisir un autre nom.");
@@ -509,11 +510,12 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       if (step !== 1) setStep(1);
       return;
     }
-    
+
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
-      
+      const editUuid = agentToEdit?.uuid || agentToEdit?.agent_id;
+      const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (editUuid ? `?excludeUuid=${editUuid}` : '');
+
       const token = localStorage.getItem('vmind_session');
       const res = await fetch(endpoint, {
         headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
@@ -522,7 +524,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       if (!res.ok) {
         throw new Error("Erreur serveur lors de la vérification du nom.");
       }
-      
+
       const data = await res.json();
       if (!data.available) {
         alert("Un agent avec ce nom existe déjà. Veuillez choisir un autre nom.");
@@ -550,8 +552,9 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       const token = localStorage.getItem('vmind_session');
 
+      const editUuid = agentToEdit?.uuid || agentToEdit?.agent_id;
       const endpoint = agentToEdit
-        ? `${baseUrl}/api/prospect-agent/update/${agentToEdit.agent_id}`
+        ? `${baseUrl}/api/prospect-agent/update/${editUuid}`
         : `${baseUrl}/api/prospect-agent/deploy`;
 
       const response = await fetch(endpoint, {
@@ -588,7 +591,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
           <div className="text-3xl font-black text-pink-400 mb-4 tracking-tighter">AGENT EN COURS DE DÉPLOIEMENT...</div>
           <p className="text-gray-300 mb-8 leading-relaxed">
             L'agent <strong>{formData.agent_name}</strong> est en cours d'activation.<br />
-            Le workflow n8n a été configuré avec les règles d'exécution et les seuils définis.
+            L'agent a été configuré avec les règles d'exécution et les seuils définis.
           </p>
           <div className="status-pill sp-running inline-flex items-center gap-2 px-6 py-3 text-sm font-bold bg-pink-950/40 border border-pink-500/30 text-pink-400 rounded-full">
             <span className="status-dot w-2 h-2 bg-pink-400 rounded-full animate-ping" />
@@ -916,7 +919,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                   <div className="wcard-title" style={{ margin: 0 }}>
                     <span className="dot" style={{ backgroundColor: template?.accent || '#FF4757' }}></span>
-                    Règles de Déclenchement (Trigger Rules n8n)
+                    Règles de Planification Automatique
                   </div>
                   <button
                     type="button"
@@ -1185,7 +1188,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     Passer et Déployer
                   </Button>
                   <Button variant="primary" onClick={handleDeploy} disabled={isDeploying || formData.trigger_rules.length === 0}>
-                    {isDeploying ? 'Déploiement en cours...' : agentToEdit ? 'Sauvegarder les modifications' : '🚀 Lancer le déploiement n8n'}
+                    {isDeploying ? 'Déploiement en cours...' : agentToEdit ? 'Sauvegarder les modifications' : '🚀 Lancer le déploiement'}
                   </Button>
                 </div>
               </div>

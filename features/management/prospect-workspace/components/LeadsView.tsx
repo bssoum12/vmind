@@ -444,11 +444,11 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
         const data = await res.json();
 
         if (!res.ok) {
-          throw new Error(data.error || 'Erreur lors de l\'envoi du fichier au workflow n8n.');
+          throw new Error(data.error || 'Erreur lors de l\'envoi et du traitement du fichier.');
         }
 
         if (!data.leads || data.leads.length === 0) {
-          throw new Error('Le workflow n8n n\'a retourné aucun prospect valide.');
+          throw new Error('Aucun prospect valide n\'a été extrait du fichier.');
         }
 
         await importLeads(data.leads);

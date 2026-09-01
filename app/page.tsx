@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMode } from '@/shared/contexts/ModeContext';
 import { jwtDecode } from 'jwt-decode';
 import { ShieldAlert, LogOut, ArrowLeft } from 'lucide-react';
@@ -243,12 +244,34 @@ export default function Home() {
 
   // Management Mode State
 
+  const searchParams = useSearchParams();
+
   const [currentView, setCurrentView] = useState(() => {
     if (typeof window !== 'undefined') {
       return sessionStorage.getItem('vmind_current_view') || 'market';
     }
     return 'market';
   });
+
+  useEffect(() => {
+    if (!searchParams) return;
+    const viewParam = searchParams.get('view');
+    const modeParam = searchParams.get('mode');
+
+    if (modeParam === 'management' || modeParam === 'MANAGEMENT') {
+      setMode('MANAGEMENT');
+    }
+
+    if (viewParam) {
+      setMode('MANAGEMENT');
+      setCurrentView(viewParam);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('vmind_current_view', viewParam);
+        sessionStorage.setItem('vmind_mode', 'MANAGEMENT');
+        localStorage.setItem('vmind_mode', 'MANAGEMENT');
+      }
+    }
+  }, [searchParams, setMode]);
 
   useEffect(() => {
     const handleSwitchManagementView = (e: Event) => {

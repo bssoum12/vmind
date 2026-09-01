@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   getAgents,
   pauseAgent,
@@ -32,6 +33,7 @@ type AgentStatus = 'running' | 'paused' | 'stopped';
 
 export interface LiveAgent {
   agent_name: string;
+  nom?: string;
   run_mode: string;
   workflow_timezone: string;
   recovery_config: any;
@@ -43,6 +45,9 @@ export interface LiveAgent {
   schedule_id?: string;
   agent_id?: number | string;
   uuid?: string;
+  config?: any;
+  target_agent_ids?: (number | string)[];
+  is_executing?: boolean;
 }
 
 function deriveStatus(agent: LiveAgent): AgentStatus {
@@ -51,24 +56,277 @@ function deriveStatus(agent: LiveAgent): AgentStatus {
   return 'stopped';
 }
 
-function formatDate(ts?: number) {
+function formatDate(ts?: number | string) {
   if (!ts) return '—';
-  return new Date(ts).toLocaleString('fr-FR', {
+  let num: number;
+  if (typeof ts === 'number') {
+    num = ts;
+  } else if (!isNaN(Number(ts))) {
+    num = Number(ts);
+  } else {
+    num = new Date(ts).getTime();
+  }
+  if (isNaN(num) || num <= 0) return '—';
+  return new Date(num).toLocaleString('fr-FR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+}
+
+function parseHourString(rawHour: any): string {
+  if (rawHour === undefined || rawHour === null || rawHour === '') return '08';
+  const str = String(rawHour).trim().toLowerCase();
+  if (str.endsWith('am')) {
+    const val = parseInt(str.replace('am', ''), 10);
+    return String(isNaN(val) ? 8 : (val === 12 ? 0 : val)).padStart(2, '0');
+  }
+  if (str.endsWith('pm')) {
+    const val = parseInt(str.replace('pm', ''), 10);
+    return String(isNaN(val) ? 20 : (val === 12 ? 12 : val + 12)).padStart(2, '0');
+  }
+  const val = parseInt(str, 10);
+  return String(isNaN(val) ? 8 : val).padStart(2, '0');
 }
 
 function triggerRuleSummary(rules: any[]): string {
   if (!rules || rules.length === 0) return 'Aucune règle';
   const r = rules[0];
   const interval = r.interval;
-  if (interval === 'Minutes') return `Toutes les ${r.minutesBetween || '?'} min`;
-  if (interval === 'Hours') return `Toutes les ${r.hoursBetween || '?'} h`;
-  if (interval === 'Days') return `Chaque ${r.daysBetween > 1 ? r.daysBetween + ' jours' : 'jour'} à ${r.triggerAtHour || '08'}h`;
-  if (interval === 'Weeks') return `Hebdo (${(r.triggerOnWeekdays || []).join(', ')}) à ${r.triggerAtHour || '08'}h`;
-  if (interval === 'Months') return `Mensuel le ${r.triggerAtDayOfMonth || 1} à ${r.triggerAtHour || '08'}h`;
-  return interval;
+  const minPad = String(r.triggerAtMinute ?? 0).padStart(2, '0');
+  const hourPad = parseHourString(r.triggerAtHour);
+  const timeStr = `${hourPad}h${minPad}`;
+
+  const dayNamesFr: Record<string, string> = {
+    'Monday': 'Lun', 'Tuesday': 'Mar', 'Wednesday': 'Mer', 
+    'Thursday': 'Jeu', 'Friday': 'Ven', 'Saturday': 'Sam', 'Sunday': 'Dim',
+    'Lundi': 'Lun', 'Mardi': 'Mar', 'Mercredi': 'Mer',
+    'Jeudi': 'Jeu', 'Vendredi': 'Ven', 'Samedi': 'Sam', 'Dimanche': 'Dim'
+  };
+
+  if (interval === 'Seconds') {
+    const step = Number(r.secondsBetween) || 30;
+    return step <= 1 ? 'Toutes les secondes' : `Toutes les ${step} s`;
+  }
+  if (interval === 'Minutes') {
+    const step = Number(r.minutesBetween) || 5;
+    return step <= 1 ? 'Toutes les minutes' : `Toutes les ${step} min`;
+  }
+  if (interval === 'Hours') {
+    const step = Number(r.hoursBetween) || 1;
+    const minInfo = r.triggerAtMinute !== undefined && r.triggerAtMinute !== null ? ` (à min ${minPad})` : '';
+    return step <= 1 ? `Chaque heure${minInfo}` : `Toutes les ${step} h${minInfo}`;
+  }
+  if (interval === 'Days') {
+    const step = Number(r.daysBetween) || 1;
+    return step <= 1 ? `Chaque jour à ${timeStr}` : `Tous les ${step} jours à ${timeStr}`;
+  }
+  if (interval === 'Weeks') {
+    const step = Number(r.weeksBetween) || 1;
+    const rawDays = Array.isArray(r.triggerOnWeekdays) && r.triggerOnWeekdays.length > 0 ? r.triggerOnWeekdays : ['Monday'];
+    const days = rawDays.map((d: string) => dayNamesFr[d] || d).join(', ');
+    return step <= 1 ? `Hebdo (${days}) à ${timeStr}` : `Toutes les ${step} sem. (${days}) à ${timeStr}`;
+  }
+  if (interval === 'Months') {
+    const step = Number(r.monthsBetween) || 1;
+    const dom = r.triggerAtDayOfMonth || 1;
+    return step <= 1 ? `Mensuel (le ${dom}) à ${timeStr}` : `Tous les ${step} mois (le ${dom}) à ${timeStr}`;
+  }
+  return interval || 'Aucune règle';
+}
+
+function TargetAgentsBadge({ targets }: { targets: string[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  if (!targets || targets.length === 0) return null;
+
+  const firstTarget = targets[0];
+  const remainingTargets = targets.slice(1);
+
+  const updatePosition = () => {
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      if (spaceBelow < 220 && rect.top > 220) {
+        // Open upwards if not enough space below
+        setCoords({
+          bottom: window.innerHeight - rect.top + 6,
+          left: Math.max(12, Math.min(rect.left, window.innerWidth - 300))
+        });
+      } else {
+        // Open downwards by default
+        setCoords({
+          top: rect.bottom + 6,
+          left: Math.max(12, Math.min(rect.left, window.innerWidth - 300))
+        });
+      }
+    }
+  };
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isOpen) {
+      updatePosition();
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleScrollOrResize = () => {
+      if (btnRef.current) updatePosition();
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (btnRef.current && !btnRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  return (
+    <div
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, position: 'relative' }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* 1st Agent Badge (Capped at 1) */}
+      <span
+        style={{
+          fontSize: 10,
+          padding: '2px 8px',
+          borderRadius: 6,
+          background: 'rgba(0, 229, 200, 0.1)',
+          color: '#00E5C8',
+          border: '1px solid rgba(0, 229, 200, 0.25)',
+          fontWeight: 500,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+          whiteSpace: 'nowrap'
+        }}
+        title={`Agent Prospect Cible: ${firstTarget}`}
+      >
+        🎯 {firstTarget}
+      </span>
+
+      {/* +N autres Badge with Hover / Click Popover */}
+      {remainingTargets.length > 0 && (
+        <>
+          <button
+            ref={btnRef}
+            type="button"
+            onClick={handleToggle}
+            onMouseEnter={() => {
+              updatePosition();
+              setIsOpen(true);
+            }}
+            style={{
+              fontSize: 10,
+              padding: '2px 7px',
+              borderRadius: 6,
+              background: isOpen ? 'rgba(0, 229, 200, 0.25)' : 'rgba(0, 229, 200, 0.12)',
+              color: '#00E5C8',
+              border: '1px solid rgba(0, 229, 200, 0.35)',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 2,
+              transition: 'all 0.15s ease'
+            }}
+            title="Voir tous les agents prospect cibles"
+          >
+            +{remainingTargets.length} autre{remainingTargets.length > 1 ? 's' : ''} ▾
+          </button>
+
+          {isOpen && coords && typeof document !== 'undefined' && createPortal(
+            <div
+              style={{
+                position: 'fixed',
+                ...(coords.top !== undefined ? { top: coords.top } : {}),
+                ...(coords.bottom !== undefined ? { bottom: coords.bottom } : {}),
+                left: coords.left,
+                zIndex: 999999,
+                minWidth: 230,
+                width: 'max-content',
+                maxWidth: '90vw',
+                background: 'rgba(6, 17, 31, 0.98)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(0, 229, 200, 0.3)',
+                boxShadow: '0 12px 30px rgba(0, 0, 0, 0.7), 0 0 15px rgba(0, 229, 200, 0.15)',
+                borderRadius: 10,
+                padding: '10px 12px',
+                pointerEvents: 'auto'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#00E5C8',
+                marginBottom: 8,
+                paddingBottom: 6,
+                borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12
+              }}>
+                <span>🎯 Prospects Cibles</span>
+                <span style={{ fontSize: 10, opacity: 0.8, color: '#F0F4F8' }}>{targets.length} agents</span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
+                {targets.map((name, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      fontSize: 11,
+                      color: '#F0F4F8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '6px 8px',
+                      borderRadius: 6,
+                      background: 'rgba(255, 255, 255, 0.03)',
+                      border: '1px solid rgba(255, 255, 255, 0.05)',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(0, 229, 200, 0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.2)';
+                      e.currentTarget.style.color = '#00E5C8';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                      e.currentTarget.style.color = '#F0F4F8';
+                    }}
+                  >
+                    <span style={{ fontSize: 11, flexShrink: 0 }}>🎯</span>
+                    <span style={{ whiteSpace: 'nowrap', fontWeight: 500 }}>
+                      {name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>,
+            document.body
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
@@ -121,7 +379,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   };
 
   const nextTutorialStep = () => {
-    if (tutorialStep === 3 && tutorialAgent?.run_mode !== 'prospection') {
+    const hasWorkspace = tutorialAgent?.run_mode === 'prospection' || tutorialAgent?.run_mode === 'sourcing';
+    if (tutorialStep === 3 && !hasWorkspace) {
       setTutorialStep(5);
     } else if (tutorialStep >= 5) {
       setTutorialStep(0);
@@ -144,8 +403,10 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
         return {
           title: "Activer / Désactiver",
           message: tutorialAgent.run_mode === 'prospection'
-            ? "Le bouton Start active le mode automatique. L'agent commencera à envoyer des emails de prospection selon vos limites."
-            : "Le bouton Start active la planification cron pour relancer automatiquement les impayés.",
+            ? "Le bouton Start active la planification automatique pour prospecter vos clients."
+            : tutorialAgent.run_mode === 'sourcing'
+            ? "Le bouton Start active la recherche et l'extraction automatique selon vos critères."
+            : "Le bouton Start active la planification automatique pour relancer les impayés.",
           mood: 'convinced' as GuideMood
         };
       case 3:
@@ -157,7 +418,9 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
       case 4:
         return {
           title: "Espace de Travail",
-          message: "Ouvrez l'Espace de Travail pour suivre vos leads, valider les emails et superviser l'agent.",
+          message: tutorialAgent.run_mode === 'sourcing'
+            ? "Ouvrez l'Espace de Travail pour suivre vos profils sourcés, consulter le tableau de bord et superviser l'agent."
+            : "Ouvrez l'Espace de Travail pour suivre vos leads, valider les emails et superviser l'agent.",
           mood: 'curious' as GuideMood
         };
       case 5:
@@ -230,7 +493,25 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     refresh();
   }, []);
 
+  useProspectSocket((payload) => {
+    if (typeof payload.is_executing === 'boolean' && (payload.agent_id || payload.uuid)) {
+      const targetId = String(payload.uuid || payload.agent_id || '').toLowerCase();
+      setAgents((prev) => prev.map(a => {
+        const aUuid = String(a.uuid || '').toLowerCase();
+        const aAgentId = String(a.agent_id || '').toLowerCase();
+        const aName = String(a.agent_name || a.nom || '').toLowerCase();
 
+        if (
+          targetId === aUuid ||
+          targetId === aAgentId ||
+          targetId === aName
+        ) {
+          return { ...a, is_executing: payload.is_executing };
+        }
+        return a;
+      }));
+    }
+  });
 
   const handlePause = async (agent: LiveAgent) => {
     setActionLoading(agent.agent_name);
@@ -296,8 +577,22 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     }
   };
 
+  const getTargetAgentNames = (agent: LiveAgent) => {
+    const rawIds = Array.isArray(agent?.config?.target_agent_ids)
+      ? agent.config.target_agent_ids
+      : (Array.isArray((agent as any)?.target_agent_ids) ? (agent as any).target_agent_ids : []);
+
+    const targetIds = Array.isArray(rawIds) ? rawIds : [];
+    if (!targetIds || targetIds.length === 0) return [];
+
+    return targetIds.map(id => {
+      const found = agents.find(a => (a.uuid === String(id) || a.agent_id === String(id) || a.agent_name.toLowerCase() === String(id).toLowerCase()));
+      return found ? found.agent_name : null;
+    }).filter(Boolean) as string[];
+  };
+
   const statusMeta: Record<AgentStatus, { label: string; dot: string; pill: string }> = {
-    running: { label: 'Actif', dot: '#00E5A0', pill: 'sp-running' },
+    running: { label: 'Programmé', dot: '#00E5A0', pill: 'sp-running' },
     paused: { label: 'En pause', dot: '#FFB800', pill: 'sp-pending' },
     stopped: { label: 'Arrêté', dot: '#FF4757', pill: 'sp-stopped' },
   };
@@ -418,31 +713,53 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                           </div>
                           <div>
                             <div className="agent-row-name">{agent.agent_name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{agent.run_mode}</div>
+                            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span>{agent.run_mode}</span>
+                              {agent.run_mode === 'sourcing' && (
+                                <TargetAgentsBadge targets={getTargetAgentNames(agent)} />
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
 
                       <td>
                         <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                          {triggerRuleSummary(agent.trigger_rules)}
+                          {agent.schedule_id ? triggerRuleSummary(agent.trigger_rules) : 'Aucune règle'}
                         </div>
                       </td>
 
                       <td>
-                        <span className={`status-pill ${meta.pill}`} style={{ display: 'flex', alignItems: 'center', gap: 6, width: 'fit-content' }}>
-                          <span style={{
-                            width: 7, height: 7, borderRadius: '50%',
-                            background: meta.dot,
-                            boxShadow: status === 'running' ? `0 0 6px ${meta.dot}` : 'none',
-                            animation: status === 'running' ? 'pulse 1.8s infinite' : 'none',
-                          }} />
-                          {meta.label}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {agent.is_executing ? (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6,
+                              fontSize: 11, padding: '4px 10px', borderRadius: 20,
+                              background: 'rgba(0, 229, 200, 0.15)', color: '#00E5C8',
+                              border: '1px solid rgba(0, 229, 200, 0.4)',
+                              fontWeight: 600, animation: 'pulse 1.5s infinite',
+                              boxShadow: '0 0 10px rgba(0, 229, 200, 0.2)',
+                              width: 'fit-content', whiteSpace: 'nowrap'
+                            }}>
+                              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00E5C8', boxShadow: '0 0 6px #00E5C8' }} />
+                              ⚡ En cours...
+                            </span>
+                          ) : (
+                            <span className={`status-pill ${meta.pill}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, width: 'fit-content' }}>
+                              <span style={{
+                                width: 7, height: 7, borderRadius: '50%',
+                                background: meta.dot,
+                                boxShadow: status === 'running' ? `0 0 6px ${meta.dot}` : 'none',
+                                animation: status === 'running' ? 'pulse 1.8s infinite' : 'none',
+                              }} />
+                              {meta.label}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       <td style={{ fontSize: 12, color: 'var(--muted)' }}>
-                        {formatDate(agent.lastExecuted || undefined)}
+                        {formatDate(agent.lastExecuted)}
                       </td>
 
                       <td onClick={e => e.stopPropagation()}>
@@ -450,10 +767,14 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                           {/* Run Now */}
                           <button
                             className="row-btn"
-                            disabled={busy}
+                            disabled={busy || agent.is_executing}
                             onClick={() => handleRunNow(agent)}
                             title="Exécuter maintenant"
-                            style={{ ...getBtnStyle(agent, 1) }}
+                            style={{ 
+                              ...getBtnStyle(agent, 1),
+                              opacity: agent.is_executing ? 0.5 : 1,
+                              cursor: agent.is_executing ? 'not-allowed' : 'pointer'
+                            }}
                           >
                             {renderTutorialArrow(agent, 1)}
                             {busy ? '…' : '▶ Run'}
@@ -463,10 +784,14 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                           {status === 'running' ? (
                             <button
                               className="row-btn danger"
-                              disabled={busy}
+                              disabled={busy || agent.is_executing}
                               onClick={() => handlePause(agent)}
                               title="Mettre en pause"
-                              style={{ ...getBtnStyle(agent, 2) }}
+                              style={{ 
+                                ...getBtnStyle(agent, 2),
+                                opacity: agent.is_executing ? 0.5 : 1,
+                                cursor: agent.is_executing ? 'not-allowed' : 'pointer'
+                              }}
                             >
                               {renderTutorialArrow(agent, 2)}
                               {busy ? '…' : '⏸ Stop'}
@@ -474,7 +799,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                           ) : (
                             <button
                               className="row-btn"
-                              disabled={busy}
+                              disabled={busy || agent.is_executing}
                               onClick={() => {
                                 if (agent.run_mode === 'prospection' || agent.run_mode === 'sourcing') {
                                   setScheduleModalAgent(agent);
@@ -483,7 +808,11 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                                 }
                               }}
                               title="Reprendre"
-                              style={{ color: '#00E5A0', borderColor: 'rgba(0,229,160,0.3)', ...getBtnStyle(agent, 2) }}
+                              style={{ 
+                                color: '#00E5A0', borderColor: 'rgba(0,229,160,0.3)', ...getBtnStyle(agent, 2),
+                                opacity: agent.is_executing ? 0.5 : 1,
+                                cursor: agent.is_executing ? 'not-allowed' : 'pointer'
+                              }}
                             >
                               {renderTutorialArrow(agent, 2)}
                               {busy ? '…' : '▶ Start'}
@@ -507,7 +836,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                               className="row-btn"
                               onClick={() => {
                                 setNavigatingTo(agent.agent_name);
-                                const route = agent.run_mode === 'sourcing' 
+                                const route = agent.run_mode === 'sourcing'
                                   ? `/sourcing-agent-workspace/${agent.uuid || (agent as any).agent_id}`
                                   : `/prospect-agent-workspace/${agent.uuid || (agent as any).agent_id || 1}`;
                                 router.push(route);
@@ -569,11 +898,15 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
             {[
               { label: '📋 Mode', value: selected.run_mode },
               { label: '🌍 Timezone', value: selected.workflow_timezone },
-              { label: '⏰ Planification', value: triggerRuleSummary(selected.trigger_rules) },
+              { label: '⏰ Planification', value: selected.schedule_id ? triggerRuleSummary(selected.trigger_rules) : 'Aucune règle' },
+              selected.run_mode === 'sourcing' && getTargetAgentNames(selected).length > 0 ? {
+                label: '🎯 Prospects Cibles',
+                value: getTargetAgentNames(selected).join(', ')
+              } : null,
               { label: '🔑 Schedule ID', value: selected.schedule_id || 'Aucun (en pause)' },
               { label: '🏷️ Session', value: selected.session_id },
               { label: '🕓 Dernière exéc.', value: formatDate(selected.lastExecuted || undefined) },
-            ].map(row => (
+            ].filter(Boolean).map((row: any) => (
               <div key={row.label} style={{
                 display: 'flex', justifyContent: 'space-between', gap: 8,
                 padding: '8px 0', borderBottom: '1px solid var(--border)',
@@ -676,18 +1009,25 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
       </div>
 
       {/* ── EXÉCUTION (AUTO MODE) MODAL ── */}
-      {runModalAgent && (runModalAgent.run_mode !== 'sourcing') && (
-        <ProspectAgentExecutionModal 
-          agent={runModalAgent} 
-          onClose={() => setRunModalAgent(null)} 
-          onToast={showToast} 
+      {runModalAgent && runModalAgent.run_mode === 'prospection' && (
+        <ProspectAgentExecutionModal
+          agent={runModalAgent}
+          onClose={() => {
+            setRunModalAgent(null);
+            refresh();
+          }}
+          onToast={showToast}
         />
       )}
       {runModalAgent && runModalAgent.run_mode === 'sourcing' && (
-        <SourcingAgentExecutionModal 
-          agent={runModalAgent} 
-          onClose={() => setRunModalAgent(null)} 
-          onToast={showToast} 
+        <SourcingAgentExecutionModal
+          agent={runModalAgent}
+          onClose={() => {
+            setRunModalAgent(null);
+            refresh();
+          }}
+          onSuccess={() => refresh()}
+          onToast={showToast}
         />
       )}
       {/* ── SCHEDULE MODAL ── */}
@@ -712,12 +1052,70 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           onClose={() => setScheduleModalAgent(null)}
           onToast={showToast}
           onConfirm={async (params?: any) => {
-            await handleResume(scheduleModalAgent, params);
+            if (params?.trigger_rules) {
+              try {
+                const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+                const tokenStr = localStorage.getItem('vmind_session');
+                let token = tokenStr;
+                if (tokenStr?.trim().startsWith("{")) {
+                  try { token = JSON.parse(tokenStr).token; } catch (e) { }
+                }
+                const publicId = scheduleModalAgent.uuid || scheduleModalAgent.agent_id;
+                const updateBody: any = {
+                  agent_name: scheduleModalAgent.agent_name,
+                  trigger_rules: params.trigger_rules,
+                  agent_mission: params.sourcingSummary,
+                  sourcing_config: {
+                    agent_mission: params.sourcingSummary,
+                    sourcingSummary: params.sourcingSummary,
+                    totalLeads: params.totalLeads,
+                    leadsPerCompany: params.leadsPerCompany,
+                    ignoreDuplicates: params.ignoreDuplicates
+                  }
+                };
+
+                if (params.update_defaults) {
+                  updateBody.target_agent_ids = params.target_agent_ids;
+                }
+
+                await fetch(`${baseUrl}/api/sourcing-agent/update/${publicId}`, {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...(token && { 'Authorization': `Bearer ${token}` })
+                  },
+                  body: JSON.stringify(updateBody)
+                });
+
+                const startRes = await fetch(`${baseUrl}/api/sourcing-agent/start/${publicId}`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...(token && { 'Authorization': `Bearer ${token}` })
+                  },
+                  body: JSON.stringify({
+                    target_agent_ids: params.target_agent_ids || scheduleModalAgent.target_agent_ids,
+                    update_defaults: params.update_defaults
+                  })
+                });
+
+                if (!startRes.ok) {
+                  const errData = await startRes.json().catch(() => ({}));
+                  throw new Error(errData.error || "Échec du démarrage de l'agent.");
+                }
+
+                showToast(`Sourcing continu activé pour "${scheduleModalAgent.agent_name}" !`);
+                await refresh();
+              } catch (err: any) {
+                showToast(err.message || "Erreur lors de l'activation du schedule", 'err');
+              }
+            } else {
+              await handleResume(scheduleModalAgent, params);
+            }
             setScheduleModalAgent(null);
           }}
           onEditSchedule={() => {
             setScheduleModalAgent(null);
-            onConfigure(scheduleModalAgent.run_mode || 'recouvrement', scheduleModalAgent, 4);
           }}
         />
       )}

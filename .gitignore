@@ -8,3 +8,17 @@ tsconfig.tsbuildinfo
 .agents/
 
 "tsconfig.tsbuildinfo" 
+
+
+
+
+
+app/email-builder/
+features/email-builder/
+public/vmind-agent-lifecycle.html
+public/vmind-architecture.html
+public/vmind-docs.html
+public/vmind-lead-pipeline.html
+public/vmind-realtime-sync.html
+public/vmind-webhook-security.html
+skills-lock.json

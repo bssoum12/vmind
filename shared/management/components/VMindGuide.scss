@@ -80,12 +80,12 @@
   bottom: 2rem;
   right: 2rem;
   width: 360px;
-  background-color: rgba(9, 13, 20, 0.92);
+  background-color: rgba(9, 13, 20, 0.95);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-radius: 12px;
   padding: 1.25rem 1.5rem;
-  z-index: 10005;
+  z-index: 999999;
   overflow: hidden;
   font-family: var(--font-sans, system-ui, sans-serif);
   transition: all 0.5s ease-in-out;
@@ -95,7 +95,7 @@
 .vmind-guide-arrow {
   display: flex;
   pointer-events: none;
-  z-index: 10002;
+  z-index: 999999;
 
   &.direction-down {
     flex-direction: column;

@@ -189,6 +189,18 @@ export default function AgentWorkspacePage() {
 
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   useProspectSocket((payload) => {
+    if (typeof payload.is_executing === 'boolean' && (payload.agent_id || payload.uuid)) {
+      const targetUuid = payload.uuid || payload.agent_id;
+      setAgentData((prev: any) => {
+        if (!prev) return prev;
+        const prevUuid = prev.uuid || prev.agent_id;
+        if (prevUuid === targetUuid) {
+          return { ...prev, is_executing: payload.is_executing };
+        }
+        return prev;
+      });
+    }
+
     // When a DB update happens, debounce the fetch by 500ms to batch multiple updates
     if (debounceTimer.current) {
       clearTimeout(debounceTimer.current);
@@ -252,8 +264,12 @@ export default function AgentWorkspacePage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <button
             onClick={() => {
-              sessionStorage.setItem('vmind_current_view', 'agents');
-              router.push('/');
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('vmind_current_view', 'agents');
+                sessionStorage.setItem('vmind_mode', 'MANAGEMENT');
+                localStorage.setItem('vmind_mode', 'MANAGEMENT');
+              }
+              router.push('/?view=agents');
             }}
             style={{
               background: 'transparent', border: '1px solid var(--border)',
@@ -264,7 +280,21 @@ export default function AgentWorkspacePage() {
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>Espace de Travail : {agentName}</h1>
+            <h1 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
+              Espace de Travail : {agentName}
+              {agentData?.is_executing && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontSize: 12, padding: '2px 10px', borderRadius: 4,
+                  background: 'rgba(0, 229, 200, 0.1)', color: '#00E5C8',
+                  border: '1px solid rgba(0, 229, 200, 0.3)',
+                  fontWeight: 600, animation: 'pulse 1.5s infinite',
+                  marginLeft: 12, verticalAlign: 'middle'
+                }}>
+                  ⚡ En cours d'exécution...
+                </span>
+              )}
+            </h1>
             <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '4px 0 0 0' }}>Supervisez l'agent de prospection en temps réel.</p>
           </div>
         </div>
