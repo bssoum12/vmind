@@ -593,18 +593,10 @@ export default function LoginPage() {
     return () => clearInterval(t);
   }, []);
 
-  // Load remembered username on mount
+  // Ensure login fields start completely clean and un-prefilled on mount
   useEffect(() => {
-    try {
-      const remembered = localStorage.getItem('vmind_remembered_username');
-      const shouldRemember = localStorage.getItem('vmind_remember_me') === 'true';
-      if (shouldRemember && remembered) {
-        setUsername(remembered);
-        setRememberMe(true);
-      }
-    } catch (e) {
-      console.error("Error reading rememberMe from localStorage:", e);
-    }
+    setUsername('');
+    setPassword('');
   }, []);
 
 
@@ -779,11 +771,7 @@ export default function LoginPage() {
           <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: cyan }}>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: cyan, boxShadow: `0 0 8px ${cyan}`, display: 'inline-block' }} />
             ERP Connecté
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: cyan, border: '1px solid rgba(0,229,200,0.3)', padding: '2px 9px', borderRadius: '4px' }}>
-            <span style={{ width: '5px', height: '5px', borderRadius: '50%', border: `1px solid ${cyan}`, display: 'inline-block' }} />
-            TraLIS v3.2
-          </span>
+          </span>          
           <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Shield size={10} /> Accès Sécurisé
           </span>
@@ -1094,7 +1082,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <form onSubmit={handleLogin} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                   {error && (
                     <div style={{ padding: '11px 14px', background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.4)', color: '#ff6b7a', borderRadius: '10px', fontSize: '13px', textAlign: 'center' }}>
                       {error}
@@ -1107,7 +1095,7 @@ export default function LoginPage() {
                     <div style={{ position: 'relative' }}>
                       <User size={16} color={muted} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                       <input type="text" className="vmind-input" value={username} onChange={e => setUsername(e.target.value)}
-                        placeholder="Saisissez votre nom d'utilisateur" required suppressHydrationWarning={true} />
+                        placeholder="Saisissez votre nom d'utilisateur" required autoComplete="off" name="vmind_user_id_field" suppressHydrationWarning={true} />
                     </div>
                   </div>
 
@@ -1118,7 +1106,7 @@ export default function LoginPage() {
                       <Lock size={16} color={muted} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                       <input type={showPassword ? 'text' : 'password'} className="vmind-input" style={{ paddingRight: '48px' }}
                         value={password} onChange={e => setPassword(e.target.value)}
-                        placeholder="Veuillez entrer ce champ" required suppressHydrationWarning={true} />
+                        placeholder="Veuillez entrer ce champ" required autoComplete="new-password" name="vmind_user_pwd_field" suppressHydrationWarning={true} />
                       <div onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: muted, transition: 'color .2s' }}>
                         {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                       </div>

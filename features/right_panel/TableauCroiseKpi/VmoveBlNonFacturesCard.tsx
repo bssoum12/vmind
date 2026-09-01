@@ -2,27 +2,27 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { PieChart as PieIcon, RefreshCw, Layers, Calendar, FileText, ChevronRight, ChevronLeft, X, Ship, Loader2, TrendingUp, Package, Filter, ChevronDown, ChevronUp } from 'lucide-react';
+import { RefreshCw, Layers, Calendar, FileText, ChevronRight, ChevronLeft, X, AlertCircle, Clock, Loader2, FileWarning, Receipt, ChevronDown, ChevronUp } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
-interface VmoveDossiersOuvertsCardProps {
+interface VmoveBlNonFacturesCardProps {
   activeAgentId?: string;
   clientId?: string;
   onInsertPrompt?: (prompt: string) => void;
 }
 
 const SENS_COLORS: Record<string, { main: string; glow: string; bg: string }> = {
-  'Import': { main: '#38BDF8', glow: 'rgba(56, 189, 248, 0.4)', bg: 'rgba(56, 189, 248, 0.12)' },
-  'Export': { main: '#34D399', glow: 'rgba(52, 211, 153, 0.4)', bg: 'rgba(52, 211, 153, 0.12)' },
-  'National': { main: '#FBBF24', glow: 'rgba(251, 191, 36, 0.4)', bg: 'rgba(251, 191, 36, 0.12)' },
+  'Import': { main: '#F59E0B', glow: 'rgba(245, 158, 11, 0.4)', bg: 'rgba(245, 158, 11, 0.12)' },
+  'Export': { main: '#38BDF8', glow: 'rgba(56, 189, 248, 0.4)', bg: 'rgba(56, 189, 248, 0.12)' },
+  'National': { main: '#A78BFA', glow: 'rgba(167, 139, 250, 0.4)', bg: 'rgba(167, 139, 250, 0.12)' },
   'N/A': { main: '#94A3B8', glow: 'rgba(148, 163, 184, 0.3)', bg: 'rgba(148, 163, 184, 0.1)' }
 };
 
 const NATURE_COLORS: Record<string, { main: string; glow: string }> = {
-  'Complet': { main: '#A78BFA', glow: 'rgba(167, 139, 250, 0.35)' },
-  'Groupage': { main: '#F472B6', glow: 'rgba(244, 114, 182, 0.35)' },
-  'Co-chargement': { main: '#22D3EE', glow: 'rgba(34, 211, 238, 0.35)' },
+  'Complet': { main: '#F472B6', glow: 'rgba(244, 114, 182, 0.35)' },
+  'Groupage': { main: '#34D399', glow: 'rgba(52, 211, 153, 0.35)' },
+  'Co-chargement': { main: '#FBBF24', glow: 'rgba(251, 191, 36, 0.35)' },
   'N/A': { main: '#64748B', glow: 'rgba(100, 116, 139, 0.25)' }
 };
 
@@ -57,7 +57,7 @@ function getAuthToken(): string {
   }
 }
 
-export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> = ({
+export const VmoveBlNonFacturesCard: React.FC<VmoveBlNonFacturesCardProps> = ({
   activeAgentId,
   clientId = "DEMO",
   onInsertPrompt
@@ -74,7 +74,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
   const [selectedSensFilter, setSelectedSensFilter] = useState<string>("ALL");
   const [isWidgetOpen, setIsWidgetOpen] = useState<boolean>(false);
 
-  // Hover states for dynamic chart -> list interaction
+  // Hover states for chart -> list interaction
   const [hoveredSens, setHoveredSens] = useState<string | null>(null);
   const [hoveredNature, setHoveredNature] = useState<string | null>(null);
 
@@ -143,7 +143,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       const token = getAuthToken();
 
-      const res = await fetch(`${baseUrl}/api/tools/get-vmove-dossiers-ouverts-kpi`, {
+      const res = await fetch(`${baseUrl}/api/tools/get-vmove-bl-non-factures-kpi`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -164,8 +164,8 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
       const fetchedData = json.data || json;
       setDbData(fetchedData);
     } catch (err: any) {
-      console.error("[VMOVE-CARD] Direct DB Fetch Error:", err);
-      setError(err?.message || "Impossible de charger les données VMOVE.");
+      console.error("[VMOVE-BL-NON-FACTURES] Direct DB Fetch Error:", err);
+      setError(err?.message || "Impossible de charger les BL non facturés.");
     } finally {
       setLoading(false);
     }
@@ -181,19 +181,18 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
 
   // Use fetched DB data
   const summary = dbData?.summary || {
-    total_dossiers_actifs: 0,
-    total_dossiers: 0,
-    total_poids_kg: 0,
-    total_volume_m3: 0,
+    total_bl_non_factures: 0,
+    avg_attente_jours: 0,
+    max_attente_jours: 0,
     annee: selectedYear,
     mois: selectedMonth
   };
 
   const rawBySens = dbData?.by_sens || [];
-  const rawBySensNature = dbData?.by_sens_nature || [];
+  const rawByNature = dbData?.by_nature || [];
   const detailsList: any[] = dbData?.details || [];
 
-  // Helper to determine if a value represents missing/unassigned data (N/A, Non défini, null, empty)
+  // Helper to determine if a value represents missing/unassigned data
   const isMissingOrNA = (val: any) => {
     if (!val) return true;
     const s = String(val).trim().toUpperCase();
@@ -228,30 +227,10 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
   const totalPages = Math.ceil(filteredWidgetDetails.length / ITEMS_PER_PAGE) || 1;
   const paginatedDetails = filteredWidgetDetails.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  // Filter nature breakdown based on selectedSensFilter or hoveredSens
-  const filteredNatureData = rawBySensNature.filter((item: any) => {
-    const sFilter = hoveredSens || selectedSensFilter;
-    if (!sFilter || sFilter === "ALL") return true;
-    return item.sens === sFilter;
-  });
+  const totalBL = summary.total_bl_non_factures || detailsList.length;
 
-  // Group filteredNatureData by nature_transport for Pie Chart #2
-  const natureGroupedMap: Record<string, number> = {};
-  filteredNatureData.forEach((item: any) => {
-    const nat = item.nature_transport || 'N/A';
-    const count = Number(item.dossiers_actifs) || 0;
-    natureGroupedMap[nat] = (natureGroupedMap[nat] || 0) + count;
-  });
-
-  const naturePieData = Object.entries(natureGroupedMap).map(([name, value]) => ({
-    name,
-    value
-  }));
-
-  const totalActifs = summary.total_dossiers_actifs || rawBySens.reduce((acc: number, s: any) => acc + (s.value || 0), 0);
-
-  // Positioning calculations for the Left-floating Cyber HUD Widget
-  const widgetWidth = 560;
+  // Positioning calculations for Left-floating Cyber HUD Widget
+  const widgetWidth = 580;
   let leftPosition = coords.left - widgetWidth - 16;
   if (leftPosition < 16) leftPosition = 16;
   let topPosition = coords.top;
@@ -259,7 +238,6 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
     topPosition = Math.max(16, window.innerHeight - 540);
   }
 
-  // Active hover filter label for Cyber HUD title
   const activeHoverLabel = hoveredNature
     ? `NATURE: ${hoveredNature.toUpperCase()}`
     : hoveredSens
@@ -272,8 +250,8 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
     <div
       ref={cardRef}
       style={{
-        background: 'linear-gradient(135deg, rgba(8, 19, 36, 0.95) 0%, rgba(13, 27, 50, 0.95) 100%)',
-        border: '1px solid rgba(56, 189, 248, 0.28)',
+        background: 'linear-gradient(135deg, rgba(30, 20, 8, 0.95) 0%, rgba(42, 26, 10, 0.95) 100%)',
+        border: '1px solid rgba(245, 158, 11, 0.45)',
         borderRadius: '16px',
         padding: '14px',
         color: '#F8FAFC',
@@ -292,10 +270,29 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
         right: '-60px',
         width: '160px',
         height: '160px',
-        background: 'radial-gradient(circle, rgba(56, 189, 248, 0.18) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(245, 158, 11, 0.22) 0%, transparent 70%)',
         pointerEvents: 'none',
         borderRadius: '50%'
       }} />
+
+      {/* High-Priority Badge Header */}
+      <div style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        background: 'rgba(245, 158, 11, 0.18)',
+        border: '1px solid rgba(245, 158, 11, 0.4)',
+        borderRadius: '6px',
+        padding: '2px 6px',
+        fontSize: '8px',
+        fontWeight: 800,
+        color: '#F59E0B',
+        letterSpacing: '0.6px',
+        textTransform: 'uppercase',
+        marginBottom: '8px'
+      }}>
+        <AlertCircle size={10} color="#F59E0B" /> PRIORTÉ FACTURATION • URGENT
+      </div>
 
       {/* 1. Header Section */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', gap: '6px' }}>
@@ -304,22 +301,22 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
             width: '32px',
             height: '32px',
             borderRadius: '10px',
-            background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.25) 0%, rgba(14, 165, 233, 0.15) 100%)',
-            border: '1px solid rgba(56, 189, 248, 0.45)',
+            background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.15) 100%)',
+            border: '1px solid rgba(245, 158, 11, 0.5)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 0 12px rgba(56, 189, 248, 0.35)',
+            boxShadow: '0 0 14px rgba(245, 158, 11, 0.4)',
             flexShrink: 0
           }}>
-            <Ship size={16} color="#38BDF8" />
+            <FileWarning size={16} color="#F59E0B" />
           </div>
           <div style={{ minWidth: 0 }}>
             <h3 style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.2px', margin: 0, color: '#F1F5F9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Dossiers Ouverts du Mois
+              BL Non Facturés
             </h3>
             <p style={{ fontSize: '10px', color: '#94A3B8', margin: 0, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Exploitation VMOVE
+              Bons de Livraison Émis • Direct SQL
             </p>
           </div>
         </div>
@@ -329,11 +326,11 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
           disabled={loading}
           title="Rafraîchir les données SQL"
           style={{
-            background: 'rgba(56, 189, 248, 0.08)',
-            border: '1px solid rgba(56, 189, 248, 0.25)',
+            background: 'rgba(245, 158, 11, 0.08)',
+            border: '1px solid rgba(245, 158, 11, 0.25)',
             borderRadius: '6px',
             padding: '4px 8px',
-            color: '#38BDF8',
+            color: '#F59E0B',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -355,8 +352,8 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
         display: 'flex',
         gap: '6px',
         alignItems: 'center',
-        background: 'rgba(15, 23, 42, 0.75)',
-        border: '1px solid rgba(56, 189, 248, 0.22)',
+        background: 'rgba(30, 20, 8, 0.75)',
+        border: '1px solid rgba(245, 158, 11, 0.25)',
         borderRadius: '10px',
         padding: '6px 8px',
         marginBottom: '14px',
@@ -364,7 +361,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
         width: '100%',
         boxSizing: 'border-box'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#38BDF8', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#F59E0B', flexShrink: 0 }}>
           <Calendar size={13} />
           <span style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>Période:</span>
         </div>
@@ -378,9 +375,9 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
             fetchDirectDbData(selectedYear, val);
           }}
           style={{
-            background: 'rgba(30, 41, 59, 0.8)',
+            background: 'rgba(42, 26, 10, 0.8)',
             color: '#F1F5F9',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
             borderRadius: '6px',
             padding: '4px 6px',
             fontSize: '11px',
@@ -392,7 +389,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
           }}
         >
           {MONTHS_LIST.map((m) => (
-            <option key={m.value} value={m.value} style={{ background: '#0F172A', color: '#FFF' }}>
+            <option key={m.value} value={m.value} style={{ background: '#1E1408', color: '#FFF' }}>
               {m.label}
             </option>
           ))}
@@ -407,9 +404,9 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
             fetchDirectDbData(val, selectedMonth);
           }}
           style={{
-            background: 'rgba(30, 41, 59, 0.8)',
-            color: '#38BDF8',
-            border: '1px solid rgba(56, 189, 248, 0.3)',
+            background: 'rgba(42, 26, 10, 0.8)',
+            color: '#F59E0B',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
             borderRadius: '6px',
             padding: '4px 6px',
             fontSize: '11px',
@@ -420,61 +417,83 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
           }}
         >
           {[2022, 2023, 2024, 2025, 2026, 2027].map((y) => (
-            <option key={y} value={y} style={{ background: '#0F172A', color: '#FFF' }}>
+            <option key={y} value={y} style={{ background: '#1E1408', color: '#FFF' }}>
               {y}
             </option>
           ))}
         </select>
       </div>
 
-      {/* 3. Primary Metric KPI Summary Banner */}
+      {/* 3. Primary Metric KPI Summary Banner (3-Card Layout) */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: '10px',
+        gridTemplateColumns: '1fr 1fr 1fr',
+        gap: '8px',
         marginBottom: '16px'
       }}>
-        {/* Metric Card #1: Active Dossiers */}
+        {/* Metric Card #1: Total BL Non Facturés */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(14, 165, 233, 0.04) 100%)',
-          border: '1px solid rgba(56, 189, 248, 0.3)',
+          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(217, 119, 6, 0.06) 100%)',
+          border: '1px solid rgba(245, 158, 11, 0.4)',
           borderRadius: '12px',
-          padding: '10px 12px',
+          padding: '8px 10px',
           boxShadow: '0 4px 15px rgba(0, 0, 0, 0.25)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
-            <TrendingUp size={11} color="#38BDF8" />
-            <span style={{ fontSize: '9px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-              Dossiers Actifs
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+            <Receipt size={11} color="#F59E0B" />
+            <span style={{ fontSize: '9px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+              BL À Facturer
             </span>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: 900, color: '#38BDF8', lineHeight: 1.1, letterSpacing: '-0.5px' }}>
-            <AnimatedNumber value={totalActifs} />
+          <div style={{ fontSize: '20px', fontWeight: 900, color: '#F59E0B', lineHeight: 1.1, letterSpacing: '-0.5px' }}>
+            <AnimatedNumber value={totalBL} />
           </div>
-          <span style={{ fontSize: '9px', color: '#64748B', display: 'block', marginTop: '2px', fontWeight: 500 }}>
+          <span style={{ fontSize: '8px', color: '#64748B', display: 'block', marginTop: '2px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {selectedMonth > 0 ? MONTHS_LIST[selectedMonth]?.label : "Année"} {selectedYear}
           </span>
         </div>
 
-        {/* Metric Card #2: Weight & Volume */}
+        {/* Metric Card #2: Attente Moyenne */}
         <div style={{
           background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%)',
           border: '1px solid rgba(148, 163, 184, 0.2)',
           borderRadius: '12px',
-          padding: '10px 12px',
+          padding: '8px 10px',
           boxShadow: '0 4px 15px rgba(0, 0, 0, 0.25)'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '3px' }}>
-            <Package size={11} color="#A78BFA" />
-            <span style={{ fontSize: '9px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
-              Poids & Volume totales
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+            <Clock size={11} color="#38BDF8" />
+            <span style={{ fontSize: '9px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+              Attente Moy.
             </span>
           </div>
-          <div style={{ fontSize: '14px', fontWeight: 800, color: '#F1F5F9', lineHeight: 1.2 }}>
-            {((summary.total_poids_kg || 0) / 1000).toFixed(1)} <span style={{ fontSize: '10px', color: '#94A3B8', fontWeight: 600 }}>Tonnes</span>
+          <div style={{ fontSize: '13px', fontWeight: 800, color: '#F1F5F9', lineHeight: 1.2 }}>
+            +{summary.avg_attente_jours} <span style={{ fontSize: '9px', color: '#94A3B8', fontWeight: 600 }}>j.</span>
           </div>
-          <div style={{ fontSize: '10px', color: '#38BDF8', fontWeight: 700, marginTop: '2px' }}>
-            {summary.total_volume_m3 || 0} <span style={{ fontSize: '9px', color: '#64748B' }}>m³</span>
+          <div style={{ fontSize: '8px', color: '#38BDF8', fontWeight: 600, marginTop: '2px' }}>
+            depuis livraison
+          </div>
+        </div>
+
+        {/* Metric Card #3: Attente Max */}
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(185, 28, 28, 0.05) 100%)',
+          border: '1px solid rgba(239, 68, 68, 0.35)',
+          borderRadius: '12px',
+          padding: '8px 10px',
+          boxShadow: '0 4px 15px rgba(0, 0, 0, 0.25)'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '2px' }}>
+            <AlertCircle size={11} color="#EF4444" />
+            <span style={{ fontSize: '9px', fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+              Attente Max
+            </span>
+          </div>
+          <div style={{ fontSize: '13px', fontWeight: 900, color: '#EF4444', lineHeight: 1.2 }}>
+            +{summary.max_attente_jours} <span style={{ fontSize: '9px', color: '#94A3B8', fontWeight: 600 }}>j.</span>
+          </div>
+          <div style={{ fontSize: '8px', color: '#EF4444', fontWeight: 700, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            urgent
           </div>
         </div>
       </div>
@@ -488,10 +507,10 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '6px 10px',
-          background: 'rgba(56, 189, 248, 0.08)',
-          border: '1px solid rgba(56, 189, 248, 0.25)',
+          background: 'rgba(245, 158, 11, 0.08)',
+          border: '1px solid rgba(245, 158, 11, 0.25)',
           borderRadius: '8px',
-          color: '#38BDF8',
+          color: '#F59E0B',
           fontSize: '10px',
           fontWeight: 700,
           cursor: 'pointer',
@@ -513,18 +532,18 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
               justifyContent: 'center',
               minHeight: '220px',
               gap: '12px',
-              color: '#38BDF8'
+              color: '#F59E0B'
             }}>
               <Loader2 size={26} className="animate-spin" />
-              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Chargement SQL Server en cours...</span>
+              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Recherche des BL non facturés SQL...</span>
             </div>
           ) : (
             <>
-              {/* 4. PIE CHART #1: REPARTITION PAR SENS (WITH LIVE HOVER INTERACTION) */}
+              {/* 4. PIE CHART #1: REPARTITION PAR SENS (BL NON FACTURES) */}
               <div style={{ marginBottom: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <span style={{ fontSize: '11px', fontWeight: 700, color: '#E2E8F0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Layers size={13} color="#38BDF8" /> 1. Répartition par Sens
+                    <Layers size={13} color="#F59E0B" /> 1. BL par Sens
                   </span>
                   <span style={{ fontSize: '9px', color: '#64748B', fontWeight: 600 }}>Import / Export / National</span>
                 </div>
@@ -549,9 +568,9 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                             const isHovered = hoveredSens === entry.name;
                             return (
                               <Cell
-                                key={`cell-${index}`}
+                                key={`bl-sens-cell-${index}`}
                                 fill={styleConfig.main}
-                                stroke={isHovered ? '#FFFFFF' : 'rgba(15, 23, 42, 0.9)'}
+                                stroke={isHovered ? '#FFFFFF' : 'rgba(30, 20, 8, 0.9)'}
                                 strokeWidth={isHovered ? 3 : 2}
                                 style={{
                                   filter: isHovered ? `drop-shadow(0 0 10px ${styleConfig.glow})` : 'none',
@@ -566,11 +585,11 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                           content={({ active, payload }) => {
                             if (active && payload && payload.length) {
                               const data = payload[0].payload;
-                              const pct = totalActifs > 0 ? ((data.value / totalActifs) * 100).toFixed(1) : '0';
+                              const pct = totalBL > 0 ? ((data.value / totalBL) * 100).toFixed(1) : '0';
                               const styleConfig = SENS_COLORS[data.name] || SENS_COLORS['N/A'];
                               return (
                                 <div style={{
-                                  background: 'rgba(15, 23, 42, 0.95)',
+                                  background: 'rgba(30, 20, 8, 0.95)',
                                   border: `1px solid ${styleConfig.main}`,
                                   padding: '8px 12px',
                                   borderRadius: '10px',
@@ -579,7 +598,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                                   boxShadow: `0 4px 20px ${styleConfig.glow}`
                                 }}>
                                   <strong style={{ color: styleConfig.main }}>{data.name}</strong>
-                                  <div>Dossiers actifs: <b>{data.value}</b> ({pct}%)</div>
+                                  <div>BL non facturés: <b>{data.value}</b> ({pct}%)</div>
                                 </div>
                               );
                             }
@@ -590,7 +609,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                     </ResponsiveContainer>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#64748B', fontSize: '11px' }}>
-                      Aucun dossier actif pour cette période
+                      Aucun BL non facturé pour cette période
                     </div>
                   )}
                 </div>
@@ -599,7 +618,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                 {rawBySens.length > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
                     {rawBySens.map((s: any) => {
-                      const pct = totalActifs > 0 ? ((s.value / totalActifs) * 100).toFixed(0) : '0';
+                      const pct = totalBL > 0 ? ((s.value / totalBL) * 100).toFixed(0) : '0';
                       const styleConfig = SENS_COLORS[s.name] || SENS_COLORS['N/A'];
                       const isSelected = selectedSensFilter === s.name;
                       const isHovered = hoveredSens === s.name;
@@ -618,7 +637,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                             cursor: 'pointer',
                             padding: '3px 8px',
                             borderRadius: '16px',
-                            background: (isSelected || isHovered) ? styleConfig.bg : 'rgba(30, 41, 59, 0.6)',
+                            background: (isSelected || isHovered) ? styleConfig.bg : 'rgba(42, 26, 10, 0.6)',
                             border: `1px solid ${(isSelected || isHovered) ? styleConfig.main : 'rgba(148, 163, 184, 0.2)'}`,
                             transition: 'all 0.2s ease',
                             boxShadow: (isSelected || isHovered) ? `0 0 10px ${styleConfig.glow}` : 'none'
@@ -635,17 +654,17 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                 )}
               </div>
 
-              {/* 5. PIE CHART #2: DETAIL PAR NATURE DE TRANSPORT */}
+              {/* 5. PIE CHART #2: DETAIL PAR NATURE DE TRANSPORT (BL NON FACTURES) */}
               <div style={{
-                background: 'rgba(15, 23, 42, 0.65)',
-                border: '1px solid rgba(56, 189, 248, 0.2)',
+                background: 'rgba(30, 20, 8, 0.65)',
+                border: '1px solid rgba(245, 158, 11, 0.2)',
                 borderRadius: '12px',
                 padding: '12px',
                 boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.3)'
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#38BDF8', letterSpacing: '0.2px' }}>
-                    2. Répartition par Nature ({selectedSensFilter === "ALL" ? "Tous les Sens" : selectedSensFilter})
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#F59E0B', letterSpacing: '0.2px' }}>
+                    2. BL par Nature ({selectedSensFilter === "ALL" ? "Tous les Sens" : selectedSensFilter})
                   </span>
                   {selectedSensFilter !== "ALL" && (
                     <button
@@ -658,28 +677,28 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                 </div>
 
                 <div style={{ height: '130px', width: '100%', position: 'relative' }}>
-                  {isMounted && naturePieData.length > 0 ? (
+                  {isMounted && rawByNature.length > 0 ? (
                     <ResponsiveContainer width="100%" height={130} minWidth={0} minHeight={0}>
                       <PieChart>
                         <Pie
-                          data={naturePieData}
+                          data={rawByNature}
                           cx="50%"
                           cy="50%"
                           innerRadius={30}
                           outerRadius={50}
                           paddingAngle={4}
                           dataKey="value"
-                          onMouseEnter={(_, index) => setHoveredNature(naturePieData[index]?.name || null)}
+                          onMouseEnter={(_, index) => setHoveredNature(rawByNature[index]?.name || null)}
                           onMouseLeave={() => setHoveredNature(null)}
                         >
-                          {naturePieData.map((entry: any, index: number) => {
+                          {rawByNature.map((entry: any, index: number) => {
                             const styleConfig = NATURE_COLORS[entry.name] || NATURE_COLORS['N/A'];
                             const isHovered = hoveredNature === entry.name;
                             return (
                               <Cell
-                                key={`cell-nat-${index}`}
+                                key={`bl-nat-cell-${index}`}
                                 fill={styleConfig.main}
-                                stroke={isHovered ? '#FFFFFF' : 'rgba(15, 23, 42, 0.9)'}
+                                stroke={isHovered ? '#FFFFFF' : 'rgba(30, 20, 8, 0.9)'}
                                 strokeWidth={isHovered ? 3 : 2}
                                 style={{
                                   filter: isHovered ? `drop-shadow(0 0 10px ${styleConfig.glow})` : 'none',
@@ -697,7 +716,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                               const styleConfig = NATURE_COLORS[data.name] || NATURE_COLORS['N/A'];
                               return (
                                 <div style={{
-                                  background: 'rgba(15, 23, 42, 0.95)',
+                                  background: 'rgba(30, 20, 8, 0.95)',
                                   border: `1px solid ${styleConfig.main}`,
                                   padding: '6px 10px',
                                   borderRadius: '8px',
@@ -706,7 +725,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                                   boxShadow: `0 4px 15px ${styleConfig.glow}`
                                 }}>
                                   <strong style={{ color: styleConfig.main }}>{data.name}</strong>
-                                  <div>Dossiers: <b>{data.value}</b></div>
+                                  <div>BL non facturés: <b>{data.value}</b></div>
                                 </div>
                               );
                             }
@@ -723,9 +742,9 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                 </div>
 
                 {/* Legend for Pie #2 */}
-                {naturePieData.length > 0 && (
+                {rawByNature.length > 0 && (
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '2px' }}>
-                    {naturePieData.map((n: any) => {
+                    {rawByNature.map((n: any) => {
                       const styleConfig = NATURE_COLORS[n.name] || NATURE_COLORS['N/A'];
                       const isHovered = hoveredNature === n.name;
                       return (
@@ -768,10 +787,10 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
           width: '100%',
           marginTop: '14px',
           padding: '10px 14px',
-          background: 'linear-gradient(90deg, rgba(56, 189, 248, 0.22) 0%, rgba(14, 165, 233, 0.22) 100%)',
-          border: '1px solid rgba(56, 189, 248, 0.45)',
+          background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.25) 100%)',
+          border: '1px solid rgba(245, 158, 11, 0.5)',
           borderRadius: '10px',
-          color: '#38BDF8',
+          color: '#F59E0B',
           fontSize: '11px',
           fontWeight: 800,
           letterSpacing: '0.2px',
@@ -780,15 +799,15 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
           alignItems: 'center',
           justifyContent: 'center',
           gap: '6px',
-          boxShadow: '0 4px 16px rgba(56, 189, 248, 0.2)',
+          boxShadow: '0 4px 16px rgba(245, 158, 11, 0.25)',
           transition: 'all 0.2s ease'
         }}
       >
-        <FileText size={14} /> Voir la liste des {totalActifs} dossiers actifs
+        <FileText size={14} /> Voir la liste des {totalBL} BL non facturés
         <ChevronRight size={14} />
       </button>
 
-      {/* 7. FLOATING CYBER HUD WIDGET (ATTACHED TO THE LEFT OF THE CARD - WITH LIVE HOVER FILTERING & QUANTITIES) */}
+      {/* 7. FLOATING CYBER HUD WIDGET (ATTACHED TO THE LEFT OF THE CARD) */}
       {isWidgetOpen && isMounted && createPortal(
         <div
           style={{
@@ -811,39 +830,39 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
               top: `${topPosition}px`,
               width: `${widgetWidth}px`,
               pointerEvents: 'auto',
-              background: 'rgba(6, 17, 31, 0.98)',
-              border: '1px solid rgba(56, 189, 248, 0.4)',
+              background: 'rgba(30, 20, 8, 0.98)',
+              border: '1px solid rgba(245, 158, 11, 0.45)',
               borderRadius: '16px',
               padding: '20px',
               backdropFilter: 'blur(16px)',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 35px rgba(56, 189, 248, 0.15)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.85), 0 0 35px rgba(245, 158, 11, 0.2)',
               color: '#F8FAFC',
               fontFamily: 'system-ui, -apple-system, sans-serif'
             }}
           >
-            {/* Cyber HUD Header (Matching Score Global Tooltip) */}
+            {/* Cyber HUD Header */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              borderBottom: '1px solid rgba(56, 189, 248, 0.25)',
+              borderBottom: '1px solid rgba(245, 158, 11, 0.25)',
               paddingBottom: '10px',
               marginBottom: '14px',
               fontSize: '10px',
-              color: '#38BDF8',
+              color: '#F59E0B',
               letterSpacing: '1px',
               textTransform: 'uppercase',
               fontFamily: 'var(--font-mono), monospace'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ display: 'inline-block', width: '6px', height: '6px', background: '#38BDF8', borderRadius: '50%', boxShadow: '0 0 8px #38BDF8' }} />
-                <span style={{ color: '#38BDF8', fontWeight: 800 }}>DOSSIERS ACTIFS DU MOIS</span>
+                <span style={{ display: 'inline-block', width: '6px', height: '6px', background: '#F59E0B', borderRadius: '50%', boxShadow: '0 0 8px #F59E0B' }} />
+                <span style={{ color: '#F59E0B', fontWeight: 800 }}>REGISTRE BL NON FACTURÉS</span>
                 {activeHoverLabel && (
                   <span style={{
                     padding: '2px 6px',
                     borderRadius: '4px',
-                    background: 'rgba(56, 189, 248, 0.2)',
-                    border: '1px solid rgba(56, 189, 248, 0.4)',
+                    background: 'rgba(245, 158, 11, 0.2)',
+                    border: '1px solid rgba(245, 158, 11, 0.4)',
                     color: '#FFF',
                     fontWeight: 700,
                     fontSize: '9px'
@@ -864,71 +883,32 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
               </div>
             </div>
 
-            {/* Quick Metrics Stats Bar inside Widget with Live Quantity Displays */}
+            {/* Quick Metrics Stats Bar inside Widget */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(4, 1fr)',
               gap: '10px',
               marginBottom: '16px',
-              background: 'rgba(15, 23, 42, 0.7)',
-              border: '1px solid rgba(56, 189, 248, 0.15)',
+              background: 'rgba(42, 26, 10, 0.7)',
+              border: '1px solid rgba(245, 158, 11, 0.2)',
               borderRadius: '10px',
               padding: '10px 12px'
             }}>
-              <div
-                onMouseEnter={() => setHoveredSens(null)}
-                style={{ cursor: 'pointer' }}
-              >
-                <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>Total Actifs</span>
-                <span style={{ fontSize: '15px', fontWeight: 800, color: '#38BDF8' }}>{totalActifs}</span>
+              <div>
+                <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>Total BL À Facturer</span>
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#F59E0B' }}>{totalBL}</span>
               </div>
-              <div
-                onMouseEnter={() => setHoveredSens('Import')}
-                onMouseLeave={() => setHoveredSens(null)}
-                style={{
-                  cursor: 'pointer',
-                  padding: '2px 4px',
-                  borderRadius: '6px',
-                  background: hoveredSens === 'Import' ? 'rgba(56, 189, 248, 0.2)' : 'transparent',
-                  transition: 'background 0.2s ease'
-                }}
-              >
-                <span style={{ fontSize: '9px', color: '#38BDF8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>Import</span>
-                <span style={{ fontSize: '15px', fontWeight: 800, color: '#38BDF8' }}>
-                  {rawBySens.find((s: any) => s.name === 'Import')?.value || 0}
-                </span>
+              <div>
+                <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>Attente Moyenne</span>
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#38BDF8' }}>+{summary.avg_attente_jours} j.</span>
               </div>
-              <div
-                onMouseEnter={() => setHoveredSens('Export')}
-                onMouseLeave={() => setHoveredSens(null)}
-                style={{
-                  cursor: 'pointer',
-                  padding: '2px 4px',
-                  borderRadius: '6px',
-                  background: hoveredSens === 'Export' ? 'rgba(52, 211, 153, 0.2)' : 'transparent',
-                  transition: 'background 0.2s ease'
-                }}
-              >
-                <span style={{ fontSize: '9px', color: '#34D399', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>Export</span>
-                <span style={{ fontSize: '15px', fontWeight: 800, color: '#34D399' }}>
-                  {rawBySens.find((s: any) => s.name === 'Export')?.value || 0}
-                </span>
+              <div>
+                <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>Attente Max</span>
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#EF4444' }}>+{summary.max_attente_jours} j.</span>
               </div>
-              <div
-                onMouseEnter={() => setHoveredSens('National')}
-                onMouseLeave={() => setHoveredSens(null)}
-                style={{
-                  cursor: 'pointer',
-                  padding: '2px 4px',
-                  borderRadius: '6px',
-                  background: hoveredSens === 'National' ? 'rgba(251, 191, 36, 0.2)' : 'transparent',
-                  transition: 'background 0.2s ease'
-                }}
-              >
-                <span style={{ fontSize: '9px', color: '#FBBF24', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>National</span>
-                <span style={{ fontSize: '15px', fontWeight: 800, color: '#FBBF24' }}>
-                  {rawBySens.find((s: any) => s.name === 'National')?.value || 0}
-                </span>
+              <div>
+                <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>Période</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#CBD5E1' }}>{selectedMonth > 0 ? MONTHS_LIST[selectedMonth]?.label : "Année"} {selectedYear}</span>
               </div>
             </div>
 
@@ -937,24 +917,25 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', color: '#E2E8F0', tableLayout: 'fixed' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.12)', textAlign: 'left', color: '#94A3B8', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    <th style={{ padding: '8px 4px', width: '25%' }}>Réf Dossier</th>
-                    <th style={{ padding: '8px 4px', width: '35%' }}>Client</th>
-                    <th style={{ padding: '8px 4px', width: '15%' }}>Sens</th>
-                    <th style={{ padding: '8px 4px', width: '15%' }}>Nature</th>
-                    <th style={{ padding: '8px 4px', width: '10%', textAlign: 'right' }}>Statut</th>
+                    <th style={{ padding: '8px 4px', width: '22%' }}>Réf Dossier / BL</th>
+                    <th style={{ padding: '8px 4px', width: '28%' }}>Client</th>
+                    <th style={{ padding: '8px 4px', width: '14%' }}>Sens</th>
+                    <th style={{ padding: '8px 4px', width: '16%' }}>Date Livraison</th>
+                    <th style={{ padding: '8px 4px', width: '20%', textAlign: 'right' }}>Attente</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedDetails.length > 0 ? (
                     paginatedDetails.map((d: any, idx: number) => {
                       const sensConfig = SENS_COLORS[d.sens_operation] || SENS_COLORS['N/A'];
+                      const delay = Number(d.jours_attente_facturation) || 0;
                       return (
                         <tr key={idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
-                          <td style={{ padding: '10px 4px', fontWeight: 800, color: '#38BDF8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.reference_dossier}>
+                          <td style={{ padding: '10px 4px', fontWeight: 800, color: '#F59E0B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.reference_dossier}>
                             {d.reference_dossier}
                           </td>
-                          <td style={{ padding: '10px 4px', fontWeight: 600, color: '#F8FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.client || 'N/A'}>
-                            {d.client || 'N/A'}
+                          <td style={{ padding: '10px 4px', fontWeight: 600, color: '#F8FAFC', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={d.client || 'Client Inconnu'}>
+                            {d.client || 'Client Inconnu'}
                           </td>
                           <td style={{ padding: '10px 4px' }}>
                             <span style={{
@@ -970,11 +951,21 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                               {d.sens_operation || 'N/A'}
                             </span>
                           </td>
-                          <td style={{ padding: '10px 4px', color: '#CBD5E1', fontSize: '11px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {d.nature_transport || 'N/A'}
+                          <td style={{ padding: '10px 4px', color: '#CBD5E1', fontSize: '10px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {d.date_livraison_bl || 'N/A'}
                           </td>
-                          <td style={{ padding: '10px 4px', textAlign: 'right', color: '#FBBF24', fontSize: '10px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {d.statut_dossier || 'En cours'}
+                          <td style={{ padding: '10px 4px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <span style={{
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 900,
+                              background: 'rgba(245, 158, 11, 0.18)',
+                              color: '#F59E0B',
+                              border: '1px solid rgba(245, 158, 11, 0.4)'
+                            }}>
+                              +{delay} Jours
+                            </span>
                           </td>
                         </tr>
                       );
@@ -982,7 +973,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                   ) : (
                     <tr>
                       <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: '#94A3B8' }}>
-                        Aucun dossier correspondant au filtre survolé.
+                        Aucun BL non facturé pour cette sélection.
                       </td>
                     </tr>
                   )}
@@ -994,24 +985,24 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
             {filteredWidgetDetails.length > 0 && (
               <div style={{
                 paddingTop: '10px',
-                borderTop: '1px solid rgba(56, 189, 248, 0.2)',
+                borderTop: '1px solid rgba(245, 158, 11, 0.2)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 fontSize: '11px',
                 color: '#94A3B8'
               }}>
-                <span>Page <strong style={{ color: '#38BDF8' }}>{currentPage}</strong> sur <strong style={{ color: '#FFF' }}>{totalPages}</strong> ({filteredWidgetDetails.length} dossiers affichés)</span>
+                <span>Page <strong style={{ color: '#F59E0B' }}>{currentPage}</strong> sur <strong style={{ color: '#FFF' }}>{totalPages}</strong> ({filteredWidgetDetails.length} BL affichés)</span>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
                     style={{
-                      background: currentPage === 1 ? 'rgba(255,255,255,0.03)' : 'rgba(56, 189, 248, 0.15)',
-                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      background: currentPage === 1 ? 'rgba(255,255,255,0.03)' : 'rgba(245, 158, 11, 0.15)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
                       borderRadius: '6px',
                       padding: '4px 8px',
-                      color: currentPage === 1 ? '#64748B' : '#38BDF8',
+                      color: currentPage === 1 ? '#64748B' : '#F59E0B',
                       cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
@@ -1026,11 +1017,11 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
                     style={{
-                      background: currentPage === totalPages ? 'rgba(255,255,255,0.03)' : 'rgba(56, 189, 248, 0.15)',
-                      border: '1px solid rgba(56, 189, 248, 0.3)',
+                      background: currentPage === totalPages ? 'rgba(255,255,255,0.03)' : 'rgba(245, 158, 11, 0.15)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
                       borderRadius: '6px',
                       padding: '4px 8px',
-                      color: currentPage === totalPages ? '#64748B' : '#38BDF8',
+                      color: currentPage === totalPages ? '#64748B' : '#F59E0B',
                       cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
