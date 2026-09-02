@@ -40,7 +40,7 @@ export const JournalView: React.FC = () => {
           if (sessionStr.trim().startsWith('{')) {
             try {
               token = JSON.parse(sessionStr).token || sessionStr;
-            } catch (e) {}
+            } catch (e) { }
           }
           headers['Authorization'] = `Bearer ${token}`;
         }
@@ -100,36 +100,59 @@ export const JournalView: React.FC = () => {
   };
 
   const getStatusBadge = (statut: string) => {
-    const s = (statut || '').toUpperCase();
-    if (s.includes('ERR') || s.includes('FAIL')) {
+    const s = (statut || '').toUpperCase().trim();
+    
+    // 1. Unified Errors & Failures (FAIL, ERROR, ERREUR, ECHEC)
+    if (s === 'FAIL' || s === 'FAILED' || s === 'ERROR' || s === 'ERREUR' || s === 'ECHEC' || s.includes('ERR')) {
       return {
-        bg: 'rgba(239, 68, 68, 0.12)',
-        color: '#EF4444',
-        border: '1px solid rgba(239, 68, 68, 0.3)',
-        label: statut || 'ERREUR'
+        bg: 'rgba(255, 71, 87, 0.08)',
+        color: '#FF4757',
+        border: '1px solid rgba(255, 71, 87, 0.25)',
+        icon: '✕',
+        label: 'Erreur'
       };
     }
-    if (s.includes('SKIP') || s.includes('WARN')) {
+
+    // 2. Search Exhausted (Vivier épuisé)
+    if (s === 'EXHAUSTED' || s.includes('EXHAUST')) {
       return {
-        bg: 'rgba(245, 158, 11, 0.12)',
+        bg: 'rgba(245, 158, 11, 0.08)',
         color: '#F59E0B',
-        border: '1px solid rgba(245, 158, 11, 0.3)',
-        label: statut || 'ATTENTION'
+        border: '1px solid rgba(245, 158, 11, 0.25)',
+        icon: '●',
+        label: 'Épuisé'
       };
     }
-    if (s.includes('SUCC') || s.includes('OK')) {
+
+    // 3. Unified Successes (SUCCESS, COMPLETED, DONE, OK, TERMINE)
+    if (s === 'SUCCESS' || s === 'COMPLETED' || s === 'DONE' || s === 'OK' || s === 'TERMINE' || s.includes('SUCC')) {
       return {
-        bg: 'rgba(16, 185, 129, 0.12)',
-        color: '#10B981',
-        border: '1px solid rgba(16, 185, 129, 0.3)',
-        label: statut || 'SUCCÈS'
+        bg: 'rgba(0, 229, 160, 0.08)',
+        color: '#00E5A0',
+        border: '1px solid rgba(0, 229, 160, 0.25)',
+        icon: '✓',
+        label: 'Succès'
       };
     }
+
+    // 4. Warning / Attention
+    if (s.includes('WARN') || s.includes('SKIP')) {
+      return {
+        bg: 'rgba(245, 158, 11, 0.08)',
+        color: '#F59E0B',
+        border: '1px solid rgba(245, 158, 11, 0.25)',
+        icon: '⚠️',
+        label: 'Attention'
+      };
+    }
+
+    // 5. Default Info (including IN_PROGRESS, INFO, START, etc.)
     return {
-      bg: 'rgba(0, 229, 200, 0.1)',
-      color: 'var(--cyan)',
-      border: '1px solid rgba(0, 229, 200, 0.25)',
-      label: statut || 'INFO'
+      bg: 'rgba(0, 229, 200, 0.06)',
+      color: '#00E5C8',
+      border: '1px solid rgba(0, 229, 200, 0.2)',
+      icon: 'ℹ',
+      label: 'Info'
     };
   };
 
@@ -309,7 +332,7 @@ export const JournalView: React.FC = () => {
           </button>
         </div>
       </div>
-      
+
       {/* Category Tabs */}
       <div className="tabs-bar">
         <div className={`tab ${activeTab === 'all' ? 'active' : ''}`} onClick={() => handleTabChange('all')}>Tout l&apos;historique</div>
@@ -319,16 +342,16 @@ export const JournalView: React.FC = () => {
       </div>
 
       <div className="scroll">
-         <div className="exec-panel" style={{ marginTop: 0, padding: 0, overflow: 'hidden', background: 'rgba(20, 27, 45, 0.7)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
+        <div className="exec-panel" style={{ marginTop: 0, padding: 0, overflow: 'hidden', background: 'rgba(20, 27, 45, 0.7)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
           <div style={{ width: '100%' }}>
-            
+
             {/* Table Header */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: '160px 250px 1fr 110px', 
-              gap: '1rem', 
-              padding: '0.85rem 1.25rem', 
-              background: 'rgba(10, 15, 28, 0.8)', 
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '160px 250px 1fr 110px',
+              gap: '1rem',
+              padding: '0.85rem 1.25rem',
+              background: 'rgba(10, 15, 28, 0.8)',
               borderBottom: '1px solid rgba(255,255,255,0.08)',
               fontSize: '0.75rem',
               fontWeight: 700,
@@ -351,25 +374,25 @@ export const JournalView: React.FC = () => {
               logs.map((log) => {
                 const formattedTime = log.timestamp
                   ? new Date(log.timestamp).toLocaleString('fr-FR', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit'
-                    })
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                  })
                   : 'N/A';
 
                 const badge = getStatusBadge(log.statut);
                 const agentBadge = getAgentBadgeStyle(log.agent_name);
 
                 return (
-                  <div key={log.id} style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: '160px 250px 1fr 110px', 
-                    gap: '1rem', 
+                  <div key={log.id} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '160px 250px 1fr 110px',
+                    gap: '1rem',
                     alignItems: 'center',
-                    padding: '0.75rem 1.25rem', 
+                    padding: '0.75rem 1.25rem',
                     borderBottom: '1px solid rgba(255,255,255,0.03)',
                     fontSize: '0.85rem',
                     transition: 'background 0.15s ease'
@@ -381,11 +404,11 @@ export const JournalView: React.FC = () => {
 
                     {/* Agent Badge */}
                     <div>
-                      <span style={{ 
+                      <span style={{
                         display: 'inline-block',
-                        padding: '0.2rem 0.6rem', 
-                        borderRadius: '6px', 
-                        fontSize: '0.78rem', 
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
                         fontWeight: 600,
                         background: agentBadge.bg,
                         color: agentBadge.color,
@@ -402,12 +425,12 @@ export const JournalView: React.FC = () => {
                     {/* Action Effectuée */}
                     <div style={{ color: 'var(--text-light)', lineHeight: 1.4, display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                       {log.etape && (
-                        <span style={{ 
-                          padding: '0.1rem 0.4rem', 
-                          background: 'rgba(255, 255, 255, 0.05)', 
-                          border: '1px solid rgba(255, 255, 255, 0.08)', 
-                          borderRadius: '4px', 
-                          fontSize: '0.75rem', 
+                        <span style={{
+                          padding: '0.1rem 0.4rem',
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.08)',
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
                           color: 'var(--text-muted)',
                           fontWeight: 500
                         }}>
@@ -419,17 +442,22 @@ export const JournalView: React.FC = () => {
 
                     {/* Résultat Badge */}
                     <div style={{ textAlign: 'right' }}>
-                      <span style={{ 
-                        display: 'inline-block',
-                        padding: '0.2rem 0.65rem', 
-                        borderRadius: '12px', 
-                        fontSize: '0.75rem', 
-                        fontWeight: 700,
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        padding: '0.25rem 0.65rem',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
                         background: badge.bg,
                         color: badge.color,
-                        border: badge.border
+                        border: badge.border,
+                        letterSpacing: '0.3px',
+                        fontFamily: 'inherit'
                       }}>
-                        {badge.label}
+                        <span style={{ fontSize: '0.75rem' }}>{badge.icon}</span>
+                        <span>{badge.label}</span>
                       </span>
                     </div>
                   </div>
@@ -442,12 +470,12 @@ export const JournalView: React.FC = () => {
             )}
 
             {/* Pagination Controls Footer */}
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              padding: '0.85rem 1.25rem', 
-              background: 'rgba(10, 15, 28, 0.8)', 
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '0.85rem 1.25rem',
+              background: 'rgba(10, 15, 28, 0.8)',
               borderTop: '1px solid rgba(255,255,255,0.08)',
               fontSize: '0.8rem',
               color: 'var(--text-muted)'

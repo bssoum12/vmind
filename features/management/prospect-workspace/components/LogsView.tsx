@@ -18,7 +18,7 @@ interface LogsViewProps {
 export default function LogsView({ logs }: LogsViewProps) {
   const [levelFilter, setLevelFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   const limit = 50;
   const [displayCount, setDisplayCount] = useState(limit);
 
@@ -43,8 +43,8 @@ export default function LogsView({ logs }: LogsViewProps) {
   // Filter and prepare logs
   const terminalLogs = logs
     .filter(log => levelFilter === 'All' || log.statut === levelFilter)
-    .filter(log => 
-      searchQuery === '' || 
+    .filter(log =>
+      searchQuery === '' ||
       log.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
       log.workflow_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       log.etape.toLowerCase().includes(searchQuery.toLowerCase())
@@ -59,7 +59,7 @@ export default function LogsView({ logs }: LogsViewProps) {
           <h1>Journaux d&apos;Exécution</h1>
           <p>Suivi en temps réel des actions menées par les agents VMIND (Collecte, Qualification, Prospection)</p>
         </div>
-        <button className="btn btn-secondary" onClick={() => {}}>
+        <button className="btn btn-secondary" onClick={() => { }}>
           🔄 Actualiser les Logs
         </button>
       </div>
