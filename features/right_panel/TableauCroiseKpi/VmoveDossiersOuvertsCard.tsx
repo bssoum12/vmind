@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useKpis } from '@/shared/contexts/KpiCacheContext';
 import { PieChart as PieIcon, RefreshCw, Layers, Calendar, FileText, ChevronRight, ChevronLeft, X, Ship, Loader2, TrendingUp, Package, Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
@@ -131,56 +132,22 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
     setIsWidgetOpen(prev => !prev);
   };
 
-  // Direct DB Fetch State
-  const [dbData, setDbData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>("");
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
+  const agentData = kpisByAgent["vmove"] || kpisByAgent["VMOVE"] || {};
+  const n8nToolData = agentData.get_vmove_kpi_dossiers_ouverts;
 
-  const fetchDirectDbData = async (annee: number, mois: number) => {
-    setLoading(true);
-    setError("");
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      const token = getAuthToken();
+  const effectiveLoading = (loadingByAgent["vmove"] || loadingByAgent["VMOVE"]) && !n8nToolData;
+  const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
+  const payload = n8nToolData?.data || n8nToolData;
 
-      const res = await fetch(`${baseUrl}/api/tools/get-vmove-dossiers-ouverts-kpi`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          client_id: clientId,
-          annee: Number(annee),
-          mois: Number(mois)
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error(`Erreur SQL HTTP ${res.status}`);
-      }
-
-      const json = await res.json();
-      const fetchedData = json.data || json;
-      setDbData(fetchedData);
-    } catch (err: any) {
-      console.error("[VMOVE-CARD] Direct DB Fetch Error:", err);
-      setError(err?.message || "Impossible de charger les données VMOVE.");
-    } finally {
-      setLoading(false);
-    }
+  const handleRefresh = () => {
+    fetchKpis('vmove', true, 'get_vmove_kpi_dossiers_ouverts');
   };
-
-  useEffect(() => {
-    if (isVisible) {
-      fetchDirectDbData(selectedYear, selectedMonth);
-    }
-  }, [isVisible]);
 
   if (!isVisible) return null;
 
-  // Use fetched DB data
-  const summary = dbData?.summary || {
+  // Use n8n payload
+  const summary = payload?.summary || {
     total_dossiers_actifs: 0,
     total_dossiers: 0,
     total_poids_kg: 0,
@@ -189,9 +156,9 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
     mois: selectedMonth
   };
 
-  const rawBySens = dbData?.by_sens || [];
-  const rawBySensNature = dbData?.by_sens_nature || [];
-  const detailsList: any[] = dbData?.details || [];
+  const rawBySens = payload?.by_sens || [];
+  const rawBySensNature = payload?.by_sens_nature || [];
+  const detailsList: any[] = payload?.details || [];
 
   // Helper to determine if a value represents missing/unassigned data (N/A, Non défini, null, empty)
   const isMissingOrNA = (val: any) => {
@@ -319,15 +286,15 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
               Dossiers Ouverts du Mois
             </h3>
             <p style={{ fontSize: '10px', color: '#94A3B8', margin: 0, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Exploitation VMOVE
+              Exploitation VMOVE • n8n KPI
             </p>
           </div>
         </div>
 
         <button
-          onClick={() => fetchDirectDbData(selectedYear, selectedMonth)}
-          disabled={loading}
-          title="Rafraîchir les données SQL"
+          onClick={handleRefresh}
+          disabled={effectiveLoading}
+          title="Rafraîchir les données via n8n"
           style={{
             background: 'rgba(56, 189, 248, 0.08)',
             border: '1px solid rgba(56, 189, 248, 0.25)',
@@ -345,8 +312,8 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
             flexShrink: 0
           }}
         >
-          <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
-          <span>{loading ? "..." : "Actualiser"}</span>
+          <RefreshCw size={11} className={effectiveLoading ? 'animate-spin' : ''} />
+          <span>{effectiveLoading ? "..." : "Actualiser"}</span>
         </button>
       </div>
 
@@ -375,7 +342,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
           onChange={(e) => {
             const val = Number(e.target.value);
             setSelectedMonth(val);
-            fetchDirectDbData(selectedYear, val);
+            handleRefresh();
           }}
           style={{
             background: 'rgba(30, 41, 59, 0.8)',
@@ -404,7 +371,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
           onChange={(e) => {
             const val = Number(e.target.value);
             setSelectedYear(val);
-            fetchDirectDbData(val, selectedMonth);
+            handleRefresh();
           }}
           style={{
             background: 'rgba(30, 41, 59, 0.8)',
@@ -505,7 +472,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
 
       {isChartsExpanded && (
         <>
-          {loading && !dbData ? (
+          {effectiveLoading ? (
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -516,7 +483,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
               color: '#38BDF8'
             }}>
               <Loader2 size={26} className="animate-spin" />
-              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Chargement SQL Server en cours...</span>
+              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Chargement des dossiers ouverts...</span>
             </div>
           ) : (
             <>

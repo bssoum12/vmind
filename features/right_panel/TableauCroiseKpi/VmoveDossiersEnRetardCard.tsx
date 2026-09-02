@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useKpis } from '@/shared/contexts/KpiCacheContext';
 import { RefreshCw, Layers, Calendar, FileText, ChevronRight, ChevronLeft, X, AlertTriangle, Clock, Loader2, TrendingDown, CheckCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
@@ -131,56 +132,22 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
     setIsWidgetOpen(prev => !prev);
   };
 
-  // Direct DB Fetch State
-  const [dbData, setDbData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>("");
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
+  const agentData = kpisByAgent["vmove"] || kpisByAgent["VMOVE"] || {};
+  const n8nToolData = agentData.get_vmove_kpi_dossiers_en_retard;
 
-  const fetchDirectDbData = async (annee: number, mois: number) => {
-    setLoading(true);
-    setError("");
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      const token = getAuthToken();
+  const effectiveLoading = (loadingByAgent["vmove"] || loadingByAgent["VMOVE"]) && !n8nToolData;
+  const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
+  const payload = n8nToolData?.data || n8nToolData;
 
-      const res = await fetch(`${baseUrl}/api/tools/get-vmove-dossiers-en-retard-kpi`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          client_id: clientId,
-          annee: Number(annee),
-          mois: Number(mois)
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error(`Erreur SQL HTTP ${res.status}`);
-      }
-
-      const json = await res.json();
-      const fetchedData = json.data || json;
-      setDbData(fetchedData);
-    } catch (err: any) {
-      console.error("[VMOVE-RETARD-CARD] Direct DB Fetch Error:", err);
-      setError(err?.message || "Impossible de charger les dossiers en retard.");
-    } finally {
-      setLoading(false);
-    }
+  const handleRefresh = () => {
+    fetchKpis('vmove', true, 'get_vmove_kpi_dossiers_en_retard');
   };
-
-  useEffect(() => {
-    if (isVisible) {
-      fetchDirectDbData(selectedYear, selectedMonth);
-    }
-  }, [isVisible]);
 
   if (!isVisible) return null;
 
-  // Use fetched DB data
-  const summary = dbData?.summary || {
+  // Use n8n payload
+  const summary = payload?.summary || {
     total_dossiers_retard: 0,
     avg_retard_jours: 0,
     max_retard_jours: 0,
@@ -188,9 +155,9 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
     mois: selectedMonth
   };
 
-  const rawBySens = dbData?.by_sens || [];
-  const rawByNature = dbData?.by_nature || [];
-  const detailsList: any[] = dbData?.details || [];
+  const rawBySens = payload?.by_sens || [];
+  const rawByNature = payload?.by_nature || [];
+  const detailsList: any[] = payload?.details || [];
 
   // Helper to determine if a value represents missing/unassigned data
   const isMissingOrNA = (val: any) => {
@@ -297,15 +264,15 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
               Dossiers en Retard
             </h3>
             <p style={{ fontSize: '10px', color: '#94A3B8', margin: 0, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Suivi des Délais ETA / ATA 
+              Suivi des Délais ETA / ATA • n8n KPI
             </p>
           </div>
         </div>
 
         <button
-          onClick={() => fetchDirectDbData(selectedYear, selectedMonth)}
-          disabled={loading}
-          title="Rafraîchir les données SQL"
+          onClick={handleRefresh}
+          disabled={effectiveLoading}
+          title="Rafraîchir les données via n8n"
           style={{
             background: 'rgba(248, 113, 113, 0.08)',
             border: '1px solid rgba(248, 113, 113, 0.25)',
@@ -323,8 +290,8 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
             flexShrink: 0
           }}
         >
-          <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
-          <span>{loading ? "..." : "Actualiser"}</span>
+          <RefreshCw size={11} className={effectiveLoading ? 'animate-spin' : ''} />
+          <span>{effectiveLoading ? "..." : "Actualiser"}</span>
         </button>
       </div>
 
@@ -353,7 +320,7 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
           onChange={(e) => {
             const val = Number(e.target.value);
             setSelectedMonth(val);
-            fetchDirectDbData(selectedYear, val);
+            handleRefresh();
           }}
           style={{
             background: 'rgba(40, 16, 28, 0.8)',
@@ -382,7 +349,7 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
           onChange={(e) => {
             const val = Number(e.target.value);
             setSelectedYear(val);
-            fetchDirectDbData(val, selectedMonth);
+            handleRefresh();
           }}
           style={{
             background: 'rgba(40, 16, 28, 0.8)',
@@ -505,7 +472,7 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
 
       {isChartsExpanded && (
         <>
-          {loading && !dbData ? (
+          {effectiveLoading ? (
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -516,7 +483,7 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
               color: '#F87171'
             }}>
               <Loader2 size={26} className="animate-spin" />
-              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Analyse des retards SQL Server en cours...</span>
+              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Chargement des dossiers en retard...</span>
             </div>
           ) : (
             <>
