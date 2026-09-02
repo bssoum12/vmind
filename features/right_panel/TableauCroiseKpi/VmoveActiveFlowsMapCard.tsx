@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useKpis } from '@/shared/contexts/KpiCacheContext';
 import { RefreshCw, Globe, Layers, Calendar, FileText, ChevronRight, ChevronLeft, X, Loader2, Navigation, MapPin, ChevronDown, ChevronUp, Ship, Plane, Truck, ArrowRight, Activity, Search, Maximize2, Minimize2 } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 
@@ -124,8 +125,14 @@ export const VmoveActiveFlowsMapCard: React.FC<VmoveActiveFlowsMapCardProps> = (
   activeAgentId,
   onRefresh,
 }) => {
-  const [dbData, setDbData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
+  const agentData = kpisByAgent["vmove"] || kpisByAgent["VMOVE"] || {};
+  const n8nToolData = agentData.get_vmove_kpi_active_flows;
+
+  const effectiveLoading = (loadingByAgent["vmove"] || loadingByAgent["VMOVE"]) && !n8nToolData;
+  const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
+  const payload = n8nToolData?.data || n8nToolData;
+
   const [selectedYear, setSelectedYear] = useState<number>(2026);
   const [selectedMonth, setSelectedMonth] = useState<number>(0);
 
@@ -161,45 +168,8 @@ export const VmoveActiveFlowsMapCard: React.FC<VmoveActiveFlowsMapCardProps> = (
     setIsMounted(true);
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-      const token = localStorage.getItem('vmind_session');
-      const res = await fetch(`${baseUrl}/api/tools/get-vmove-active-flows-kpi`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          client_id: activeAgentId || 'VMOVE',
-          annee: selectedYear,
-          mois: selectedMonth
-        })
-      });
-      const json = await res.json();
-      if (json.ok && json.data) {
-        setDbData(json.data);
-      } else {
-        setDbData(null);
-      }
-    } catch (err) {
-      console.error('[VMOVE-ACTIVE-FLOWS-CARD-ERROR] Failed to fetch data:', err);
-      setDbData(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!activeAgentId || activeAgentId === 'VMOVE' || activeAgentId === 'VDATA') {
-      fetchData();
-    }
-  }, [selectedYear, selectedMonth, activeAgentId]);
-
   const handleRefreshClick = () => {
-    fetchData();
+    fetchKpis('vmove', true, 'get_vmove_kpi_active_flows');
   };
 
   // Close widget on outside click
@@ -224,15 +194,15 @@ export const VmoveActiveFlowsMapCard: React.FC<VmoveActiveFlowsMapCardProps> = (
     return null;
   }
 
-  const summary = dbData?.summary || {
+  const summary = payload?.summary || {
     total_dossiers_actifs: 0,
     total_routes_actives: 0,
     annee: selectedYear,
     mois: selectedMonth
   };
 
-  const routesList: any[] = dbData?.routes || [];
-  const rawDetails: any[] = dbData?.details || [];
+  const routesList: any[] = payload?.routes || [];
+  const rawDetails: any[] = payload?.details || [];
 
   // Aggregate raw routes into clean Country Hub routes
   const aggregatedRoutesMap = new Map<string, { origin_country: string; destination_country: string; count: number; route_key: string; cities: Set<string> }>();
@@ -365,6 +335,7 @@ export const VmoveActiveFlowsMapCard: React.FC<VmoveActiveFlowsMapCardProps> = (
 
         <button
           onClick={handleRefreshClick}
+          disabled={effectiveLoading}
           style={{
             background: 'rgba(0, 229, 200, 0.1)',
             border: '1px solid rgba(0, 229, 200, 0.3)',
@@ -380,8 +351,8 @@ export const VmoveActiveFlowsMapCard: React.FC<VmoveActiveFlowsMapCardProps> = (
             transition: 'all 0.2s ease'
           }}
         >
-          <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
-          <span>Actualiser</span>
+          <RefreshCw size={12} className={effectiveLoading ? "animate-spin" : ""} />
+          <span>{effectiveLoading ? "..." : "Actualiser"}</span>
         </button>
       </div>
 
@@ -506,7 +477,7 @@ export const VmoveActiveFlowsMapCard: React.FC<VmoveActiveFlowsMapCardProps> = (
       {/* 5. Expanded Interactive Network Node View */}
       {isChartsExpanded && (
         <>
-          {loading && !dbData ? (
+          {effectiveLoading ? (
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -517,7 +488,7 @@ export const VmoveActiveFlowsMapCard: React.FC<VmoveActiveFlowsMapCardProps> = (
               color: '#00E5C8'
             }}>
               <Loader2 size={26} className="animate-spin" />
-              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Construction du schéma des flux SQL...</span>
+              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Construction du schéma des flux...</span>
             </div>
           ) : (
             <div style={{

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useKpis } from '@/shared/contexts/KpiCacheContext';
 import { RefreshCw, Calendar, FileText, ChevronRight, ChevronLeft, X, Truck, Loader2, Award, Users, CheckCircle2 } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 
@@ -112,56 +113,22 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
     setIsWidgetOpen(prev => !prev);
   };
 
-  // Direct DB Fetch State
-  const [dbData, setDbData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>("");
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
+  const agentData = kpisByAgent["vmove"] || kpisByAgent["VMOVE"] || {};
+  const n8nToolData = agentData.get_vmove_kpi_volume_transporteur;
 
-  const fetchDirectDbData = async (annee: number, mois: number) => {
-    setLoading(true);
-    setError("");
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      const token = getAuthToken();
+  const effectiveLoading = (loadingByAgent["vmove"] || loadingByAgent["VMOVE"]) && !n8nToolData;
+  const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
+  const payload = n8nToolData?.data || n8nToolData;
 
-      const res = await fetch(`${baseUrl}/api/tools/get-vmove-volume-transporteur-kpi`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          client_id: clientId,
-          annee: Number(annee),
-          mois: Number(mois)
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error(`Erreur SQL HTTP ${res.status}`);
-      }
-
-      const json = await res.json();
-      const fetchedData = json.data || json;
-      setDbData(fetchedData);
-    } catch (err: any) {
-      console.error("[VMOVE-TRANSPORTEUR-CARD] Direct DB Fetch Error:", err);
-      setError(err?.message || "Impossible de charger le volume par transporteur.");
-    } finally {
-      setLoading(false);
-    }
+  const handleRefresh = () => {
+    fetchKpis('vmove', true, 'get_vmove_kpi_volume_transporteur');
   };
-
-  useEffect(() => {
-    if (isVisible) {
-      fetchDirectDbData(selectedYear, selectedMonth);
-    }
-  }, [isVisible]);
 
   if (!isVisible) return null;
 
-  // Use fetched DB data
-  const summary = dbData?.summary || {
+  // Use n8n payload
+  const summary = payload?.summary || {
     total_transporteurs: 0,
     total_dossiers_clotures: 0,
     top_transporteur_nom: 'N/A',
@@ -171,8 +138,8 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
     mois: selectedMonth
   };
 
-  const rankingList: any[] = dbData?.ranking || [];
-  const detailsList: any[] = dbData?.details || [];
+  const rankingList: any[] = payload?.ranking || [];
+  const detailsList: any[] = payload?.details || [];
 
   // Dynamic filtering of widget details based on carrier hover or click
   const activeCarrier = hoveredCarrier || (selectedCarrierFilter !== "ALL" ? selectedCarrierFilter : null);
@@ -251,15 +218,15 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
               Volume par Transporteur
             </h3>
             <p style={{ fontSize: '10px', color: '#94A3B8', margin: 0, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Dossiers Clôturés
+              Dossiers Clôturés • n8n KPI
             </p>
           </div>
         </div>
 
         <button
-          onClick={() => fetchDirectDbData(selectedYear, selectedMonth)}
-          disabled={loading}
-          title="Rafraîchir les données SQL"
+          onClick={handleRefresh}
+          disabled={effectiveLoading}
+          title="Rafraîchir les données via n8n"
           style={{
             background: 'rgba(0, 229, 200, 0.08)',
             border: '1px solid rgba(0, 229, 200, 0.25)',
@@ -277,8 +244,8 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
             flexShrink: 0
           }}
         >
-          <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
-          <span>{loading ? "..." : "Actualiser"}</span>
+          <RefreshCw size={11} className={effectiveLoading ? 'animate-spin' : ''} />
+          <span>{effectiveLoading ? "..." : "Actualiser"}</span>
         </button>
       </div>
 
@@ -307,7 +274,7 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
           onChange={(e) => {
             const val = Number(e.target.value);
             setSelectedMonth(val);
-            fetchDirectDbData(selectedYear, val);
+            handleRefresh();
           }}
           style={{
             background: 'rgba(14, 30, 48, 0.8)',
@@ -336,7 +303,7 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
           onChange={(e) => {
             const val = Number(e.target.value);
             setSelectedYear(val);
-            fetchDirectDbData(val, selectedMonth);
+            handleRefresh();
           }}
           style={{
             background: 'rgba(14, 30, 48, 0.8)',
@@ -412,7 +379,7 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
       </div>
 
       {/* Loading Skeleton */}
-      {loading && !dbData ? (
+      {effectiveLoading ? (
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -423,7 +390,7 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
           color: '#00E5C8'
         }}>
           <Loader2 size={26} className="animate-spin" />
-          <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Classement SQL des transporteurs...</span>
+          <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Chargement des transporteurs...</span>
         </div>
       ) : (
         /* 4. CARRIER RANKING LIST (BAR CHART STYLE) */

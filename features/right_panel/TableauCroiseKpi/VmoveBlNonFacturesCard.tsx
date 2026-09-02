@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useKpis } from '@/shared/contexts/KpiCacheContext';
 import { RefreshCw, Layers, Calendar, FileText, ChevronRight, ChevronLeft, X, AlertCircle, Clock, Loader2, FileWarning, Receipt, ChevronDown, ChevronUp } from 'lucide-react';
 import { AnimatedNumber } from './AnimatedNumber';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
@@ -131,56 +132,22 @@ export const VmoveBlNonFacturesCard: React.FC<VmoveBlNonFacturesCardProps> = ({
     setIsWidgetOpen(prev => !prev);
   };
 
-  // Direct DB Fetch State
-  const [dbData, setDbData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string>("");
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
+  const agentData = kpisByAgent["vmove"] || kpisByAgent["VMOVE"] || {};
+  const n8nToolData = agentData.get_vmove_kpi_bl_non_factures;
 
-  const fetchDirectDbData = async (annee: number, mois: number) => {
-    setLoading(true);
-    setError("");
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      const token = getAuthToken();
+  const effectiveLoading = (loadingByAgent["vmove"] || loadingByAgent["VMOVE"]) && !n8nToolData;
+  const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
+  const payload = n8nToolData?.data || n8nToolData;
 
-      const res = await fetch(`${baseUrl}/api/tools/get-vmove-bl-non-factures-kpi`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          client_id: clientId,
-          annee: Number(annee),
-          mois: Number(mois)
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error(`Erreur SQL HTTP ${res.status}`);
-      }
-
-      const json = await res.json();
-      const fetchedData = json.data || json;
-      setDbData(fetchedData);
-    } catch (err: any) {
-      console.error("[VMOVE-BL-NON-FACTURES] Direct DB Fetch Error:", err);
-      setError(err?.message || "Impossible de charger les BL non facturés.");
-    } finally {
-      setLoading(false);
-    }
+  const handleRefresh = () => {
+    fetchKpis('vmove', true, 'get_vmove_kpi_bl_non_factures');
   };
-
-  useEffect(() => {
-    if (isVisible) {
-      fetchDirectDbData(selectedYear, selectedMonth);
-    }
-  }, [isVisible]);
 
   if (!isVisible) return null;
 
-  // Use fetched DB data
-  const summary = dbData?.summary || {
+  // Use n8n payload
+  const summary = payload?.summary || {
     total_bl_non_factures: 0,
     avg_attente_jours: 0,
     max_attente_jours: 0,
@@ -188,9 +155,9 @@ export const VmoveBlNonFacturesCard: React.FC<VmoveBlNonFacturesCardProps> = ({
     mois: selectedMonth
   };
 
-  const rawBySens = dbData?.by_sens || [];
-  const rawByNature = dbData?.by_nature || [];
-  const detailsList: any[] = dbData?.details || [];
+  const rawBySens = payload?.by_sens || [];
+  const rawByNature = payload?.by_nature || [];
+  const detailsList: any[] = payload?.details || [];
 
   // Helper to determine if a value represents missing/unassigned data
   const isMissingOrNA = (val: any) => {
@@ -316,15 +283,15 @@ export const VmoveBlNonFacturesCard: React.FC<VmoveBlNonFacturesCardProps> = ({
               BL Non Facturés
             </h3>
             <p style={{ fontSize: '10px', color: '#94A3B8', margin: 0, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Bons de Livraison Émis • Direct SQL
+              Bons de Livraison Émis • n8n KPI
             </p>
           </div>
         </div>
 
         <button
-          onClick={() => fetchDirectDbData(selectedYear, selectedMonth)}
-          disabled={loading}
-          title="Rafraîchir les données SQL"
+          onClick={handleRefresh}
+          disabled={effectiveLoading}
+          title="Rafraîchir les données via n8n"
           style={{
             background: 'rgba(245, 158, 11, 0.08)',
             border: '1px solid rgba(245, 158, 11, 0.25)',
@@ -342,8 +309,8 @@ export const VmoveBlNonFacturesCard: React.FC<VmoveBlNonFacturesCardProps> = ({
             flexShrink: 0
           }}
         >
-          <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
-          <span>{loading ? "..." : "Actualiser"}</span>
+          <RefreshCw size={11} className={effectiveLoading ? 'animate-spin' : ''} />
+          <span>{effectiveLoading ? "..." : "Actualiser"}</span>
         </button>
       </div>
 
@@ -372,7 +339,7 @@ export const VmoveBlNonFacturesCard: React.FC<VmoveBlNonFacturesCardProps> = ({
           onChange={(e) => {
             const val = Number(e.target.value);
             setSelectedMonth(val);
-            fetchDirectDbData(selectedYear, val);
+            handleRefresh();
           }}
           style={{
             background: 'rgba(42, 26, 10, 0.8)',
@@ -401,7 +368,7 @@ export const VmoveBlNonFacturesCard: React.FC<VmoveBlNonFacturesCardProps> = ({
           onChange={(e) => {
             const val = Number(e.target.value);
             setSelectedYear(val);
-            fetchDirectDbData(val, selectedMonth);
+            handleRefresh();
           }}
           style={{
             background: 'rgba(42, 26, 10, 0.8)',
@@ -524,7 +491,7 @@ export const VmoveBlNonFacturesCard: React.FC<VmoveBlNonFacturesCardProps> = ({
 
       {isChartsExpanded && (
         <>
-          {loading && !dbData ? (
+          {effectiveLoading ? (
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -535,7 +502,7 @@ export const VmoveBlNonFacturesCard: React.FC<VmoveBlNonFacturesCardProps> = ({
               color: '#F59E0B'
             }}>
               <Loader2 size={26} className="animate-spin" />
-              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Recherche des BL non facturés SQL...</span>
+              <span style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 500 }}>Chargement des BL non facturés...</span>
             </div>
           ) : (
             <>
