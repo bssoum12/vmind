@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
+import { Mail } from 'lucide-react';
 
 interface EmailCampaign {
   id: number;
@@ -135,10 +137,26 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
 
   return (
     <div className="fade-in">
-      <div className="view-header">
-        <div className="view-title">
-          <h1>Suivi des Campagnes</h1>
-          <p>Historique et taux de délivrabilité des emails de prospection personnalisés</p>
+      <div className="view-header" style={{ justifyContent: 'flex-start' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: 'rgba(0, 229, 200, 0.1)',
+            border: '1px solid rgba(0, 229, 200, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#00E5C8',
+            flexShrink: 0
+          }}>
+            <Mail size={22} />
+          </div>
+          <div className="view-title">
+            <h1 style={{ margin: 0 }}>Suivi des Campagnes</h1>
+            <p style={{ margin: '0.25rem 0 0 0' }}>Historique et taux de délivrabilité des emails de prospection personnalisés</p>
+          </div>
         </div>
       </div>
 
@@ -184,7 +202,9 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
       {/* Search Bar */}
       <div className="filters-bar" style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
         <div className="search-input-wrapper" style={{ flex: 1, minWidth: '300px' }}>
-          <span className="search-icon">🔍</span>
+          <span className="search-icon" style={{ display: 'flex', alignItems: 'center' }}>
+            <CyberIcon name="search" size={14} color="var(--text-muted)" />
+          </span>
           <input
             type="text"
             placeholder="Rechercher par destinataire, entreprise, sujet ou contenu..."
@@ -225,8 +245,8 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
           }}
         >
           <option value="All">Tous les modes</option>
-          <option value="Auto">🤖 Automatique</option>
-          <option value="Manuel">👤 Manuel</option>
+          <option value="Auto">Automatique (IA)</option>
+          <option value="Manuel">Manuel</option>
           {Array.from(new Set(campaigns.map(c => c.mode_envoi).filter(Boolean))).filter(m => m !== 'Auto' && m !== 'Manuel').map(mode => (
             <option key={mode} value={mode}>{mode}</option>
           ))}
@@ -237,8 +257,9 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
       <div style={{ display: 'grid', gridTemplateColumns: selectedEmail ? '3fr 2fr' : '1fr', gap: '1.5rem', alignItems: 'start' }}>
         {/* Table List */}
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)', fontWeight: 600 }}>
-            Historique des Envois
+          <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Mail size={16} color="#00E5C8" style={{ flexShrink: 0 }} />
+            <span>Historique des Envois</span>
           </div>
           <div className="table-container" style={{ border: 'none', margin: 0, borderRadius: 0, boxShadow: 'none' }}>
             <table className="leads-table">
@@ -290,11 +311,16 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
                         </span>
                       </td>
                       <td>
-                        <button className="btn btn-secondary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }} onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedEmail(email);
-                        }}>
-                          Prévisualiser 👁️
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 5 }} 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedEmail(email);
+                          }}
+                        >
+                          <CyberIcon name="eye" size={13} color="#00E5C8" />
+                          <span>Prévisualiser</span>
                         </button>
                       </td>
                     </tr>
@@ -355,9 +381,9 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
               <span style={{ fontWeight: 'bold' }}>Aperçu & Édition du Message</span>
               <button 
                 onClick={() => setSelectedEmail(null)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1rem' }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
               >
-                ✕
+                <CyberIcon name="close" size={14} />
               </button>
             </div>
 
@@ -367,10 +393,11 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
                 <div style={{ fontWeight: 600 }}>{selectedEmail.prenom} {selectedEmail.nom} ({selectedEmail.email})</div>
                 <button 
                   className="btn btn-secondary" 
-                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
+                  style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: 5 }} 
                   onClick={() => onOpenLeadById(selectedEmail.lead_id)}
                 >
-                  Voir Prospect 👁️
+                  <CyberIcon name="eye" size={13} color="#00E5C8" />
+                  <span>Voir Prospect</span>
                 </button>
               </div>
             </div>
@@ -387,7 +414,7 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
             </div>
 
             <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Copie conforme (CC)</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>CC</div>
               <input 
                 type="text" 
                 className="email-input" 

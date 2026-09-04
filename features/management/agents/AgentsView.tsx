@@ -15,8 +15,9 @@ import {
 import { useProspectSocket } from '../prospect-workspace/hooks/useProspectSocket';
 import { useRouter } from 'next/navigation';
 import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Brain, CheckSquare, ListChecks, SkipForward, Users, Info, ExternalLink, UploadCloud } from 'lucide-react';
+import { Play, Brain, CheckSquare, ListChecks, SkipForward, Users, Info, ExternalLink, UploadCloud, RefreshCw, BarChart2, LayoutDashboard } from 'lucide-react';
 import { ProspectAgentExecutionModal } from './components/ProspectAgentExecutionModal';
 import { SourcingAgentExecutionModal } from './components/SourcingAgentExecutionModal';
 import { ProspectAgentScheduleModal } from './components/ProspectAgentScheduleModal';
@@ -97,7 +98,7 @@ function triggerRuleSummary(rules: any[]): string {
   const timeStr = `${hourPad}h${minPad}`;
 
   const dayNamesFr: Record<string, string> = {
-    'Monday': 'Lun', 'Tuesday': 'Mar', 'Wednesday': 'Mer', 
+    'Monday': 'Lun', 'Tuesday': 'Mar', 'Wednesday': 'Mer',
     'Thursday': 'Jeu', 'Friday': 'Ven', 'Saturday': 'Sam', 'Sunday': 'Dim',
     'Lundi': 'Lun', 'Mardi': 'Mar', 'Mercredi': 'Mer',
     'Jeudi': 'Jeu', 'Vendredi': 'Ven', 'Samedi': 'Sam', 'Dimanche': 'Dim'
@@ -329,6 +330,17 @@ function TargetAgentsBadge({ targets }: { targets: string[] }) {
   );
 }
 
+export const resolveAgentType = (agent: LiveAgent): string => {
+  const rm = (agent.run_mode || '').toLowerCase().trim();
+  if (rm === 'prospection') return 'prospection';
+  if (rm === 'sourcing') return 'sourcing';
+  if (rm === 'recouvrement') return 'recouvrement';
+  const name = (agent.agent_name || (agent as any).nom || '').toLowerCase();
+  if (name.includes('source') || name.includes('sourcing')) return 'sourcing';
+  if (name.includes('prospect')) return 'prospection';
+  return 'recouvrement';
+};
+
 export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const router = useRouter();
   const { showToast: globalShowToast } = useToast();
@@ -378,55 +390,121 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     showToast('Tutoriels réinitialisés pour tous les types d\'agents. Survolez un agent pour commencer.', 'ok');
   };
 
-  const nextTutorialStep = () => {
-    const hasWorkspace = tutorialAgent?.run_mode === 'prospection' || tutorialAgent?.run_mode === 'sourcing';
-    if (tutorialStep === 3 && !hasWorkspace) {
-      setTutorialStep(5);
-    } else if (tutorialStep >= 5) {
-      setTutorialStep(0);
-      setTutorialAgent(null);
-    } else {
-      setTutorialStep(s => s + 1);
-    }
-  };
+  const nextTutorialStep = useCallback(() => {
+    setTutorialStep(s => {
+      if (s >= 5) {
+        setTutorialAgent(null);
+        return 0;
+      }
+      return s + 1;
+    });
+  }, []);
+
+  // Keyboard navigation for VMindGuide Tutorial: Space / ArrowRight = Next, Escape = Dismiss
+  useEffect(() => {
+    if (tutorialStep <= 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Guard: Never intercept when user is typing in form controls
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        e.stopPropagation();
+        nextTutorialStep();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        e.stopPropagation();
+        nextTutorialStep();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setTutorialStep(0);
+        setTutorialAgent(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [tutorialStep, nextTutorialStep]);
 
   const getTutorialContent = () => {
     if (!tutorialAgent) return null;
+    const isProspection = tutorialAgent.run_mode === 'prospection';
+    const isSourcing = tutorialAgent.run_mode === 'sourcing';
+    const currentStatus = deriveStatus(tutorialAgent);
+    const isExecuting = !!tutorialAgent.is_executing;
+
     switch (tutorialStep) {
-      case 1:
+      case 1: {
+        let statusPhrase = "déployé et prêt à l'emploi";
+        let statusAdvice = "Son autopilot est actuellement arrêté. Vous pouvez lancer une exécution ponctuelle (▶ Run) ou programmer son automatisation continue (▶ Start).";
+        let guideMood: GuideMood = 'curious';
+
+        if (isExecuting) {
+          statusPhrase = "actuellement en cours d'exécution ⚡";
+          statusAdvice = "Il traite activement vos données en tâche de fond.";
+          guideMood = 'focused';
+        } else if (currentStatus === 'running') {
+          statusPhrase = "actif et programmé 🟢";
+          statusAdvice = "Ses tâches automatisées sont enclenchées et s'exécutent selon les plages programmées.";
+          guideMood = 'focused';
+        } else if (currentStatus === 'paused') {
+          statusPhrase = "en pause 🟡";
+          statusAdvice = "Ses déclenchements automatiques sont temporairement suspendus. Vous pouvez le relancer à tout moment.";
+          guideMood = 'curious';
+        } else {
+          // stopped (Arrêté)
+          statusPhrase = "prêt mais actuellement arrêté 🔴";
+          statusAdvice = "Son autopilot est inactif. Vous pouvez cliquer sur '▶ Run' pour un lancement immédiat ou '▶ Start' pour programmer son exécution automatique.";
+          guideMood = 'curious';
+        }
+
         return {
-          title: "Exécution Immédiate",
-          message: "Exécutez l'agent immédiatement, indépendamment de sa planification.",
-          mood: 'focused' as GuideMood
+          title: "1. Votre Agent dans le Dashboard",
+          message: `Votre agent "${tutorialAgent.agent_name}" est ${statusPhrase}. ${statusAdvice} Vous pouvez retrouver toutes ses métriques et actions ici en temps réel.`,
+          mood: guideMood
         };
+      }
       case 2:
         return {
-          title: "Activer / Désactiver",
-          message: tutorialAgent.run_mode === 'prospection'
-            ? "Le bouton Start active la planification automatique pour prospecter vos clients."
-            : tutorialAgent.run_mode === 'sourcing'
-            ? "Le bouton Start active la recherche et l'extraction automatique selon vos critères."
-            : "Le bouton Start active la planification automatique pour relancer les impayés.",
-          mood: 'convinced' as GuideMood
+          title: "2. Espace de Travail & Données",
+          message: isProspection
+            ? "Cliquez sur 'Espace' pour ouvrir son interface dédiée. C'est ici que vous déposez vos contacts (fichiers CSV, Excel, XML... ou URL web), vérifiez les qualifications de l'IA et supervisez l'envoi de vos campagnes d'emails."
+            : isSourcing
+              ? "Ouvrez l'Espace de Travail pour suivre vos profils sourcés, consulter le tableau de bord et superviser l'agent."
+              : "Ouvrez l'Espace de Travail pour suivre vos données et superviser l'agent.",
+          mood: 'focused' as GuideMood
         };
       case 3:
         return {
-          title: "Configuration",
-          message: "Modifiez la configuration de cet agent à tout moment.",
+          title: "3. Lancement Immédiat & Planification",
+          message: isProspection
+            ? "Le bouton 'Run' lance une qualification immédiate de vos contacts. Le bouton 'Start' (ou 'Pause') active ou suspend la planification automatique selon les plages configurées."
+            : isSourcing
+              ? "Le bouton 'Run' lance une recherche immédiate. Le bouton 'Start' (ou 'Pause') active ou suspend la recherche continue selon vos critères."
+              : "Le bouton 'Run' lance une tâche immédiate et 'Start' / 'Pause' gère la planification.",
           mood: 'focused' as GuideMood
         };
       case 4:
         return {
-          title: "Espace de Travail",
-          message: tutorialAgent.run_mode === 'sourcing'
-            ? "Ouvrez l'Espace de Travail pour suivre vos profils sourcés, consulter le tableau de bord et superviser l'agent."
-            : "Ouvrez l'Espace de Travail pour suivre vos leads, valider les emails et superviser l'agent.",
-          mood: 'curious' as GuideMood
+          title: isProspection
+            ? "4. Associer un Sourcing Agent (Duo Autopilot)"
+            : "4. Configuration de l'Agent",
+          message: isProspection
+            ? "Pourquoi ce 2ème agent est important ? Cet Agent de Prospection est votre closer : il qualifie et contacte vos leads, mais NE cherche PAS de prospects tout seul. Le Sourcing Agent est le chasseur qui explore le web et lui injecte des décideurs B2B en continu. Sans lui, vous devez importer vos fichiers manuellement. Avec lui, votre prospection tourne en 100% pilote automatique !"
+            : "Modifiez la configuration de cet agent et ajustez ses critères à tout moment.",
+          mood: 'convinced' as GuideMood
         };
       case 5:
         return {
-          title: "Suppression",
-          message: "Supprimez définitivement cet agent. Soyez certain de votre choix.",
+          title: "5. Configuration & Gestion",
+          message: "Modifiez la configuration de cet agent (⚙️) ou supprimez-le définitivement (🗑️) selon vos besoins.",
           mood: 'settled' as GuideMood
         };
       default:
@@ -477,6 +555,17 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
         return a.agent_name.localeCompare(b.agent_name);
       });
       setAgents(sortedData);
+      if (typeof window !== 'undefined') {
+        const postDeployName = sessionStorage.getItem('vmind_post_deploy_tutorial_agent');
+        if (postDeployName) {
+          sessionStorage.removeItem('vmind_post_deploy_tutorial_agent');
+          const target = sortedData.find(a => a.agent_name.toLowerCase() === postDeployName.toLowerCase()) || sortedData[0];
+          if (target) {
+            setTutorialAgent(target);
+            setTutorialStep(1);
+          }
+        }
+      }
       // Keep selected in sync
       if (selected) {
         const updated = data.find((a: LiveAgent) => a.agent_name === selected.agent_name);
@@ -620,8 +709,92 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           message={getTutorialContent()?.message || null}
           mood={getTutorialContent()?.mood}
           showBackdrop={true}
-          onClose={() => setTutorialStep(0)}
-        />
+          onClose={() => {
+            setTutorialStep(0);
+            setTutorialAgent(null);
+          }}
+        >
+          <div className="vmind-guide-actions">
+            {tutorialStep < 4 && (
+              <button
+                type="button"
+                className="vmind-guide-btn-primary"
+                onClick={nextTutorialStep}
+              >
+                <span>Suivant</span>
+                <CyberIcon name="arrow-right" size={13} color="currentColor" />
+              </button>
+            )}
+
+            {tutorialStep === 4 && tutorialAgent.run_mode === 'prospection' && (
+              <>
+                <button
+                  type="button"
+                  className="vmind-guide-btn-primary"
+                  onClick={() => {
+                    setTutorialStep(0);
+                    setTutorialAgent(null);
+                    if (typeof window !== 'undefined') {
+                      sessionStorage.setItem('vmind_guide_target_marketplace', 'sourcing');
+                      const linkId = tutorialAgent.uuid || (tutorialAgent as any).agent_id;
+                      if (linkId) {
+                        sessionStorage.setItem('vmind_guide_link_prospect_uuid', String(linkId));
+                      }
+                    }
+                    onNavigate('market');
+                  }}
+                >
+                  <CyberIcon name="zap" size={13} color="currentColor" />
+                  <span>Trouver dans le Marketplace</span>
+                  <CyberIcon name="arrow-right" size={13} color="currentColor" />
+                </button>
+                <button
+                  type="button"
+                  className="vmind-guide-btn-secondary"
+                  onClick={nextTutorialStep}
+                >
+                  <span>Passer cette étape</span>
+                </button>
+              </>
+            )}
+
+            {tutorialStep === 4 && tutorialAgent.run_mode !== 'prospection' && (
+              <button
+                type="button"
+                className="vmind-guide-btn-primary"
+                onClick={nextTutorialStep}
+              >
+                <span>Suivant</span>
+                <CyberIcon name="arrow-right" size={13} color="currentColor" />
+              </button>
+            )}
+
+            {tutorialStep >= 5 && (
+              <button
+                type="button"
+                className="vmind-guide-btn-primary"
+                onClick={() => {
+                  setTutorialStep(0);
+                  setTutorialAgent(null);
+                }}
+              >
+                <span>Terminer la Visite</span>
+                <CyberIcon name="check" size={14} color="currentColor" />
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="vmind-guide-btn-ghost"
+              onClick={() => {
+                setTutorialStep(0);
+                setTutorialAgent(null);
+              }}
+            >
+              <span>Fermer</span>
+            </button>
+          </div>
+        </VMindGuide>
       )}
 
       {/* ── Header ── */}
@@ -630,10 +803,19 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           <div className="page-title">Mes Agents Actifs</div>
           <div className="page-sub">Gérez et surveillez vos employés virtuels en temps réel</div>
         </div>
-        <div className="page-actions">
-          <button className="btn" onClick={restartTutorial} style={{ marginRight: 8, background: 'rgba(0, 229, 200, 0.1)', color: '#00E5C8', border: '1px solid rgba(0, 229, 200, 0.3)' }}>ℹ️ Relancer le tutoriel</button>
-          <button className="btn" onClick={refresh} style={{ marginRight: 8 }}>🔄 Rafraîchir</button>
-          <button className="btn" onClick={() => onNavigate('reports')}>📊 Rapports consolidés</button>
+        <div className="page-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button className="btn" onClick={restartTutorial} style={{ background: 'rgba(0, 229, 200, 0.1)', color: '#00E5C8', border: '1px solid rgba(0, 229, 200, 0.3)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Info size={13} />
+            Relancer le tutoriel
+          </button>
+          <button className="btn" onClick={refresh} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <RefreshCw size={13} />
+            Rafraîchir
+          </button>
+          <button className="btn" onClick={() => onNavigate('reports')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <BarChart2 size={13} />
+            Rapports consolidés
+          </button>
         </div>
       </div>
 
@@ -695,26 +877,40 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                       onClick={() => setSelected(isSelected ? null : agent)}
                       style={{
                         cursor: 'pointer',
-                        background: isSelected ? 'rgba(0,229,160,0.06)' : undefined,
+                        background: isTutorialActive && tutorialStep === 1 ? 'rgba(0, 229, 200, 0.12)' : isSelected ? 'rgba(0,229,160,0.06)' : undefined,
                         borderLeft: isSelected ? '3px solid #00E5A0' : '3px solid transparent',
                         transition: 'all .15s',
                         position: isTutorialActive ? 'relative' : undefined,
-                        zIndex: isTutorialActive ? 10000 : undefined,
+                        zIndex: isTutorialActive ? 10001 : undefined,
+                        boxShadow: isTutorialActive && tutorialStep === 1 ? '0 0 0 4px rgba(0, 229, 200, 0.85)' : undefined,
                       }}
                     >
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
+                          {isTutorialActive && tutorialStep === 1 && (
+                            <VMindGuideArrow
+                              direction="down"
+                              color="#00E5C8"
+                              style={{
+                                position: 'absolute',
+                                top: '-42px',
+                                left: '16px',
+                                zIndex: 10002
+                              }}
+                            />
+                          )}
                           <div style={{
-                            width: 36, height: 36, borderRadius: 8, display: 'flex',
-                            alignItems: 'center', justifyContent: 'center', fontSize: 18,
+                            width: 32, height: 32, borderRadius: 8, display: 'flex',
+                            alignItems: 'center', justifyContent: 'center', fontSize: 16,
                             background: AGENT_TEMPLATES.find(t => t.id === agent.run_mode)?.iconBg || 'rgba(255,255,255,0.05)',
+                            flexShrink: 0
                           }}>
                             {AGENT_TEMPLATES.find(t => t.id === agent.run_mode)?.icon || '🤖'}
                           </div>
                           <div>
                             <div className="agent-row-name">{agent.agent_name}</div>
                             <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                              <span>{agent.run_mode}</span>
+                              <span>{agent.run_mode || resolveAgentType(agent)}</span>
                               {agent.run_mode === 'sourcing' && (
                                 <TargetAgentsBadge targets={getTargetAgentNames(agent)} />
                               )}
@@ -764,36 +960,35 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
 
                       <td onClick={e => e.stopPropagation()}>
                         <div className="row-actions">
-                          {/* Run Now */}
+                          {/* Run Now - Tutorial Step 3 */}
                           <button
                             className="row-btn"
                             disabled={busy || agent.is_executing}
                             onClick={() => handleRunNow(agent)}
                             title="Exécuter maintenant"
-                            style={{ 
-                              ...getBtnStyle(agent, 1),
+                            style={{
+                              ...getBtnStyle(agent, 3),
                               opacity: agent.is_executing ? 0.5 : 1,
                               cursor: agent.is_executing ? 'not-allowed' : 'pointer'
                             }}
                           >
-                            {renderTutorialArrow(agent, 1)}
+                            {renderTutorialArrow(agent, 3)}
                             {busy ? '…' : '▶ Run'}
                           </button>
 
-                          {/* Stop / Start */}
+                          {/* Stop / Start - Tutorial Step 3 */}
                           {status === 'running' ? (
                             <button
                               className="row-btn danger"
                               disabled={busy || agent.is_executing}
                               onClick={() => handlePause(agent)}
                               title="Mettre en pause"
-                              style={{ 
-                                ...getBtnStyle(agent, 2),
+                              style={{
+                                ...getBtnStyle(agent, 3),
                                 opacity: agent.is_executing ? 0.5 : 1,
                                 cursor: agent.is_executing ? 'not-allowed' : 'pointer'
                               }}
                             >
-                              {renderTutorialArrow(agent, 2)}
                               {busy ? '…' : '⏸ Stop'}
                             </button>
                           ) : (
@@ -808,29 +1003,28 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                                 }
                               }}
                               title="Reprendre"
-                              style={{ 
-                                color: '#00E5A0', borderColor: 'rgba(0,229,160,0.3)', ...getBtnStyle(agent, 2),
+                              style={{
+                                color: '#00E5A0', borderColor: 'rgba(0,229,160,0.3)', ...getBtnStyle(agent, 3),
                                 opacity: agent.is_executing ? 0.5 : 1,
                                 cursor: agent.is_executing ? 'not-allowed' : 'pointer'
                               }}
                             >
-                              {renderTutorialArrow(agent, 2)}
                               {busy ? '…' : '▶ Start'}
                             </button>
                           )}
 
-                          {/* Config */}
+                          {/* Config - Tutorial Step 5 */}
                           <button
                             className="row-btn"
                             onClick={() => onConfigure(agent.run_mode || 'recouvrement', agent)}
                             title="Modifier la configuration"
-                            style={{ ...getBtnStyle(agent, 3) }}
+                            style={{ ...getBtnStyle(agent, 5) }}
                           >
-                            {renderTutorialArrow(agent, 3)}
+                            {renderTutorialArrow(agent, 5)}
                             ⚙️
                           </button>
 
-                          {/* Open Workspace (Prospect and Sourcing) */}
+                          {/* Open Workspace (Prospect and Sourcing) - Tutorial Step 2 */}
                           {(agent.run_mode === 'prospection' || agent.run_mode === 'sourcing') && (
                             <button
                               className="row-btn"
@@ -842,14 +1036,28 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                                 router.push(route);
                               }}
                               title="Ouvrir l'espace de travail"
-                              style={{ color: '#00E5C8', borderColor: 'rgba(0,229,200,0.3)', ...getBtnStyle(agent, 4) }}
+                              style={{
+                                color: '#00E5C8',
+                                borderColor: 'rgba(0,229,200,0.3)',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                ...getBtnStyle(agent, 2)
+                              }}
                             >
-                              {renderTutorialArrow(agent, 4)}
-                              {navigatingTo === agent.agent_name ? '⏳ Ouverture...' : '🚀 Espace'}
+                              {renderTutorialArrow(agent, 2)}
+                              {navigatingTo === agent.agent_name ? (
+                                <span>⏳ Ouverture...</span>
+                              ) : (
+                                <>
+                                  <LayoutDashboard size={13} style={{ flexShrink: 0 }} />
+                                  <span>Espace</span>
+                                </>
+                              )}
                             </button>
                           )}
 
-                          {/* Delete */}
+                          {/* Delete - Tutorial Step 5 */}
                           <button
                             className="row-btn danger"
                             disabled={busy}
@@ -857,7 +1065,6 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                             title="Supprimer l'agent"
                             style={{ ...getBtnStyle(agent, 5) }}
                           >
-                            {renderTutorialArrow(agent, 5)}
                             🗑️
                           </button>
                         </div>

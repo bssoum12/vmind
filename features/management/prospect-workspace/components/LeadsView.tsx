@@ -4,7 +4,10 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useSearchParams } from 'next/navigation';
 import GlobalLeadsModal from './GlobalLeadsModal';
+import { LeadsEmptyState } from './LeadsEmptyState';
 import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
+import { Database, FileSpreadsheet, ScanLine, UserPlus, Zap, Globe, Sparkles, UploadCloud, Target } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
@@ -623,10 +626,17 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
       });
 
       if (res.ok) {
+        const count = leadsToQualify.length;
+        const msg = count === 1
+          ? `Qualification lancée pour 1 prospect sélectionné. Les statuts se mettront à jour sous peu.`
+          : selectedLeadIds.length > 0
+            ? `Qualification lancée pour ${count} prospects sélectionnés. Les statuts se mettront à jour sous peu.`
+            : `Qualification lancée pour l'ensemble des ${count} prospects. Les statuts se mettront à jour sous peu.`;
         setUploadMessage({
-          text: `Qualification en masse lancée pour ${filteredLeads.length} prospects. Les statuts se mettront à jour sous peu.`,
+          text: msg,
           type: 'success'
         });
+        setSelectedLeadIds([]);
       } else {
         throw new Error('Erreur API qualification');
       }
@@ -667,31 +677,63 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
       )}
 
       <div className="view-header" style={{ position: 'relative', zIndex: leadsTutorialStep > 0 && leadsTutorialStep < 5 ? 10001 : 1 }}>
-        <div className="view-title">
-          <h1>Liste des Prospects</h1>
-          <p>Visualiser, filtrer et gérer vos leads qualifiés par l&apos;intelligence artificielle</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: 'rgba(0, 229, 200, 0.1)',
+            border: '1px solid rgba(0, 229, 200, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#00E5C8',
+            flexShrink: 0
+          }}>
+            <Database size={22} />
+          </div>
+          <div className="view-title">
+            <h1 style={{ margin: 0 }}>Liste des Prospects</h1>
+            <p style={{ margin: '0.25rem 0 0 0' }}>Visualiser, filtrer et gérer vos leads qualifiés par l&apos;intelligence artificielle</p>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button className="btn btn-secondary" onClick={exportToCSV} style={{ ...getTabBtnStyle(1) }}>
+        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexShrink: 0 }}>
+          <button
+            className="btn btn-secondary"
+            onClick={exportToCSV}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '0.45rem 0.85rem', fontSize: '0.85rem', whiteSpace: 'nowrap', ...getTabBtnStyle(1) }}
+          >
             {renderTutorialArrow(1)}
-            📥 Exporter CSV ({selectedLeadIds.length > 0 ? selectedLeadIds.length : sortedLeads.length})
+            <FileSpreadsheet size={15} style={{ flexShrink: 0 }} />
+            <span>Exporter CSV ({selectedLeadIds.length > 0 ? selectedLeadIds.length : sortedLeads.length})</span>
           </button>
           <button
             className="btn btn-secondary"
             onClick={handleBulkQualify}
             disabled={isBulkQualifying || csvUploading || filteredLeads.length === 0}
-            style={{ borderColor: 'var(--accent-secondary)', ...getTabBtnStyle(2) }}
+            style={{ borderColor: 'var(--accent-secondary)', display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '0.45rem 0.85rem', fontSize: '0.85rem', whiteSpace: 'nowrap', ...getTabBtnStyle(2) }}
           >
             {renderTutorialArrow(2)}
-            {isBulkQualifying ? '🤖 Qualification...' : `🤖 Qualifier la sélection (${selectedLeadIds.length > 0 ? selectedLeadIds.length : filteredLeads.length})`}
+            <ScanLine size={15} style={{ flexShrink: 0 }} />
+            <span>{isBulkQualifying ? 'Qualification...' : `Qualifier (${selectedLeadIds.length > 0 ? selectedLeadIds.length : filteredLeads.length})`}</span>
           </button>
-          <button className="btn btn-primary" onClick={() => setIsGlobalModalOpen(true)} style={{ ...getTabBtnStyle(3) }}>
+          <button
+            className="btn btn-primary"
+            onClick={() => setIsGlobalModalOpen(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '0.45rem 0.85rem', fontSize: '0.85rem', whiteSpace: 'nowrap', ...getTabBtnStyle(3) }}
+          >
             {renderTutorialArrow(3)}
-            ✨ Assigner Prospect Existant
+            <UserPlus size={15} style={{ flexShrink: 0 }} />
+            <span>Assigner Prospect</span>
           </button>
-          <button className="btn btn-primary" onClick={() => setShowImportConsole(!showImportConsole)} style={{ ...getTabBtnStyle(4) }}>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowImportConsole(!showImportConsole)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '0.45rem 0.85rem', fontSize: '0.85rem', whiteSpace: 'nowrap', ...getTabBtnStyle(4) }}
+          >
             {renderTutorialArrow(4)}
-            ⚡ Ingestion Prospects {showImportConsole ? '▲' : '▼'}
+            <Zap size={15} style={{ flexShrink: 0 }} />
+            <span>Ingestion {showImportConsole ? '▲' : '▼'}</span>
           </button>
           <input
             type="file"
@@ -708,7 +750,9 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
         <div className="card fade-in" style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--accent-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>
             <span>Qualification de {qualifyingCount} prospects par l&apos;IA en cours...</span>
-            <span style={{ opacity: 0.8 }}>Veuillez patienter 🤖</span>
+            <span style={{ opacity: 0.8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              Veuillez patienter <CyberIcon name="bot" size={14} color="#00E5C8" />
+            </span>
           </div>
           <div style={{ height: '6px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' }}>
             <div
@@ -756,9 +800,9 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
           <span>{uploadMessage.text}</span>
           <button
             onClick={() => setUploadMessage(null)}
-            style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontWeight: 'bold' }}
+            style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
           >
-            ✕
+            <CyberIcon name="close" size={13} />
           </button>
         </div>
       )}
@@ -778,11 +822,15 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
                 fontWeight: 600,
                 fontSize: '0.95rem',
                 paddingBottom: '0.5rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
                 transition: 'all var(--transition-fast)'
               }}
               onClick={() => setImportTab('file')}
             >
-              📁 Fichier (CSV / JSON)
+              <FileSpreadsheet size={16} style={{ flexShrink: 0 }} />
+              <span>Fichier (CSV / JSON)</span>
             </button>
             <button
               type="button"
@@ -795,11 +843,15 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
                 fontWeight: 600,
                 fontSize: '0.95rem',
                 paddingBottom: '0.5rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
                 transition: 'all var(--transition-fast)'
               }}
               onClick={() => setImportTab('url')}
             >
-              🔗 Lien URL
+              <Globe size={16} style={{ flexShrink: 0 }} />
+              <span>Lien URL</span>
             </button>
             <button
               type="button"
@@ -812,11 +864,15 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
                 fontWeight: 600,
                 fontSize: '0.95rem',
                 paddingBottom: '0.5rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
                 transition: 'all var(--transition-fast)'
               }}
               onClick={() => setImportTab('paste')}
             >
-              ✍️ Saisie Manuelle
+              <Sparkles size={16} style={{ flexShrink: 0 }} />
+              <span>Saisie Manuelle</span>
             </button>
           </div>
 
@@ -857,7 +913,9 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
                 style={{ width: '100%', marginBottom: 0, padding: '1.5rem 1rem' }}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <div className="upload-icon" style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>📁</div>
+                <div className="upload-icon" style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+                  <UploadCloud size={44} color="#00E5C8" style={{ flexShrink: 0 }} />
+                </div>
                 <h4 style={{ fontSize: '0.9rem', fontWeight: 600, marginBottom: '0.25rem' }}>
                   {csvUploading ? 'Importation en cours...' : 'Déposez votre fichier CSV ou JSON ici, ou cliquez pour parcourir'}
                 </h4>
@@ -944,238 +1002,268 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
         </div>
       )}
 
-      {/* Filters Panel */}
-      <div className="filters-bar" style={{ ...(leadsTutorialStep === 5 ? getTabBtnStyle(5) : {}) }}>
-        {renderTutorialArrow(5)}
-        {/* Search */}
-        <div className="search-input-wrapper">
-          <span className="search-icon">🔍</span>
-          <input
-            type="text"
-            placeholder="Rechercher par nom, email, entreprise..."
-            className="search-input"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
-            }}
-          />
-        </div>
+      {/* If the agent has 0 leads in its pipeline, display the educational Hero Empty State */}
+      {leads.length === 0 ? (
+        <LeadsEmptyState
+          onOpenImport={() => setShowImportConsole(true)}
+          onOpenGlobalModal={() => setIsGlobalModalOpen(true)}
+        />
+      ) : (
+        <>
+          {/* Filters Panel */}
+          <div className="filters-bar" style={{ ...(leadsTutorialStep === 5 ? getTabBtnStyle(5) : {}) }}>
+            {renderTutorialArrow(5)}
+            {/* Search */}
+            <div className="search-input-wrapper">
+              <span className="search-icon" style={{ display: 'flex', alignItems: 'center' }}>
+                <CyberIcon name="search" size={14} color="var(--text-muted)" />
+              </span>
+              <input
+                type="text"
+                placeholder="Rechercher par nom, email, entreprise..."
+                className="search-input"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
 
-        {/* Status Filter */}
-        <select
-          className="filter-select"
-          value={statusFilter}
-          onChange={(e) => {
-            setStatusFilter(e.target.value);
-            setCurrentPage(1);
-          }}
-        >
-          <option value="All">Tous les statuts</option>
-          <option value="Nouveau">Nouveau</option>
-          <option value="Qualifié">Qualifié</option>
-          <option value="Écarté">Écarté</option>
-        </select>
+            {/* Status Filter */}
+            <select
+              className="filter-select"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="All">Tous les statuts</option>
+              <option value="Nouveau">Nouveau</option>
+              <option value="Qualifié">Qualifié</option>
+              <option value="Écarté">Écarté</option>
+            </select>
 
-        {/* Source Filter */}
-        <select
-          className="filter-select"
-          value={sourceFilter}
-          onChange={(e) => {
-            setSourceFilter(e.target.value);
-            setCurrentPage(1);
-          }}
-        >
-          <option value="All">Toutes les sources</option>
-          {Array.from(new Set(leads.map(l => l.source).filter(Boolean))).map(src => (
-            <option key={src} value={src}>{src}</option>
-          ))}
-        </select>
+            {/* Source Filter */}
+            <select
+              className="filter-select"
+              value={sourceFilter}
+              onChange={(e) => {
+                setSourceFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="All">Toutes les sources</option>
+              {Array.from(new Set(leads.map(l => l.source).filter(Boolean))).map(src => (
+                <option key={src} value={src}>{src}</option>
+              ))}
+            </select>
 
-        {/* Score Filter */}
-        <select
-          className="filter-select"
-          value={scoreFilter}
-          onChange={(e) => {
-            setScoreFilter(e.target.value);
-            setCurrentPage(1);
-          }}
-        >
-          <option value="All">Tous les scores</option>
-          <option value="Qualified">Qualifiés (Décision IA)</option>
-          <option value="Unqualified">Écartés (Décision IA)</option>
-        </select>
-      </div>
+            {/* Score Filter */}
+            <select
+              className="filter-select"
+              value={scoreFilter}
+              onChange={(e) => {
+                setScoreFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+            >
+              <option value="All">Tous les scores</option>
+              <option value="Qualified">Qualifiés (Décision IA)</option>
+              <option value="Unqualified">Écartés (Décision IA)</option>
+            </select>
+          </div>
 
-      {/* Table */}
-      <div className="table-container" style={{ overflowX: leadsTutorialStep === 6 ? 'visible' : 'auto' }}>
-        <table className="leads-table">
-          <thead>
-            <tr>
-              <th style={{ width: '40px', textAlign: 'center', verticalAlign: 'middle' }}>
-                <StyledCheckbox
-                  checked={paginatedLeads.length > 0 && selectedLeadIds.length === sortedLeads.length}
-                  isIndeterminate={selectedLeadIds.length > 0 && selectedLeadIds.length < sortedLeads.length}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedLeadIds(sortedLeads.map(l => l.id));
-                    } else {
-                      setSelectedLeadIds([]);
-                    }
-                  }}
-                />
-              </th>
-              <th style={{ cursor: 'pointer', width: '20%' }} onClick={() => toggleSort('nom')}>
-                Contact {sortBy === 'nom' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-              </th>
-              <th style={{ width: '16%' }}>Entreprise</th>
-              <th style={{ cursor: 'pointer', width: '12%' }} onClick={() => toggleSort('score')}>
-                Score ICP {sortBy === 'score' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-              </th>
-              <th style={{ cursor: 'pointer', width: '10%', whiteSpace: 'nowrap', textAlign: 'center' }} onClick={() => toggleSort('statut')}>
-                Statut {sortBy === 'statut' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-              </th>
-              <th style={{ cursor: 'pointer', width: '10%', textAlign: 'center' }} onClick={() => toggleSort('emails_count')}>
-                Emails {sortBy === 'emails_count' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-              </th>
-              <th style={{ width: '10%' }}>Source</th>
-              <th style={{ cursor: 'pointer', width: '12%' }} onClick={() => toggleSort('date_collecte')}>
-                Collecté {sortBy === 'date_collecte' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
-              </th>
-              <th style={{ width: '10%', textAlign: 'center' }}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paginatedLeads.length > 0 ? (
-              paginatedLeads.map((lead) => {
-                const isQualified = lead.score !== null && lead.score >= threshold;
-                const scoreColorClass = lead.score === null
-                  ? ''
-                  : isQualified
-                    ? 'high'
-                    : lead.score >= 40
-                      ? 'medium'
-                      : 'low';
+          {/* Table */}
+          <div className="table-container" style={{ overflowX: leadsTutorialStep === 6 ? 'visible' : 'auto' }}>
+            <table className="leads-table">
+              <thead>
+                <tr>
+                  <th style={{ width: '40px', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <StyledCheckbox
+                      checked={paginatedLeads.length > 0 && selectedLeadIds.length === sortedLeads.length}
+                      isIndeterminate={selectedLeadIds.length > 0 && selectedLeadIds.length < sortedLeads.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedLeadIds(sortedLeads.map(l => l.id));
+                        } else {
+                          setSelectedLeadIds([]);
+                        }
+                      }}
+                    />
+                  </th>
+                  <th style={{ cursor: 'pointer', width: '20%' }} onClick={() => toggleSort('nom')}>
+                    Contact {sortBy === 'nom' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </th>
+                  <th style={{ width: '16%' }}>Entreprise</th>
+                  <th style={{ cursor: 'pointer', width: '12%' }} onClick={() => toggleSort('score')}>
+                    Score ICP {sortBy === 'score' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </th>
+                  <th style={{ cursor: 'pointer', width: '10%', whiteSpace: 'nowrap', textAlign: 'center' }} onClick={() => toggleSort('statut')}>
+                    Statut {sortBy === 'statut' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </th>
+                  <th style={{ cursor: 'pointer', width: '10%', textAlign: 'center' }} onClick={() => toggleSort('emails_count')}>
+                    Emails {sortBy === 'emails_count' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </th>
+                  <th style={{ width: '10%' }}>Source</th>
+                  <th style={{ cursor: 'pointer', width: '12%' }} onClick={() => toggleSort('date_collecte')}>
+                    Collecté {sortBy === 'date_collecte' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </th>
+                  <th style={{ width: '10%', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedLeads.length > 0 ? (
+                  paginatedLeads.map((lead) => {
+                    const isQualified = lead.score !== null && lead.score >= threshold;
+                    const scoreColorClass = lead.score === null
+                      ? ''
+                      : isQualified
+                        ? 'high'
+                        : lead.score >= 40
+                          ? 'medium'
+                          : 'low';
 
-                return (
-                  <tr key={lead.id} className={`lead-row ${selectedLeadIds.includes(lead.id) ? 'selected-row' : ''}`} style={{ cursor: 'pointer', ...(selectedLeadIds.includes(lead.id) ? { backgroundColor: 'rgba(99, 102, 241, 0.05)' } : {}) }} onDoubleClick={() => onOpenLead(lead)}>
-                    <td style={{ textAlign: 'center', width: '40px', verticalAlign: 'middle' }}>
-                      <StyledCheckbox
-                        checked={selectedLeadIds.includes(lead.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedLeadIds(prev => [...prev, lead.id]);
-                          } else {
-                            setSelectedLeadIds(prev => prev.filter(id => id !== lead.id));
-                          }
-                        }}
-                      />
-                    </td>
-                    <td>
-                      <div className="lead-name">{lead.prenom} {lead.nom}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{lead.email}</div>
-                    </td>
-                    <td>
-                      <div>{lead.entreprise}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        {lead.poste} • {lead.secteur} • {lead.pays}
-                      </div>
-                    </td>
-                    <td>
-                      {lead.score !== null ? (
-                        <div className="score-progress-container">
-                          <div className="score-progress-bar">
-                            <div
-                              className={`score-progress-fill ${scoreColorClass}`}
-                              style={{ width: `${lead.score}%` }}
-                            ></div>
+                    return (
+                      <tr key={lead.id} className={`lead-row ${selectedLeadIds.includes(lead.id) ? 'selected-row' : ''}`} style={{ cursor: 'pointer', ...(selectedLeadIds.includes(lead.id) ? { backgroundColor: 'rgba(99, 102, 241, 0.05)' } : {}) }} onDoubleClick={() => onOpenLead(lead)}>
+                        <td style={{ textAlign: 'center', width: '40px', verticalAlign: 'middle' }}>
+                          <StyledCheckbox
+                            checked={selectedLeadIds.includes(lead.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedLeadIds(prev => [...prev, lead.id]);
+                              } else {
+                                setSelectedLeadIds(prev => prev.filter(id => id !== lead.id));
+                              }
+                            }}
+                          />
+                        </td>
+                        <td>
+                          <div className="lead-name">{lead.prenom} {lead.nom}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{lead.email}</div>
+                        </td>
+                        <td>
+                          <div>{lead.entreprise}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                            {lead.poste} • {lead.secteur} • {lead.pays}
                           </div>
-                          <span className="score-text">{lead.score}</span>
-                        </div>
-                      ) : (
-                        <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Non qualifié</span>
-                      )}
-                    </td>
-                    <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
-                      <span className={`badge badge-${lead.est_qualifie === true ? 'qualified' : lead.est_qualifie === false ? 'discarded' : lead.statut === 'Erreur' ? 'error' : 'new'}`}>
-                        {lead.est_qualifie === true ? 'Qualifié' : lead.est_qualifie === false ? 'Écarté' : lead.statut || 'Nouveau'}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <span className={`badge ${(lead.agent_emails_count ?? lead.emails_count ?? 0) > 0 ? 'badge-sent' : 'badge-new'}`}>
-                        {(lead.agent_emails_count ?? lead.emails_count ?? 0) > 0 ? `📧 ${(lead.agent_emails_count ?? lead.emails_count)}` : '0'}
-                      </span>
-                    </td>
-                    <td>
-                      <span style={{ fontSize: '0.85rem' }}>
-                        {lead.source.includes('CSV') ? '📁 CSV' : lead.source.includes('Webhook') ? '⚡ Webhook' : '🔗 API'}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ fontSize: '0.85rem' }}>
-                        {new Date(lead.date_collecte).toLocaleDateString('fr-FR', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric'
-                        })}
-                      </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {new Date(lead.date_collecte).toLocaleTimeString('fr-FR', {
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </div>
-                    </td>
-                    <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', ...(paginatedLeads.indexOf(lead) === 0 ? getTabBtnStyle(6) : {}) }}
-                        onClick={(e) => { e.stopPropagation(); onOpenLead(lead); }}
-                      >
-                        {paginatedLeads.indexOf(lead) === 0 && renderTutorialArrow(6)}
-                        👁️ Détail
-                      </button>
+                        </td>
+                        <td>
+                          {lead.score !== null ? (
+                            <div className="score-progress-container">
+                              <div className="score-progress-bar">
+                                <div
+                                  className={`score-progress-fill ${scoreColorClass}`}
+                                  style={{ width: `${lead.score}%` }}
+                                ></div>
+                              </div>
+                              <span className="score-text">{lead.score}</span>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Non qualifié</span>
+                          )}
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                          <span className={`badge badge-${lead.est_qualifie === true ? 'qualified' : lead.est_qualifie === false ? 'discarded' : lead.statut === 'Erreur' ? 'error' : 'new'}`}>
+                            {lead.est_qualifie === true ? 'Qualifié' : lead.est_qualifie === false ? 'Écarté' : lead.statut || 'Nouveau'}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span className={`badge ${(lead.agent_emails_count ?? lead.emails_count ?? 0) > 0 ? 'badge-sent' : 'badge-new'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            {(lead.agent_emails_count ?? lead.emails_count ?? 0) > 0 ? (
+                              <>
+                                <CyberIcon name="mail" size={12} color="#00E5C8" />
+                                <span>{lead.agent_emails_count ?? lead.emails_count}</span>
+                              </>
+                            ) : '0'}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{ fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                            {lead.source.includes('CSV') ? (
+                              <>
+                                <CyberIcon name="file" size={13} color="#38BDF8" /> CSV
+                              </>
+                            ) : lead.source.includes('Webhook') ? (
+                              <>
+                                <CyberIcon name="zap" size={13} color="#00E5C8" /> Webhook
+                              </>
+                            ) : (
+                              <>
+                                <CyberIcon name="link" size={13} color="#A855F7" /> API
+                              </>
+                            )}
+                          </span>
+                        </td>
+                        <td>
+                          <div style={{ fontSize: '0.85rem' }}>
+                            {new Date(lead.date_collecte).toLocaleDateString('fr-FR', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric'
+                            })}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            {new Date(lead.date_collecte).toLocaleTimeString('fr-FR', {
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        </td>
+                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <button
+                            className="btn btn-secondary"
+                            style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: 5, ...(paginatedLeads.indexOf(lead) === 0 ? getTabBtnStyle(6) : {}) }}
+                            onClick={(e) => { e.stopPropagation(); onOpenLead(lead); }}
+                          >
+                            {paginatedLeads.indexOf(lead) === 0 && renderTutorialArrow(6)}
+                            <CyberIcon name="eye" size={13} color="#00E5C8" />
+                            <span>Détail</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                      Aucun prospect ne correspond aux filtres de recherche.
                     </td>
                   </tr>
-                );
-              })
-            ) : (
-              <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                  Aucun prospect ne correspond aux filtres.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="pagination">
-          <span className="pagination-text">
-            Affichage de {Math.min(filteredLeads.length, (currentPage - 1) * itemsPerPage + 1)} à{' '}
-            {Math.min(filteredLeads.length, currentPage * itemsPerPage)} sur {filteredLeads.length} prospects
-          </span>
-          <div className="pagination-buttons">
-            <button
-              className="btn btn-secondary"
-              style={{ padding: '0.4rem 0.8rem' }}
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(currentPage - 1)}
-            >
-              Précédent
-            </button>
-            <button
-              className="btn btn-secondary"
-              style={{ padding: '0.4rem 0.8rem' }}
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(currentPage + 1)}
-            >
-              Suivant
-            </button>
+                )}
+              </tbody>
+            </table>
           </div>
-        </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="pagination">
+              <span className="pagination-text">
+                Affichage de {Math.min(filteredLeads.length, (currentPage - 1) * itemsPerPage + 1)} à{' '}
+                {Math.min(filteredLeads.length, currentPage * itemsPerPage)} sur {filteredLeads.length} prospects
+              </span>
+              <div className="pagination-buttons">
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '0.4rem 0.8rem' }}
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                >
+                  Précédent
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '0.4rem 0.8rem' }}
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                >
+                  Suivant
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Qualification Prompt Modal */}
@@ -1217,7 +1305,21 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🤖</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+                <div style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 16,
+                  background: 'rgba(0, 229, 200, 0.1)',
+                  border: '1px solid rgba(0, 229, 200, 0.25)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#00E5C8'
+                }}>
+                  <Target size={28} />
+                </div>
+              </div>
               <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
                 Qualification IA Immédiate ?
               </h2>
@@ -1246,11 +1348,16 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                   padding: '0.75rem',
                   background: 'linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%)',
                   border: 'none',
-                  boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)'
+                  boxShadow: '0 4px 15px rgba(99, 102, 241, 0.3)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
                 }}
                 onClick={handleQualifyNewLeads}
               >
-                🤖 Qualifier maintenant
+                <CyberIcon name="bot" size={16} color="#fff" />
+                <span>Qualifier maintenant</span>
               </button>
             </div>
           </div>

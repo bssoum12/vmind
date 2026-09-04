@@ -245,6 +245,7 @@ export default function Home() {
   // Management Mode State
 
   const searchParams = useSearchParams();
+  const hasInitializedFromUrl = React.useRef(false);
 
   const [currentView, setCurrentView] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -254,22 +255,26 @@ export default function Home() {
   });
 
   useEffect(() => {
-    if (!searchParams) return;
+    if (!searchParams || hasInitializedFromUrl.current) return;
     const viewParam = searchParams.get('view');
     const modeParam = searchParams.get('mode');
 
-    if (modeParam === 'management' || modeParam === 'MANAGEMENT') {
-      setMode('MANAGEMENT');
+    if (viewParam || modeParam) {
+      hasInitializedFromUrl.current = true;
     }
 
-    if (viewParam) {
+    if (modeParam === 'management' || modeParam === 'MANAGEMENT' || viewParam) {
       setMode('MANAGEMENT');
-      setCurrentView(viewParam);
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('vmind_current_view', viewParam);
-        sessionStorage.setItem('vmind_mode', 'MANAGEMENT');
-        localStorage.setItem('vmind_mode', 'MANAGEMENT');
+      if (viewParam) {
+        setCurrentView(viewParam);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('vmind_current_view', viewParam);
+          sessionStorage.setItem('vmind_mode', 'MANAGEMENT');
+          localStorage.setItem('vmind_mode', 'MANAGEMENT');
+        }
       }
+    } else if (modeParam === 'assistant' || modeParam === 'ASSISTANT') {
+      setMode('ASSISTANT');
     }
   }, [searchParams, setMode]);
 
@@ -323,7 +328,8 @@ export default function Home() {
   };
 
   const handleCancelWizard = () => {
-    setCurrentView('market');
+    const hasPostDeploy = typeof window !== 'undefined' && sessionStorage.getItem('vmind_post_deploy_tutorial_agent');
+    setCurrentView(hasPostDeploy ? 'agents' : 'market');
     setSelectedTemplate(null);
     setEditingAgent(null);
     setInitialWizardStep(undefined);

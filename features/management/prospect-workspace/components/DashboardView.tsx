@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
+import { Building2, User, BarChart2, Globe, FileText, Target } from 'lucide-react';
 
 interface Lead {
   id: number;
@@ -259,10 +261,10 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
           const mission = agentConfig.agent_mission || '';
 
           const poids = [
-            { label: 'Secteur d\'Activité', value: icp.poids_secteur || 25, color: '#3B82F6', icon: '🏢' },
-            { label: 'Poste du Contact', value: icp.poids_poste || 25, color: '#10B981', icon: '👤' },
-            { label: 'Taille d\'Entreprise', value: icp.poids_taille || 25, color: '#F59E0B', icon: '📊' },
-            { label: 'Zone Géographique', value: icp.poids_pays || 25, color: '#8B5CF6', icon: '🌍' }
+            { label: 'Secteur d\'Activité', value: icp.poids_secteur || 25, color: '#3B82F6', icon: <Building2 size={16} color="#3B82F6" /> },
+            { label: 'Poste du Contact', value: icp.poids_poste || 25, color: '#10B981', icon: <User size={16} color="#10B981" /> },
+            { label: 'Taille d\'Entreprise', value: icp.poids_taille || 25, color: '#F59E0B', icon: <BarChart2 size={16} color="#F59E0B" /> },
+            { label: 'Zone Géographique', value: icp.poids_pays || 25, color: '#8B5CF6', icon: <Globe size={16} color="#8B5CF6" /> }
           ];
 
           return (
@@ -270,7 +272,22 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
               {/* Header */}
               <div className="icp-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                 <div className="icp-header-title">
-                  <div className="icp-icon">🎯</div>
+                  <div className="icp-icon" style={{ background: 'transparent', padding: 0 }}>
+                    <div style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 10,
+                      background: 'rgba(255, 71, 87, 0.12)',
+                      border: '1px solid rgba(255, 71, 87, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#FF4757',
+                      flexShrink: 0
+                    }}>
+                      <Target size={20} />
+                    </div>
+                  </div>
                   <div>
                     <h3>Configuration & Algorithme de Ciblage (ICP)</h3>
                     <p>Règles et pondérations utilisées par l'intelligence artificielle pour évaluer les prospects</p>
@@ -302,7 +319,8 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
                     }}
                     title="Modifier la configuration et l'algorithme ICP de cet agent"
                   >
-                    ⚙️ Modifier la configuration
+                    <CyberIcon name="settings" size={14} color="#00E5C8" />
+                    <span>Modifier la configuration</span>
                   </button>
                 </div>
               </div>
@@ -367,8 +385,8 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
               <div className="icp-targets-grid">
                 {/* Postes */}
                 <div className="icp-target-box">
-                  <div className="target-title green">
-                    <span>👤</span> Postes Ciblés
+                  <div className="target-title green" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <User size={15} color="#10B981" /> Postes Ciblés
                   </div>
                   {icp.poste_contact && icp.poste_contact.length > 0 ? (
                     <div className="tags-wrapper">
@@ -383,8 +401,8 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
 
                 {/* Secteurs */}
                 <div className="icp-target-box">
-                  <div className="target-title blue">
-                    <span>🏢</span> Secteurs d'Activité
+                  <div className="target-title blue" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Building2 size={15} color="#3B82F6" /> Secteurs d'Activité
                   </div>
                   {icp.secteur_activite && icp.secteur_activite.length > 0 ? (
                     <div className="tags-wrapper">
@@ -399,8 +417,8 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
 
                 {/* Zones Geo */}
                 <div className="icp-target-box">
-                  <div className="target-title purple">
-                    <span>🌍</span> Zones Géographiques
+                  <div className="target-title purple" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Globe size={15} color="#8B5CF6" /> Zones Géographiques
                   </div>
                   {icp.zone_geo && icp.zone_geo.length > 0 ? (
                     <div className="tags-wrapper">
@@ -417,7 +435,9 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
               {/* Agent Mission Box if present */}
               {mission && (
                 <div className="icp-mission-box">
-                  <div className="mission-title">📜 Mission Spécifique & Directive du Prompt</div>
+                  <div className="mission-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <CyberIcon name="file" size={15} color="#00E5C8" /> Mission Spécifique & Directive du Prompt
+                  </div>
                   <div className="mission-text">"{mission}"</div>
                 </div>
               )}

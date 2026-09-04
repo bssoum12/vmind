@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CyberIcon } from './CyberIcon';
 import './VMindGuide.scss';
 
 export type GuideMood = 'curious' | 'focused' | 'convinced' | 'settled';
@@ -53,6 +54,7 @@ export interface VMindGuideProps {
   backdropBlur?: number;
   onBackdropClick?: () => void;
   onClose?: () => void;
+  children?: React.ReactNode;
 }
 
 export const VMindGuide: React.FC<VMindGuideProps> = ({
@@ -64,7 +66,8 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
   backdropOpacity = 0.12,
   backdropBlur = 1,
   onBackdropClick,
-  onClose
+  onClose,
+  children
 }) => {
   const [displayedText, setDisplayedText] = useState('');
   const [mounted, setMounted] = useState(false);
@@ -212,6 +215,18 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
             transition: 'all 0.5s ease-in-out'
           }} />
           
+          {onClose && (
+            <button
+              type="button"
+              className="vmind-guide-close-btn"
+              onClick={onClose}
+              title="Fermer le guide"
+              aria-label="Fermer"
+            >
+              <CyberIcon name="close" size={11} color="currentColor" />
+            </button>
+          )}
+
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
             <div style={{
               width: '42px', 
@@ -267,6 +282,11 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
                   }}
                 />
               </p>
+              {children && (
+                <div style={{ marginTop: '0.85rem' }}>
+                  {children}
+                </div>
+              )}
             </div>
           </div>
         </motion.div>

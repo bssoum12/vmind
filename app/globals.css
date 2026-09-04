@@ -66,6 +66,8 @@ a,
 
 /* ── TOP BAR ── */
 .topbar {
+  position: relative;
+  z-index: 10005;
   height: 52px;
   background: var(--navy2);
   border-bottom: 1px solid var(--border);
@@ -204,6 +206,8 @@ a,
   border-radius: 8px;
   border: 1px solid var(--border);
   margin-left: 20px;
+  position: relative;
+  z-index: 10;
 }
 
 .mode-btn {
@@ -219,6 +223,8 @@ a,
   font-family: var(--font-title);
   letter-spacing: 1px;
   text-transform: uppercase;
+  user-select: none;
+  pointer-events: auto;
 }
 
 .mode-btn.active {

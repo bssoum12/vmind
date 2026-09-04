@@ -99,9 +99,13 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose }: LeadDetailDr
           onClick={onClose}
           style={{
             position: 'fixed',
-            inset: 0,
+            top: '52px',
+            left: 0,
+            right: 0,
+            bottom: 0,
             backgroundColor: 'rgba(3, 8, 16, 0.75)',
-            backdropFilter: 'blur(6px)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
             zIndex: 9998,
             transition: 'opacity 0.25s ease'
           }}
@@ -112,14 +116,16 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose }: LeadDetailDr
       <div 
         style={{
           position: 'fixed',
-          top: 0,
+          top: '52px',
           right: 0,
           bottom: 0,
+          height: 'calc(100vh - 52px)',
           width: '520px',
           maxWidth: '92vw',
           backgroundColor: '#071324',
           backgroundImage: 'radial-gradient(ellipse at top right, rgba(0, 229, 200, 0.08) 0%, transparent 60%)',
           borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
           boxShadow: '-12px 0 40px rgba(0, 0, 0, 0.6)',
           zIndex: 9999,
           display: 'flex',
@@ -227,14 +233,19 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose }: LeadDetailDr
         </div>
 
         {/* 2. DRAWER CONTENT */}
-        <div style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '24px 28px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '20px'
-        }}>
+        <div 
+          className="premium-scrollbar"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '24px 28px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '20px',
+            scrollbarWidth: 'thin',
+            scrollbarColor: 'rgba(0, 229, 200, 0.35) rgba(6, 17, 31, 0.4)'
+          }}
+        >
 
           {/* SOURCING STATUS CARD */}
           <div style={{

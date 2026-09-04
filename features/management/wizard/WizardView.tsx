@@ -527,13 +527,13 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel, ag
   const removeTriggerRule = (index: number) => {
     setFormData(prev => ({
       ...prev,
-      trigger_rules: prev.trigger_rules.filter((_, idx) => idx !== index)
+      trigger_rules: prev.trigger_rules.filter((_: TriggerRule, idx: number) => idx !== index)
     }));
   };
 
   const updateTriggerRuleAtIndex = (index: number, key: keyof TriggerRule, value: any) => {
     setFormData(prev => {
-      const updatedRules = prev.trigger_rules.map((rule, idx) => {
+      const updatedRules = prev.trigger_rules.map((rule: TriggerRule, idx: number) => {
         if (idx === index) {
           return {
             ...rule,
@@ -941,7 +941,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel, ag
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {formData.trigger_rules.map((rule, index) => (
+                    {formData.trigger_rules.map((rule: TriggerRule, index: number) => (
                       <div
                         key={index}
                         style={{

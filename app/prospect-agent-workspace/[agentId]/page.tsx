@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, LayoutDashboard, Users, Mail, Activity } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, Users, Mail, Terminal, Target } from 'lucide-react';
 
 import DashboardView from '../../../features/management/prospect-workspace/components/DashboardView';
 import LeadsView from '../../../features/management/prospect-workspace/components/LeadsView';
@@ -11,6 +11,7 @@ import CampaignsView from '../../../features/management/prospect-workspace/compo
 import LogsView from '../../../features/management/prospect-workspace/components/LogsView';
 import LeadDetailDrawer from '../../../features/management/prospect-workspace/components/LeadDetailDrawer';
 import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { getAgents } from '@/shared/api/n8n-api';
 import { useProspectSocket } from '../../../features/management/prospect-workspace/hooks/useProspectSocket';
 
@@ -279,23 +280,39 @@ export default function AgentWorkspacePage() {
           >
             <ArrowLeft size={18} />
           </button>
-          <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
-              Espace de Travail : {agentName}
-              {agentData?.is_executing && (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 12, padding: '2px 10px', borderRadius: 4,
-                  background: 'rgba(0, 229, 200, 0.1)', color: '#00E5C8',
-                  border: '1px solid rgba(0, 229, 200, 0.3)',
-                  fontWeight: 600, animation: 'pulse 1.5s infinite',
-                  marginLeft: 12, verticalAlign: 'middle'
-                }}>
-                  ⚡ En cours d'exécution...
-                </span>
-              )}
-            </h1>
-            <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '4px 0 0 0' }}>Supervisez l'agent de prospection en temps réel.</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 42,
+              height: 42,
+              borderRadius: 12,
+              background: 'rgba(0, 229, 200, 0.1)',
+              border: '1px solid rgba(0, 229, 200, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#00E5C8',
+              flexShrink: 0
+            }}>
+              <Target size={22} />
+            </div>
+            <div>
+              <h1 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                Espace de Travail : {agentName}
+                {agentData?.is_executing && (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    fontSize: 12, padding: '2px 10px', borderRadius: 4,
+                    background: 'rgba(0, 229, 200, 0.1)', color: '#00E5C8',
+                    border: '1px solid rgba(0, 229, 200, 0.3)',
+                    fontWeight: 600, animation: 'pulse 1.5s infinite',
+                    verticalAlign: 'middle'
+                  }}>
+                    <CyberIcon name="zap" size={11} color="#00E5C8" /> En cours d'exécution...
+                  </span>
+                )}
+              </h1>
+              <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '4px 0 0 0' }}>Supervisez l'agent de prospection en temps réel.</p>
+            </div>
           </div>
         </div>
 
@@ -305,26 +322,30 @@ export default function AgentWorkspacePage() {
             { id: 'dashboard', label: 'Vue d\'ensemble', icon: LayoutDashboard, step: 1 },
             { id: 'leads', label: 'Prospects', icon: Users, step: 2 },
             { id: 'outbox', label: 'Campagnes', icon: Mail, step: 3 },
-            { id: 'logs', label: 'Journal', icon: Activity, step: 4 },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '8px 16px', borderRadius: '8px',
-                background: activeTab === tab.id ? 'var(--cyan)' : 'transparent',
-                color: activeTab === tab.id ? '#000' : 'var(--text-muted)',
-                fontWeight: activeTab === tab.id ? 600 : 500,
-                border: 'none', cursor: 'pointer', transition: 'all 0.2s',
-                ...getTabBtnStyle(tab.step)
-              }}
-            >
-              {renderTutorialArrow(tab.step)}
-              <tab.icon size={16} />
-              {tab.label}
-            </button>
-          ))}
+            { id: 'logs', label: 'Journal', icon: Terminal, step: 4 },
+          ].map(tab => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '6px 14px', borderRadius: '8px',
+                  background: isActive ? 'var(--cyan)' : 'transparent',
+                  color: isActive ? '#000' : 'var(--text-muted)',
+                  fontWeight: isActive ? 600 : 500,
+                  border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                  ...getTabBtnStyle(tab.step)
+                }}
+              >
+                {renderTutorialArrow(tab.step)}
+                <Icon size={16} style={{ flexShrink: 0, color: isActive ? '#000' : 'inherit' }} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 

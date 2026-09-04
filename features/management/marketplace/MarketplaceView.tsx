@@ -3,6 +3,8 @@
 import React from 'react';
 import { Button } from '@/shared/management/components/Button';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
+import { VMindGuide, VMindGuideArrow } from '@/shared/management/components/VMindGuide';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
 
 interface MarketplaceViewProps {
   onDeploy: (templateId: string) => void;
@@ -13,6 +15,38 @@ interface MarketplaceViewProps {
 export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, activeCategory, onSelectCategory }) => {
   const [activeTab, setActiveTab] = React.useState('all');
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [highlightedTemplateId, setHighlightedTemplateId] = React.useState<string | null>(null);
+  const [linkedProspectUuid, setLinkedProspectUuid] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const targetTemplate = sessionStorage.getItem('vmind_guide_target_marketplace');
+      const prospectUuid = sessionStorage.getItem('vmind_guide_link_prospect_uuid');
+      if (targetTemplate) {
+        sessionStorage.removeItem('vmind_guide_target_marketplace');
+        setHighlightedTemplateId(targetTemplate);
+        if (prospectUuid) {
+          setLinkedProspectUuid(prospectUuid);
+        }
+      }
+    }
+  }, []);
+
+  const handleDeployTarget = (templateId: string) => {
+    if (linkedProspectUuid && typeof window !== 'undefined') {
+      sessionStorage.setItem('vmind_editing_agent', JSON.stringify({
+        run_mode: templateId,
+        target_agent_ids: [linkedProspectUuid],
+        config: {
+          target_agent_ids: [linkedProspectUuid]
+        }
+      }));
+      sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
+    }
+    setHighlightedTemplateId(null);
+    onDeploy(templateId);
+  };
+
   const allCategories = ['all', ...Array.from(new Set(AGENT_TEMPLATES.flatMap(a => a.category.split(' · '))))].sort();
 
   let filteredAgents = AGENT_TEMPLATES;
@@ -46,7 +80,53 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
   const otherAgents = filteredAgents.slice(6);
 
   return (
-    <div id="view-market" className="anim">
+    <div id="view-market" className="anim" style={{ position: 'relative' }}>
+      {/* ── Guided Focus Backdrop Overlay ── */}
+      {highlightedTemplateId && (
+        <div
+          onClick={() => setHighlightedTemplateId(null)}
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0, 0, 0, 0.82)',
+            backdropFilter: 'blur(3px)',
+            zIndex: 10000,
+            cursor: 'pointer'
+          }}
+        />
+      )}
+
+      {/* ── Guided Assistant Popup in Marketplace ── */}
+      {highlightedTemplateId && (
+        <VMindGuide
+          isOpen={!!highlightedTemplateId}
+          title="Modèle : Agent de Sourcing"
+          message="Voici l'Agent de Sourcing dans votre Marketplace ! Cliquez directement sur cette carte ou sur 'Déployer' pour le configurer et l'associer à votre agent de prospection pour un autopilot 100% autonome."
+          mood="convinced"
+          showBackdrop={true}
+          onClose={() => setHighlightedTemplateId(null)}
+        >
+          <div className="vmind-guide-actions">
+            <button
+              type="button"
+              className="vmind-guide-btn-primary"
+              onClick={() => handleDeployTarget(highlightedTemplateId)}
+            >
+              <CyberIcon name="zap" size={13} color="currentColor" />
+              <span>Déployer & Lier Maintenant</span>
+              <CyberIcon name="arrow-right" size={13} color="currentColor" />
+            </button>
+            <button
+              type="button"
+              className="vmind-guide-btn-secondary"
+              onClick={() => setHighlightedTemplateId(null)}
+            >
+              Fermer
+            </button>
+          </div>
+        </VMindGuide>
+      )}
+
       <div className="page-head">
         <div>
           <div className="page-title">Marketplace d&apos;Agents {activeCategory !== 'all' && `· ${activeCategory}`}</div>
@@ -76,7 +156,9 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
       </div>
       <div className="scroll">
         <div className="market-search">
-          <span style={{ color: 'var(--muted)', fontSize: '14px' }}>🔍</span>
+          <span style={{ color: 'var(--muted)', display: 'inline-flex', alignItems: 'center' }}>
+            <CyberIcon name="search" size={15} color="var(--muted)" />
+          </span>
           <input 
             type="text" 
             placeholder="Rechercher par nom, description, ERP (Sage, Odoo...), canal (WhatsApp, Email)..." 
@@ -100,68 +182,206 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
 
         {popularAgents.length > 0 && (
           <>
-            <div className="section-title">🔥 Agents Populaires</div>
+            <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CyberIcon name="flame" size={16} color="#FF6B00" />
+              <span>Agents Populaires</span>
+            </div>
             <div className="agent-grid">
-              {popularAgents.map((agent) => (
-                <div 
-                  key={agent.id} 
-                  className="atcard" 
-                  style={{ '--card-accent': agent.accent, '--card-iconbg': agent.iconBg } as React.CSSProperties}
-                  onClick={() => onDeploy(agent.id)}
-                >
-                  <div className="atcard-head">
-                    <div className="atcard-icon">{agent.icon}</div>
-                    <div className="atcard-badges">
-                      {agent.tag === 'pop' && <span className="atcard-tag pop">★ POPULAIRE</span>}
-                      {agent.tag === 'new' && <span className="atcard-tag new">NOUVEAU</span>}
-                      {agent.tag === 'beta' && <span className="atcard-tag beta">BÊTA</span>}
+              {popularAgents.map((agent) => {
+                const isHighlighted = highlightedTemplateId === agent.id;
+                return (
+                  <div 
+                    key={agent.id} 
+                    className="atcard" 
+                    style={{
+                      '--card-accent': agent.accent,
+                      '--card-iconbg': agent.iconBg,
+                      position: isHighlighted ? 'relative' : undefined,
+                      zIndex: isHighlighted ? 10001 : undefined,
+                      boxShadow: isHighlighted ? '0 0 0 4px rgba(0, 229, 200, 0.95), 0 16px 48px rgba(0, 229, 200, 0.35)' : undefined,
+                      background: isHighlighted ? 'linear-gradient(165deg, rgba(8, 24, 44, 0.98) 0%, rgba(4, 14, 28, 0.99) 100%)' : undefined,
+                      transform: isHighlighted ? 'scale(1.03)' : undefined,
+                      transition: 'all 0.25s ease',
+                      cursor: 'pointer',
+                    } as React.CSSProperties}
+                    onClick={() => handleDeployTarget(agent.id)}
+                  >
+                    {isHighlighted && (
+                      <VMindGuideArrow
+                        direction="down"
+                        color="#00E5C8"
+                        style={{
+                          position: 'absolute',
+                          top: '-48px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          zIndex: 10002
+                        }}
+                      />
+                    )}
+                    <div className="atcard-head">
+                      <div className="atcard-icon">{agent.icon}</div>
+                      <div className="atcard-badges">
+                        {isHighlighted && (
+                          <span className="atcard-tag new" style={{ background: '#00E5C8', color: '#04101E', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <CyberIcon name="zap" size={10} color="#04101E" />
+                            CLIQUEZ ICI
+                          </span>
+                        )}
+                        {agent.tag === 'pop' && (
+                          <span className="atcard-tag pop" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <CyberIcon name="star" size={9} color="#FFB800" />
+                            POPULAIRE
+                          </span>
+                        )}
+                        {agent.tag === 'new' && !isHighlighted && <span className="atcard-tag new">NOUVEAU</span>}
+                        {agent.tag === 'beta' && <span className="atcard-tag beta">BÊTA</span>}
+                      </div>
+                    </div>
+                    <div className="atcard-name">{agent.name}</div>
+                    <div className="atcard-desc">{agent.description}</div>
+                    <div className="atcard-meta">
+                      <span className="atcard-cat">{agent.category}</span>
+                      <button 
+                        className="atcard-deploy"
+                        style={isHighlighted ? {
+                          background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
+                          color: '#04101E',
+                          fontWeight: 800,
+                          boxShadow: '0 0 14px rgba(0, 229, 200, 0.6)'
+                        } : undefined}
+                      >
+                        {isHighlighted ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                            <CyberIcon name="zap" size={12} color="#04101E" />
+                            Déployer & Lier
+                            <CyberIcon name="arrow-right" size={12} color="#04101E" />
+                          </span>
+                        ) : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            Déployer
+                            <CyberIcon name="arrow-right" size={12} color="currentColor" />
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                    <div style={{ marginTop: '10px', fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--FM)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <CyberIcon name="link" size={10} color="var(--muted)" />
+                        {agent.connections.join(' · ')}
+                      </span>
+                      <span>·</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <CyberIcon name="zap" size={10} color="#00E5C8" />
+                        {agent.deployments} déploiements
+                      </span>
                     </div>
                   </div>
-                  <div className="atcard-name">{agent.name}</div>
-                  <div className="atcard-desc">{agent.description}</div>
-                  <div className="atcard-meta">
-                    <span className="atcard-cat">{agent.category}</span>
-                    <button className="atcard-deploy">Déployer →</button>
-                  </div>
-                  <div style={{ marginTop: '10px', fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--FM)' }}>
-                    🔗 {agent.connections.join(' · ')} &nbsp;·&nbsp; ⚡ {agent.deployments} déploiements
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}
 
         {otherAgents.length > 0 && (
           <>
-            <div className="section-title">📋 Autres Modèles Disponibles</div>
+            <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <CyberIcon name="sparkles" size={16} color="#00E5C8" />
+              <span>Autres Modèles Disponibles</span>
+            </div>
             <div className="agent-grid">
-              {otherAgents.map((agent) => (
-                <div 
-                  key={agent.id} 
-                  className="atcard" 
-                  style={{ '--card-accent': agent.accent, '--card-iconbg': agent.iconBg } as React.CSSProperties}
-                  onClick={() => onDeploy(agent.id)}
-                >
-                  <div className="atcard-head">
-                    <div className="atcard-icon">{agent.icon}</div>
-                    <div className="atcard-badges">
-                      {agent.tag === 'pop' && <span className="atcard-tag pop">★ POPULAIRE</span>}
-                      {agent.tag === 'new' && <span className="atcard-tag new">NOUVEAU</span>}
-                      {agent.tag === 'beta' && <span className="atcard-tag beta">BÊTA</span>}
+              {otherAgents.map((agent) => {
+                const isHighlighted = highlightedTemplateId === agent.id;
+                return (
+                  <div 
+                    key={agent.id} 
+                    className="atcard" 
+                    style={{
+                      '--card-accent': agent.accent,
+                      '--card-iconbg': agent.iconBg,
+                      position: isHighlighted ? 'relative' : undefined,
+                      zIndex: isHighlighted ? 10001 : undefined,
+                      boxShadow: isHighlighted ? '0 0 0 4px rgba(0, 229, 200, 0.95), 0 16px 48px rgba(0, 229, 200, 0.35)' : undefined,
+                      background: isHighlighted ? 'linear-gradient(165deg, rgba(8, 24, 44, 0.98) 0%, rgba(4, 14, 28, 0.99) 100%)' : undefined,
+                      transform: isHighlighted ? 'scale(1.03)' : undefined,
+                      transition: 'all 0.25s ease',
+                      cursor: 'pointer',
+                    } as React.CSSProperties}
+                    onClick={() => handleDeployTarget(agent.id)}
+                  >
+                    {isHighlighted && (
+                      <VMindGuideArrow
+                        direction="down"
+                        color="#00E5C8"
+                        style={{
+                          position: 'absolute',
+                          top: '-48px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          zIndex: 10002
+                        }}
+                      />
+                    )}
+                    <div className="atcard-head">
+                      <div className="atcard-icon">{agent.icon}</div>
+                      <div className="atcard-badges">
+                        {isHighlighted && (
+                          <span className="atcard-tag new" style={{ background: '#00E5C8', color: '#04101E', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <CyberIcon name="zap" size={10} color="#04101E" />
+                            CLIQUEZ ICI
+                          </span>
+                        )}
+                        {agent.tag === 'pop' && (
+                          <span className="atcard-tag pop" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <CyberIcon name="star" size={9} color="#FFB800" />
+                            POPULAIRE
+                          </span>
+                        )}
+                        {agent.tag === 'new' && !isHighlighted && <span className="atcard-tag new">NOUVEAU</span>}
+                        {agent.tag === 'beta' && <span className="atcard-tag beta">BÊTA</span>}
+                      </div>
+                    </div>
+                    <div className="atcard-name">{agent.name}</div>
+                    <div className="atcard-desc">{agent.description}</div>
+                    <div className="atcard-meta">
+                      <span className="atcard-cat">{agent.category}</span>
+                      <button 
+                        className="atcard-deploy"
+                        style={isHighlighted ? {
+                          background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
+                          color: '#04101E',
+                          fontWeight: 800,
+                          boxShadow: '0 0 14px rgba(0, 229, 200, 0.6)'
+                        } : undefined}
+                      >
+                        {isHighlighted ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                            <CyberIcon name="zap" size={12} color="#04101E" />
+                            Déployer & Lier
+                            <CyberIcon name="arrow-right" size={12} color="#04101E" />
+                          </span>
+                        ) : (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            Déployer
+                            <CyberIcon name="arrow-right" size={12} color="currentColor" />
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                    <div style={{ marginTop: '10px', fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--FM)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <CyberIcon name="link" size={10} color="var(--muted)" />
+                        {agent.connections.join(' · ')}
+                      </span>
+                      <span>·</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <CyberIcon name="zap" size={10} color="#00E5C8" />
+                        {agent.deployments} déploiements
+                      </span>
                     </div>
                   </div>
-                  <div className="atcard-name">{agent.name}</div>
-                  <div className="atcard-desc">{agent.description}</div>
-                  <div className="atcard-meta">
-                    <span className="atcard-cat">{agent.category}</span>
-                    <button className="atcard-deploy">Déployer →</button>
-                  </div>
-                  <div style={{ marginTop: '10px', fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--FM)' }}>
-                    🔗 {agent.connections.join(' · ')} &nbsp;·&nbsp; ⚡ {agent.deployments} déploiements
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}

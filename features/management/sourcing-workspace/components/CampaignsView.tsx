@@ -380,7 +380,7 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
             </div>
 
             <div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Copie conforme (CC)</div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>CC</div>
               <input 
                 type="text" 
                 className="email-input" 

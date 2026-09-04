@@ -79,16 +79,164 @@
   position: fixed;
   bottom: 2rem;
   right: 2rem;
-  width: 360px;
-  background-color: rgba(9, 13, 20, 0.95);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border-radius: 12px;
-  padding: 1.25rem 1.5rem;
+  width: 390px;
+  max-width: calc(100vw - 2.5rem);
+  background-color: rgba(8, 14, 24, 0.96);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border-radius: 14px;
+  padding: 1.25rem 1.4rem;
   z-index: 999999;
   overflow: hidden;
   font-family: var(--font-sans, system-ui, sans-serif);
   transition: all 0.5s ease-in-out;
+}
+
+/* Close icon button in top right */
+.vmind-guide-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  color: #64748B;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 10;
+
+  &:hover {
+    color: #F0F4F8;
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: scale(1.08);
+  }
+}
+
+/* Actions Container inside VMindGuide */
+.vmind-guide-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+/* Primary Action Button (Cyber Neon Glow Pill) */
+.vmind-guide-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, rgba(0, 229, 200, 0.22) 0%, rgba(0, 180, 216, 0.3) 100%);
+  border: 1px solid rgba(0, 229, 200, 0.65);
+  border-radius: 20px;
+  color: #00E5C8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 229, 200, 0.18);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+
+  &:hover {
+    background: linear-gradient(135deg, rgba(0, 229, 200, 0.38) 0%, rgba(0, 180, 216, 0.5) 100%);
+    border-color: #00E5C8;
+    color: #FFFFFF;
+    box-shadow: 0 6px 20px rgba(0, 229, 200, 0.4);
+    transform: translateY(-1.5px);
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(0, 229, 200, 0.25);
+  }
+
+  &.full-width {
+    width: 100%;
+  }
+}
+
+/* Secondary Button (Frosted Dark Pill) */
+.vmind-guide-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  color: #94A3B8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.24);
+    color: #F0F4F8;
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+/* Ghost Button (Discreet dismiss) */
+.vmind-guide-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: #64748B;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    color: #CBD5E1;
+    background: rgba(255, 255, 255, 0.05);
+  }
+}
+
+/* Keyboard Shortcut Badge */
+.vmind-guide-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  padding: 2px 5px;
+  margin-left: 5px;
+  letter-spacing: 0.03em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  vertical-align: middle;
+  transition: all 0.2s ease;
+  pointer-events: none;
 }
 
 /* Reusable Chevron Arrow Container */

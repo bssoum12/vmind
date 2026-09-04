@@ -2,11 +2,17 @@
 
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/shared/management/components/Button';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
-import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
+import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
 import { OnboardingChat } from './components/OnboardingChat';
+import { IndustryMultiSelect } from './components/IndustryMultiSelect';
+import { JobTitleMultiSelect } from './components/JobTitleMultiSelect';
+import { CountryMultiSelect } from './components/CountryMultiSelect';
+import { EmailSignatureEditor } from './components/EmailSignatureEditor';
+import { ProspectPipeline3D } from './components/ProspectPipeline3D';
 
 interface WizardViewProps {
   templateId: string;
@@ -25,8 +31,9 @@ const VIRTUAL_MIND_GUIDE: Record<string, { title: string; text: string }> = {
   zone_geo: { title: "Zone Géographique", text: "Où se situent vos prospects idéaux ? L'agent adaptera sa recherche et la langue de contact en conséquence." },
   seuil_qualification: { title: "Seuil de Qualification", text: "Le score minimal sur 100 requis pour qu'un lead soit considéré comme qualifié et contacté automatiquement par l'agent." },
   ponderations: { title: "Pondérations ICP", text: "Répartissez l'importance (sur 100) entre le secteur, la taille, le poste et le pays. Cela dicte la formule de scoring IA." },
+  lead_strategy: { title: "Alimentation en Leads", text: "Choisissez en toute transparence comment cet agent recevra ses contacts pour éviter tout pipeline vide." },
   signature_email: { title: "Signature d'Email", text: "Cette signature sera insérée automatiquement à la fin de tous les emails générés par VMind. Soyez professionnel !" },
-  default_cc: { title: "Copie Conforme (CC)", text: "Ajoutez votre adresse email ou celle d'un manager pour recevoir une copie des emails envoyés aux prospects." },
+  default_cc: { title: "CC", text: "Ajoutez votre adresse email ou celle d'un manager pour recevoir une copie des emails envoyés aux prospects." },
   email_recap: { title: "Email Récapitulatif", text: "Adresse email sur laquelle vous recevrez le bilan quotidien des performances." },
   delai_envois: { title: "Délai entre les envois", text: "Délais en secondes entre deux envois successifs." },
   email_limits: { title: "Cadence d'Envoi", text: "Configurez le délai entre chaque email pour éviter d'être marqué comme spam. Les limites journalières protègent la réputation de votre domaine." },
@@ -206,8 +213,22 @@ function TagInput({
 }
 
 export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, onCancel, agentToEdit, initialStep }) => {
+  const router = useRouter();
   const [step, setStep] = useState(initialStep || 1);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  const [deployedUuid, setDeployedUuid] = useState<string | null>(null);
+  const [hoveredDeployAction, setHoveredDeployAction] = useState<'sourcing' | 'workspace' | null>(null);
+
+  const [pipelineHoveredStage, setPipelineHoveredStage] = useState<'card' | 'scanner' | 'mail' | null>(null);
+  const [hasInteractedWithPipeline, setHasInteractedWithPipeline] = useState(false);
+
+  const handlePipelineStageChange = (stage: 'card' | 'scanner' | 'mail' | null) => {
+    setPipelineHoveredStage(stage);
+    if (stage) {
+      setHasInteractedWithPipeline(true);
+    }
+  };
 
   const [showStep2Guide, setShowStep2Guide] = useState(false);
   const step2GuideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -570,10 +591,13 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
         throw new Error(`Impossible de ${agentToEdit ? 'mettre à jour' : 'déployer'} l'agent (${response.statusText})`);
       }
 
-      setDeployed(true);
-      setTimeout(() => {
-        onCancel();
-      }, 4500);
+      const data = await response.json().catch(() => ({}));
+      const createdUuid = data.agent_id || editUuid;
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('vmind_post_deploy_tutorial_agent', formData.agent_name);
+        window.dispatchEvent(new CustomEvent('switch-management-view', { detail: 'agents' }));
+      }
+      onCancel();
     } catch (error: any) {
       console.error('Deployment error:', error);
       alert(`Erreur de déploiement: ${error.message}`);
@@ -582,25 +606,277 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     }
   };
 
+  const handleOpenWorkspace = () => {
+    if (deployedUuid) {
+      router.push(`/prospect-agent-workspace/${deployedUuid}?tab=leads`);
+    } else {
+      onCancel();
+    }
+  };
+
+  const handleCreateLinkedSourcingAgent = () => {
+    if (typeof window !== 'undefined') {
+      const targetIds = deployedUuid ? [deployedUuid] : [];
+      sessionStorage.setItem('vmind_editing_agent', JSON.stringify({
+        run_mode: 'sourcing',
+        target_agent_ids: targetIds,
+        config: {
+          target_agent_ids: targetIds
+        }
+      }));
+      window.location.href = '/?mode=management&view=wizard';
+    }
+  };
+
   if (deployed) {
     return (
-      <div id="view-wizard" className="anim flex items-center justify-center h-full">
-        <div className="wcard text-center p-12 max-w-lg border-pink-500/30 bg-pink-950/10 backdrop-blur-md relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-pink-500 to-transparent animate-pulse" />
-          <div className="text-7xl mb-8 animate-bounce">🚀</div>
-          <div className="text-3xl font-black text-pink-400 mb-4 tracking-tighter">AGENT EN COURS DE DÉPLOIEMENT...</div>
-          <p className="text-gray-300 mb-8 leading-relaxed">
-            L'agent <strong>{formData.agent_name}</strong> est en cours d'activation.<br />
-            L'agent a été configuré avec les règles d'exécution et les seuils définis.
-          </p>
-          <div className="status-pill sp-running inline-flex items-center gap-2 px-6 py-3 text-sm font-bold bg-pink-950/40 border border-pink-500/30 text-pink-400 rounded-full">
-            <span className="status-dot w-2 h-2 bg-pink-400 rounded-full animate-ping" />
-            SYNCHRONISATION ACTIVED
+      <div id="view-wizard" className="anim" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh', padding: '2rem 1rem' }}>
+        <div
+          className="wcard relative overflow-hidden"
+          style={{
+            maxWidth: '680px',
+            width: '100%',
+            padding: '2.5rem 2.2rem',
+            borderRadius: '18px',
+            background: 'linear-gradient(165deg, rgba(8, 20, 38, 0.98) 0%, rgba(4, 12, 24, 0.99) 100%)',
+            border: '1px solid rgba(0, 229, 200, 0.35)',
+            boxShadow: '0 24px 64px rgba(0, 0, 0, 0.6), 0 0 40px rgba(0, 229, 200, 0.12)',
+            backdropFilter: 'blur(20px)',
+          }}
+        >
+          {/* Top subtle cyan accent line */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: '10%',
+              right: '10%',
+              height: '2px',
+              background: 'linear-gradient(90deg, transparent, #00E5C8, transparent)',
+            }}
+          />
+
+          {/* Header & Success Celebration */}
+          <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+            <div style={{ fontSize: '2.75rem', marginBottom: '0.5rem', lineHeight: 1 }}>🎉</div>
+            <div
+              style={{
+                fontSize: '1.4rem',
+                fontWeight: 900,
+                color: '#00E5C8',
+                letterSpacing: '-0.02em',
+                marginBottom: '0.35rem',
+              }}
+            >
+              AGENT DE PROSPECTION DÉPLOYÉ AVEC SUCCÈS
+            </div>
+            <p style={{ color: '#94A3B8', fontSize: '0.875rem', lineHeight: '1.5', margin: 0 }}>
+              L&apos;agent <strong style={{ color: '#F0F4F8' }}>{formData.agent_name}</strong> est opérationnel et prêt à qualifier vos contacts.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.6rem', marginTop: '0.85rem' }}>
+              <span className="status-pill sp-running inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-bold bg-cyan-950/40 border border-cyan-500/30 text-cyan-300 rounded-full">
+                <span className="status-dot w-1.5 h-1.5 bg-cyan-400 rounded-full animate-ping" />
+                SYNCHRONISATION ACTIVE
+              </span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[11px] font-semibold bg-white/5 border border-white/10 text-slate-300 rounded-full">
+                <span>⚡</span> En attente de contacts
+              </span>
+            </div>
           </div>
-          <p className="text-[11px] text-gray-500 mt-12 font-mono uppercase tracking-widest">
-            Redirection automatique vers le tableau de bord...
-          </p>
+
+          {/* Section 1: Where to find it & how to access it */}
+          <div
+            style={{
+              padding: '1rem 1.25rem',
+              borderRadius: '12px',
+              background: 'rgba(0, 229, 200, 0.04)',
+              border: '1px solid rgba(0, 229, 200, 0.18)',
+              marginBottom: '1.5rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+              <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>📍</span>
+              <div>
+                <strong style={{ color: '#00E5C8', fontSize: '0.85rem', display: 'block', marginBottom: '0.25rem' }}>
+                  Où retrouver votre agent ?
+                </strong>
+                <p style={{ fontSize: '0.8rem', color: '#94A3B8', lineHeight: '1.5', margin: 0 }}>
+                  Votre agent est désormais actif dans votre <strong style={{ color: '#F0F4F8' }}>Dashboard des Agents</strong> (accessible à tout moment via le menu latéral). Vous pouvez y surveiller son statut, consulter ses métriques ou ouvrir directement son espace de travail.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 2: The Sourcing Agent Question & Synergy (Why it is critical) */}
+          <div
+            style={{
+              padding: '1.25rem',
+              borderRadius: '14px',
+              background: 'linear-gradient(145deg, rgba(0, 229, 200, 0.08) 0%, rgba(0, 229, 200, 0.02) 100%)',
+              border: '1px solid rgba(0, 229, 200, 0.3)',
+              marginBottom: '1.25rem',
+            }}
+            onMouseEnter={() => setHoveredDeployAction('sourcing')}
+            onMouseLeave={() => setHoveredDeployAction(null)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.65rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.25rem' }}>⚡</span>
+                <strong style={{ color: '#F0F4F8', fontSize: '0.95rem' }}>
+                  Voulez-vous lui associer un Sourcing Agent ?
+                </strong>
+              </div>
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  fontWeight: 800,
+                  color: '#00E5C8',
+                  background: 'rgba(0, 229, 200, 0.15)',
+                  border: '1px solid rgba(0, 229, 200, 0.35)',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                Autopilot Recommandé
+              </span>
+            </div>
+
+            <p style={{ fontSize: '0.8rem', color: '#94A3B8', lineHeight: '1.5', margin: '0 0 0.85rem 0' }}>
+              <strong style={{ color: '#F0F4F8' }}>Pourquoi ce 2ème agent est essentiel ?</strong> Cet Agent de Prospection est votre <em>vendeur</em> : il qualifie les contacts et expédie des emails personnalisés. Mais <strong>il ne cherche pas de leads tout seul</strong>.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.65rem', marginBottom: '1rem' }}>
+              <div style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                <div style={{ color: '#F0F4F8', fontWeight: 600, fontSize: '0.75rem', marginBottom: '0.2rem' }}>Sans Sourcing Agent :</div>
+                <div style={{ color: '#94A3B8', fontSize: '0.725rem', lineHeight: '1.4' }}>Vous devez déposer manuellement des fichiers (CSV, Excel, XML...) ou URL à chaque campagne.</div>
+              </div>
+              <div style={{ padding: '0.65rem 0.85rem', borderRadius: '8px', background: 'rgba(0, 229, 200, 0.04)', border: '1px solid rgba(0, 229, 200, 0.2)' }}>
+                <div style={{ color: '#00E5C8', fontWeight: 600, fontSize: '0.75rem', marginBottom: '0.2rem' }}>Avec Sourcing Agent (Duo) :</div>
+                <div style={{ color: '#94A3B8', fontSize: '0.725rem', lineHeight: '1.4' }}>Il explore le web et injecte des décideurs B2B en continu. <strong>Prospection 100% autonome !</strong></div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCreateLinkedSourcingAgent}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.6rem',
+                padding: '0.85rem 1.25rem',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
+                border: 'none',
+                color: '#04101E',
+                fontWeight: 800,
+                fontSize: '0.875rem',
+                cursor: 'pointer',
+                boxShadow: '0 4px 20px rgba(0, 229, 200, 0.35)',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span>⚡</span>
+              <span>Créer & Lier un Sourcing Agent Maintenant</span>
+              <span>→</span>
+            </button>
+          </div>
+
+          {/* Section 3: Direct Workspace Access */}
+          <div
+            style={{
+              padding: '1rem 1.25rem',
+              borderRadius: '12px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              marginBottom: '1.25rem',
+            }}
+            onMouseEnter={() => setHoveredDeployAction('workspace')}
+            onMouseLeave={() => setHoveredDeployAction(null)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
+                  <span style={{ fontSize: '1.1rem' }}>📥</span>
+                  <strong style={{ color: '#F0F4F8', fontSize: '0.85rem' }}>Vous avez déjà des contacts à qualifier ?</strong>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: '#94A3B8', margin: 0 }}>
+                  Accédez directement à son espace de travail pour importer vos fichiers (CSV, Excel, XML...) ou URL.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleOpenWorkspace}
+                style={{
+                  padding: '0.65rem 1rem',
+                  borderRadius: '8px',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#F0F4F8',
+                  fontSize: '0.775rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                Ouvrir l&apos;Espace de Travail →
+              </button>
+            </div>
+          </div>
+
+          {/* Section 4: Return to Fleet */}
+          <div style={{ textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={onCancel}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#64748B',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '0.4rem 0.8rem',
+                transition: 'color 0.2s ease',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#F0F4F8')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#64748B')}
+            >
+              ← Retourner au Dashboard des Agents
+            </button>
+          </div>
         </div>
+
+        {/* VMindGuide Proactive Guidance on Post-Deployment Decisions */}
+        <VMindGuide
+          isOpen={true}
+          title={
+            hoveredDeployAction === 'sourcing'
+              ? "Pilote Automatique IA"
+              : hoveredDeployAction === 'workspace'
+              ? "Espace de Travail Dédié"
+              : "Duo Stratégique : Prospection + Sourcing"
+          }
+          message={
+            hoveredDeployAction === 'sourcing'
+              ? "En associant un Sourcing Agent, ce Prospect Agent recevra des leads qualifiés en continu sans aucune intervention manuelle. C'est la configuration recommandée pour un autopilot complet !"
+              : hoveredDeployAction === 'workspace'
+              ? "Vous pouvez glisser vos listes de contacts (CSV, Excel, XML...) ou renseigner des URL web dans l'onglet Leads pour lancer les premières qualifications dès aujourd'hui."
+              : `Votre agent "${formData.agent_name}" est prêt et visible dans votre Dashboard ! Voulez-vous lui associer un Sourcing Agent pour chasser des leads automatiquement, ou préférez-vous importer vos propres fichiers ?`
+          }
+          mood={
+            hoveredDeployAction === 'sourcing'
+              ? 'convinced'
+              : hoveredDeployAction === 'workspace'
+              ? 'focused'
+              : 'curious'
+          }
+        />
       </div>
     );
   }
@@ -671,10 +947,139 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                     <div className="form-hint">Ce nom sera affiché en interne pour identifier l'agent.</div>
                   </div>
                 </div>
-
-
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+
+              {/* Note Pédagogique & Transparence : Comment cet agent fonctionne */}
+              <div
+                className="wcard"
+                style={{
+                  marginTop: '20px',
+                  background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.85) 0%, rgba(4, 12, 24, 0.95) 100%)',
+                  border: '1px solid rgba(0, 229, 200, 0.25)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: '15%',
+                    right: '15%',
+                    height: '2px',
+                    background: 'linear-gradient(90deg, transparent, #00E5C8, transparent)',
+                  }}
+                />
+
+                <div className="wcard-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="dot" style={{ backgroundColor: '#00E5C8' }}></span>
+                  <span>Alimentation en Prospects : Ce dont cet agent a besoin</span>
+                </div>
+
+                <p style={{ fontSize: '0.825rem', color: '#94A3B8', lineHeight: '1.55', margin: '0 0 1rem 0' }}>
+                  Un <strong style={{ color: '#F0F4F8' }}>Agent de Prospection</strong> est un commercial virtuel : il analyse et qualifie vos contacts selon votre profil de client idéal, puis rédige et envoie des emails personnalisés. Il ne recherche pas de contacts par lui-même et a besoin d&apos;être alimenté :
+                </p>
+
+                {/* Interactive 3D Real Pipeline (Fiche Contact 3D -> Scanner Laser IA -> Enveloppe Email 3D) */}
+                <div style={{ position: 'relative', marginBottom: '1.25rem' }}>
+                  {!hasInteractedWithPipeline && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '-34px',
+                        right: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        zIndex: 10,
+                        pointerEvents: 'none',
+                        transition: 'opacity 0.3s ease',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '0.725rem',
+                          fontWeight: 700,
+                          color: '#00E5C8',
+                          background: 'rgba(6, 17, 31, 0.94)',
+                          border: '1px solid rgba(0, 229, 200, 0.4)',
+                          padding: '3px 10px',
+                          borderRadius: '16px',
+                          boxShadow: '0 0 16px rgba(0, 229, 200, 0.25)',
+                          backdropFilter: 'blur(10px)',
+                          letterSpacing: '0.02em',
+                        }}
+                      >
+                        ✨ Survolez les étapes 3D
+                      </span>
+                      <VMindGuideArrow
+                        direction="down"
+                        color="#00E5C8"
+                        style={{ width: '18px', height: '22px' }}
+                      />
+                    </div>
+                  )}
+                  <ProspectPipeline3D onStageChange={handlePipelineStageChange} />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.85rem' }}>
+                  {/* Option 1: Mes Contacts */}
+                  <div
+                    style={{
+                      padding: '0.9rem',
+                      borderRadius: '10px',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                      <span style={{ fontSize: '1.1rem' }}>📥</span>
+                      <strong style={{ color: '#00E5A0', fontSize: '0.85rem' }}>1. Importer vos Contacts (100% Gratuit)</strong>
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: '#94A3B8', lineHeight: '1.45', margin: 0 }}>
+                      Une fois déployé, vous pourrez déposer vos fichiers (CSV, Excel, XML...), renseigner des URL web ou assigner des contacts existants dans son espace de travail.
+                    </p>
+                  </div>
+
+                  {/* Option 2: Sourcing Agent */}
+                  <div
+                    style={{
+                      padding: '0.9rem',
+                      borderRadius: '10px',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(0, 229, 200, 0.15)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                      <span style={{ fontSize: '1.1rem' }}>🔍</span>
+                      <strong style={{ color: '#00E5C8', fontSize: '0.85rem' }}>2. Associer un Sourcing Agent (IA)</strong>
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: '#94A3B8', lineHeight: '1.45', margin: 0 }}>
+                      Vous n&apos;avez pas de fichier ? Vous pourrez lui associer un <strong>Sourcing Agent</strong> qui explorera le web pour lui injecter des décideurs B2B qualifiés.
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: '0.85rem',
+                    padding: '0.6rem 0.85rem',
+                    borderRadius: '8px',
+                    background: 'rgba(0, 229, 200, 0.06)',
+                    border: '1px dashed rgba(0, 229, 200, 0.25)',
+                    fontSize: '0.78rem',
+                    color: '#00E5C8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <span>💡</span>
+                  <span>Dès le déploiement terminé, l&apos;assistant <strong>VMindGuide</strong> vous indiquera comment importer vos données ou créer votre premier flux de sourcing.</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
                 <Button variant="primary" onClick={() => validateAndNext(2)}>Briefing & Objectifs →</Button>
               </div>
             </div>
@@ -694,16 +1099,20 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      width: '20px',
-                      height: '20px',
+                      width: '22px',
+                      height: '22px',
                       borderRadius: '50%',
-                      backgroundColor: 'rgba(255,255,255,0.1)',
-                      color: '#aaa',
+                      backgroundColor: showStep2Guide ? 'rgba(255, 71, 87, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                      border: showStep2Guide ? '1px solid rgba(255, 71, 87, 0.5)' : '1px solid rgba(255, 255, 255, 0.15)',
+                      color: showStep2Guide ? '#FF4757' : '#cbd5e1',
                       fontSize: '12px',
+                      fontWeight: 700,
                       marginLeft: '10px',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      transition: 'all 0.25s ease',
+                      boxShadow: showStep2Guide ? '0 0 12px rgba(255, 71, 87, 0.35)' : 'none',
                     }}
-                    title="Aide"
+                    title="Afficher l'aide VMindGuide"
                   >?</span>
                 </div>
                 <p style={{ color: 'var(--text)', marginBottom: '1rem', fontSize: '0.95rem' }}>Discutez avec VMind pour définir la mission de l'agent. Il vous posera quelques questions pour comprendre votre offre et vos objectifs.</p>
@@ -738,12 +1147,13 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 <div className="wcard-title"><span className="dot" style={{ backgroundColor: template?.accent || '#FF4757' }}></span>Critères ICP (Valeurs Cibles)</div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">Secteur d'activité</label>
-                    <TagInput
-                      tags={formData.prospection_config.icp.secteur_activite}
-                      onChange={(t) => updateIcp('secteur_activite', t)} onFocus={() => setFocusedField('secteur_activite')} onBlur={() => setFocusedField(null)}
-                      placeholder="Ajouter un secteur..."
-                      suggestions={['Transport', 'Logistique', 'Industrie', 'Commerce', 'BTP', 'Santé', 'IT', 'Finance', 'E-commerce', 'Energie', 'Services']}
+                    <label className="form-label">Secteur d&apos;activité</label>
+                    <IndustryMultiSelect
+                      selectedIndustries={formData.prospection_config.icp.secteur_activite}
+                      onChange={(industries) => updateIcp('secteur_activite', industries)}
+                      onFocus={() => setFocusedField('secteur_activite')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="Sélectionner un ou plusieurs secteurs d'activité..."
                     />
                   </div>
                   <div className="form-group">
@@ -770,20 +1180,22 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                 <div className="form-row" style={{ marginTop: '10px' }}>
                   <div className="form-group">
                     <label className="form-label">Poste du contact</label>
-                    <TagInput
-                      tags={formData.prospection_config.icp.poste_contact}
-                      onChange={(t) => updateIcp('poste_contact', t)} onFocus={() => setFocusedField('poste_contact')} onBlur={() => setFocusedField(null)}
-                      placeholder="Ajouter un poste..."
-                      suggestions={['DAF', 'DSI', 'Directeur Ops', 'DG', 'PDG', 'Responsable Logistique', 'Directeur Commercial', 'CEO', 'CTO', 'Directeur Marketing', 'Responsable Achats']}
+                    <JobTitleMultiSelect
+                      selectedJobTitles={formData.prospection_config.icp.poste_contact}
+                      onChange={(titles) => updateIcp('poste_contact', titles)}
+                      onFocus={() => setFocusedField('poste_contact')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="Sélectionner un ou plusieurs intitulés de poste..."
                     />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Zone géographique</label>
-                    <TagInput
-                      tags={formData.prospection_config.icp.zone_geo}
-                      onChange={(t) => updateIcp('zone_geo', t)} onFocus={() => setFocusedField('zone_geo')} onBlur={() => setFocusedField(null)}
-                      placeholder="Ajouter un pays..."
-                      suggestions={['Tunisie', 'Maroc', 'Belgique', 'France', 'Suisse', 'Canada', 'Sénégal', 'Côte d\'Ivoire', 'Algérie', 'Monaco', 'Luxembourg']}
+                    <CountryMultiSelect
+                      selectedCountries={formData.prospection_config.icp.zone_geo}
+                      onChange={(countries) => updateIcp('zone_geo', countries)}
+                      onFocus={() => setFocusedField('zone_geo')}
+                      onBlur={() => setFocusedField(null)}
+                      placeholder="Sélectionner un ou plusieurs pays..."
                     />
                   </div>
                 </div>
@@ -841,6 +1253,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                   </div>
                 </div>
               </div>
+
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
                 <Button onClick={() => validateAndNext(2)}>← Retour</Button>
                 <div style={{ display: 'flex', gap: '10px' }}>
@@ -855,20 +1268,19 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
           {step === 4 && (
             <div id="step4" className="anim">
               <div className="wcard">
-                <div className="wcard-title"><span className="dot" style={{ backgroundColor: template?.accent || '#00e5c8' }}></span>Signature & Copie Conforme</div>
+                <div className="wcard-title"><span className="dot" style={{ backgroundColor: template?.accent || '#00e5c8' }}></span>Signature & CC</div>
                 <div className="form-group" style={{ marginBottom: '20px' }}>
-                  <label className="form-label">Signature de l'Email <span className="req">*</span></label>
-                  <textarea
-                    className="form-input"
-                    style={{ minHeight: '100px', fontSize: '13px', lineHeight: '1.5' }}
-                    value={formData.prospection_config.campaign.signature_email} onFocus={() => setFocusedField('signature_email')} onBlur={() => setFocusedField(null)}
-                    onChange={(e) => updateCampaign('signature_email', e.target.value)}
-                    placeholder="Cordialement,&#10;L'équipe Commerciale..."
+                  <label className="form-label">Signature de l&apos;Email <span className="req">*</span></label>
+                  <EmailSignatureEditor
+                    value={formData.prospection_config.campaign.signature_email}
+                    onChange={(sig) => updateCampaign('signature_email', sig)}
+                    onFocus={() => setFocusedField('signature_email')}
+                    onBlur={() => setFocusedField(null)}
                   />
                 </div>
 
                 <div className="form-group" style={{ marginBottom: '20px' }}>
-                  <label className="form-label">Copie conforme (CC) par défaut</label>
+                  <label className="form-label">CC</label>
                   <TagInput
                     tags={formData.prospection_config.campaign.default_cc ? formData.prospection_config.campaign.default_cc.split(/[,;]+/).map(s => s.trim()).filter(Boolean) : []}
                     onChange={(tags) => updateCampaign('default_cc', tags.join(','))} onFocus={() => setFocusedField('default_cc')} onBlur={() => setFocusedField(null)}
@@ -1198,10 +1610,61 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
 
           {/* VirtualMind Floating Guide */}
           <VMindGuide
-            isOpen={!!(focusedField && VIRTUAL_MIND_GUIDE[focusedField]) || step === 2}
-            title={focusedField && VIRTUAL_MIND_GUIDE[focusedField] ? VIRTUAL_MIND_GUIDE[focusedField].title : step === 2 ? "Briefing de l'Agent" : undefined}
-            message={focusedField && VIRTUAL_MIND_GUIDE[focusedField] ? VIRTUAL_MIND_GUIDE[focusedField].text : step === 2 ? "Cette section est cruciale. Les réponses que vous donnerez ici définiront le contexte global et la compréhension de l'IA. Soyez le plus précis possible, car ces informations impacteront directement la qualité des emails générés." : null}
-            mood={focusedField && VIRTUAL_MIND_GUIDE[focusedField] ? getMoodForField(focusedField) : step === 2 ? 'convinced' : undefined}
+            isOpen={
+              !!(focusedField && VIRTUAL_MIND_GUIDE[focusedField]) ||
+              (step === 2 && showStep2Guide) ||
+              (step === 1 && (!hasInteractedWithPipeline || !!pipelineHoveredStage))
+            }
+            title={
+              pipelineHoveredStage === 'card'
+                ? "Étape 1 : Entrée des Contacts"
+                : pipelineHoveredStage === 'scanner'
+                ? "Étape 2 : Scanner IA"
+                : pipelineHoveredStage === 'mail'
+                ? "Étape 3 : Email Personnalisé"
+                : focusedField && VIRTUAL_MIND_GUIDE[focusedField]
+                ? VIRTUAL_MIND_GUIDE[focusedField].title
+                : step === 2
+                ? "Briefing de l'Agent"
+                : step === 1
+                ? "Pipeline Interactif 3D"
+                : undefined
+            }
+            message={
+              pipelineHoveredStage === 'card'
+                ? "Vos prospects entrent dans le pipeline via vos fichiers (CSV, Excel, XML...), des URL web ou via un Sourcing Agent connecté."
+                : pipelineHoveredStage === 'scanner'
+                ? "L'IA évalue le profil de chaque prospect et calcule sa correspondance avec votre client idéal."
+                : pipelineHoveredStage === 'mail'
+                ? "Un email percutant et ultra-personnalisé est généré puis expédié automatiquement au prospect qualifié."
+                : focusedField && VIRTUAL_MIND_GUIDE[focusedField]
+                ? VIRTUAL_MIND_GUIDE[focusedField].text
+                : step === 2
+                ? "Cette section est cruciale. Les réponses que vous donnerez ici définiront le contexte global et la compréhension de l'IA. Soyez le plus précis possible, car ces informations impacteront directement la qualité des emails générés."
+                : step === 1
+                ? "Voici le cœur de votre agent ! Survolez chaque élément du pipeline 3D (Fiche Contact, Scanner IA, Email) pour voir comment vos prospects seront traités."
+                : null
+            }
+            mood={
+              pipelineHoveredStage === 'scanner'
+                ? 'convinced'
+                : pipelineHoveredStage
+                ? 'curious'
+                : focusedField && VIRTUAL_MIND_GUIDE[focusedField]
+                ? getMoodForField(focusedField)
+                : step === 2
+                ? 'convinced'
+                : 'curious'
+            }
+            onClose={() => {
+              if (step === 1) setHasInteractedWithPipeline(true);
+              if (step === 2) {
+                setShowStep2Guide(false);
+                if (step2GuideTimeoutRef.current) {
+                  clearTimeout(step2GuideTimeoutRef.current);
+                }
+              }
+            }}
           />
 
         </div>
