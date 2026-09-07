@@ -548,8 +548,9 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
               Choisissez une méthode pour activer l'accès sécurisé de l'IA à votre ERP TraLIS.
             </p>
 
-            {/* Option A */}
+            {/* Option A (Hidden for presentation) */}
             <button onClick={handleUseCurrentSession} disabled={loginLoading} style={{
+              display: 'none',
               width: '100%',
               background: 'linear-gradient(90deg, #00E5C8 0%, #21F3D6 100%)',
               color: '#021010', border: 'none',
@@ -557,13 +558,13 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
               fontSize: '14px', fontWeight: 800, cursor: 'pointer',
               marginBottom: '20px',
               boxShadow: '0 0 20px rgba(0, 229, 200, 0.15)',
-              display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+              justifyContent: 'center', alignItems: 'center', gap: '8px',
               opacity: loginLoading ? 0.7 : 1,
             }}>
               {loginLoading ? 'Validation en cours…' : 'Utiliser ma session VMIND actuelle'}
             </button>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'none', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
               <div style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.08)' }} />
               <span style={{ fontSize: '11px', color: '#6A7E95', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>ou compte TraLIS différent</span>
               <div style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.08)' }} />
