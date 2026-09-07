@@ -13,13 +13,18 @@ interface MarketplaceViewProps {
 export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, activeCategory, onSelectCategory }) => {
   const [activeTab, setActiveTab] = React.useState('all');
   const [searchQuery, setSearchQuery] = React.useState('');
-  const allCategories = ['all', ...Array.from(new Set(AGENT_TEMPLATES.flatMap(a => a.category.split(' · '))))].sort();
+  const parentCategories = Array.from(new Set(AGENT_TEMPLATES.map(a => a.category.split(' · ')[0]))).sort();
+  const allCategories = ['all', ...parentCategories];
 
   let filteredAgents = AGENT_TEMPLATES;
 
-  // Category filter
+  // Category filter: supports "Commercial" (parent) and "Commercial · Ventes" (full subcategory)
   if (activeCategory !== 'all') {
-    filteredAgents = filteredAgents.filter(a => a.category.includes(activeCategory));
+    filteredAgents = filteredAgents.filter(a =>
+      a.category === activeCategory ||
+      a.category.startsWith(activeCategory + ' ·') ||
+      a.category.includes(activeCategory)
+    );
   }
 
   // Tab filter / sort

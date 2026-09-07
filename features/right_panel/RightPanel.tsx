@@ -54,7 +54,7 @@ interface RightPanelProps {
 import { KpiCacheProvider, useKpis } from '../../shared/contexts/KpiCacheContext';
 
 const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, activeAgentId }) => {
-  const { startDate, endDate, updateGlobalDates, error, clearError, fetchKpis } = useKpis();
+  const { startDate, endDate, updateGlobalDates, error, clearError, fetchKpis, kpisByAgent } = useKpis();
   const [performances, setPerformances] = React.useState<Record<string, number>>({
     VDATA: 0,
     VFIN: 0,
@@ -73,49 +73,29 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
     VMOVE: 0,
   });
 
-  const fetchDomainPerformance = async () => {
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-      const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || 'DEMO';
+  // Extract domain performances dynamically from n8n IA execution cache
+  React.useEffect(() => {
+    const vdataData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
+    const toolData = vdataData.get_score_global_vdata_kpi || vdataData;
+    const kpis = toolData?.kpis || toolData?.data?.kpis;
 
-      const response = await fetch(`${baseUrl}/api/tools/get-score-global-vdata-kpi`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`, },
-        body: JSON.stringify({ 
-          client_id: clientId,
-          startDate,
-          endDate
-        }),
-      });
+    if (kpis && Array.isArray(kpis)) {
+      const scoreGlobal = kpis.find((k: any) => k.label === 'Score qualité global')?.value ?? 0;
+      const scoreLivraison = kpis.find((k: any) => k.label === 'Taux livraison')?.value ?? 0;
+      const scoreFinance = kpis.find((k: any) => k.label === 'Score impayés')?.value ?? 0;
 
-      if (response.ok) {
-        const resJson = await response.json();
-        if (resJson.ok && resJson.data) {
-          const kpis = resJson.data.kpis;
-          const scoreGlobal = kpis?.find((k: any) => k.label === 'Score qualité global')?.value ?? 0;
-          const scoreLivraison = kpis?.find((k: any) => k.label === 'Taux livraison')?.value ?? 0;
-          const scoreFinance = kpis?.find((k: any) => k.label === 'Score impayés')?.value ?? 0;
-
-          setPerformances(prev => ({
-            ...prev,
-            VDATA: scoreGlobal,
-            VMOVE: scoreLivraison,
-            VFIN: scoreFinance,
-          }));
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch domain performances:", err);
+      setPerformances(prev => ({
+        ...prev,
+        VDATA: scoreGlobal,
+        VMOVE: scoreLivraison,
+        VFIN: scoreFinance,
+      }));
     }
-  };
+  }, [kpisByAgent]);
 
   React.useEffect(() => {
     if (activeAgentId === 'VDATA') {
-      const timer = setTimeout(() => {
-        fetchDomainPerformance();
-      }, 800);
-      return () => clearTimeout(timer);
+      fetchKpis('VDATA', false, 'get_score_global_vdata_kpi');
     }
   }, [activeAgentId, startDate, endDate]);
 
