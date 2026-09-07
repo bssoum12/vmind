@@ -52,6 +52,7 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
   { name: 'get_delivery_rate',             description: 'Taux de livraison à temps', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
   { name: 'analyze_delay_by_client_type',  description: 'Analyse des délais par type client', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
   { name: 'get_exploitation_kpis',         description: 'KPIs opérationnels exploitation', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
+  { name: 'get_vmove_suggestion_bl_non_factures', description: 'Liste des bons de livraison non facturés', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
   // VSELL
   { name: 'get_customer_profile',          description: 'Profil complet d\'un client', agent: 'VSELL', accessType: 'read', authLevel: 'always' },
   { name: 'search_cotations',              description: 'Recherche de cotations commerciales', agent: 'VSELL', accessType: 'read', authLevel: 'always' },
@@ -355,8 +356,33 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   const handleDisconnect = () => onDisconnected();
 
   // ── Build tool sections ────────────────────────────────────────────────────
-  const readTools      = ALL_TOOL_METADATA.filter(t => t.accessType === 'read');
-  const sensitiveTools = ALL_TOOL_METADATA.filter(t => t.accessType === 'sensitive' || t.accessType === 'write');
+  const dynamicMetadata = [...ALL_TOOL_METADATA];
+  if (authorizedToolNames && authorizedToolNames.size > 0) {
+    authorizedToolNames.forEach(toolName => {
+      // Exclude special dynamic client tools that duplicate existing logic
+      if (toolName.startsWith('Client1_') || toolName.startsWith('MCP_Client1_')) return;
+      
+      if (!dynamicMetadata.find(t => t.name === toolName)) {
+        let guessedAgent = 'VDATA';
+        if (toolName.includes('vmove')) guessedAgent = 'VMOVE';
+        else if (toolName.includes('vfin')) guessedAgent = 'VFIN';
+        else if (toolName.includes('vsell')) guessedAgent = 'VSELL';
+        else if (toolName.includes('vbuy')) guessedAgent = 'VBUY';
+        else if (toolName.includes('vstock')) guessedAgent = 'VSTOCK';
+        
+        dynamicMetadata.push({
+          name: toolName,
+          description: toolName.replace(/_/g, ' '),
+          agent: guessedAgent,
+          accessType: 'read',
+          authLevel: 'always'
+        });
+      }
+    });
+  }
+
+  const readTools      = dynamicMetadata.filter(t => t.accessType === 'read');
+  const sensitiveTools = dynamicMetadata.filter(t => t.accessType === 'sensitive' || t.accessType === 'write');
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -467,7 +493,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '16px' }}>
             <h2 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>Autorisations des outils</h2>
             <span style={{ fontSize: '12px', color: '#6A7E95' }}>
-              {authorizedToolNames.size} outil{authorizedToolNames.size !== 1 ? 's' : ''} autorisé{authorizedToolNames.size !== 1 ? 's' : ''} sur {ALL_TOOL_METADATA.length} disponibles
+              {authorizedToolNames.size} outil{authorizedToolNames.size !== 1 ? 's' : ''} autorisé{authorizedToolNames.size !== 1 ? 's' : ''} sur {dynamicMetadata.length} disponibles
             </span>
           </div>
 
@@ -512,7 +538,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
             Connecteur non activé
           </p>
           <p style={{ margin: 0, fontSize: '13px' }}>
-            {ALL_TOOL_METADATA.length} outils ERP disponibles selon vos droits TraLIS.
+            {dynamicMetadata.length} outils ERP disponibles selon vos droits TraLIS.
             Connectez-vous pour voir vos autorisations.
           </p>
         </div>
