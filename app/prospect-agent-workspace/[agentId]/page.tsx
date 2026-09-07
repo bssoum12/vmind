@@ -81,6 +81,26 @@ export default function AgentWorkspacePage() {
     }
   };
 
+  useEffect(() => {
+    if (navTutorialStep <= 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) return;
+
+      if (e.key === ' ' || e.code === 'Space' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        nextTutorialStep();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setNavTutorialStep(0);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navTutorialStep]);
+
   const getTutorialContent = () => {
     switch (navTutorialStep) {
       case 1:
@@ -116,10 +136,12 @@ export default function AgentWorkspacePage() {
     if (navTutorialStep === step) {
       return {
         position: 'relative' as any,
-        zIndex: 10001,
-        boxShadow: '0 0 0 4px rgba(0,229,200,0.8)',
+        zIndex: 10003,
+        background: '#00E5C8',
+        color: '#04101E',
+        fontWeight: 700,
+        boxShadow: '0 0 0 3px #00E5C8, 0 0 25px rgba(0, 229, 200, 0.75)',
         pointerEvents: 'none' as any,
-        background: 'var(--card-bg)'
       };
     }
     return {};
@@ -129,13 +151,14 @@ export default function AgentWorkspacePage() {
     if (navTutorialStep === step) {
       return (
         <VMindGuideArrow
-          direction="down"
+          direction="up"
           color="#00E5C8"
           style={{
             position: 'absolute',
-            top: '-45px',
+            bottom: '-42px',
             left: '50%',
-            transform: 'translateX(-50%)'
+            transform: 'translateX(-50%)',
+            zIndex: 10004
           }}
         />
       );
@@ -191,11 +214,20 @@ export default function AgentWorkspacePage() {
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   useProspectSocket((payload) => {
     if (typeof payload.is_executing === 'boolean' && (payload.agent_id || payload.uuid)) {
-      const targetUuid = payload.uuid || payload.agent_id;
+      const targetId = String(payload.uuid || payload.agent_id || '').toLowerCase();
+      const currentParamId = String(agentId || '').toLowerCase();
       setAgentData((prev: any) => {
         if (!prev) return prev;
-        const prevUuid = prev.uuid || prev.agent_id;
-        if (prevUuid === targetUuid) {
+        const prevUuid = String(prev.uuid || '').toLowerCase();
+        const prevAgentId = String(prev.agent_id || '').toLowerCase();
+        const prevName = String(prev.agent_name || prev.nom || '').toLowerCase();
+
+        if (
+          targetId === prevUuid ||
+          targetId === prevAgentId ||
+          targetId === prevName ||
+          targetId === currentParamId
+        ) {
           return { ...prev, is_executing: payload.is_executing };
         }
         return prev;
@@ -228,16 +260,15 @@ export default function AgentWorkspacePage() {
     <div className="workspace-container app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden' }}>
 
       {/* ── Tutorial Overlay ── */}
-      {navTutorialStep > 0 && typeof document !== 'undefined' && createPortal(
+      {navTutorialStep > 0 && (
         <div
           onClick={nextTutorialStep}
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.8)', zIndex: 10000,
+            background: 'rgba(3, 8, 16, 0.82)', zIndex: 10000,
             cursor: 'pointer'
           }}
-        />,
-        document.body
+        />
       )}
 
       {/* ── VMind Guide for Tutorial ── */}
@@ -247,9 +278,20 @@ export default function AgentWorkspacePage() {
           title={getTutorialContent()?.title}
           message={getTutorialContent()?.message || null}
           mood={getTutorialContent()?.mood}
-          showBackdrop={true}
+          showBackdrop={false}
           onClose={() => setNavTutorialStep(0)}
-        />
+        >
+          <div className="vmind-guide-actions" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
+            <button
+              type="button"
+              className="vmind-guide-btn-primary"
+              onClick={nextTutorialStep}
+            >
+              <span>{navTutorialStep < 4 ? 'Suivant' : 'Terminer'}</span>
+              <CyberIcon name="arrow-right" size={13} color="currentColor" />
+            </button>
+          </div>
+        </VMindGuide>
       )}
 
       {/* HEADER (Native VMIND Style) */}
@@ -259,8 +301,8 @@ export default function AgentWorkspacePage() {
         background: 'rgba(8, 20, 38, 0.4)',
         backdropFilter: navTutorialStep > 0 ? 'none' : 'blur(10px)',
         flexShrink: 0,
-        position: navTutorialStep > 0 ? 'relative' : undefined,
-        zIndex: navTutorialStep > 0 ? 10000 : undefined
+        position: 'relative',
+        zIndex: navTutorialStep > 0 ? 10001 : 1
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <button
@@ -317,7 +359,7 @@ export default function AgentWorkspacePage() {
         </div>
 
         {/* TABS */}
-        <div style={{ display: 'flex', background: 'var(--navy2)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)', position: 'relative', zIndex: 10001 }}>
+        <div style={{ display: 'flex', background: 'var(--navy2)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)', position: 'relative', zIndex: 10002 }}>
           {[
             { id: 'dashboard', label: 'Vue d\'ensemble', icon: LayoutDashboard, step: 1 },
             { id: 'leads', label: 'Prospects', icon: Users, step: 2 },
@@ -326,6 +368,7 @@ export default function AgentWorkspacePage() {
           ].map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
+            const isStepActive = navTutorialStep === tab.step;
             return (
               <button
                 key={tab.id}
@@ -333,16 +376,16 @@ export default function AgentWorkspacePage() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: '8px',
                   padding: '6px 14px', borderRadius: '8px',
-                  background: isActive ? 'var(--cyan)' : 'transparent',
-                  color: isActive ? '#000' : 'var(--text-muted)',
-                  fontWeight: isActive ? 600 : 500,
+                  background: isStepActive ? '#00E5C8' : isActive ? 'var(--cyan)' : 'transparent',
+                  color: (isStepActive || isActive) ? '#04101E' : 'var(--text-muted)',
+                  fontWeight: (isStepActive || isActive) ? 700 : 500,
                   border: 'none', cursor: 'pointer', transition: 'all 0.2s',
                   ...getTabBtnStyle(tab.step)
                 }}
               >
                 {renderTutorialArrow(tab.step)}
-                <Icon size={16} style={{ flexShrink: 0, color: isActive ? '#000' : 'inherit' }} />
-                <span>{tab.label}</span>
+                <Icon size={16} style={{ flexShrink: 0, color: (isStepActive || isActive) ? '#04101E' : 'inherit' }} />
+                <span style={{ color: (isStepActive || isActive) ? '#04101E' : 'inherit' }}>{tab.label}</span>
               </button>
             );
           })}
@@ -358,7 +401,7 @@ export default function AgentWorkspacePage() {
         ) : (
           <div style={{ padding: '2.5rem', maxWidth: '1600px', margin: '0 auto' }}>
             {activeTab === 'dashboard' && <DashboardView leads={leads} campaigns={campaigns} threshold={60} agent={agentData} />}
-            {activeTab === 'leads' && <LeadsView leads={leads} threshold={60} onOpenLead={handleOpenLead} onRefresh={fetchData} />}
+            {activeTab === 'leads' && <LeadsView leads={leads} threshold={60} onOpenLead={handleOpenLead} onRefresh={fetchData} isNavTutorialActive={navTutorialStep > 0} />}
             {activeTab === 'outbox' && <CampaignsView campaigns={campaigns} onRefresh={fetchData} defaultCc="" onOpenLeadById={handleOpenLeadById} />}
             {activeTab === 'logs' && <LogsView logs={logs} />}
           </div>

@@ -7,6 +7,9 @@
  */
 
 export const JOB_TITLES = [
+  // Option spéciale décisionnaires
+  "Tous les postes décisionnaires",
+
   // Direction générale
   "PDG / CEO",
   "Directeur général",

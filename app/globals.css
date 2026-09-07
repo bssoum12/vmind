@@ -57,6 +57,19 @@ select,
   caret-color: var(--cyan, #00E5C8);
 }
 
+input[type="range"],
+input[type="checkbox"],
+input[type="radio"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="file"],
+input[type="color"] {
+  cursor: pointer;
+  caret-color: transparent !important;
+  user-select: none;
+}
+
 button,
 a,
 .btn,
@@ -3091,4 +3104,74 @@ textarea.form-input {
 .glass-bubble {
   backdrop-filter: blur(8px);
   background: linear-gradient(135deg, rgba(0, 240, 255, 0.05) 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+
+/* Custom Cyber Range Slider */
+input[type="range"].vmind-range-slider,
+.vmind-range-slider {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 100% !important;
+  height: 6px !important;
+  border-radius: 4px !important;
+  outline: none !important;
+  cursor: pointer !important;
+  border: none !important;
+  accent-color: #00E5C8 !important;
+}
+
+input[type="range"].vmind-range-slider::-webkit-slider-runnable-track,
+.vmind-range-slider::-webkit-slider-runnable-track {
+  -webkit-appearance: none !important;
+  height: 6px !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+input[type="range"].vmind-range-slider::-webkit-slider-thumb,
+.vmind-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  width: 18px !important;
+  height: 18px !important;
+  margin-top: -6px !important;
+  border-radius: 50% !important;
+  background: #00E5C8 !important;
+  border: 2px solid #06111F !important;
+  box-shadow: 0 0 10px rgba(0, 229, 200, 0.8), 0 2px 4px rgba(0, 0, 0, 0.5) !important;
+  cursor: grab !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+input[type="range"].vmind-range-slider::-webkit-slider-thumb:hover,
+.vmind-range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25) !important;
+  box-shadow: 0 0 16px rgba(0, 229, 200, 1) !important;
+}
+
+input[type="range"].vmind-range-slider::-moz-range-track,
+.vmind-range-slider::-moz-range-track {
+  height: 6px !important;
+  border-radius: 4px !important;
+  background: transparent !important;
+  border: none !important;
+}
+
+input[type="range"].vmind-range-slider::-moz-range-thumb,
+.vmind-range-slider::-moz-range-thumb {
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 50% !important;
+  background: #00E5C8 !important;
+  border: 2px solid #06111F !important;
+  box-shadow: 0 0 10px rgba(0, 229, 200, 0.8), 0 2px 4px rgba(0, 0, 0, 0.5) !important;
+  cursor: grab !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+input[type="range"].vmind-range-slider::-moz-range-thumb:hover,
+.vmind-range-slider::-moz-range-thumb:hover {
+  transform: scale(1.25) !important;
+  box-shadow: 0 0 16px rgba(0, 229, 200, 1) !important;
 }

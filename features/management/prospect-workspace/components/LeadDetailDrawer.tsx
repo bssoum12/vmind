@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams } from 'next/navigation';
 import { 
@@ -24,9 +24,30 @@ import {
   ExternalLink,
   ScanLine,
   FileSpreadsheet,
-  Globe
+  Globe,
+  Zap
 } from 'lucide-react';
 import { useToast } from '@/shared/contexts/ToastContext';
+import { useProspectSocket } from '../hooks/useProspectSocket';
+
+// Zero Technical Jargon policy: sanitize and translate raw backend logs for the end user
+function formatUserFacingMessage(raw?: string): string {
+  if (!raw) return "Initialisation de l'évaluation IA...";
+  const lower = raw.toLowerCase();
+  if (lower.includes('lancée') || lower.includes('initialisation') || lower.includes('démarrage') || (lower.includes('qualification de') && lower.includes('prospect'))) {
+    return "Initialisation et analyse du profil par l'IA...";
+  }
+  const clean = raw
+    .replace(/\s*via\s+n8n\.?/gi, '')
+    .replace(/\s*\(n8n\)/gi, '')
+    .replace(/\bn8n\b/gi, '')
+    .replace(/\bqstash\b/gi, '')
+    .replace(/\bworkflow\b/gi, 'processus')
+    .replace(/\bpayload\b/gi, 'données')
+    .trim();
+
+  return clean || "Analyse du profil en cours...";
+}
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
@@ -99,6 +120,96 @@ export default function LeadDetailDrawer({
 
   const params = useParams();
   const agentId = params.agentId;
+
+  // Live Qualification Progress State (Tracked via WebSockets)
+  interface DrawerQualifyProgress {
+    active: boolean;
+    isDone: boolean;
+    message: string;
+  }
+  const [qualifyProgress, setQualifyProgress] = useState<DrawerQualifyProgress | null>(null);
+  const qualifyProgressRef = useRef<DrawerQualifyProgress | null>(null);
+  qualifyProgressRef.current = qualifyProgress;
+  const [fakePercent, setFakePercent] = useState<number>(14);
+  const dismissTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up auto-dismiss timer on unmount
+  useEffect(() => {
+    return () => {
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Synthetic progressive easing for percentage display (eliminates stagnant 0% sensation)
+  useEffect(() => {
+    if (!qualifyProgress || !qualifyProgress.active) return;
+
+    if (qualifyProgress.isDone) {
+      setFakePercent(100);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setFakePercent((prev) => {
+        if (prev >= 94) return prev;
+        const diff = 94 - prev;
+        const step = diff > 30 ? Math.floor(Math.random() * 4 + 2) : diff > 10 ? Math.floor(Math.random() * 2 + 1) : 1;
+        return Math.min(prev + step, 94);
+      });
+    }, 450);
+
+    return () => clearInterval(interval);
+  }, [qualifyProgress?.active, qualifyProgress?.isDone]);
+
+  // Real-time WebSocket listener for qualification updates
+  useProspectSocket((payload) => {
+    const current = qualifyProgressRef.current;
+    if (!current || !current.active || !lead) return;
+
+    // 1. Logs
+    if (payload.table === 'prospect_agent_logs_execution' && payload.new) {
+      const message = (payload.new.message || '').toString();
+      const statut = (payload.new.statut || payload.new.status || '').toString().toUpperCase();
+
+      const isLaunchLog = message.includes('lancée via n8n') || (message.includes('Qualification de') && message.includes('prospect'));
+      if (isLaunchLog) {
+        setQualifyProgress((prev) => (prev ? { ...prev, message: "Initialisation et analyse du profil par l'IA..." } : null));
+        return;
+      }
+
+      const isLeadEval = message.includes('Score ICP') || message.includes(`Lead #${lead.id}`) || (lead.nom && message.includes(lead.nom)) || (lead.entreprise && message.includes(lead.entreprise));
+      if (isLeadEval) {
+        setQualifyProgress((prev) => (prev ? { ...prev, message } : null));
+      }
+
+      if (statut === 'COMPLETED' || statut === 'SUCCESS') {
+        if (payload.new.workflow_id && payload.new.workflow_id.toString().includes('qualif')) {
+          setQualifyProgress((prev) => (prev ? { ...prev, isDone: true, message: "Évaluation terminée avec succès !" } : null));
+          onRefresh();
+          if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+          dismissTimerRef.current = setTimeout(() => {
+            setQualifyProgress(null);
+            qualifyProgressRef.current = null;
+          }, 3500);
+        }
+      }
+    }
+
+    // 2. Qualifications table trigger
+    if (payload.table === 'prospect_agent_qualifications' && payload.new) {
+      if (payload.new.lead_id === lead.id) {
+        setQualifyProgress((prev) => (prev ? { ...prev, isDone: true, message: "Évaluation terminée avec succès !" } : null));
+        onRefresh();
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = setTimeout(() => {
+          setQualifyProgress(null);
+          qualifyProgressRef.current = null;
+        }, 3500);
+      }
+    }
+  });
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -189,7 +300,29 @@ export default function LeadDetailDrawer({
   };
 
   const handleQualifyIA = async () => {
+    if (!lead || !agentId) return;
     setIsQualifying(true);
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    setFakePercent(14);
+    const newState: DrawerQualifyProgress = {
+      active: true,
+      isDone: false,
+      message: "Initialisation et analyse du profil par l'IA..."
+    };
+    setQualifyProgress(newState);
+    qualifyProgressRef.current = newState;
+
+    // Dispatch global window event so LeadsView (and background) activates its cyber progress bar
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('vmind:qualify-start', {
+        detail: {
+          leadIds: [lead.id],
+          total: 1,
+          agentId
+        }
+      }));
+    }
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
@@ -202,13 +335,17 @@ export default function LeadDetailDrawer({
 
       if (res.ok) {
         showToast('Qualification IA lancée pour ce prospect !', 'info');
-        onRefresh();
       } else {
-        showToast('Erreur lors du déclenchement de la qualification IA', 'error');
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || 'Erreur lors du déclenchement de la qualification IA', 'error');
+        setQualifyProgress(null);
+        qualifyProgressRef.current = null;
       }
     } catch (error) {
       console.error('IA Qualification error:', error);
       showToast('Erreur de connexion au service de qualification', 'error');
+      setQualifyProgress(null);
+      qualifyProgressRef.current = null;
     } finally {
       setIsQualifying(false);
     }
@@ -494,16 +631,16 @@ export default function LeadDetailDrawer({
               </div>
               <button
                 onClick={handleQualifyIA}
-                disabled={isQualifying}
+                disabled={isQualifying || !!qualifyProgress?.active}
                 style={{
-                  background: isQualifying ? 'rgba(0, 229, 200, 0.1)' : 'linear-gradient(135deg, rgba(0, 229, 200, 0.15), rgba(56, 189, 248, 0.15))',
+                  background: (isQualifying || qualifyProgress?.active) ? 'rgba(0, 229, 200, 0.1)' : 'linear-gradient(135deg, rgba(0, 229, 200, 0.15), rgba(56, 189, 248, 0.15))',
                   border: '1px solid rgba(0, 229, 200, 0.35)',
                   borderRadius: '8px',
                   padding: '5px 12px',
                   fontSize: '0.78rem',
                   fontWeight: 600,
                   color: '#00E5C8',
-                  cursor: isQualifying ? 'not-allowed' : 'pointer',
+                  cursor: (isQualifying || qualifyProgress?.active) ? 'not-allowed' : 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
@@ -511,9 +648,202 @@ export default function LeadDetailDrawer({
                 }}
               >
                 <Sparkles size={12} style={{ flexShrink: 0 }} />
-                <span>{isQualifying ? 'Analyse en cours...' : 'Re-qualifier IA'}</span>
+                <span>{(isQualifying || qualifyProgress?.active) ? 'Analyse en cours...' : 'Re-qualifier IA'}</span>
               </button>
             </div>
+
+            {/* Live Cyber Qualification Progress Bar */}
+            {qualifyProgress && (
+              <div
+                className="fade-in"
+                style={{
+                  marginBottom: '16px',
+                  padding: '12px 14px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  background: qualifyProgress.isDone
+                    ? 'linear-gradient(145deg, rgba(6, 31, 22, 0.85) 0%, rgba(8, 20, 38, 0.85) 100%)'
+                    : 'linear-gradient(145deg, rgba(8, 20, 38, 0.95) 0%, rgba(12, 28, 52, 0.85) 100%)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                  border: `1px solid ${qualifyProgress.isDone ? 'rgba(0, 229, 160, 0.4)' : 'rgba(0, 229, 200, 0.3)'}`,
+                  borderRadius: '12px',
+                  boxShadow: qualifyProgress.isDone
+                    ? '0 6px 24px rgba(0, 229, 160, 0.15), inset 0 0 16px rgba(0, 229, 160, 0.05)'
+                    : '0 6px 24px rgba(0, 229, 200, 0.12), inset 0 0 16px rgba(0, 229, 200, 0.04)',
+                  transition: 'all 0.4s ease'
+                }}
+              >
+                {/* Ambient Specular Top Line */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: '5%',
+                    right: '5%',
+                    height: '1px',
+                    background: qualifyProgress.isDone
+                      ? 'linear-gradient(90deg, transparent, #00E5A0, transparent)'
+                      : 'linear-gradient(90deg, transparent, #00E5C8, transparent)',
+                    opacity: 0.8
+                  }}
+                />
+
+                {/* Progress Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {qualifyProgress.isDone ? (
+                      <div
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: '50%',
+                          background: 'rgba(0, 229, 160, 0.15)',
+                          border: '1px solid rgba(0, 229, 160, 0.4)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#00E5A0'
+                        }}
+                      >
+                        <CheckCircle2 size={13} />
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: '50%',
+                          background: 'rgba(0, 229, 200, 0.12)',
+                          border: '1px solid rgba(0, 229, 200, 0.35)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: '#00E5C8',
+                          boxShadow: '0 0 10px rgba(0, 229, 200, 0.25)'
+                        }}
+                      >
+                        <Sparkles size={12} className="animate-pulse" />
+                      </div>
+                    )}
+                    <span
+                      style={{
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        color: qualifyProgress.isDone ? '#00E5A0' : '#F0F4F8'
+                      }}
+                    >
+                      {qualifyProgress.isDone ? 'Qualification terminée avec succès' : 'Qualification IA en direct...'}
+                    </span>
+                  </div>
+
+                  {/* Percentage badge */}
+                  <div
+                    style={{
+                      fontFamily: 'monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas',
+                      fontSize: '0.8rem',
+                      fontWeight: 700,
+                      color: qualifyProgress.isDone ? '#00E5A0' : '#00E5C8',
+                      background: qualifyProgress.isDone ? 'rgba(0, 229, 160, 0.1)' : 'rgba(0, 229, 200, 0.08)',
+                      border: `1px solid ${qualifyProgress.isDone ? 'rgba(0, 229, 160, 0.3)' : 'rgba(0, 229, 200, 0.25)'}`,
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      letterSpacing: '0.04em'
+                    }}
+                  >
+                    {qualifyProgress.isDone ? 100 : fakePercent}%
+                  </div>
+                </div>
+
+                {/* Progress Track */}
+                <div
+                  style={{
+                    height: '6px',
+                    backgroundColor: 'rgba(6, 17, 31, 0.8)',
+                    borderRadius: '3px',
+                    overflow: 'hidden',
+                    position: 'relative',
+                    border: '1px solid rgba(0, 229, 200, 0.25)',
+                    boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.6)'
+                  }}
+                >
+                  {qualifyProgress.isDone ? (
+                    <div
+                      style={{
+                        height: '100%',
+                        width: '100%',
+                        borderRadius: '3px',
+                        background: 'linear-gradient(90deg, #00E5A0 0%, #00E5C8 100%)',
+                        boxShadow: '0 0 14px rgba(0, 229, 160, 0.7)',
+                        transition: 'all 0.5s ease'
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        height: '100%',
+                        width: '100%',
+                        borderRadius: '3px',
+                        background: 'linear-gradient(90deg, #06111F 0%, #00E5C8 25%, #3B82F6 50%, #00E5C8 75%, #06111F 100%)',
+                        backgroundSize: '200% 100%',
+                        animation: 'infinite-void-stream 3.2s linear infinite',
+                        boxShadow: '0 0 14px rgba(0, 229, 200, 0.5), inset 0 0 6px rgba(255, 255, 255, 0.2)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          bottom: 0,
+                          width: '35%',
+                          background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%)',
+                          animation: 'void-laser-gleam 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-ticker */}
+                <div
+                  style={{
+                    marginTop: '8px',
+                    fontSize: '0.74rem',
+                    color: 'var(--text-secondary, #94A3B8)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    overflow: 'hidden'
+                  }}
+                >
+                  <Zap size={12} color={qualifyProgress.isDone ? '#00E5A0' : '#00E5C8'} style={{ flexShrink: 0 }} />
+                  <span
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      opacity: 0.9,
+                      fontFamily: (qualifyProgress.message || '').includes('Lead #') ? 'monospace, sans-serif' : 'inherit'
+                    }}
+                  >
+                    {formatUserFacingMessage(qualifyProgress.message)}
+                  </span>
+                </div>
+
+                <style>{`
+                  @keyframes infinite-void-stream {
+                    0% { background-position: 200% 0; }
+                    100% { background-position: -200% 0; }
+                  }
+                  @keyframes void-laser-gleam {
+                    0% { left: -35%; }
+                    100% { left: 115%; }
+                  }
+                `}</style>
+              </div>
+            )}
 
             {scoreVal !== null ? (
               <div>
@@ -598,11 +928,11 @@ export default function LeadDetailDrawer({
                 <button
                   className="btn btn-secondary"
                   onClick={handleQualifyIA}
-                  disabled={isQualifying}
+                  disabled={isQualifying || !!qualifyProgress?.active}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', padding: '0.45rem 0.9rem' }}
                 >
                   <ScanLine size={14} style={{ flexShrink: 0 }} />
-                  <span>{isQualifying ? 'Qualification...' : 'Lancer la Qualification'}</span>
+                  <span>{(isQualifying || qualifyProgress?.active) ? 'Qualification...' : 'Lancer la Qualification'}</span>
                 </button>
               </div>
             )}

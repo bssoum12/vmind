@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Search, X, Check } from 'lucide-react';
 import { INDUSTRIES } from '@/shared/constants/industries';
 
 interface IndustryMultiSelectProps {
@@ -10,6 +11,8 @@ interface IndustryMultiSelectProps {
   onBlur?: () => void;
   placeholder?: string;
 }
+
+const ALL_INDUSTRIES_OPTION = "Tous les secteurs d'activité";
 
 export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
   selectedIndustries,
@@ -21,7 +24,7 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -41,6 +44,15 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
     };
   }, [isOpen, onBlur]);
 
+  // Focus search input when dropdown opens
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+    }
+  }, [isOpen]);
+
   // Normalize string for accent-insensitive search
   const normalize = (str: string) =>
     str
@@ -48,18 +60,27 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '');
 
+  const allAvailableIndustries = useMemo(() => {
+    const withoutSpecial = INDUSTRIES.filter((i: string) => i !== ALL_INDUSTRIES_OPTION);
+    return [ALL_INDUSTRIES_OPTION, ...withoutSpecial];
+  }, []);
+
   const filteredIndustries = useMemo(() => {
-    if (!searchTerm.trim()) return INDUSTRIES;
+    if (!searchTerm.trim()) return allAvailableIndustries;
     const normSearch = normalize(searchTerm);
-    return INDUSTRIES.filter((ind) => normalize(ind).includes(normSearch));
-  }, [searchTerm]);
+    return allAvailableIndustries.filter((ind) => normalize(ind).includes(normSearch));
+  }, [searchTerm, allAvailableIndustries]);
 
   const toggleIndustry = (industry: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (selectedIndustries.includes(industry)) {
       onChange(selectedIndustries.filter((item) => item !== industry));
     } else {
-      onChange([...selectedIndustries, industry]);
+      if (industry === ALL_INDUSTRIES_OPTION) {
+        onChange([ALL_INDUSTRIES_OPTION]);
+      } else {
+        onChange([...selectedIndustries.filter(item => item !== ALL_INDUSTRIES_OPTION), industry]);
+      }
     }
   };
 
@@ -79,12 +100,12 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
       className="industry-multiselect-container"
       style={{ position: 'relative', width: '100%' }}
     >
-      {/* Box Displaying Selected Chips and Input/Trigger */}
+      {/* Trigger Box displaying selected chips or placeholder */}
       <div
         onClick={() => {
-          setIsOpen(true);
-          inputRef.current?.focus();
-          if (onFocus) onFocus();
+          const next = !isOpen;
+          setIsOpen(next);
+          if (next && onFocus) onFocus();
         }}
         style={{
           display: 'flex',
@@ -101,74 +122,53 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
           boxShadow: isOpen ? '0 0 12px rgba(0, 229, 200, 0.15)' : 'none',
         }}
       >
-        {/* Selected Chips */}
-        {selectedIndustries.map((ind) => (
-          <span
-            key={ind}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.35rem',
-              backgroundColor: 'rgba(0, 229, 200, 0.12)',
-              border: '1px solid rgba(0, 229, 200, 0.3)',
-              color: 'var(--cyan, #00E5C8)',
-              padding: '0.2rem 0.55rem',
-              borderRadius: '16px',
-              fontSize: '0.78rem',
-              fontWeight: 500,
-              userSelect: 'none',
-            }}
-          >
-            <span>{ind}</span>
-            <button
-              type="button"
-              onClick={(e) => removeIndustry(ind, e)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--cyan, #00E5C8)',
-                cursor: 'pointer',
-                padding: '0 2px',
-                fontSize: '0.85rem',
-                lineHeight: 1,
-                display: 'flex',
-                alignItems: 'center',
-                opacity: 0.8,
-              }}
-              title={`Retirer ${ind}`}
-            >
-              ✕
-            </button>
+        {selectedIndustries.length === 0 ? (
+          <span style={{ color: '#64748B', fontSize: '0.825rem', userSelect: 'none', padding: '0.2rem 0' }}>
+            {placeholder}
           </span>
-        ))}
+        ) : (
+          selectedIndustries.map((ind) => (
+            <span
+              key={ind}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                backgroundColor: 'rgba(0, 229, 200, 0.12)',
+                border: '1px solid rgba(0, 229, 200, 0.3)',
+                color: 'var(--cyan, #00E5C8)',
+                padding: '0.2rem 0.55rem',
+                borderRadius: '16px',
+                fontSize: '0.78rem',
+                fontWeight: 500,
+                userSelect: 'none',
+              }}
+            >
+              <span>{ind}</span>
+              <button
+                type="button"
+                onClick={(e) => removeIndustry(ind, e)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--cyan, #00E5C8)',
+                  cursor: 'pointer',
+                  padding: '0 2px',
+                  fontSize: '0.85rem',
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  opacity: 0.8,
+                }}
+                title={`Retirer ${ind}`}
+              >
+                <X size={12} />
+              </button>
+            </span>
+          ))
+        )}
 
-        {/* Input for searching inside the trigger */}
-        <input
-          ref={inputRef}
-          type="text"
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            if (!isOpen) setIsOpen(true);
-          }}
-          onFocus={() => {
-            setIsOpen(true);
-            if (onFocus) onFocus();
-          }}
-          placeholder={selectedIndustries.length === 0 ? placeholder : 'Ajouter un secteur...'}
-          style={{
-            flex: 1,
-            minWidth: '140px',
-            background: 'transparent',
-            border: 'none',
-            outline: 'none',
-            color: 'var(--text-light, #F0F4F8)',
-            fontSize: '0.825rem',
-            padding: '0.2rem 0',
-          }}
-        />
-
-        {/* Right Arrow / Clear indicators */}
+        {/* Right Action Icons (Clear All + Dropdown Chevron) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: 'auto' }}>
           {selectedIndustries.length > 0 && (
             <button
@@ -178,18 +178,19 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
                 background: 'rgba(255, 255, 255, 0.08)',
                 border: 'none',
                 borderRadius: '50%',
-                width: '18px',
-                height: '18px',
+                width: '20px',
+                height: '20px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'var(--text-muted, #94A3B8)',
                 cursor: 'pointer',
                 fontSize: '0.7rem',
+                transition: 'all 0.15s ease',
               }}
               title="Tout désélectionner"
             >
-              ✕
+              <X size={12} />
             </button>
           )}
           <span
@@ -211,7 +212,7 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
         <div
           style={{
             position: 'absolute',
-            top: 'calc(100% + 4px)',
+            top: 'calc(100% + 6px)',
             left: 0,
             right: 0,
             zIndex: 1000,
@@ -221,20 +222,68 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
             border: '1px solid rgba(0, 229, 200, 0.25)',
             borderRadius: '10px',
             boxShadow: '0 12px 32px rgba(0, 0, 0, 0.75), 0 0 20px rgba(0, 229, 200, 0.1)',
-            maxHeight: '280px',
+            maxHeight: '320px',
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',
           }}
         >
-          {/* Header with counter and clear */}
+          {/* Sticky Dedicated Search Header */}
+          <div
+            style={{
+              padding: '0.55rem 0.75rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              background: 'rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Search size={14} color="var(--cyan, #00E5C8)" style={{ flexShrink: 0, opacity: 0.8 }} />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Rechercher un secteur d'activité..."
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                color: 'var(--text-light, #F0F4F8)',
+                fontSize: '0.825rem',
+                padding: '0.2rem 0',
+              }}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#94A3B8',
+                  cursor: 'pointer',
+                  padding: '2px',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Subheader with selection counter and clear action */}
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '0.5rem 0.85rem',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '0.45rem 0.85rem',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
               background: 'rgba(255, 255, 255, 0.02)',
               fontSize: '0.75rem',
               color: '#94A3B8',
@@ -278,6 +327,8 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
             {filteredIndustries.length > 0 ? (
               filteredIndustries.map((ind) => {
                 const isSelected = selectedIndustries.includes(ind);
+                const isAllSpecial = ind === ALL_INDUSTRIES_OPTION;
+
                 return (
                   <div
                     key={ind}
@@ -289,7 +340,8 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
                       padding: '0.5rem 0.85rem',
                       fontSize: '0.825rem',
                       color: isSelected ? '#FFFFFF' : '#CBD5E1',
-                      background: isSelected ? 'rgba(0, 229, 200, 0.12)' : 'transparent',
+                      background: isSelected ? 'rgba(0, 229, 200, 0.12)' : (isAllSpecial ? 'rgba(255, 255, 255, 0.02)' : 'transparent'),
+                      borderBottom: isAllSpecial ? '1px solid rgba(255, 255, 255, 0.06)' : 'none',
                       cursor: 'pointer',
                       transition: 'background 0.15s ease',
                       userSelect: 'none',
@@ -298,7 +350,7 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
                       if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
                     }}
                     onMouseLeave={(e) => {
-                      if (!isSelected) e.currentTarget.style.background = 'transparent';
+                      if (!isSelected) e.currentTarget.style.background = isAllSpecial ? 'rgba(255, 255, 255, 0.02)' : 'transparent';
                     }}
                   >
                     {/* Custom Checkbox */}
@@ -313,16 +365,14 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: '#040C18',
-                        fontSize: '0.65rem',
-                        fontWeight: 900,
                         flexShrink: 0,
                       }}
                     >
-                      {isSelected && '✓'}
+                      {isSelected && <Check size={11} strokeWidth={3} />}
                     </div>
 
                     {/* Industry Name */}
-                    <span style={{ flex: 1 }}>{ind}</span>
+                    <span style={{ flex: 1, fontWeight: isAllSpecial ? 600 : 400 }}>{ind}</span>
                   </div>
                 );
               })

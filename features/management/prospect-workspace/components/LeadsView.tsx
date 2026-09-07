@@ -5,11 +5,21 @@ import { createPortal } from 'react-dom';
 import { useParams, useSearchParams } from 'next/navigation';
 import GlobalLeadsModal from './GlobalLeadsModal';
 import { LeadsEmptyState } from './LeadsEmptyState';
-import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
+import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
-import { Database, FileSpreadsheet, ScanLine, UserPlus, Zap, Globe, Sparkles, UploadCloud, Target } from 'lucide-react';
+import { Database, FileSpreadsheet, ScanLine, UserPlus, Zap, Globe, Sparkles, UploadCloud, Target, CheckCircle2, X } from 'lucide-react';
+import { useProspectSocket } from '../hooks/useProspectSocket';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+
+interface QualifyProgressState {
+  active: boolean;
+  total: number;
+  completedIds: number[];
+  targetIds: number[];
+  latestMessage?: string;
+  isDone: boolean;
+}
 
 interface Lead {
   id: number;
@@ -41,6 +51,7 @@ interface LeadsViewProps {
   threshold: number;
   onOpenLead: (lead: Lead) => void;
   onRefresh: () => void;
+  isNavTutorialActive?: boolean;
 }
 
 const StyledCheckbox = ({ checked, onChange, isIndeterminate }: { checked: boolean, onChange: (e: any) => void, isIndeterminate?: boolean }) => (
@@ -72,10 +83,29 @@ const StyledCheckbox = ({ checked, onChange, isIndeterminate }: { checked: boole
   </div>
 );
 
-export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: LeadsViewProps) {
-  const params = useParams();
+// Zero Technical Jargon policy: sanitize and translate raw backend logs for the end user
+function formatUserFacingMessage(raw?: string): string {
+  if (!raw) return "Initialisation de l'évaluation IA...";
+  const lower = raw.toLowerCase();
+  if (lower.includes('lancée') || lower.includes('initialisation') || lower.includes('démarrage') || (lower.includes('qualification de') && lower.includes('prospect'))) {
+    return "Initialisation et analyse des profils par l'IA...";
+  }
+  // Strip out any technical middleware names or API artifacts
+  const clean = raw
+    .replace(/\s*via\s+n8n\.?/gi, '')
+    .replace(/\s*\(n8n\)/gi, '')
+    .replace(/\bn8n\b/gi, '')
+    .replace(/\bqstash\b/gi, '')
+    .replace(/\bworkflow\b/gi, 'processus')
+    .replace(/\bpayload\b/gi, 'données')
+    .trim();
+
+  return clean || "Analyse du prospect en cours...";
+}
+
+export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isNavTutorialActive }: LeadsViewProps) {
+  const { agentId } = useParams();
   const searchParams = useSearchParams();
-  const agentId = params.agentId;
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -97,6 +127,220 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
   const [qualifyingCount, setQualifyingCount] = useState(0);
   const [isGlobalModalOpen, setIsGlobalModalOpen] = useState(false);
 
+  // Live Qualification Progress (Tracked via WebSockets)
+  const [qualifyProgress, setQualifyProgress] = useState<QualifyProgressState | null>(null);
+  const qualifyProgressRef = useRef<QualifyProgressState | null>(null);
+  qualifyProgressRef.current = qualifyProgress;
+  const dismissTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [fakePercent, setFakePercent] = useState<number>(14);
+
+  // Clean up auto-dismiss timer on unmount
+  useEffect(() => {
+    return () => {
+      if (dismissTimerRef.current) {
+        clearTimeout(dismissTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Synthetic progressive easing for percentage display (eliminates stagnant 0% sensation while waiting for AI inference)
+  useEffect(() => {
+    if (!qualifyProgress || !qualifyProgress.active) return;
+
+    if (qualifyProgress.isDone) {
+      setFakePercent(100);
+      return;
+    }
+
+    const completed = qualifyProgress.completedIds.length;
+    const total = Math.max(qualifyProgress.total, 1);
+    const completedFloor = Math.round((completed / total) * 100);
+    const nextCap = Math.min(Math.round(((completed + 1) / total) * 100) - 3, 94);
+
+    setFakePercent(prev => Math.max(prev, completedFloor > 0 ? completedFloor : 14));
+
+    const interval = setInterval(() => {
+      setFakePercent((prev) => {
+        if (prev >= nextCap) return prev;
+        const diff = nextCap - prev;
+        const step = diff > 35 ? Math.floor(Math.random() * 5 + 3) : diff > 12 ? Math.floor(Math.random() * 3 + 1) : 1;
+        return Math.min(prev + step, nextCap);
+      });
+    }, 450);
+
+    return () => clearInterval(interval);
+  }, [qualifyProgress?.active, qualifyProgress?.isDone, qualifyProgress?.completedIds.length, qualifyProgress?.total]);
+
+  // Listen to qualify-start events dispatched from other components (e.g., LeadDetailDrawer)
+  useEffect(() => {
+    const handleQualifyStart = (e: CustomEvent) => {
+      const { leadIds, total } = e.detail || {};
+      const count = total || (leadIds ? leadIds.length : 1);
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+      setFakePercent(14);
+      const newState: QualifyProgressState = {
+        active: true,
+        total: count,
+        completedIds: [],
+        targetIds: leadIds || [],
+        latestMessage: "Initialisation et analyse des profils par l'IA...",
+        isDone: false
+      };
+      setQualifyProgress(newState);
+      qualifyProgressRef.current = newState;
+    };
+
+    window.addEventListener('vmind:qualify-start' as any, handleQualifyStart as EventListener);
+    return () => {
+      window.removeEventListener('vmind:qualify-start' as any, handleQualifyStart as EventListener);
+    };
+  }, []);
+
+  // Listen to real-time qualification updates from PostgreSQL execution logs & qualifications
+  useProspectSocket((payload) => {
+    const current = qualifyProgressRef.current;
+
+    // 1. Process execution log entries inserted by n8n during qualification
+    if (payload.table === 'prospect_agent_logs_execution' && payload.new) {
+      const etape = (payload.new.etape || '').toString();
+      const message = (payload.new.message || '').toString();
+      const statut = (payload.new.statut || payload.new.status || '').toString().toUpperCase();
+
+      console.log('[QUALIFY-SOCKET] Log execution received:', { etape, message, statut });
+
+      // Check if it's the initial launch log from the backend route (e.g., "Qualification de X prospect(s) lancée via n8n.")
+      const isLaunchLog = message.includes('lancée via n8n') || (message.includes('Qualification de') && message.includes('prospect'));
+      if (isLaunchLog) {
+        console.log('[QUALIFY-SOCKET] Launch log detected, keeping progress active...');
+        const countMatch = message.match(/Qualification de\s*(\d+)\s*prospect/i);
+        const parsedCount = countMatch ? parseInt(countMatch[1], 10) : (current?.total || 1);
+
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+        setFakePercent(14);
+        const updated: QualifyProgressState = {
+          active: true,
+          total: current && current.total > 0 ? current.total : parsedCount,
+          completedIds: current ? current.completedIds : [],
+          targetIds: current ? current.targetIds : [],
+          latestMessage: "Initialisation et analyse des profils par l'IA...",
+          isDone: false
+        };
+        setQualifyProgress(updated);
+        qualifyProgressRef.current = updated;
+        return;
+      }
+
+      if (!current || !current.active) return;
+
+      // Check if it's an actual lead evaluation log from n8n (contains Score ICP or Lead #ID)
+      const isLeadEval = message.includes('Score ICP') || /Lead\s*#\d+/i.test(message);
+
+      if (isLeadEval) {
+        const match = message.match(/Lead\s*#(\d+)/i);
+        let leadId = match ? parseInt(match[1], 10) : null;
+
+        if (!leadId) {
+          const nameMatch = message.match(/Lead\s*#([^\(—\-]+)/i);
+          if (nameMatch) {
+            const raw = nameMatch[1].trim().toLowerCase();
+            const found = leads.find(l =>
+              (l.nom && l.nom.toLowerCase().includes(raw)) ||
+              (l.prenom && l.prenom.toLowerCase().includes(raw)) ||
+              (l.entreprise && l.entreprise.toLowerCase().includes(raw))
+            );
+            if (found) {
+              leadId = found.id;
+            }
+          }
+        }
+
+        const newCompleted = [...current.completedIds];
+        if (leadId && !newCompleted.includes(leadId)) {
+          newCompleted.push(leadId);
+        }
+
+        const isFinished = newCompleted.length >= current.total;
+        console.log(`[QUALIFY-SOCKET] Lead evaluated (${newCompleted.length}/${current.total}), isFinished:`, isFinished);
+
+        const updated: QualifyProgressState = {
+          ...current,
+          completedIds: newCompleted,
+          latestMessage: message,
+          isDone: isFinished,
+        };
+
+        setQualifyProgress(updated);
+        qualifyProgressRef.current = updated;
+        onRefresh();
+
+        if (isFinished) {
+          if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+          dismissTimerRef.current = setTimeout(() => {
+            setQualifyProgress(null);
+            qualifyProgressRef.current = null;
+          }, 4000);
+        }
+      } else if (statut === 'COMPLETED' || statut === 'SUCCESS') {
+        // Only mark finished on workflow completion if ALL leads were evaluated (or at least all expected)
+        if (payload.new.workflow_id && payload.new.workflow_id.toString().includes('qualif') && current.completedIds.length >= current.total) {
+          const updated: QualifyProgressState = {
+            ...current,
+            isDone: true,
+          };
+          setQualifyProgress(updated);
+          qualifyProgressRef.current = updated;
+          onRefresh();
+
+          if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+          dismissTimerRef.current = setTimeout(() => {
+            setQualifyProgress(null);
+            qualifyProgressRef.current = null;
+          }, 4000);
+        }
+      }
+    }
+
+    // 2. Also listen for prospect_agent_qualifications triggers as secondary confirmation
+    if (payload.table === 'prospect_agent_qualifications' && payload.new) {
+      const qualLeadId = payload.new.lead_id;
+      if (qualLeadId) {
+        const activeCurrent: QualifyProgressState = current && current.active ? current : {
+          active: true,
+          total: 1,
+          completedIds: [],
+          targetIds: [qualLeadId],
+          latestMessage: "Évaluation enregistrée par l'IA...",
+          isDone: false
+        };
+
+        if (activeCurrent.targetIds.length === 0 || activeCurrent.targetIds.includes(qualLeadId)) {
+          if (!activeCurrent.completedIds.includes(qualLeadId)) {
+            const newCompleted = [...activeCurrent.completedIds, qualLeadId];
+            const isFinished = newCompleted.length >= activeCurrent.total;
+            console.log(`[QUALIFY-SOCKET] Qualification DB row detected for lead #${qualLeadId} (${newCompleted.length}/${activeCurrent.total})`);
+
+            const updated: QualifyProgressState = {
+              ...activeCurrent,
+              completedIds: newCompleted,
+              isDone: isFinished,
+            };
+            setQualifyProgress(updated);
+            qualifyProgressRef.current = updated;
+            onRefresh();
+
+            if (isFinished) {
+              if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+              dismissTimerRef.current = setTimeout(() => {
+                setQualifyProgress(null);
+                qualifyProgressRef.current = null;
+              }, 4000);
+            }
+          }
+        }
+      }
+    }
+  });
+
   const [availableAgents, setAvailableAgents] = useState<any[]>([]);
   const [selectedAgentIds, setSelectedAgentIds] = useState<string[]>([agentId as string]);
 
@@ -104,11 +348,15 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
   const [leadsTutorialStep, setLeadsTutorialStep] = useState<number>(0);
 
   useEffect(() => {
+    if (isNavTutorialActive) {
+      setLeadsTutorialStep(0);
+      return;
+    }
     if (!localStorage.getItem('vmind_tutorial_workspace_prospects')) {
       localStorage.setItem('vmind_tutorial_workspace_prospects', 'true');
       setLeadsTutorialStep(1);
     }
-  }, []);
+  }, [isNavTutorialActive]);
 
   const nextTutorialStep = () => {
     if (leadsTutorialStep === 5 && filteredLeads.length === 0) {
@@ -164,47 +412,34 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
   };
 
   const getTabBtnStyle = (step: number) => {
-    if (leadsTutorialStep === step) {
+    if (leadsTutorialStep === step && !isNavTutorialActive) {
       return {
         position: 'relative' as any,
-        zIndex: 10001,
-        boxShadow: '0 0 0 4px rgba(0,229,200,0.8)',
+        zIndex: 10003,
+        background: '#00E5C8',
+        color: '#04101E',
+        fontWeight: 700,
+        boxShadow: '0 0 0 3px #00E5C8, 0 0 25px rgba(0, 229, 200, 0.75)',
         pointerEvents: 'none' as any,
-        background: 'var(--card-bg)'
       };
     }
     return {};
   };
 
   const renderTutorialArrow = (step: number) => {
-    if (leadsTutorialStep === step) {
+    if (leadsTutorialStep === step && !isNavTutorialActive) {
       return (
-        <div style={{
-          position: 'absolute',
-          top: '-45px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          animation: 'bounceArrow 1.5s infinite ease-in-out',
-          pointerEvents: 'none',
-          zIndex: 10002
-        }}>
-          {[0.2, 0.6, 1].map((opacity, i) => (
-            <div key={i} style={{
-              width: '16px',
-              height: '16px',
-              borderBottom: '4px solid #00E5C8',
-              borderRight: '4px solid #00E5C8',
-              transform: 'rotate(45deg)',
-              opacity: opacity,
-              filter: 'drop-shadow(2px 2px 4px rgba(0, 229, 200, 0.6))',
-              borderRadius: '2px',
-              marginBottom: '-8px'
-            }} />
-          ))}
-        </div>
+        <VMindGuideArrow
+          direction="up"
+          color="#00E5C8"
+          style={{
+            position: 'absolute',
+            bottom: '-42px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10004
+          }}
+        />
       );
     }
     return null;
@@ -564,13 +799,25 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
     if (newlyImportedLeads.length === 0) return;
 
     setShowQualifyPrompt(false);
+    const lead_ids = newlyImportedLeads.map((l: Lead) => l.id);
+    const count = lead_ids.length;
+
     setIsBulkQualifying(true);
-    setQualifyingCount(newlyImportedLeads.length);
+    setQualifyingCount(count);
     setUploadMessage(null);
 
-    try {
-      const lead_ids = newlyImportedLeads.map((l: Lead) => l.id);
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    setFakePercent(14);
+    setQualifyProgress({
+      active: true,
+      total: count,
+      completedIds: [],
+      targetIds: lead_ids,
+      latestMessage: "Initialisation et analyse des profils par l'IA...",
+      isDone: false
+    });
 
+    try {
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
         headers: {
@@ -581,15 +828,11 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
         body: JSON.stringify({ lead_ids, agentId }),
       });
 
-      if (res.ok) {
-        setUploadMessage({
-          text: `Qualification automatique lancée pour ${newlyImportedLeads.length} prospects. Les statuts se mettront à jour sous peu.`,
-          type: 'success'
-        });
-      } else {
+      if (!res.ok) {
         throw new Error('Erreur API qualification');
       }
     } catch (err: unknown) {
+      setQualifyProgress(null);
       setUploadMessage({
         text: `Erreur lors de la qualification automatique : ${err instanceof Error ? err.message : 'Erreur interne'}`,
         type: 'error'
@@ -608,13 +851,26 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
 
     if (leadsToQualify.length === 0) return;
 
+    const lead_ids = leadsToQualify.map((l: Lead) => l.id);
+    const count = lead_ids.length;
+
     setIsBulkQualifying(true);
-    setQualifyingCount(leadsToQualify.length);
+    setQualifyingCount(count);
     setUploadMessage(null);
 
-    try {
-      const lead_ids = leadsToQualify.map((l: Lead) => l.id);
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    setFakePercent(14);
+    setQualifyProgress({
+      active: true,
+      total: count,
+      completedIds: [],
+      targetIds: lead_ids,
+      latestMessage: "Initialisation et analyse des profils par l'IA...",
+      isDone: false
+    });
+    setSelectedLeadIds([]);
 
+    try {
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
         headers: {
@@ -625,22 +881,12 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
         body: JSON.stringify({ lead_ids, agentId }),
       });
 
-      if (res.ok) {
-        const count = leadsToQualify.length;
-        const msg = count === 1
-          ? `Qualification lancée pour 1 prospect sélectionné. Les statuts se mettront à jour sous peu.`
-          : selectedLeadIds.length > 0
-            ? `Qualification lancée pour ${count} prospects sélectionnés. Les statuts se mettront à jour sous peu.`
-            : `Qualification lancée pour l'ensemble des ${count} prospects. Les statuts se mettront à jour sous peu.`;
-        setUploadMessage({
-          text: msg,
-          type: 'success'
-        });
-        setSelectedLeadIds([]);
-      } else {
+      if (!res.ok) {
         throw new Error('Erreur API qualification');
       }
+      // Live progress and dynamic increments are handled in real-time by qualifyProgress via WebSocket!
     } catch (err: unknown) {
+      setQualifyProgress(null);
       setUploadMessage({
         text: `Erreur lors de la qualification : ${err instanceof Error ? err.message : 'Erreur interne'}`,
         type: 'error'
@@ -654,26 +900,38 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
   return (
     <div className="fade-in">
       {/* ── Tutorial Overlay ── */}
-      {leadsTutorialStep > 0 && typeof document !== 'undefined' && createPortal(
+      {leadsTutorialStep > 0 && !isNavTutorialActive && (
         <div
           onClick={nextTutorialStep}
           style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.8)', zIndex: 10000,
+            background: 'rgba(3, 8, 16, 0.82)', zIndex: 10000,
             cursor: 'pointer'
           }}
-        />,
-        document.body
+        />
       )}
 
       {/* ── VMind Guide for Tutorial ── */}
-      {leadsTutorialStep > 0 && (
+      {leadsTutorialStep > 0 && !isNavTutorialActive && (
         <VMindGuide
-          isOpen={leadsTutorialStep > 0}
+          isOpen={leadsTutorialStep > 0 && !isNavTutorialActive}
           title={getTutorialContent()?.title}
           message={getTutorialContent()?.message || null}
           mood={getTutorialContent()?.mood}
-        />
+          showBackdrop={false}
+          onClose={() => setLeadsTutorialStep(0)}
+        >
+          <div className="vmind-guide-actions" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px', marginTop: '14px' }}>
+            <button
+              type="button"
+              className="vmind-guide-btn-primary"
+              onClick={nextTutorialStep}
+            >
+              <span>{leadsTutorialStep < 6 ? 'Suivant' : 'Terminer'}</span>
+              <CyberIcon name="arrow-right" size={13} color="currentColor" />
+            </button>
+          </div>
+        </VMindGuide>
       )}
 
       <div className="view-header" style={{ position: 'relative', zIndex: leadsTutorialStep > 0 && leadsTutorialStep < 5 ? 10001 : 1 }}>
@@ -745,30 +1003,280 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh }: L
         </div>
       </div>
 
-      {/* Bulk Qualify Progress Bar */}
-      {isBulkQualifying && (
-        <div className="card fade-in" style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'var(--accent-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>
-            <span>Qualification de {qualifyingCount} prospects par l&apos;IA en cours...</span>
-            <span style={{ opacity: 0.8, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              Veuillez patienter <CyberIcon name="bot" size={14} color="#00E5C8" />
+      {/* ── Live Qualification Cyber Progress Bar (WebSocket-tracked) ── */}
+      {qualifyProgress && (
+        <div
+          className="card fade-in"
+          style={{
+            marginBottom: '1.5rem',
+            padding: '1.25rem 1.5rem',
+            position: 'relative',
+            overflow: 'hidden',
+            background: qualifyProgress.isDone
+              ? 'linear-gradient(145deg, rgba(6, 31, 22, 0.85) 0%, rgba(8, 20, 38, 0.85) 100%)'
+              : 'linear-gradient(145deg, rgba(8, 20, 38, 0.95) 0%, rgba(12, 28, 52, 0.85) 100%)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: `1px solid ${qualifyProgress.isDone ? 'rgba(0, 229, 160, 0.4)' : 'rgba(0, 229, 200, 0.3)'}`,
+            borderRadius: '14px',
+            boxShadow: qualifyProgress.isDone
+              ? '0 8px 32px rgba(0, 229, 160, 0.15), inset 0 0 20px rgba(0, 229, 160, 0.05)'
+              : '0 8px 32px rgba(0, 229, 200, 0.12), inset 0 0 20px rgba(0, 229, 200, 0.04)',
+            transition: 'all 0.4s ease'
+          }}
+        >
+          {/* Ambient Specular Top Line */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: '5%',
+              right: '5%',
+              height: '1px',
+              background: qualifyProgress.isDone
+                ? 'linear-gradient(90deg, transparent, #00E5A0, transparent)'
+                : 'linear-gradient(90deg, transparent, #00E5C8, transparent)',
+              opacity: 0.8
+            }}
+          />
+
+          {/* Header Row: Telemetry Status & Monospace Counter */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '0.85rem'
+            }}
+          >
+            {/* Left: Telemetry State */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              {qualifyProgress.isDone ? (
+                <div
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    background: 'rgba(0, 229, 160, 0.15)',
+                    border: '1px solid rgba(0, 229, 160, 0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#00E5A0'
+                  }}
+                >
+                  <CheckCircle2 size={15} />
+                </div>
+              ) : (
+                <div
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    background: 'rgba(0, 229, 200, 0.12)',
+                    border: '1px solid rgba(0, 229, 200, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#00E5C8',
+                    boxShadow: '0 0 12px rgba(0, 229, 200, 0.25)'
+                  }}
+                >
+                  <Sparkles size={14} className="animate-pulse" />
+                </div>
+              )}
+
+              <div>
+                <span
+                  style={{
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    color: qualifyProgress.isDone ? '#00E5A0' : '#F0F4F8',
+                    letterSpacing: '0.01em'
+                  }}
+                >
+                  {qualifyProgress.isDone
+                    ? `Qualification terminée avec succès (${qualifyProgress.completedIds.length}/${qualifyProgress.total})`
+                    : `Qualification IA en direct...`}
+                </span>
+                {!qualifyProgress.isDone && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginLeft: '0.6rem',
+                      fontSize: '0.75rem',
+                      color: 'var(--text-secondary, #94A3B8)',
+                      fontWeight: 400
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: '#00E5C8',
+                        boxShadow: '0 0 8px #00E5C8',
+                        animation: 'cyber-ping 2s ease-in-out infinite'
+                      }}
+                    />
+                    <span>
+                      Analyse IA en cours (Lead #{Math.min(qualifyProgress.completedIds.length + 1, qualifyProgress.total)} sur {qualifyProgress.total})...
+                    </span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Cyber Counter & Dismiss */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              {/* Monospace Badge Counter */}
+              <div
+                style={{
+                  fontFamily: 'monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  color: qualifyProgress.isDone ? '#00E5A0' : '#00E5C8',
+                  background: qualifyProgress.isDone ? 'rgba(0, 229, 160, 0.1)' : 'rgba(0, 229, 200, 0.08)',
+                  border: `1px solid ${qualifyProgress.isDone ? 'rgba(0, 229, 160, 0.3)' : 'rgba(0, 229, 200, 0.25)'}`,
+                  padding: '3px 10px',
+                  borderRadius: '6px',
+                  letterSpacing: '0.04em',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>
+                  {Math.min(qualifyProgress.completedIds.length, qualifyProgress.total)} / {qualifyProgress.total}
+                </span>
+                <span style={{ opacity: 0.6 }}>•</span>
+                <span>
+                  {qualifyProgress.isDone ? 100 : fakePercent}%
+                </span>
+              </div>
+
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+                  setQualifyProgress(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-secondary, #94A3B8)',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: '4px',
+                  transition: 'color 0.2s ease'
+                }}
+                title="Fermer"
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#F0F4F8')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text-secondary, #94A3B8)')}
+              >
+                <X size={15} />
+              </button>
+            </div>
+          </div>
+
+          {/* Progress Track with Infinite Void Loop */}
+          <div
+            style={{
+              height: '8px',
+              backgroundColor: 'rgba(6, 17, 31, 0.8)',
+              borderRadius: '4px',
+              overflow: 'hidden',
+              position: 'relative',
+              border: '1px solid rgba(0, 229, 200, 0.25)',
+              boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.6)'
+            }}
+          >
+            {qualifyProgress.isDone ? (
+              /* Solid Emerald Full Bar when Complete */
+              <div
+                style={{
+                  height: '100%',
+                  width: '100%',
+                  borderRadius: '4px',
+                  background: 'linear-gradient(90deg, #00E5A0 0%, #00E5C8 100%)',
+                  boxShadow: '0 0 16px rgba(0, 229, 160, 0.7)',
+                  transition: 'all 0.5s ease'
+                }}
+              />
+            ) : (
+              /* Infinite Full Bar Looping in the Void */
+              <div
+                style={{
+                  height: '100%',
+                  width: '100%',
+                  borderRadius: '4px',
+                  background: 'linear-gradient(90deg, #06111F 0%, #00E5C8 25%, #3B82F6 50%, #00E5C8 75%, #06111F 100%)',
+                  backgroundSize: '200% 100%',
+                  animation: 'infinite-void-stream 3.2s linear infinite',
+                  boxShadow: '0 0 16px rgba(0, 229, 200, 0.5), inset 0 0 6px rgba(255, 255, 255, 0.2)',
+                  position: 'relative',
+                  overflow: 'hidden'
+                }}
+              >
+                {/* Secondary Laser Gleam sweeping through the void */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    width: '35%',
+                    background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%)',
+                    animation: 'void-laser-gleam 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite'
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Live Sub-Ticker: latest evaluated lead (sanitized & jargon-free) */}
+          <div
+            style={{
+              marginTop: '0.65rem',
+              fontSize: '0.78rem',
+              color: 'var(--text-secondary, #94A3B8)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              overflow: 'hidden'
+            }}
+          >
+            <Zap size={13} color={qualifyProgress.isDone ? '#00E5A0' : '#00E5C8'} style={{ flexShrink: 0 }} />
+            <span
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                opacity: 0.85,
+                fontFamily: (qualifyProgress.latestMessage || '').includes('Lead #') ? 'monospace, sans-serif' : 'inherit'
+              }}
+            >
+              {formatUserFacingMessage(qualifyProgress.latestMessage)}
             </span>
           </div>
-          <div style={{ height: '6px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden' }}>
-            <div
-              style={{
-                height: '100%',
-                background: 'linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-secondary) 50%, var(--accent-primary) 100%)',
-                backgroundSize: '200% 100%',
-                width: '100%',
-                animation: 'gradient-shift 2s linear infinite'
-              }}
-            />
-          </div>
+
           <style>{`
-            @keyframes gradient-shift {
-              0% { background-position: 100% 0; }
-              100% { background-position: -100% 0; }
+            @keyframes infinite-void-stream {
+              0% { background-position: 200% 0; }
+              100% { background-position: -200% 0; }
+            }
+            @keyframes void-laser-gleam {
+              0% { left: -35%; }
+              100% { left: 115%; }
+            }
+            @keyframes cyber-ping {
+              0% { transform: scale(0.9); opacity: 0.7; }
+              50% { transform: scale(1.3); opacity: 1; }
+              100% { transform: scale(0.9); opacity: 0.7; }
             }
           `}</style>
         </div>

@@ -341,10 +341,20 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
                 <div className="icp-metric-box">
                   <div className="label">Taille d'Entreprise Cible</div>
                   <div className="value-container">
-                    <span className="value-white">{icp.taille_min || 50} - {icp.taille_max || 500}</span>
-                    <span className="unit">employés</span>
+                    {(!icp.taille_min && !icp.taille_max) ? (
+                      <span className="value-cyan" style={{ fontSize: '18px' }}>Toutes tailles</span>
+                    ) : (
+                      <>
+                        <span className="value-white">
+                          {icp.taille_min ? (icp.taille_max ? `${icp.taille_min} - ${icp.taille_max}` : `${icp.taille_min}+`) : `≤ ${icp.taille_max}`}
+                        </span>
+                        <span className="unit">employés</span>
+                      </>
+                    )}
                   </div>
-                  <div className="desc">Tranche d'effectifs priorisée pour l'analyse</div>
+                  <div className="desc">
+                    {(!icp.taille_min && !icp.taille_max) ? "Aucune restriction d'effectif" : "Tranche d'effectifs priorisée pour l'analyse"}
+                  </div>
                 </div>
 
                 {/* Metric 3: Total Criteria Evaluated */}
@@ -395,7 +405,7 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
                       ))}
                     </div>
                   ) : (
-                    <div className="empty-fallback">Tous les postes décisionnaires</div>
+                    <div className="empty-fallback">Tous les postes</div>
                   )}
                 </div>
 

@@ -131,7 +131,36 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint }: Onboa
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '500px', height: '100%', maxHeight: '650px', backgroundColor: 'var(--navy2)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
-      <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <style>{`
+        .onboarding-chat-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(0, 229, 200, 0.4) rgba(6, 17, 31, 0.4);
+          scroll-behavior: smooth;
+        }
+        .onboarding-chat-scroll::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        .onboarding-chat-scroll::-webkit-scrollbar-track {
+          background: rgba(6, 17, 31, 0.4);
+          border-radius: 8px;
+        }
+        .onboarding-chat-scroll::-webkit-scrollbar-thumb {
+          background: linear-gradient(180deg, rgba(0, 229, 200, 0.4) 0%, rgba(0, 168, 255, 0.3) 100%);
+          border-radius: 8px;
+          border: 1px solid rgba(0, 229, 200, 0.2);
+          transition: all 0.2s ease;
+        }
+        .onboarding-chat-scroll::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(180deg, rgba(0, 229, 200, 0.8) 0%, rgba(0, 168, 255, 0.7) 100%);
+          border: 1px solid rgba(0, 229, 200, 0.4);
+          box-shadow: 0 0 10px rgba(0, 229, 200, 0.5);
+        }
+      `}</style>
+      <div 
+        className="onboarding-chat-scroll" 
+        style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}
+      >
         {messages.filter(m => m.role !== 'system').map((msg, idx) => (
           <div key={idx} style={{ display: 'flex', gap: '12px', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
             {msg.role === 'assistant' && (
@@ -146,7 +175,8 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint }: Onboa
               color: msg.role === 'user' ? '#000' : 'var(--text)',
               border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
               fontSize: '0.95rem',
-              lineHeight: 1.5
+              lineHeight: 1.5,
+              whiteSpace: 'pre-wrap'
             }}>
               {msg.content}
             </div>
@@ -168,7 +198,7 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint }: Onboa
       {summary ? (
         <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border)', background: 'rgba(0, 229, 200, 0.05)' }}>
           <h4 style={{ color: 'var(--cyan)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={18} /> Résumé de la mission</h4>
-          <p style={{ color: 'var(--text)', fontSize: '0.95rem', marginBottom: '16px', lineHeight: 1.5 }}>{summary}</p>
+          <p className="onboarding-chat-scroll" style={{ color: 'var(--text)', fontSize: '0.95rem', marginBottom: '16px', lineHeight: 1.5, maxHeight: '160px', overflowY: 'auto', whiteSpace: 'pre-wrap' }}>{summary}</p>
           <div style={{ display: 'flex', gap: '12px' }}>
             <Button variant="primary" onClick={() => onConfirm(summary)} style={{ flex: 1 }}>
               Confirmer & Continuer

@@ -124,28 +124,25 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
     // Default: 'sidebar' with cyan vertical bar and logo/avatar
     return `<table cellpadding="0" cellspacing="0" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1E293B; line-height: 1.4; border-collapse: collapse;">
   <tr>
-    ${
-      logoUrl
+    ${logoUrl
         ? `<td style="padding-right: 14px; vertical-align: middle; border-right: 2px solid #00E5C8;">
       <img src="${logoUrl}" alt="Logo" style="max-height: 52px; max-width: 90px; width: auto; display: block; border-radius: 4px;" />
     </td>`
         : ''
-    }
+      }
     <td style="padding-left: ${logoUrl ? '14px' : '0'}; vertical-align: middle;">
       ${fullName ? `<div style="font-size: 15px; font-weight: bold; color: #0F172A;">${fullName}</div>` : ''}
-      ${
-        jobTitle || company
-          ? `<div style="font-size: 13px; color: #475569; margin-top: 2px;">
+      ${jobTitle || company
+        ? `<div style="font-size: 13px; color: #475569; margin-top: 2px;">
         ${jobTitle ? `<span style="color: #008f7d; font-weight: 600;">${jobTitle}</span>` : ''}${jobTitle && company ? ' | ' : ''}${company ? `<strong>${company}</strong>` : ''}
       </div>`
-          : ''
+        : ''
       }
-      ${
-        phone || email || website
-          ? `<div style="font-size: 12px; color: #64748B; margin-top: 4px;">
+      ${phone || email || website
+        ? `<div style="font-size: 12px; color: #64748B; margin-top: 4px;">
         ${[phone, email ? `<a href="mailto:${email}" style="color: #008f7d; text-decoration: none;">${email}</a>` : '', website ? `<a href="${website.startsWith('http') ? website : `https://${website}`}" style="color: #008f7d; text-decoration: none;">${website}</a>` : ''].filter(Boolean).join(' &nbsp;•&nbsp; ')}
       </div>`
-          : ''
+        : ''
       }
     </td>
   </tr>
@@ -241,6 +238,76 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
   };
 
   const isHtml = (str: string) => /<[a-z][\s\S]*>/i.test(str);
+
+  const handleSelectPreset = (themeName: 'sidebar' | 'classic' | 'minimal') => {
+    setVisualState((prev) => {
+      // Keep any user-entered text or uploaded logo
+      const hasUserData = Boolean(
+        prev.fullName || prev.jobTitle || prev.company || prev.phone || prev.email || prev.website
+      );
+
+      let nextState: VisualSignatureState;
+      if (hasUserData) {
+        nextState = {
+          ...prev,
+          theme: themeName,
+        };
+      } else {
+        // If the user hasn't filled text fields yet, populate default demo details while strictly preserving any uploaded logo
+        if (themeName === 'sidebar') {
+          nextState = {
+            fullName: 'Hamdi Triki',
+            jobTitle: 'Technical Consultant',
+            company: 'VIRTUALDEV',
+            phone: '+216 29 400 566 / +216 71 191 616',
+            email: 'hamdi.triki@virtualdev.tn',
+            website: 'www.virtualdev.tn',
+            logoUrl: prev.logoUrl, // Strictly preserved!
+            theme: 'sidebar',
+          };
+        } else if (themeName === 'classic') {
+          nextState = {
+            fullName: 'Direction Commerciale',
+            jobTitle: 'Département Développement & Solutions',
+            company: 'VIRTUALDEV',
+            phone: '+216 71 191 616',
+            email: 'contact@virtualdev.tn',
+            website: 'www.virtualdev.tn',
+            logoUrl: prev.logoUrl, // Strictly preserved!
+            theme: 'classic',
+          };
+        } else {
+          nextState = {
+            fullName: 'Hamdi Triki',
+            jobTitle: 'Directeur Commercial',
+            company: 'VIRTUALDEV',
+            phone: '+216 29 400 566',
+            email: 'hamdi.triki@virtualdev.tn',
+            website: 'www.virtualdev.tn',
+            logoUrl: prev.logoUrl, // Strictly preserved!
+            theme: 'minimal',
+          };
+        }
+      }
+
+      const newHtml = buildHtmlFromVisualState(nextState);
+      onChange(newHtml);
+      return nextState;
+    });
+  };
+
+  // Sync initial logo if value prop already contains an image
+  React.useEffect(() => {
+    if (value && !visualState.logoUrl) {
+      const match = value.match(/<img[^>]+src=["']([^"']+)["']/i);
+      if (match && match[1]) {
+        setVisualState((prev) => ({
+          ...prev,
+          logoUrl: match[1],
+        }));
+      }
+    }
+  }, []);
 
   return (
     <div
@@ -341,73 +408,50 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
 
         {/* Presets Bar Always Visible */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Modèles prêts à l&apos;emploi :</span>
-          {SIGNATURE_PRESETS.map((preset) => (
-            <button
-              key={preset.name}
-              type="button"
-              onClick={() => {
-                if (preset.name === 'Professionnel') {
-                  setVisualState({
-                    fullName: 'Hamdi Triki',
-                    jobTitle: 'Technical Consultant',
-                    company: 'VIRTUALDEV',
-                    phone: '+216 29 400 566 / +216 71 191 616',
-                    email: 'hamdi.triki@virtualdev.tn',
-                    website: 'www.virtualdev.tn',
-                    logoUrl: '',
-                    theme: 'sidebar',
-                  });
-                } else if (preset.name === 'Corporate') {
-                  setVisualState({
-                    fullName: 'Direction Commerciale',
-                    jobTitle: 'Département Développement',
-                    company: 'VIRTUALDEV',
-                    phone: '+216 71 191 616',
-                    email: 'contact@virtualdev.tn',
-                    website: 'www.virtualdev.tn',
-                    logoUrl: '',
-                    theme: 'classic',
-                  });
-                } else {
-                  setVisualState({
-                    fullName: 'Hamdi Triki',
-                    jobTitle: '',
-                    company: 'VIRTUALDEV',
-                    phone: '+216 29 400 566',
-                    email: '',
-                    website: 'www.virtualdev.tn',
-                    logoUrl: '',
-                    theme: 'minimal',
-                  });
-                }
-                onChange(preset.html);
-              }}
-              style={{
-                padding: '0.25rem 0.55rem',
-                borderRadius: '6px',
-                fontSize: '0.725rem',
-                fontWeight: 500,
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                color: '#CBD5E1',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.3)';
-                e.currentTarget.style.color = '#00E5C8';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                e.currentTarget.style.color = '#CBD5E1';
-              }}
-            >
-              <span>{preset.name}</span>
-            </button>
-          ))}
+          <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Modèles :</span>
+          {[
+            { id: 'sidebar' as const, name: 'Professionnel' },
+            { id: 'classic' as const, name: 'Corporate' },
+            { id: 'minimal' as const, name: 'Minimaliste' },
+          ].map((preset) => {
+            const isActive = visualState.theme === preset.id;
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => handleSelectPreset(preset.id)}
+                style={{
+                  padding: '0.28rem 0.65rem',
+                  borderRadius: '6px',
+                  fontSize: '0.75rem',
+                  fontWeight: isActive ? 600 : 500,
+                  background: isActive ? 'rgba(0, 229, 200, 0.15)' : 'rgba(255, 255, 255, 0.04)',
+                  border: isActive ? '1px solid #00E5C8' : '1px solid rgba(255, 255, 255, 0.08)',
+                  color: isActive ? '#00E5C8' : '#CBD5E1',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.3)';
+                    e.currentTarget.style.color = '#00E5C8';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                    e.currentTarget.style.color = '#CBD5E1';
+                  }
+                }}
+              >
+                <span>{preset.name}</span>
+                {isActive && <span style={{ fontSize: '0.7rem' }}>✓</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -622,14 +666,10 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
                     )}
                   </div>
                 ) : (
-                  <div style={{ color: '#94A3B8', fontSize: '12px', fontStyle: 'italic', paddingTop: '1rem', textAlign: 'center' }}>
+                  <div style={{ color: '#94A3B8', fontSize: '12px', fontStyle: 'italic', paddingTop: '1.5rem', textAlign: 'center' }}>
                     Remplissez les champs à gauche pour voir votre signature s&apos;afficher en direct.
                   </div>
                 )}
-              </div>
-
-              <div style={{ textAlign: 'right', fontSize: '10px', color: '#94A3B8', marginTop: '0.5rem' }}>
-                Prêt pour l&apos;envoi
               </div>
             </div>
           </div>
@@ -712,7 +752,7 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
 
             <button
               type="button"
-              onClick={() => insertSnippetInCode('<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 12px 0;" />')}
+              onClick={() => insertSnippetInCode('<hr style="border: none; border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 12px 0;" />')}
               style={toolbarBtnStyle}
               title="Ligne de séparation"
             >
@@ -824,14 +864,6 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
           </div>
         </div>
       )}
-
-      {/* Footer info */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.725rem', color: '#64748B' }}>
-        <span>
-          <em>Vous pouvez basculer entre le générateur visuel et le code HTML à tout moment.</em>
-        </span>
-        <span>{value ? `${value.length} caractères` : '0 caractère'}</span>
-      </div>
     </div>
   );
 };
