@@ -155,6 +155,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
                 setActiveNav('dashboard');
                 window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'chat' }));
                 if (onAgentClick) onAgentClick(agent.id);
+
+                // Isoler la conversation par agent : vérifier si la conversation active appartient à cet agent
+                const currentConv = conversations.find(c => c.conversation_id === activeConversationId);
+                if (!currentConv || currentConv.agent_id !== agent.id) {
+                  const matchingConvs = conversations.filter(c => c.agent_id === agent.id);
+                  if (matchingConvs.length > 0) {
+                    setActiveConversationId(matchingConvs[0].conversation_id);
+                  } else {
+                    resetToNewConversation();
+                  }
+                }
               }}
             >
               <IconBox style={{
