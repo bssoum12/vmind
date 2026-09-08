@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
-import { getAgents } from '@/shared/api/n8n-api';
+import { getAgents, getMarketplaceStats } from '@/shared/api/n8n-api';
 
 interface SidebarProps {
   currentView: string;
@@ -14,25 +14,54 @@ interface SidebarProps {
 export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, activeCategory, onSelectCategory }) => {
   const [agentCount, setAgentCount] = useState<number | null>(null);
   const [pendingRequestsCount, setPendingRequestsCount] = useState<number | null>(null);
+  const [executionsToday, setExecutionsToday] = useState<number | null>(null);
+  const [activeAgentsCount, setActiveAgentsCount] = useState<number | null>(null);
+  const [successRate, setSuccessRate] = useState<number | null>(null);
 
   useEffect(() => {
-    // Fetch real agent count from backend
-    getAgents()
-      .then(agents => setAgentCount(agents.length))
-      .catch(() => setAgentCount(0));
+    const refreshData = () => {
+      getAgents()
+        .then(agents => setAgentCount(agents.length))
+        .catch(() => setAgentCount(0));
 
-    // Fetch pending signup requests count
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/signup-requests`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.ok) {
-          const pending = data.requests.filter((r: any) => r.status === 'pending');
-          setPendingRequestsCount(pending.length);
-        } else {
-          setPendingRequestsCount(0);
-        }
-      })
-      .catch(() => setPendingRequestsCount(0));
+      getMarketplaceStats()
+        .then(res => {
+          if (res.ok && res.sidebarStats) {
+            setExecutionsToday(res.sidebarStats.executionsToday);
+            setActiveAgentsCount(res.sidebarStats.activeAgentsCount);
+            setSuccessRate(res.sidebarStats.successRate);
+          }
+        })
+        .catch(() => {});
+
+      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/signup-requests`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.ok) {
+            const pending = data.requests.filter((r: any) => r.status === 'pending');
+            setPendingRequestsCount(pending.length);
+          } else {
+            setPendingRequestsCount(0);
+          }
+        })
+        .catch(() => setPendingRequestsCount(0));
+    };
+
+    refreshData();
+
+    const handleAgentUpdate = () => refreshData();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('vmind_agent_updated', handleAgentUpdate);
+    }
+
+    const interval = setInterval(refreshData, 4000);
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('vmind_agent_updated', handleAgentUpdate);
+      }
+      clearInterval(interval);
+    };
   }, [currentView]); // re-fetch when navigating back to agents view
 
   const handleCategoryClick = (cat: string) => {
@@ -173,21 +202,19 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
       <div className="sidebar-footer">
         <div className="stats-row">
           <span className="stats-label">Exécutions aujourd&apos;hui</span>
-          <span className="stats-val">24</span>
+          <span className="stats-val">{executionsToday !== null ? executionsToday : '…'}</span>
         </div>
         <div className="stats-row">
           <span className="stats-label">Agents actifs</span>
           <span className="stats-val">
-            {agentCount !== null ? agentCount : '…'}
+            {activeAgentsCount !== null ? activeAgentsCount : (agentCount !== null ? agentCount : '…')}
           </span>
         </div>
         <div className="stats-row">
           <span className="stats-label">Taux de succès</span>
-          <span className="stats-val">97%</span>
-        </div>
-        <div className="stats-row">
-          <span className="stats-label">Connexion ERP</span>
-          <span className="stats-val" style={{ color: 'var(--green)' }}>● TraLIS</span>
+          <span className="stats-val">
+            {executionsToday && executionsToday > 0 && successRate !== null ? `${successRate}%` : '-'}
+          </span>
         </div>
       </div>
     </div>
