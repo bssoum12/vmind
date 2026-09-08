@@ -46,7 +46,8 @@ export async function sendVmindMessage(message: string, conversationId: string, 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
   const proxyUrl = `${baseUrl}/api/n8n-proxy`;
 
-  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId });
+  const agentCode = (agentId || "VFIN").toUpperCase();
+  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode });
 
   let mcp_token;
   if (typeof window !== "undefined") {
@@ -97,6 +98,7 @@ export async function sendVmindMessage(message: string, conversationId: string, 
         vmind_session_id: sessionId,
         conversation_id: conversationId,
         agent_id: agentId,
+        agent: agentCode,
         mcp_token
       }),
       signal

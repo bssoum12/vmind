@@ -87,6 +87,9 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_vmove_top_ports_retards': 'VMOVE',
   'Client1_get_vmove_top_ports_retards': 'VMOVE',
   'MCP_Client1_get_vmove_top_ports_retards': 'VMOVE',
+  'get_vmove_suggestion_bl_non_factures': 'VMOVE',
+  'Client1_get_vmove_suggestion_bl_non_factures': 'VMOVE',
+  'MCP_Client1_get_vmove_suggestion_bl_non_factures': 'VMOVE',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -143,6 +146,9 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'get_vmove_top_ports_retards': 'Top ports (Retards)',
   'Client1_get_vmove_top_ports_retards': 'Top ports (Retards)',
   'MCP_Client1_get_vmove_top_ports_retards': 'Top ports (Retards)',
+  'get_vmove_suggestion_bl_non_factures': 'BL Non Facturés (Exploitation)',
+  'Client1_get_vmove_suggestion_bl_non_factures': 'BL Non Facturés (Exploitation)',
+  'MCP_Client1_get_vmove_suggestion_bl_non_factures': 'BL Non Facturés (Exploitation)',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -191,7 +197,8 @@ const VMOVE_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Dossiers en retard ETA ?": "Quels dossiers sont en retard par rapport à la date ETA ?",
   "Dossiers clients en cours ?": "Affiche les dossiers en cours par client",
   "Top transporteurs (Ponctualité) ?": "Quel transporteur a le meilleur taux de ponctualité ce mois ?",
-  "Top ports (Retards) ?": "Quels sont les ports avec le plus de retards ce trimestre ?"
+  "Top ports (Retards) ?": "Quels sont les ports avec le plus de retards ce trimestre ?",
+  "BL non facturés ?": "Combien de BL ne sont pas encore facturés ?"
 };
 
 const FAST_TRACK_REGISTRY: Record<string, string> = {

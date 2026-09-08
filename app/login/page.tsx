@@ -744,13 +744,42 @@ export default function LoginPage() {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0,
+      minHeight: '100vh',
+      width: '100vw',
       background: `radial-gradient(ellipse 120% 80% at 28% 60%, #071424 0%, ${bg} 55%, #03080f 100%)`,
       display: 'flex', flexDirection: 'column',
       fontFamily: "'Inter', -apple-system, sans-serif",
-      color: white, overflow: 'hidden',
+      color: white,
+      overflowY: 'auto',
+      overflowX: 'hidden',
     }}>
       <PremiumBackground />
+
+      {/* Responsive layout styles */}
+      <style jsx global>{`
+        @media (max-width: 1024px) {
+          .login-main-container {
+            flex-direction: column !important;
+            overflow-y: auto !important;
+            padding-bottom: 40px !important;
+          }
+          .login-left-panel {
+            width: 100% !important;
+            padding: 32px 24px !important;
+            align-items: center !important;
+            text-align: center !important;
+          }
+          .login-right-panel {
+            width: 100% !important;
+            padding: 16px 24px 40px !important;
+          }
+        }
+        @media (max-height: 850px) {
+          .login-main-container {
+            overflow-y: auto !important;
+          }
+        }
+      `}</style>
 
       {/* ═══ HEADER ═══ */}
       <header style={{
@@ -784,10 +813,10 @@ export default function LoginPage() {
       </header>
 
       {/* ═══ MAIN ═══ */}
-      <main style={{ position: 'relative', zIndex: 10, display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <main className="login-main-container" style={{ position: 'relative', zIndex: 10, display: 'flex', flex: 1, overflowY: 'auto' }}>
 
         {/* ── LEFT (58%) ── */}
-        <div style={{ width: '58%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 2% 32px 8%' }}>
+        <div className="login-left-panel" style={{ width: '58%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 2% 32px 8%' }}>
 
           {/* Brand headline */}
           <div style={{ marginBottom: '6px' }}>
@@ -832,7 +861,7 @@ export default function LoginPage() {
         </div>
 
         {/* ── RIGHT (42%) — Card ── */}
-        <div style={{ width: '42%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 6% 32px 2%' }}>
+        <div className="login-right-panel" style={{ width: '42%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 6% 32px 2%' }}>
           <div className="anim-card" style={{
             width: '100%', maxWidth: '590px',
             background: 'linear-gradient(160deg, rgba(8,20,38,0.98) 0%, rgba(4,12,24,0.99) 100%)',

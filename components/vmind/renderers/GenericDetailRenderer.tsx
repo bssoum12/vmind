@@ -30,7 +30,11 @@ export const GenericDetailRenderer: React.FC<GenericDetailRendererProps> = ({ da
   }
 
   // 3. Si c'est un objet simple (clé-valeur), on l'affiche en liste structurée
-  const entries = Object.entries(data).filter(([k, v]) => v !== null && v !== undefined && k !== 'rows_count');
+  const entries = Object.entries(data).filter(([k, v]) => 
+    v !== null && 
+    v !== undefined && 
+    !['rows_count', 'ok', 'tool_used', 'response_type', 'message', 'text', 'title', 'kpis', 'table', 'chart', 'details', 'error'].includes(k)
+  );
 
   if (entries.length > 0 && entries.every(([_, v]) => typeof v !== 'object')) {
     return (
@@ -45,11 +49,6 @@ export const GenericDetailRenderer: React.FC<GenericDetailRendererProps> = ({ da
     );
   }
 
-  // 4. Fallback : JSON stringify propre
-  return (
-    <pre className="premium-fallback-box" style={{ padding: '16px', borderRadius: '8px', overflowX: 'auto', fontSize: '10px', color: '#9ca3af' }}>
-      <div style={{ fontWeight: 'bold', color: 'var(--cyan)', marginBottom: '8px', borderBottom: '1px solid rgba(28,37,56,1)', paddingBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '9px' }}>Données brutes structurées</div>
-      {JSON.stringify(data, null, 2)}
-    </pre>
-  );
+  // 4. Ne JAMAIS afficher les données brutes JSON dans l'interface
+  return null;
 };
