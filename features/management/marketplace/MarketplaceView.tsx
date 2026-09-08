@@ -5,6 +5,7 @@ import { Button } from '@/shared/management/components/Button';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
 import { VMindGuide, VMindGuideArrow } from '@/shared/management/components/VMindGuide';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
+import { getMarketplaceStats } from '@/shared/api/n8n-api';
 
 interface MarketplaceViewProps {
   onDeploy: (templateId: string) => void;
@@ -17,10 +18,19 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
   const [searchQuery, setSearchQuery] = React.useState('');
   const [highlightedTemplateId, setHighlightedTemplateId] = React.useState<string | null>(null);
   const [linkedProspectUuid, setLinkedProspectUuid] = React.useState<string | null>(null);
+  const [templateDeployments, setTemplateDeployments] = React.useState<Record<string, number>>({});
   const parentCategories = Array.from(new Set(AGENT_TEMPLATES.map(a => a.category.split(' · ')[0]))).sort();
   const allCategories = ['all', ...parentCategories];
 
   React.useEffect(() => {
+    getMarketplaceStats()
+      .then(res => {
+        if (res.ok && res.templateDeployments) {
+          setTemplateDeployments(res.templateDeployments);
+        }
+      })
+      .catch(() => {});
+
     if (typeof window !== 'undefined') {
       const targetTemplate = sessionStorage.getItem('vmind_guide_target_marketplace');
       const prospectUuid = sessionStorage.getItem('vmind_guide_link_prospect_uuid');
@@ -33,6 +43,10 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
       }
     }
   }, []);
+
+  const getDynamicDeployments = (agentId: string, baseDeployments: number) => {
+    return templateDeployments[agentId] || 0;
+  };
 
   const handleDeployTarget = (templateId: string) => {
     if (linkedProspectUuid && typeof window !== 'undefined') {
@@ -135,21 +149,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
         <div>
           <div className="page-title">Marketplace d&apos;Agents {activeCategory !== 'all' && `· ${activeCategory}`}</div>
           <div className="page-sub">Choisissez un modèle, configurez-le et déployez votre employé virtuel en minutes</div>
-        </div>
-        <div className="page-actions">
-          <input 
-            type="file" 
-            id="import-model" 
-            style={{ display: 'none' }} 
-            accept=".json,.vmind"
-            onChange={(e) => alert('Modèle sélectionné : ' + e.target.files?.[0].name)} 
-          />
-          <Button onClick={() => document.getElementById('import-model')?.click()}>
-            📤 Importer un modèle
-          </Button>
-          <Button variant="primary" onClick={() => onDeploy('custom')}>
-            ＋ Créer sur mesure
-          </Button>
         </div>
       </div>
       <div className="tabs-bar">
@@ -277,7 +276,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
                       <span>·</span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         <CyberIcon name="zap" size={10} color="#00E5C8" />
-                        {agent.deployments} déploiements
+                        {getDynamicDeployments(agent.id, agent.deployments)} déploiements
                       </span>
                     </div>
                   </div>
@@ -380,7 +379,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
                       <span>·</span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         <CyberIcon name="zap" size={10} color="#00E5C8" />
-                        {agent.deployments} déploiements
+                        {getDynamicDeployments(agent.id, agent.deployments)} déploiements
                       </span>
                     </div>
                   </div>

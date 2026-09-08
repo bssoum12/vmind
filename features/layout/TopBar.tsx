@@ -146,7 +146,6 @@ export const TopBar: React.FC = () => {
         </div>
       </div>
       <div className="topbar-right">
-        <div className="tb-btn" title="Notifications">🔔</div>
         <div className="tb-btn" title="Paramètres du profil" onClick={handleGoToProfile} style={{ cursor: 'pointer' }}>⚙</div>
         <div style={{ position: 'relative' }}>
           <div 

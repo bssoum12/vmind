@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation';
 import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Brain, CheckSquare, ListChecks, SkipForward, Users, Info, ExternalLink, UploadCloud, RefreshCw, BarChart2, LayoutDashboard } from 'lucide-react';
+import { Play, Brain, CheckSquare, ListChecks, SkipForward, Users, Info, ExternalLink, UploadCloud, RefreshCw, LayoutDashboard } from 'lucide-react';
 import { ProspectAgentExecutionModal } from './components/ProspectAgentExecutionModal';
 import { SourcingAgentExecutionModal } from './components/SourcingAgentExecutionModal';
 import { ProspectAgentScheduleModal } from './components/ProspectAgentScheduleModal';
@@ -811,10 +811,6 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           <button className="btn" onClick={refresh} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <RefreshCw size={13} />
             Rafraîchir
-          </button>
-          <button className="btn" onClick={() => onNavigate('reports')} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <BarChart2 size={13} />
-            Rapports consolidés
           </button>
         </div>
       </div>
