@@ -522,7 +522,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
         background: 'var(--card-bg)'
       };
     }
-    return {};
+    return tutorialStep > 0 ? { pointerEvents: 'none' as any } : {};
   };
 
   const renderTutorialArrow = (agent: LiveAgent, step: number) => {
@@ -689,14 +689,29 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   return (
     <div id="view-agents" className="anim" style={{ position: 'relative' }}>
 
-      {/* ── Tutorial Overlay ── */}
+      {/* ── Fullscreen Tutorial Blocker Overlay ── */}
       {tutorialStep > 0 && (
         <div
-          onClick={nextTutorialStep}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
           style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.8)', zIndex: 10000,
-            cursor: 'pointer'
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(2, 6, 14, 0.78)',
+            backdropFilter: 'blur(3px)',
+            WebkitBackdropFilter: 'blur(3px)',
+            zIndex: 10000,
+            cursor: 'default',
+            pointerEvents: 'all'
           }}
         />
       )}
@@ -708,7 +723,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           title={getTutorialContent()?.title}
           message={getTutorialContent()?.message || null}
           mood={getTutorialContent()?.mood}
-          showBackdrop={true}
+          showBackdrop={false}
           onClose={() => {
             setTutorialStep(0);
             setTutorialAgent(null);
@@ -739,6 +754,10 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                       const linkId = tutorialAgent.uuid || (tutorialAgent as any).agent_id;
                       if (linkId) {
                         sessionStorage.setItem('vmind_guide_link_prospect_uuid', String(linkId));
+                      }
+                      const linkName = tutorialAgent.agent_name || (tutorialAgent as any).nom;
+                      if (linkName) {
+                        sessionStorage.setItem('vmind_guide_link_prospect_name', String(linkName));
                       }
                     }
                     onNavigate('market');
@@ -873,10 +892,17 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                   return (
                     <tr
                       key={agent.agent_name}
-                      onMouseEnter={() => startTutorial(agent)}
-                      onClick={() => setSelected(isSelected ? null : agent)}
+                      onMouseEnter={() => {
+                        if (tutorialStep > 0) return;
+                        startTutorial(agent);
+                      }}
+                      onClick={() => {
+                        if (tutorialStep > 0) return;
+                        setSelected(isSelected ? null : agent);
+                      }}
                       style={{
-                        cursor: 'pointer',
+                        cursor: tutorialStep > 0 ? 'default' : 'pointer',
+                        pointerEvents: tutorialStep > 0 ? 'none' : undefined,
                         background: isTutorialActive && tutorialStep === 1 ? 'rgba(0, 229, 200, 0.12)' : isSelected ? 'rgba(0,229,160,0.06)' : undefined,
                         borderLeft: isSelected ? '3px solid #00E5A0' : '3px solid transparent',
                         transition: 'all .15s',

@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/shared/management/components/Button';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
-import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
+import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { Target, Users, Check, Bot, Zap, Save, CheckCircle2, Play, CalendarClock, X, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { SourcingAgentExecutionModal } from '../agents/components/SourcingAgentExecutionModal';
 import { SourcingAgentScheduleModal } from '../agents/components/SourcingAgentScheduleModal';
@@ -59,6 +60,8 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
   const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   const template = AGENT_TEMPLATES.find(t => t.id === templateId);
+  const isEditMode = Boolean(agentToEdit && (agentToEdit.uuid || (agentToEdit.agent_id && agentToEdit.agent_name && agentToEdit.agent_id !== 'sourcing' && agentToEdit.agent_id !== 'sourcing_agent')));
+  const editUuid = isEditMode ? (agentToEdit.uuid || agentToEdit.agent_id) : null;
 
   interface SourcingFormData {
     agent_name: string;
@@ -72,22 +75,53 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
   }
 
   const [formData, setFormData] = useState<SourcingFormData>(() => {
+    let initialTargetIds: (number | string)[] = [];
+
     if (agentToEdit) {
       const cfg = agentToEdit.config || {};
       const rawTargetIds = cfg.target_agent_ids || agentToEdit.target_agent_ids || [];
-      const targetIds = Array.isArray(rawTargetIds)
-        ? rawTargetIds.map((id: any) => {
+      if (Array.isArray(rawTargetIds)) {
+        initialTargetIds = rawTargetIds.map((id: any) => {
           if (typeof id === 'number' && !isNaN(id)) return id;
           if (typeof id === 'string' && /^\d+$/.test(id)) return parseInt(id, 10);
-          return id;
-        }).filter((id: any) => id !== null && id !== undefined && !Number.isNaN(id))
-        : [];
+          return String(id);
+        }).filter((id: any) => id !== null && id !== undefined && id !== '' && !Number.isNaN(id));
+      }
+    }
 
+    if (initialTargetIds.length === 0 && typeof window !== 'undefined') {
+      const savedLinkUuid = sessionStorage.getItem('vmind_guide_link_prospect_uuid');
+      const savedLinkName = sessionStorage.getItem('vmind_guide_link_prospect_name');
+      if (savedLinkUuid) {
+        initialTargetIds = [savedLinkUuid];
+      } else if (savedLinkName) {
+        initialTargetIds = [savedLinkName];
+      } else {
+        const savedAgentStr = sessionStorage.getItem('vmind_editing_agent');
+        if (savedAgentStr) {
+          try {
+            const parsed = JSON.parse(savedAgentStr);
+            const rawTargets = parsed.target_agent_ids || parsed.config?.target_agent_ids;
+            if (Array.isArray(rawTargets) && rawTargets.length > 0) {
+              initialTargetIds = rawTargets.map((id: any) => String(id)).filter(Boolean);
+            }
+          } catch (e) {}
+        }
+      }
+      sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
+      sessionStorage.removeItem('vmind_guide_link_prospect_name');
+    }
+
+    const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const defaultName = template?.name || 'Agent de Sourcing';
+
+    if (isEditMode) {
+      const cfg = agentToEdit.config || {};
       return {
-        agent_name: agentToEdit.agent_name || 'Agent de Sourcing',
+        agent_name: agentToEdit.agent_name || `${defaultName} - ${randomSuffix}`,
         run_mode: agentToEdit.run_mode || 'sourcing',
         workflow_timezone: agentToEdit.workflow_timezone || 'Africa/Tunis',
-        target_agent_ids: targetIds,
+        target_agent_ids: initialTargetIds,
         sourcing_config: {
           agent_mission: cfg.agent_mission || ''
         },
@@ -111,14 +145,11 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       };
     }
 
-    const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const defaultName = template?.name || 'Agent de Sourcing';
-
     return {
       agent_name: `${defaultName} - ${randomSuffix}`,
       run_mode: 'sourcing',
       workflow_timezone: 'Africa/Tunis',
-      target_agent_ids: [],
+      target_agent_ids: initialTargetIds,
       sourcing_config: {
         agent_mission: ''
       },
@@ -159,6 +190,28 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
           if (data.ok && Array.isArray(data.agents)) {
             const prospects = data.agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement'));
             setAvailableProspectAgents(prospects);
+
+            // If we have initial target IDs (e.g. from referral), ensure exact UUID matching
+            setFormData(prev => {
+              if (!prev.target_agent_ids || prev.target_agent_ids.length === 0) return prev;
+              const updatedTargetIds = prev.target_agent_ids.map(targetId => {
+                const strTarget = String(targetId).trim().toLowerCase();
+                const matched = prospects.find((p: any) => {
+                  const keys = [
+                    p.uuid,
+                    p.agent_id,
+                    p.id,
+                    p.nom,
+                    p.agent_name,
+                    p.internal_agent_id,
+                    p.sql_agent_id
+                  ].filter(Boolean).map(k => String(k).trim().toLowerCase());
+                  return keys.includes(strTarget);
+                });
+                return matched ? (matched.uuid || matched.agent_id || targetId) : targetId;
+              });
+              return { ...prev, target_agent_ids: updatedTargetIds };
+            });
           }
         }
       } catch (err) {
@@ -182,33 +235,27 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
 
   const getAgentTargetId = (agent: any): number | string => {
     if (!agent) return '';
-    if (typeof agent.internal_agent_id === 'number' && !isNaN(agent.internal_agent_id)) return agent.internal_agent_id;
-    if (typeof agent.sql_agent_id === 'number' && !isNaN(agent.sql_agent_id)) return agent.sql_agent_id;
-    if (typeof agent.agent_id === 'number' && !isNaN(agent.agent_id)) return agent.agent_id;
-    if (typeof agent.id === 'number' && !isNaN(agent.id)) return agent.id;
-    if (typeof agent.agent_id === 'string' && /^\d+$/.test(agent.agent_id)) return parseInt(agent.agent_id, 10);
-    if (typeof agent.id === 'string' && /^\d+$/.test(agent.id)) return parseInt(agent.id, 10);
-    return agent.uuid || agent.agent_id || agent.agent_name;
+    return agent.uuid || agent.agent_id || agent.id || agent.nom || agent.agent_name || '';
   };
 
   const isAgentSelected = (agent: any): boolean => {
     if (!agent || !formData.target_agent_ids || formData.target_agent_ids.length === 0) return false;
 
     const possibleKeys = [
-      getAgentTargetId(agent),
-      agent.internal_agent_id,
-      agent.sql_agent_id,
+      agent.uuid,
       agent.agent_id,
       agent.id,
-      agent.uuid,
-      agent.agent_name
-    ].filter(k => k !== null && k !== undefined && k !== '' && !Number.isNaN(k));
+      agent.nom,
+      agent.agent_name,
+      agent.internal_agent_id,
+      agent.sql_agent_id
+    ].filter(k => k !== null && k !== undefined && k !== '' && !Number.isNaN(k))
+     .map(k => String(k).trim().toLowerCase());
 
-    return possibleKeys.some(k =>
-      formData.target_agent_ids.includes(k as any) ||
-      (typeof k === 'number' && formData.target_agent_ids.includes(String(k) as any)) ||
-      (typeof k === 'string' && /^\d+$/.test(k) && formData.target_agent_ids.includes(parseInt(k, 10) as any))
-    );
+    return formData.target_agent_ids.some((targetId: any) => {
+      const strTarget = String(targetId).trim().toLowerCase();
+      return possibleKeys.includes(strTarget);
+    });
   };
 
   const toggleTargetAgent = (agent: any) => {
@@ -222,19 +269,18 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
 
       if (selected) {
         const keysToRemove = new Set([
-          targetId,
-          agent.internal_agent_id,
-          agent.sql_agent_id,
+          agent.uuid,
           agent.agent_id,
           agent.id,
-          agent.uuid,
+          agent.nom,
           agent.agent_name,
-          typeof targetId === 'number' ? String(targetId) : (typeof targetId === 'string' && /^\d+$/.test(targetId) ? parseInt(targetId, 10) : targetId)
-        ].filter(k => k !== null && k !== undefined && k !== ''));
+          agent.internal_agent_id,
+          agent.sql_agent_id
+        ].filter(k => k !== null && k !== undefined && k !== '').map(k => String(k).trim().toLowerCase()));
 
-        newIds = prev.target_agent_ids.filter((i: any) => !keysToRemove.has(i));
+        newIds = prev.target_agent_ids.filter((i: any) => !keysToRemove.has(String(i).trim().toLowerCase()));
       } else {
-        newIds = [...prev.target_agent_ids, targetId as any];
+        newIds = [...prev.target_agent_ids, targetId];
       }
 
       return { ...prev, target_agent_ids: newIds };
@@ -306,7 +352,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       }
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-        const endpoint = `${baseUrl}/api/sourcing-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
+        const endpoint = `${baseUrl}/api/sourcing-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (editUuid ? `?excludeUuid=${encodeURIComponent(String(editUuid))}` : '');
 
         const token = localStorage.getItem('vmind_session');
         const res = await fetch(endpoint, {
@@ -353,7 +399,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
     const completePayload = {
       ...formData,
       session_id: sessionId,
-      action: agentToEdit ? 'update' : 'deploy'
+      action: isEditMode ? 'update' : 'deploy'
     };
 
     try {
@@ -364,12 +410,12 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
         try { token = JSON.parse(tokenStr).token; } catch (e) { }
       }
 
-      const endpoint = agentToEdit
-        ? `${baseUrl}/api/sourcing-agent/update/${agentToEdit.uuid || agentToEdit.agent_id}`
+      const endpoint = isEditMode
+        ? `${baseUrl}/api/sourcing-agent/update/${editUuid}`
         : `${baseUrl}/api/sourcing-agent/deploy`;
 
       const response = await fetch(endpoint, {
-        method: agentToEdit ? "PUT" : "POST",
+        method: isEditMode ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token && { 'Authorization': `Bearer ${token}` })
@@ -378,11 +424,11 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       });
 
       if (!response.ok) {
-        throw new Error(`Impossible de ${agentToEdit ? 'mettre à jour' : 'déployer'} l'agent (${response.statusText})`);
+        throw new Error(`Impossible de ${isEditMode ? 'mettre à jour' : 'déployer'} l'agent (${response.statusText})`);
       }
 
       const resData = await response.json();
-      const deployedUuid = resData.uuid || resData.agent_id || agentToEdit?.uuid || agentToEdit?.agent_id || 'sourcing_agent';
+      const deployedUuid = resData.uuid || resData.agent_id || editUuid || 'sourcing_agent';
 
       const liveAgentPayload: LiveAgent = {
         agent_id: deployedUuid,
@@ -579,10 +625,71 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
                     Chargement des agents de prospection...
                   </div>
                 ) : availableProspectAgents.length === 0 ? (
-                  <div style={{ padding: '24px', textAlign: 'center', color: '#FF4757', background: 'rgba(255, 71, 87, 0.08)', borderRadius: '12px', border: '1.5px solid #FF4757' }}>
-                    <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 8 }}>❌ Aucun Agent de Prospection Trouvé</div>
-                    <div style={{ fontSize: 13, color: '#F0F4F8', lineHeight: 1.5, maxWidth: 520, margin: '0 auto' }}>
-                      Vous devez d'abord créer au moins un Agent de Prospection actif dans votre espace de travail pour pouvoir utiliser cet Agent de Sourcing.
+                  <div style={{
+                    padding: '28px 24px',
+                    textAlign: 'center',
+                    background: 'linear-gradient(160deg, rgba(8, 22, 42, 0.95) 0%, rgba(4, 12, 24, 0.98) 100%)',
+                    borderRadius: '16px',
+                    border: '1.5px solid rgba(0, 229, 200, 0.4)',
+                    boxShadow: '0 12px 35px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 229, 200, 0.15)',
+                    position: 'relative',
+                    margin: '16px 0'
+                  }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: '50%',
+                      background: 'rgba(0, 229, 200, 0.12)', border: '1px solid rgba(0, 229, 200, 0.4)',
+                      color: '#00E5C8', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      margin: '0 auto 14px auto', fontSize: 22
+                    }}>
+                      🎯
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 16, color: '#F0F4F8', marginBottom: 8 }}>
+                      Aucun Agent de Prospection Trouvé
+                    </div>
+                    <div style={{ fontSize: 13, color: '#94A3B8', lineHeight: 1.6, maxWidth: 520, margin: '0 auto 20px auto' }}>
+                      Votre Agent de Sourcing a besoin d&apos;au moins un <strong>Agent de Prospection (Closer)</strong> pour recevoir, évaluer et contacter automatiquement les leads extraits du web.
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap', position: 'relative' }}>
+                      <VMindGuideArrow
+                        direction="down"
+                        color="#00E5C8"
+                        style={{
+                          position: 'absolute',
+                          top: '-42px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          zIndex: 10
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            sessionStorage.setItem('vmind_guide_target_marketplace', 'prospection');
+                          }
+                          onCancel();
+                        }}
+                        style={{
+                          padding: '11px 24px',
+                          borderRadius: '10px',
+                          background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
+                          border: 'none',
+                          color: '#04101E',
+                          fontSize: '13px',
+                          fontWeight: 800,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          cursor: 'pointer',
+                          boxShadow: '0 0 20px rgba(0, 229, 200, 0.45)',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <CyberIcon name="zap" size={14} color="#04101E" />
+                        <span>Trouver l&apos;Agent de Prospection dans le Marketplace</span>
+                        <CyberIcon name="arrow-right" size={13} color="#04101E" />
+                      </button>
                     </div>
                   </div>
                 ) : (
@@ -933,6 +1040,54 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* VirtualMind Floating Guide */}
+      <VMindGuide
+        isOpen={
+          !!(focusedField && VIRTUAL_MIND_GUIDE[focusedField]) ||
+          (step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0)
+        }
+        title={
+          step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0
+            ? "Duo Indispensable : Agent de Prospection Requis"
+            : focusedField && VIRTUAL_MIND_GUIDE[focusedField]
+              ? VIRTUAL_MIND_GUIDE[focusedField].title
+              : undefined
+        }
+        message={
+          step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0
+            ? "Votre Chasseur (Sourcing Agent) a besoin d'un Closer (Prospect Agent) à qui transmettre ses leads qualifiés. Cliquez sur le bouton ci-dessous pour aller dans le Marketplace et découvrir l'Agent de Prospection !"
+            : focusedField && VIRTUAL_MIND_GUIDE[focusedField]
+              ? VIRTUAL_MIND_GUIDE[focusedField].text
+              : null
+        }
+        mood={
+          step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0
+            ? 'curious'
+            : 'focused'
+        }
+        showBackdrop={false}
+        onClose={() => setFocusedField(null)}
+      >
+        {step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0 && (
+          <div className="vmind-guide-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
+            <button
+              type="button"
+              className="vmind-guide-btn-primary"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('vmind_guide_target_marketplace', 'prospection');
+                }
+                onCancel();
+              }}
+            >
+              <CyberIcon name="zap" size={13} color="currentColor" />
+              <span>Trouver dans le Marketplace</span>
+              <CyberIcon name="arrow-right" size={13} color="currentColor" />
+            </button>
+          </div>
+        )}
+      </VMindGuide>
 
       {/* ── RUN ONCE (EXECUTION) MODAL ── */}
       {showExecutionModal && deployedAgent && (

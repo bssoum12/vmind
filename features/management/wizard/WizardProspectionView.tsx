@@ -272,6 +272,12 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployed, setDeployed] = useState(false);
   const template = AGENT_TEMPLATES.find(t => t.id === templateId);
+  const isEditMode = Boolean(
+    agentToEdit &&
+    (agentToEdit.uuid || (agentToEdit.agent_id && agentToEdit.agent_name && agentToEdit.agent_id !== 'prospection' && agentToEdit.agent_id !== 'sourcing')) &&
+    (agentToEdit.run_mode === 'prospection' || !agentToEdit.run_mode || agentToEdit.run_mode === 'prospect')
+  );
+  const editUuid = isEditMode ? (agentToEdit.uuid || agentToEdit.agent_id) : null;
 
   interface ProspectFormData {
     agent_name: string;
@@ -302,7 +308,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
   }
 
   const [formData, setFormData] = useState<ProspectFormData>(() => {
-    if (agentToEdit && agentToEdit.config) {
+    if (isEditMode && agentToEdit && agentToEdit.config) {
       const cfg = agentToEdit.config;
       return {
         agent_name: agentToEdit.agent_name || 'Agent de Prospection',
@@ -523,8 +529,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       }
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        const editUuid = agentToEdit?.uuid || agentToEdit?.agent_id;
-        const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (editUuid ? `?excludeUuid=${editUuid}` : '');
+        const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (editUuid ? `?excludeUuid=${encodeURIComponent(String(editUuid))}` : '');
 
         const token = localStorage.getItem('vmind_session');
         const res = await fetch(endpoint, {
@@ -695,20 +700,19 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
         }
       },
       session_id: sessionId,
-      action: agentToEdit ? 'update' : 'deploy'
+      action: isEditMode ? 'update' : 'deploy'
     };
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
       const token = localStorage.getItem('vmind_session');
 
-      const editUuid = agentToEdit?.uuid || agentToEdit?.agent_id;
-      const endpoint = agentToEdit
+      const endpoint = isEditMode
         ? `${baseUrl}/api/prospect-agent/update/${editUuid}`
         : `${baseUrl}/api/prospect-agent/deploy`;
 
       const response = await fetch(endpoint, {
-        method: agentToEdit ? "PUT" : "POST",
+        method: isEditMode ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token && { 'Authorization': `Bearer ${token}` })
@@ -717,13 +721,16 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       });
 
       if (!response.ok) {
-        throw new Error(`Impossible de ${agentToEdit ? 'mettre à jour' : 'déployer'} l'agent (${response.statusText})`);
+        throw new Error(`Impossible de ${isEditMode ? 'mettre à jour' : 'déployer'} l'agent (${response.statusText})`);
       }
 
       const data = await response.json().catch(() => ({}));
       const createdUuid = data.agent_id || editUuid;
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('vmind_post_deploy_tutorial_agent', formData.agent_name);
+        sessionStorage.removeItem('vmind_editing_agent');
+        sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
+        sessionStorage.removeItem('vmind_guide_link_prospect_name');
         window.dispatchEvent(new CustomEvent('switch-management-view', { detail: 'agents' }));
       }
       onCancel();

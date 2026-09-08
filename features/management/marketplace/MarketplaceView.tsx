@@ -7,7 +7,7 @@ import { VMindGuide, VMindGuideArrow } from '@/shared/management/components/VMin
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
 
 interface MarketplaceViewProps {
-  onDeploy: (templateId: string) => void;
+  onDeploy: (templateId: string, agent?: any, initialStep?: number) => void;
   activeCategory: string;
   onSelectCategory: (category: string) => void;
 }
@@ -25,26 +25,33 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
       if (targetTemplate) {
         sessionStorage.removeItem('vmind_guide_target_marketplace');
         setHighlightedTemplateId(targetTemplate);
-        if (prospectUuid) {
-          setLinkedProspectUuid(prospectUuid);
-        }
+      }
+      if (prospectUuid) {
+        setLinkedProspectUuid(prospectUuid);
       }
     }
   }, []);
 
   const handleDeployTarget = (templateId: string) => {
-    if (linkedProspectUuid && typeof window !== 'undefined') {
-      sessionStorage.setItem('vmind_editing_agent', JSON.stringify({
+    let agentPayload: any = undefined;
+    const effectiveProspectUuid = linkedProspectUuid || (typeof window !== 'undefined' ? sessionStorage.getItem('vmind_guide_link_prospect_uuid') : null);
+
+    if (effectiveProspectUuid && (templateId === 'sourcing' || templateId === 'sourcing_agent')) {
+      agentPayload = {
         run_mode: templateId,
-        target_agent_ids: [linkedProspectUuid],
+        target_agent_ids: [String(effectiveProspectUuid)],
         config: {
-          target_agent_ids: [linkedProspectUuid]
+          target_agent_ids: [String(effectiveProspectUuid)]
         }
-      }));
-      sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
+      };
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
+        sessionStorage.removeItem('vmind_guide_link_prospect_name');
+        sessionStorage.removeItem('vmind_editing_agent');
+      }
     }
     setHighlightedTemplateId(null);
-    onDeploy(templateId);
+    onDeploy(templateId, agentPayload);
   };
 
   const allCategories = ['all', ...Array.from(new Set(AGENT_TEMPLATES.flatMap(a => a.category.split(' · '))))].sort();
@@ -100,8 +107,20 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
       {highlightedTemplateId && (
         <VMindGuide
           isOpen={!!highlightedTemplateId}
-          title="Modèle : Agent de Sourcing"
-          message="Voici l'Agent de Sourcing dans votre Marketplace ! Cliquez directement sur cette carte ou sur 'Déployer' pour le configurer et l'associer à votre agent de prospection pour un autopilot 100% autonome."
+          title={
+            highlightedTemplateId === 'prospection'
+              ? "Modèle Recommandé : Agent de Prospection"
+              : highlightedTemplateId === 'sourcing'
+                ? "Modèle : Agent de Sourcing"
+                : `Modèle : ${AGENT_TEMPLATES.find(t => t.id === highlightedTemplateId)?.name || 'Agent'}`
+          }
+          message={
+            highlightedTemplateId === 'prospection'
+              ? "Voici l'Agent de Prospection dans votre Marketplace ! Déployez d'abord ce Closer pour qualifier et contacter vos futurs clients. Vous pourrez ensuite lui associer un Sourcing Agent pour un duo 100% autonome."
+              : highlightedTemplateId === 'sourcing'
+                ? "Voici l'Agent de Sourcing dans votre Marketplace ! Cliquez directement sur cette carte ou sur 'Déployer' pour le configurer et l'associer à votre agent de prospection pour un autopilot 100% autonome."
+                : "Voici le modèle d'agent sélectionné. Cliquez sur sa carte pour lancer sa configuration."
+          }
           mood="convinced"
           showBackdrop={true}
           onClose={() => setHighlightedTemplateId(null)}
@@ -113,7 +132,11 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
               onClick={() => handleDeployTarget(highlightedTemplateId)}
             >
               <CyberIcon name="zap" size={13} color="currentColor" />
-              <span>Déployer & Lier Maintenant</span>
+              <span>
+                {highlightedTemplateId === 'prospection'
+                  ? "Déployer l'Agent de Prospection"
+                  : "Déployer & Lier Maintenant"}
+              </span>
               <CyberIcon name="arrow-right" size={13} color="currentColor" />
             </button>
             <button
@@ -254,7 +277,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
                         {isHighlighted ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                             <CyberIcon name="zap" size={12} color="#04101E" />
-                            Déployer & Lier
+                            {highlightedTemplateId === 'prospection' ? 'Déployer ce Modèle' : 'Déployer & Lier'}
                             <CyberIcon name="arrow-right" size={12} color="#04101E" />
                           </span>
                         ) : (
@@ -357,7 +380,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
                         {isHighlighted ? (
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                             <CyberIcon name="zap" size={12} color="#04101E" />
-                            Déployer & Lier
+                            {highlightedTemplateId === 'prospection' ? 'Déployer ce Modèle' : 'Déployer & Lier'}
                             <CyberIcon name="arrow-right" size={12} color="#04101E" />
                           </span>
                         ) : (

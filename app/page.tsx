@@ -322,13 +322,17 @@ export default function Home() {
 
   const handleDeploy = (templateId: string, agent?: any, initialStep: number = 1) => {
     setSelectedTemplate(templateId);
-    setEditingAgent(agent);
+    setEditingAgent(agent || null);
     setInitialWizardStep(initialStep);
     setCurrentView('wizard');
   };
 
   const handleCancelWizard = () => {
     const hasPostDeploy = typeof window !== 'undefined' && sessionStorage.getItem('vmind_post_deploy_tutorial_agent');
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('vmind_editing_agent');
+      sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
+    }
     setCurrentView(hasPostDeploy ? 'agents' : 'market');
     setSelectedTemplate(null);
     setEditingAgent(null);
