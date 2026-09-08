@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMode } from '@/shared/contexts/ModeContext';
 import { jwtDecode } from 'jwt-decode';
 import { ShieldAlert, LogOut, ArrowLeft } from 'lucide-react';
@@ -243,12 +244,39 @@ export default function Home() {
 
   // Management Mode State
 
+  const searchParams = useSearchParams();
+  const hasInitializedFromUrl = React.useRef(false);
+
   const [currentView, setCurrentView] = useState(() => {
     if (typeof window !== 'undefined') {
       return sessionStorage.getItem('vmind_current_view') || 'market';
     }
     return 'market';
   });
+
+  useEffect(() => {
+    if (!searchParams || hasInitializedFromUrl.current) return;
+    const viewParam = searchParams.get('view');
+    const modeParam = searchParams.get('mode');
+
+    if (viewParam || modeParam) {
+      hasInitializedFromUrl.current = true;
+    }
+
+    if (modeParam === 'management' || modeParam === 'MANAGEMENT' || viewParam) {
+      setMode('MANAGEMENT');
+      if (viewParam) {
+        setCurrentView(viewParam);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('vmind_current_view', viewParam);
+          sessionStorage.setItem('vmind_mode', 'MANAGEMENT');
+          localStorage.setItem('vmind_mode', 'MANAGEMENT');
+        }
+      }
+    } else if (modeParam === 'assistant' || modeParam === 'ASSISTANT') {
+      setMode('ASSISTANT');
+    }
+  }, [searchParams, setMode]);
 
   useEffect(() => {
     const handleSwitchManagementView = (e: Event) => {
@@ -265,10 +293,6 @@ export default function Home() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('all');
 
-
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState('all');
-
   const handleNavigate = (view: string) => {
     setCurrentView(view);
     if (typeof window !== 'undefined') {
@@ -277,18 +301,39 @@ export default function Home() {
   };
 
   const [editingAgent, setEditingAgent] = useState<any>(null);
-
   const [initialWizardStep, setInitialWizardStep] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedAgentStr = sessionStorage.getItem('vmind_editing_agent');
+      if (savedAgentStr) {
+        try {
+          const agentObj = JSON.parse(savedAgentStr);
+          setEditingAgent(agentObj);
+          setSelectedTemplate(agentObj.run_mode || 'prospection');
+          setCurrentView('wizard');
+          sessionStorage.removeItem('vmind_editing_agent');
+        } catch (e) {
+          console.error("Failed to parse saved editing agent:", e);
+        }
+      }
+    }
+  }, []);
 
   const handleDeploy = (templateId: string, agent?: any, initialStep: number = 1) => {
     setSelectedTemplate(templateId);
-    setEditingAgent(agent);
+    setEditingAgent(agent || null);
     setInitialWizardStep(initialStep);
     setCurrentView('wizard');
   };
 
   const handleCancelWizard = () => {
-    setCurrentView('market');
+    const hasPostDeploy = typeof window !== 'undefined' && sessionStorage.getItem('vmind_post_deploy_tutorial_agent');
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('vmind_editing_agent');
+      sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
+    }
+    setCurrentView(hasPostDeploy ? 'agents' : 'market');
     setSelectedTemplate(null);
     setEditingAgent(null);
     setInitialWizardStep(undefined);

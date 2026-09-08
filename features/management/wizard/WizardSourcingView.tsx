@@ -1,12 +1,17 @@
 'use client';
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/shared/management/components/Button';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
-import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
-import { OnboardingChat } from './components/OnboardingChat';
+import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
+import { Target, Users, Check, Bot, Zap, Save, CheckCircle2, Play, CalendarClock, X, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { SourcingAgentExecutionModal } from '../agents/components/SourcingAgentExecutionModal';
+import { SourcingAgentScheduleModal } from '../agents/components/SourcingAgentScheduleModal';
+import { LiveAgent } from '../agents/AgentsView';
+
+import { useToast } from '@/shared/contexts/ToastContext';
 
 interface WizardViewProps {
   templateId: string;
@@ -16,12 +21,11 @@ interface WizardViewProps {
 }
 
 const VIRTUAL_MIND_GUIDE: Record<string, { title: string; text: string }> = {
-  agent_name: { title: "Identité de l'Agent", text: "Donnez un nom unique à votre agent. Ce nom vous aidera à l'identifier facilement dans votre espace de travail et dans les logs de sourcing." },
-  modele_llm: { title: "Cerveau de l'Agent (LLM)", text: "Le modèle sélectionné définit l'intelligence de votre agent. Llama 3.3 est recommandé pour sa rapidité et son rapport coût/performance." },
-  signature_email: { title: "Signature d'Email", text: "Cette signature sera insérée automatiquement à la fin de tous les emails générés par VMind. Soyez professionnel !" },
-  default_cc: { title: "Copie Conforme (CC)", text: "Ajoutez votre adresse email ou celle d'un manager pour recevoir une copie des emails envoyés aux candidats sourcés." },
-  email_limits: { title: "Cadence d'Envoi", text: "Configurez le délai entre chaque email pour éviter d'être marqué comme spam. Les limites journalières protègent la réputation de votre domaine." },
-  trigger_rules: { title: "Planification Autonome", text: "Définissez quand votre agent doit s'activer de manière autonome (ex: tous les lundis à 8h). N8N gère cette orchestration." }
+  nom: { title: "Nom de l'Agent", text: "Donnez un nom unique à votre agent de sourcing." },
+  agent_name: { title: "Identité de l'Agent", text: "Donnez un nom unique à votre agent. Ce nom vous aidera à l'identifier facilement dans votre espace de travail." },
+  agent_mission: { title: "Mission de l'Agent", text: "Définissez ce que l'agent doit accomplir. Soyez clair sur le profil des candidats ou leads ciblés." },
+  target_agents: { title: "Agents Prospect Cibles", text: "Sélectionnez les agents de prospection auxquels cet agent de sourcing transmettra automatiquement ses leads trouvés." },
+  trigger_rules: { title: "Planification Autonome", text: "Définissez quand votre agent doit s'activer de manière autonome." }
 };
 
 interface TriggerRule {
@@ -38,241 +42,88 @@ interface TriggerRule {
   triggerAtDayOfMonth: number;
 }
 
-function TagInput({
-  tags,
-  onChange,
-  placeholder,
-  suggestions,
-  onFocus,
-  onBlur
-}: {
-  tags: string[];
-  onChange: (tags: string[]) => void;
-  placeholder: string;
-  suggestions: string[];
-  onFocus?: () => void;
-  onBlur?: () => void;
-}) {
-  const [inputValue, setInputValue] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
-
-  const filteredSuggestions = suggestions.filter(
-    (s) => s.toLowerCase().includes(inputValue.toLowerCase()) && !tags.includes(s)
-  );
-
-  const addTag = (tag: string) => {
-    if (tag.trim() && !tags.includes(tag.trim())) {
-      onChange([...tags, tag.trim()]);
-    }
-    setInputValue('');
-    setShowSuggestions(false);
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    onChange(tags.filter((t) => t !== tagToRemove));
-  };
-
-  return (
-    <div className="tag-input-container" style={{ position: 'relative' }}>
-      <div
-        className="tag-input-box"
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '0.5rem',
-          padding: '0.5rem',
-          border: '1px solid var(--border)',
-          borderRadius: '6px',
-          backgroundColor: 'rgba(255,255,255,0.02)',
-          minHeight: '42px',
-          alignItems: 'center'
-        }}
-      >
-        {tags.map((tag, idx) => (
-          <span
-            key={idx}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.25rem',
-              backgroundColor: 'rgba(0,0,0,0.3)',
-              border: '1px solid var(--border)',
-              padding: '0.2rem 0.5rem',
-              borderRadius: '20px',
-              fontSize: '0.85rem'
-            }}
-          >
-            {tag}
-            <button
-              type="button"
-              onClick={() => removeTag(tag)}
-              style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '1rem', padding: '0 0.25rem', lineHeight: 1 }}
-            >
-              &times;
-            </button>
-          </span>
-        ))}
-        <input
-          type="text"
-          value={inputValue}
-          onChange={(e) => {
-            setInputValue(e.target.value);
-            setShowSuggestions(true);
-          }}
-          onFocus={(e) => {
-            setShowSuggestions(true);
-            if (onFocus) onFocus();
-          }}
-          onBlur={(e) => {
-            setTimeout(() => {
-              if (inputValue.trim()) {
-                addTag(inputValue);
-              }
-              if (onBlur) onBlur();
-              setShowSuggestions(false);
-            }, 200);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              addTag(inputValue);
-            } else if (e.key === 'Backspace' && inputValue === '' && tags.length > 0) {
-              removeTag(tags[tags.length - 1]);
-            }
-          }}
-          placeholder={tags.length === 0 ? placeholder : ''}
-          style={{
-            border: 'none',
-            outline: 'none',
-            background: 'transparent',
-            flex: 1,
-            minWidth: '120px',
-            color: '#fff',
-            fontSize: '0.9rem'
-          }}
-        />
-      </div>
-      {showSuggestions && inputValue && filteredSuggestions.length > 0 && (
-        <ul
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            backgroundColor: '#0a101d',
-            border: '1px solid var(--border)',
-            borderRadius: '6px',
-            boxShadow: '0 8px 16px rgba(0,0,0,0.5)',
-            maxHeight: '150px',
-            overflowY: 'auto',
-            zIndex: 9999,
-            listStyle: 'none',
-            padding: 0,
-            margin: '0.25rem 0 0 0',
-            opacity: 1
-          }}
-        >
-          {filteredSuggestions.map((s, idx) => (
-            <li
-              key={idx}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                addTag(s);
-              }}
-              style={{
-                padding: '0.5rem 1rem',
-                cursor: 'pointer',
-                borderBottom: '1px solid var(--border)'
-              }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-            >
-              {s}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
-
 export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCancel, agentToEdit, initialStep }) => {
+  const { showToast } = useToast();
   const [step, setStep] = useState(initialStep || 1);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const [showStep2Guide, setShowStep2Guide] = useState(false);
-  const step2GuideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [availableProspectAgents, setAvailableProspectAgents] = useState<any[]>([]);
+  const [loadingProspectAgents, setLoadingProspectAgents] = useState(false);
 
-  const triggerStep2Guide = () => {
-    setShowStep2Guide(true);
-    if (step2GuideTimeoutRef.current) {
-      clearTimeout(step2GuideTimeoutRef.current);
-    }
-    step2GuideTimeoutRef.current = setTimeout(() => {
-      setShowStep2Guide(false);
-    }, 10000);
-  };
-
-  useEffect(() => {
-    if (step === 2) {
-      triggerStep2Guide();
-    } else {
-      setShowStep2Guide(false);
-      if (step2GuideTimeoutRef.current) {
-        clearTimeout(step2GuideTimeoutRef.current);
-      }
-    }
-  }, [step]);
-
-
-  const getMoodForField = (field: string | null): GuideMood => {
-    if (!field) return 'curious';
-    const curiousFields = ['agent_name', 'zone_geo', 'taille_entreprise'];
-    const convincedFields = ['modele_llm', 'seuil_qualification', 'ponderations'];
-    if (curiousFields.includes(field)) return 'curious';
-    if (convincedFields.includes(field)) return 'convinced';
-    return 'focused';
-  };
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployed, setDeployed] = useState(false);
-  const template = AGENT_TEMPLATES.find(t => t.id === templateId);
 
-  interface ProspectFormData {
+  const [showActivationDialogue, setShowActivationDialogue] = useState(false);
+  const [activationChoice, setActivationChoice] = useState<'prompt' | 'activate'>('prompt');
+  const [deployedAgent, setDeployedAgent] = useState<LiveAgent | null>(null);
+  const [showExecutionModal, setShowExecutionModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+
+  const template = AGENT_TEMPLATES.find(t => t.id === templateId);
+  const isEditMode = Boolean(agentToEdit && (agentToEdit.uuid || (agentToEdit.agent_id && agentToEdit.agent_name && agentToEdit.agent_id !== 'sourcing' && agentToEdit.agent_id !== 'sourcing_agent')));
+  const editUuid = isEditMode ? (agentToEdit.uuid || agentToEdit.agent_id) : null;
+
+  interface SourcingFormData {
     agent_name: string;
     run_mode: string;
     workflow_timezone: string;
+    target_agent_ids: (number | string)[];
     sourcing_config: {
-      modele_llm: string;
       agent_mission: string;
-      campaign: {
-        signature_email: string;
-        default_cc: string;
-        delai_envois: number;
-        max_emails_jour: number;
-        email_recap: string;
-      };
     };
     trigger_rules: TriggerRule[];
   }
 
-  const [formData, setFormData] = useState<ProspectFormData>(() => {
-    if (agentToEdit && agentToEdit.config) {
-      const cfg = agentToEdit.config;
+  const [formData, setFormData] = useState<SourcingFormData>(() => {
+    let initialTargetIds: (number | string)[] = [];
+
+    if (agentToEdit) {
+      const cfg = agentToEdit.config || {};
+      const rawTargetIds = cfg.target_agent_ids || agentToEdit.target_agent_ids || [];
+      if (Array.isArray(rawTargetIds)) {
+        initialTargetIds = rawTargetIds.map((id: any) => {
+          if (typeof id === 'number' && !isNaN(id)) return id;
+          if (typeof id === 'string' && /^\d+$/.test(id)) return parseInt(id, 10);
+          return String(id);
+        }).filter((id: any) => id !== null && id !== undefined && id !== '' && !Number.isNaN(id));
+      }
+    }
+
+    if (initialTargetIds.length === 0 && typeof window !== 'undefined') {
+      const savedLinkUuid = sessionStorage.getItem('vmind_guide_link_prospect_uuid');
+      const savedLinkName = sessionStorage.getItem('vmind_guide_link_prospect_name');
+      if (savedLinkUuid) {
+        initialTargetIds = [savedLinkUuid];
+      } else if (savedLinkName) {
+        initialTargetIds = [savedLinkName];
+      } else {
+        const savedAgentStr = sessionStorage.getItem('vmind_editing_agent');
+        if (savedAgentStr) {
+          try {
+            const parsed = JSON.parse(savedAgentStr);
+            const rawTargets = parsed.target_agent_ids || parsed.config?.target_agent_ids;
+            if (Array.isArray(rawTargets) && rawTargets.length > 0) {
+              initialTargetIds = rawTargets.map((id: any) => String(id)).filter(Boolean);
+            }
+          } catch (e) {}
+        }
+      }
+      sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
+      sessionStorage.removeItem('vmind_guide_link_prospect_name');
+    }
+
+    const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const defaultName = template?.name || 'Agent de Sourcing';
+
+    if (isEditMode) {
+      const cfg = agentToEdit.config || {};
       return {
-        agent_name: agentToEdit.agent_name || 'Agent de Sourcing',
+        agent_name: agentToEdit.agent_name || `${defaultName} - ${randomSuffix}`,
         run_mode: agentToEdit.run_mode || 'sourcing',
         workflow_timezone: agentToEdit.workflow_timezone || 'Africa/Tunis',
+        target_agent_ids: initialTargetIds,
         sourcing_config: {
-          modele_llm: cfg.modele_llm || 'llama-3.3-70b-versatile',
-          agent_mission: cfg.agent_mission || '',
-          
-          campaign: {
-            signature_email: cfg.signature_email || '',
-            default_cc: cfg.default_cc || '',
-            delai_envois: cfg.delai_envois ?? 30,
-            max_emails_jour: cfg.max_emails_jour ?? 50,
-            email_recap: cfg.email_recap || ''
-          }
+          agent_mission: cfg.agent_mission || ''
         },
         trigger_rules: agentToEdit.trigger_rules && agentToEdit.trigger_rules.length > 0
           ? agentToEdit.trigger_rules
@@ -294,24 +145,13 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       };
     }
 
-    const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const defaultName = template?.name || 'Agent de Prospection';
-
     return {
       agent_name: `${defaultName} - ${randomSuffix}`,
       run_mode: 'sourcing',
       workflow_timezone: 'Africa/Tunis',
+      target_agent_ids: initialTargetIds,
       sourcing_config: {
-        modele_llm: 'llama-3.3-70b-versatile',
-        agent_mission: '',
-        
-        campaign: {
-          signature_email: '',
-          default_cc: '',
-          delai_envois: 30,
-          max_emails_jour: 50,
-          email_recap: ''
-        }
+        agent_mission: ''
       },
       trigger_rules: [
         {
@@ -331,6 +171,59 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
     };
   });
 
+  useEffect(() => {
+    const fetchProspectAgents = async () => {
+      setLoadingProspectAgents(true);
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const tokenStr = localStorage.getItem('vmind_session');
+        let token = tokenStr;
+        if (tokenStr?.trim().startsWith("{")) {
+          try { token = JSON.parse(tokenStr).token; } catch (e) { }
+        }
+
+        const res = await fetch(`${baseUrl}/api/list-agents`, {
+          headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && Array.isArray(data.agents)) {
+            const prospects = data.agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement'));
+            setAvailableProspectAgents(prospects);
+
+            // If we have initial target IDs (e.g. from referral), ensure exact UUID matching
+            setFormData(prev => {
+              if (!prev.target_agent_ids || prev.target_agent_ids.length === 0) return prev;
+              const updatedTargetIds = prev.target_agent_ids.map(targetId => {
+                const strTarget = String(targetId).trim().toLowerCase();
+                const matched = prospects.find((p: any) => {
+                  const keys = [
+                    p.uuid,
+                    p.agent_id,
+                    p.id,
+                    p.nom,
+                    p.agent_name,
+                    p.internal_agent_id,
+                    p.sql_agent_id
+                  ].filter(Boolean).map(k => String(k).trim().toLowerCase());
+                  return keys.includes(strTarget);
+                });
+                return matched ? (matched.uuid || matched.agent_id || targetId) : targetId;
+              });
+              return { ...prev, target_agent_ids: updatedTargetIds };
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch prospect agents for sourcing target selection:", err);
+      } finally {
+        setLoadingProspectAgents(false);
+      }
+    };
+
+    fetchProspectAgents();
+  }, []);
+
   const hourOptions = [
     'Midnight', '1am', '2am', '3am', '4am', '5am', '6am', '7am', '8am', '9am', '10am', '11am',
     'Noon', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', '7pm', '8pm', '9pm', '10pm', '11pm'
@@ -340,17 +233,58 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
     'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
   ];
 
-  const updateCampaign = (key: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      sourcing_config: {
-        ...prev.sourcing_config,
-        campaign: {
-          ...prev.sourcing_config.campaign,
-          [key]: value
-        }
+  const getAgentTargetId = (agent: any): number | string => {
+    if (!agent) return '';
+    return agent.uuid || agent.agent_id || agent.id || agent.nom || agent.agent_name || '';
+  };
+
+  const isAgentSelected = (agent: any): boolean => {
+    if (!agent || !formData.target_agent_ids || formData.target_agent_ids.length === 0) return false;
+
+    const possibleKeys = [
+      agent.uuid,
+      agent.agent_id,
+      agent.id,
+      agent.nom,
+      agent.agent_name,
+      agent.internal_agent_id,
+      agent.sql_agent_id
+    ].filter(k => k !== null && k !== undefined && k !== '' && !Number.isNaN(k))
+     .map(k => String(k).trim().toLowerCase());
+
+    return formData.target_agent_ids.some((targetId: any) => {
+      const strTarget = String(targetId).trim().toLowerCase();
+      return possibleKeys.includes(strTarget);
+    });
+  };
+
+  const toggleTargetAgent = (agent: any) => {
+    if (!agent) return;
+    const targetId = getAgentTargetId(agent);
+    if (!targetId && targetId !== 0) return;
+
+    setFormData(prev => {
+      const selected = isAgentSelected(agent);
+      let newIds: (number | string)[];
+
+      if (selected) {
+        const keysToRemove = new Set([
+          agent.uuid,
+          agent.agent_id,
+          agent.id,
+          agent.nom,
+          agent.agent_name,
+          agent.internal_agent_id,
+          agent.sql_agent_id
+        ].filter(k => k !== null && k !== undefined && k !== '').map(k => String(k).trim().toLowerCase()));
+
+        newIds = prev.target_agent_ids.filter((i: any) => !keysToRemove.has(String(i).trim().toLowerCase()));
+      } else {
+        newIds = [...prev.target_agent_ids, targetId];
       }
-    }));
+
+      return { ...prev, target_agent_ids: newIds };
+    });
   };
 
   const addTriggerRule = () => {
@@ -418,8 +352,8 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       }
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-        const endpoint = `${baseUrl}/api/sourcing-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
-        
+        const endpoint = `${baseUrl}/api/sourcing-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (editUuid ? `?excludeUuid=${encodeURIComponent(String(editUuid))}` : '');
+
         const token = localStorage.getItem('vmind_session');
         const res = await fetch(endpoint, {
           headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
@@ -428,15 +362,15 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
         if (!res.ok) {
           throw new Error("Erreur serveur lors de la vérification du nom.");
         }
-        
+
         const data = await res.json();
         if (!data.available) {
-          alert("Un agent avec ce nom existe déjà. Veuillez choisir un autre nom.");
+          showToast("Un agent avec ce nom existe déjà. Veuillez choisir un autre nom.", "err");
           return;
         }
       } catch (err) {
         console.error("Failed to check agent name", err);
-        alert("Impossible de vérifier la disponibilité du nom de l'agent. Veuillez réessayer.");
+        showToast("Impossible de vérifier la disponibilité du nom de l'agent. Veuillez réessayer.", "err");
         return;
       }
     }
@@ -445,59 +379,43 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
   };
 
   const handleDeploy = async () => {
-    // Check name availability before deploying
     if (!formData.agent_name.trim()) {
-      alert("Veuillez saisir un nom pour l'agent.");
+      showToast("Veuillez saisir un nom pour l'agent.", "err");
       if (step !== 1) setStep(1);
       return;
     }
-    
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const endpoint = `${baseUrl}/api/sourcing-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (agentToEdit ? `?excludeUuid=${agentToEdit.agent_id}` : '');
-      
-      const token = localStorage.getItem('vmind_session');
-      const res = await fetch(endpoint, {
-        headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
-      });
 
-      if (!res.ok) {
-        throw new Error("Erreur serveur lors de la vérification du nom.");
-      }
-      
-      const data = await res.json();
-      if (!data.available) {
-        alert("Un agent avec ce nom existe déjà. Veuillez choisir un autre nom.");
-        if (step !== 1) setStep(1);
-        return;
-      }
-    } catch (err) {
-      console.error("Failed to check agent name", err);
-      alert("Impossible de vérifier la disponibilité du nom de l'agent. Veuillez réessayer.");
+    if (formData.target_agent_ids.length === 0) {
+      showToast("Veuillez sélectionner au moins un agent de prospection pour recevoir les leads.", "err");
+      if (step !== 2) setStep(2);
       return;
     }
 
     setIsDeploying(true);
 
     const now = new Date();
-    const sessionId = `vprosp_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+    const sessionId = `vsourcing_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
 
     const completePayload = {
       ...formData,
       session_id: sessionId,
-      action: agentToEdit ? 'update' : 'deploy'
+      action: isEditMode ? 'update' : 'deploy'
     };
 
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const token = localStorage.getItem('vmind_session');
+      const tokenStr = localStorage.getItem('vmind_session');
+      let token = tokenStr;
+      if (tokenStr?.trim().startsWith("{")) {
+        try { token = JSON.parse(tokenStr).token; } catch (e) { }
+      }
 
-      const endpoint = agentToEdit
-        ? `${baseUrl}/api/sourcing-agent/update/${agentToEdit.agent_id}`
+      const endpoint = isEditMode
+        ? `${baseUrl}/api/sourcing-agent/update/${editUuid}`
         : `${baseUrl}/api/sourcing-agent/deploy`;
 
       const response = await fetch(endpoint, {
-        method: agentToEdit ? "PUT" : "POST",
+        method: isEditMode ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token && { 'Authorization': `Bearer ${token}` })
@@ -506,13 +424,33 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to ${agentToEdit ? 'update' : 'deploy'} agent: ${response.statusText}`);
+        throw new Error(`Impossible de ${isEditMode ? 'mettre à jour' : 'déployer'} l'agent (${response.statusText})`);
       }
 
-      setDeployed(true);
-      setTimeout(() => {
-        onCancel();
-      }, 4500);
+      const resData = await response.json();
+      const deployedUuid = resData.uuid || resData.agent_id || editUuid || 'sourcing_agent';
+
+      const liveAgentPayload: LiveAgent = {
+        agent_id: deployedUuid,
+        uuid: deployedUuid,
+        agent_name: formData.agent_name,
+        run_mode: 'sourcing',
+        status: 'running',
+        workflow_timezone: formData.workflow_timezone || 'Africa/Tunis',
+        recovery_config: {},
+        trigger_rules: [],
+        session_id: sessionId,
+        lastExecuted: Date.now(),
+        config: {
+          target_agent_ids: formData.target_agent_ids,
+          agent_mission: formData.sourcing_config?.agent_mission || ''
+        },
+        target_agent_ids: formData.target_agent_ids
+      };
+
+      setDeployedAgent(liveAgentPayload);
+      setActivationChoice('prompt');
+      setShowActivationDialogue(true);
     } catch (error: any) {
       console.error('Deployment error:', error);
       alert(`Erreur de déploiement: ${error.message}`);
@@ -521,37 +459,83 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
     }
   };
 
-  if (deployed) {
-    return (
-      <div id="view-wizard" className="anim flex items-center justify-center h-full">
-        <div className="wcard text-center p-12 max-w-lg border-pink-500/30 bg-pink-950/10 backdrop-blur-md relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-pink-500 to-transparent animate-pulse" />
-          <div className="text-7xl mb-8 animate-bounce">🚀</div>
-          <div className="text-3xl font-black text-pink-400 mb-4 tracking-tighter">AGENT EN COURS DE DÉPLOIEMENT...</div>
-          <p className="text-gray-300 mb-8 leading-relaxed">
-            L'agent <strong>{formData.agent_name}</strong> est en cours d'activation.<br />
-            Le workflow n8n a été configuré avec les règles d'exécution et les seuils définis.
-          </p>
-          <div className="status-pill sp-running inline-flex items-center gap-2 px-6 py-3 text-sm font-bold bg-pink-950/40 border border-pink-500/30 text-pink-400 rounded-full">
-            <span className="status-dot w-2 h-2 bg-pink-400 rounded-full animate-ping" />
-            SYNCHRONISATION ACTIVED
-          </div>
-          <p className="text-[11px] text-gray-500 mt-12 font-mono uppercase tracking-widest">
-            Redirection automatique vers le tableau de bord...
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const handleDeployOnly = () => {
+    setShowActivationDialogue(false);
+    onCancel();
+  };
+
+  const handleRunOnceNow = () => {
+    setShowActivationDialogue(false);
+    setShowExecutionModal(true);
+  };
+
+  const handleScheduleNow = () => {
+    setShowActivationDialogue(false);
+    setShowScheduleModal(true);
+  };
+
+  const handleActivateSchedule = async (agent: LiveAgent, params: any) => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const tokenStr = localStorage.getItem('vmind_session');
+      let token = tokenStr;
+      if (tokenStr?.trim().startsWith("{")) {
+        try { token = JSON.parse(tokenStr).token; } catch (e) { }
+      }
+
+      const targetUuid = agent.uuid || agent.agent_id;
+      const updateRes = await fetch(`${baseUrl}/api/sourcing-agent/update/${targetUuid}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify({
+          agent_name: agent.agent_name,
+          trigger_rules: params.trigger_rules,
+          target_agent_ids: params.target_agent_ids || agent.target_agent_ids,
+          sourcing_config: {
+            sourcingSummary: params.sourcingSummary,
+            totalLeads: params.totalLeads,
+            leadsPerCompany: params.leadsPerCompany,
+            ignoreDuplicates: params.ignoreDuplicates
+          }
+        })
+      });
+
+      if (!updateRes.ok) {
+        throw new Error("Échec de la mise à jour de la planification.");
+      }
+
+      const startRes = await fetch(`${baseUrl}/api/sourcing-agent/start/${targetUuid}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify({
+          target_agent_ids: params.target_agent_ids || agent.target_agent_ids
+        })
+      });
+
+      if (!startRes.ok) {
+        const errData = await startRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Échec du démarrage de l'agent.");
+      }
+    } catch (err: any) {
+      console.error("[ACTIVATE-SCHEDULE]", err);
+      alert(`Erreur lors de l'activation: ${err.message}`);
+    }
+  };
 
   return (
     <div id="view-wizard" className="anim">
       <div className="page-head">
         <div>
           <div className="page-title" id="wiz-title">
-            Configuration: {template ? template.name : 'Nouvel Agent sur mesure'}
+            Configuration: {template ? template.name : 'Nouvel Agent Sourcing'}
           </div>
-          <div className="page-sub">Configurez votre agent de sourcing en 3 étapes</div>
+          <div className="page-sub">Configurez votre agent de recherche de leads en 2 étapes</div>
         </div>
         <div className="page-actions">
           <Button onClick={onCancel}>← Retour Marketplace</Button>
@@ -570,481 +554,573 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
             <div className={`wstep ${step === 2 ? 'active' : step > 2 ? 'done' : ''}`}>
               <div className="wstep-inner">
                 <div className="wstep-num">2</div>
-                <div className="wstep-label">Briefing</div>
-              </div>
-            </div>
-            
-            <div className={`wstep ${step === 3 ? 'active' : step > 3 ? 'done' : ''}`}>
-              <div className="wstep-inner">
-                <div className="wstep-num">3</div>
-                <div className="wstep-label">Campagne</div>
-              </div>
-            </div>
-            <div className={`wstep ${step === 4 ? 'active' : step > 4 ? 'done' : ''}`}>
-              <div className="wstep-inner">
-                <div className="wstep-num">4</div>
-                <div className="wstep-label">Planification</div>
+                <div className="wstep-label">Agents Cibles</div>
               </div>
             </div>
           </div>
+
           {/* STEP 1: Identité */}
           {step === 1 && (
             <div id="step1" className="anim">
               <div className="wcard">
-                <div className="wcard-title"><span className="dot" style={{ backgroundColor: template?.accent || '#FF4757' }}></span>Identité de l'Agent</div>
+                <div className="wcard-title"><span className="dot" style={{ backgroundColor: '#00E5C8' }}></span>Identité de l'Agent</div>
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Nom de l'agent <span className="req">*</span></label>
                     <input
                       type="text"
                       className="form-input"
-                      value={formData.agent_name} onFocus={() => setFocusedField('agent_name')} onBlur={() => setFocusedField(null)}
+                      value={formData.agent_name}
+                      onFocus={() => setFocusedField('agent_name')}
+                      onBlur={() => setFocusedField(null)}
                       onChange={(e) => setFormData({ ...formData, agent_name: e.target.value })}
-                      placeholder="Ex: Yasmine, Mohamed, Amira..."
+                      placeholder="Ex: Sourcer IT - Paris, Chasseur SDR..."
                     />
-                    <div className="form-hint">Ce nom sera affiché en interne pour identifier l'agent.</div>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Modèle de Langage (LLM)</label>
-                    <select
-                      className="form-input"
-                      value={formData.sourcing_config.modele_llm} onFocus={() => setFocusedField('modele_llm')} onBlur={() => setFocusedField(null)}
-                      onChange={(e) => setFormData({
-                        ...formData,
-                        sourcing_config: { ...formData.sourcing_config, modele_llm: e.target.value }
-                      })}
-                    >
-                      <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
-                      <option value="openai/gpt-oss-120b">openai/gpt-oss-120b</option>
-                      <option value="Claude 3.5 Sonnet">Claude 3.5 Sonnet (Anthropic Cloud)</option>
-                      <option value="Llama 3 (Ollama Local)">Llama 3 (Local Ollama Engine)</option>
-                    </select>
+                    <div className="form-hint">Ce nom identifie votre agent de sourcing dans le système.</div>
                   </div>
                 </div>
-
-
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Button variant="primary" onClick={() => validateAndNext(2)}>Briefing & Objectifs →</Button>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+                <Button variant="primary" onClick={() => validateAndNext(2)}>Distribution & Agents Cibles →</Button>
               </div>
             </div>
           )}
 
-
-          {/* STEP 2: Briefing & Objectifs */}
+          {/* STEP 2: Agents Prospect Destinataires */}
           {step === 2 && (
             <div id="step2" className="anim">
               <div className="wcard">
-                <div className="wcard-title">
-                  <span className="dot" style={{ backgroundColor: template?.accent || '#FF4757' }}></span>
-                  Briefing de l'Agent
-                  <span
-                    onClick={triggerStep2Guide}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '20px',
-                      height: '20px',
-                      borderRadius: '50%',
-                      backgroundColor: 'rgba(255,255,255,0.1)',
-                      color: '#aaa',
-                      fontSize: '12px',
-                      marginLeft: '10px',
-                      cursor: 'pointer'
-                    }}
-                    title="Aide"
-                  >?</span>
-                </div>
-                <p style={{ color: 'var(--text)', marginBottom: '1rem', fontSize: '0.95rem' }}>Discutez avec VMind pour définir la mission de l'agent. Il vous posera quelques questions pour comprendre votre offre et vos objectifs.</p>
-                <OnboardingChat
-                  apiEndpoint="/api/sourcing-agent/onboarding-chat"
-                  initialMission={formData.sourcing_config.agent_mission}
-                  onConfirm={(mission) => {
-                    setFormData(prev => ({
-                      ...prev,
-                      sourcing_config: { ...prev.sourcing_config, agent_mission: mission }
-                    }));
-                    validateAndNext(3);
-                  }}
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
-                <Button variant="secondary" onClick={() => validateAndNext(1)}>← Retour</Button>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <Button variant="secondary" onClick={() => setStep(3)}>Passer (Ignorer)</Button>
-                  {formData.sourcing_config.agent_mission && (
-                    <Button variant="primary" onClick={() => validateAndNext(3)}>Campagne & Limites →</Button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: Campagne & Limites */}
-          {step === 3 && (
-            <div id="step3" className="anim">
-              <div className="wcard">
-                <div className="wcard-title"><span className="dot" style={{ backgroundColor: template?.accent || '#00e5c8' }}></span>Signature & Copie Conforme</div>
-                <div className="form-group" style={{ marginBottom: '20px' }}>
-                  <label className="form-label">Signature de l'Email <span className="req">*</span></label>
-                  <textarea
-                    className="form-input"
-                    style={{ minHeight: '100px', fontSize: '13px', lineHeight: '1.5' }}
-                    value={formData.sourcing_config.campaign.signature_email} onFocus={() => setFocusedField('signature_email')} onBlur={() => setFocusedField(null)}
-                    onChange={(e) => updateCampaign('signature_email', e.target.value)}
-                    placeholder="Cordialement,&#10;L'équipe Commerciale..."
-                  />
+                <div className="wcard-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Target size={18} color="#00E5C8" />
+                  <span>Attribution des Leads (Agents de Prospection Destinataires)</span>
                 </div>
 
-                <div className="form-group" style={{ marginBottom: '20px' }}>
-                  <label className="form-label">Copie conforme (CC) par défaut</label>
-                  <TagInput
-                    tags={formData.sourcing_config.campaign.default_cc ? formData.sourcing_config.campaign.default_cc.split(/[,;]+/).map(s => s.trim()).filter(Boolean) : []}
-                    onChange={(tags) => updateCampaign('default_cc', tags.join(','))} onFocus={() => setFocusedField('default_cc')} onBlur={() => setFocusedField(null)}
-                    placeholder="Ajouter une adresse email..."
-                    suggestions={[]}
-                  />
-                </div>
-              </div>
-
-              <div className="wcard" style={{ marginTop: '20px' }}>
-                <div className="wcard-title"><span className="dot" style={{ backgroundColor: template?.accent || '#00e5c8' }}></span>Règles d'Envoi</div>
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label">Délai min entre envois (s)</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={formData.sourcing_config.campaign.delai_envois} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
-                      onChange={(e) => updateCampaign('delai_envois', Number(e.target.value))}
-                    />
+                {/* Concise Info Banner */}
+                <div style={{
+                  padding: '14px 18px',
+                  background: 'rgba(0, 229, 200, 0.06)',
+                  border: '1px solid rgba(0, 229, 200, 0.3)',
+                  borderRadius: '12px',
+                  margin: '16px 0 20px 0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: '50%',
+                    background: 'rgba(0, 229, 200, 0.15)', color: '#00E5C8',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Target size={18} color="#00E5C8" />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Emails max / jour</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={formData.sourcing_config.campaign.max_emails_jour} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
-                      onChange={(e) => updateCampaign('max_emails_jour', Number(e.target.value))}
-                    />
+                  <div style={{ fontSize: '13px', color: '#F0F4F8', lineHeight: 1.4 }}>
+                    Sélectionnez au moins un <strong>agent de prospection</strong> ci-dessous pour recevoir et contacter automatiquement les leads extraits.
                   </div>
                 </div>
 
-                <div className="form-group" style={{ marginTop: '10px' }}>
-                  <label className="form-label">Email de récapitulatif quotidien</label>
-                  <TagInput
-                    tags={formData.sourcing_config.campaign.email_recap ? formData.sourcing_config.campaign.email_recap.split(',').map(s => s.trim()).filter(Boolean) : []}
-                    onChange={(tags) => updateCampaign('email_recap', tags.join(','))} onFocus={() => setFocusedField('email_limits')} onBlur={() => setFocusedField(null)}
-                    placeholder="Ajouter une adresse email..."
-                    suggestions={[]}
-                  />
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-                <Button onClick={() => validateAndNext(2)}>← Retour</Button>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <Button variant="secondary" onClick={() => setStep(4)}>Passer (Ignorer)</Button>
-                  <Button variant="primary" onClick={() => validateAndNext(4)}>Planification →</Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4: Planification */}
-          {step === 4 && (
-            <div id="step4" className="anim">
-              <div className="wcard">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                  <div className="wcard-title" style={{ margin: 0 }}>
-                    <span className="dot" style={{ backgroundColor: template?.accent || '#FF4757' }}></span>
-                    Règles de Déclenchement (Trigger Rules n8n)
+                {loadingProspectAgents ? (
+                  <div style={{ padding: '30px', textAlign: 'center', color: '#8A99AD' }}>
+                    Chargement des agents de prospection...
                   </div>
-                  <button
-                    type="button"
-                    onClick={addTriggerRule}
-                    style={{
-                      padding: '8px 16px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                      borderRadius: '6px',
-                      color: '#fff',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <span>+</span> Ajouter une règle
-                  </button>
-                </div>
+                ) : availableProspectAgents.length === 0 ? (
+                  <div style={{
+                    padding: '28px 24px',
+                    textAlign: 'center',
+                    background: 'linear-gradient(160deg, rgba(8, 22, 42, 0.95) 0%, rgba(4, 12, 24, 0.98) 100%)',
+                    borderRadius: '16px',
+                    border: '1.5px solid rgba(0, 229, 200, 0.4)',
+                    boxShadow: '0 12px 35px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 229, 200, 0.15)',
+                    position: 'relative',
+                    margin: '16px 0'
+                  }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: '50%',
+                      background: 'rgba(0, 229, 200, 0.12)', border: '1px solid rgba(0, 229, 200, 0.4)',
+                      color: '#00E5C8', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      margin: '0 auto 14px auto', fontSize: 22
+                    }}>
+                      🎯
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 16, color: '#F0F4F8', marginBottom: 8 }}>
+                      Aucun Agent de Prospection Trouvé
+                    </div>
+                    <div style={{ fontSize: 13, color: '#94A3B8', lineHeight: 1.6, maxWidth: 520, margin: '0 auto 20px auto' }}>
+                      Votre Agent de Sourcing a besoin d&apos;au moins un <strong>Agent de Prospection (Closer)</strong> pour recevoir, évaluer et contacter automatiquement les leads extraits du web.
+                    </div>
 
-                {formData.trigger_rules.length === 0 ? (
-                  <div style={{ padding: '30px', textAlign: 'center', color: '#b2bec3', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px dashed rgba(255,255,255,0.1)' }}>
-                    Aucune règle de déclenchement définie. L'agent ne s'exécutera pas automatiquement.
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {formData.trigger_rules.map((rule, index) => (
-                      <div
-                        key={index}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap', position: 'relative' }}>
+                      <VMindGuideArrow
+                        direction="down"
+                        color="#00E5C8"
                         style={{
-                          padding: '20px',
-                          backgroundColor: 'rgba(0,0,0,0.25)',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(255,255,255,0.07)',
-                          position: 'relative'
+                          position: 'absolute',
+                          top: '-42px',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          zIndex: 10
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof window !== 'undefined') {
+                            sessionStorage.setItem('vmind_guide_target_marketplace', 'prospection');
+                          }
+                          onCancel();
+                        }}
+                        style={{
+                          padding: '11px 24px',
+                          borderRadius: '10px',
+                          background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
+                          border: 'none',
+                          color: '#04101E',
+                          fontSize: '13px',
+                          fontWeight: 800,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          cursor: 'pointer',
+                          boxShadow: '0 0 20px rgba(0, 229, 200, 0.45)',
+                          transition: 'all 0.2s ease'
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'rgba(255,255,255,0.7)' }}>
-                            ⚡ Règle d'Intervalle #{index + 1}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => removeTriggerRule(index)}
+                        <CyberIcon name="zap" size={14} color="#04101E" />
+                        <span>Trouver l&apos;Agent de Prospection dans le Marketplace</span>
+                        <CyberIcon name="arrow-right" size={13} color="#04101E" />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+                    {availableProspectAgents.map((agent: any) => {
+                      const isSelected = isAgentSelected(agent);
+                      return (
+                        <div
+                          key={agent.uuid || agent.agent_id || agent.agent_name}
+                          onClick={() => toggleTargetAgent(agent)}
+                          style={{
+                            padding: '16px',
+                            borderRadius: '12px',
+                            background: isSelected ? 'rgba(0, 229, 200, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                            border: `1.5px solid ${isSelected ? '#00E5C8' : 'rgba(255, 255, 255, 0.08)'}`,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <div
                             style={{
-                              backgroundColor: 'transparent',
-                              border: 'none',
-                              color: '#ff7675',
-                              cursor: 'pointer',
-                              fontSize: '14px',
-                              padding: '4px',
-                              opacity: 0.8,
-                              transition: 'opacity 0.2s'
+                              width: '24px',
+                              height: '24px',
+                              borderRadius: '6px',
+                              border: `1.5px solid ${isSelected ? '#00E5C8' : 'rgba(255,255,255,0.3)'}`,
+                              background: isSelected ? '#00E5C8' : 'transparent',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}
-                            title="Supprimer la règle"
                           >
-                            🗑️
-                          </button>
-                        </div>
-
-                        <div className="form-row">
-                          <div className="form-group" style={{ flex: '1 1 100%' }}>
-                            <label className="form-label" style={{ fontWeight: 'bold' }}>Trigger Interval</label>
-                            <select
-                              className="form-input"
-                              value={rule.interval} onFocus={() => setFocusedField('trigger_rules')} onBlur={() => setFocusedField(null)}
-                              onChange={(e) => updateTriggerRuleAtIndex(index, 'interval', e.target.value)}
-                            >
-                              <option value="Seconds">Seconds</option>
-                              <option value="Minutes">Minutes</option>
-                              <option value="Hours">Hours</option>
-                              <option value="Days">Days</option>
-                              <option value="Weeks">Weeks</option>
-                              <option value="Months">Months</option>
-                            </select>
+                            {isSelected && <Check size={16} color="#06111F" strokeWidth={3} />}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, color: '#F0F4F8', fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {agent.agent_name}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                              <Bot size={12} />
+                              <span>{agent.run_mode || 'Prospection'}</span>
+                            </div>
                           </div>
                         </div>
-
-                        <div style={{ marginTop: '12px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
-
-                          {rule.interval === 'Seconds' && (
-                            <div className="form-group anim">
-                              <label className="form-label">Seconds Between Triggers (1 - 59)</label>
-                              <input
-                                type="number"
-                                className="form-input"
-                                min="1"
-                                max="59"
-                                value={rule.secondsBetween} onFocus={() => setFocusedField('trigger_rules')} onBlur={() => setFocusedField(null)}
-                                onChange={(e) => updateTriggerRuleAtIndex(index, 'secondsBetween', Number(e.target.value))}
-                              />
-                            </div>
-                          )}
-
-                          {rule.interval === 'Minutes' && (
-                            <div className="form-group anim">
-                              <label className="form-label">Minutes Between Triggers (1 - 59)</label>
-                              <input
-                                type="number"
-                                className="form-input"
-                                min="1"
-                                max="59"
-                                value={rule.minutesBetween} onFocus={() => setFocusedField('trigger_rules')} onBlur={() => setFocusedField(null)}
-                                onChange={(e) => updateTriggerRuleAtIndex(index, 'minutesBetween', Number(e.target.value))}
-                              />
-                            </div>
-                          )}
-
-                          {rule.interval === 'Hours' && (
-                            <div className="form-row anim">
-                              <div className="form-group">
-                                <label className="form-label">Hours Between Triggers (1 - 23)</label>
-                                <input
-                                  type="number"
-                                  className="form-input"
-                                  min="1"
-                                  max="23"
-                                  value={rule.hoursBetween} onFocus={() => setFocusedField('trigger_rules')} onBlur={() => setFocusedField(null)}
-                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'hoursBetween', Number(e.target.value))}
-                                />
-                              </div>
-                              <div className="form-group">
-                                <label className="form-label">Trigger at Minute</label>
-                                <input
-                                  type="number"
-                                  className="form-input"
-                                  min="0"
-                                  max="59"
-                                  value={rule.triggerAtMinute} onFocus={() => setFocusedField('trigger_rules')} onBlur={() => setFocusedField(null)}
-                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtMinute', Number(e.target.value))}
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {rule.interval === 'Days' && (
-                            <div className="form-row anim">
-                              <div className="form-group">
-                                <label className="form-label">Days Between Triggers (1 - 31)</label>
-                                <input
-                                  type="number"
-                                  className="form-input"
-                                  min="1"
-                                  max="31"
-                                  value={rule.daysBetween}
-                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'daysBetween', Number(e.target.value))}
-                                />
-                              </div>
-                              <div className="form-group">
-                                <label className="form-label">Trigger at Hour</label>
-                                <select
-                                  className="form-input"
-                                  value={rule.triggerAtHour}
-                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtHour', e.target.value)}
-                                >
-                                  {hourOptions.map(h => (
-                                    <option key={h} value={h}>{h}</option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="form-group">
-                                <label className="form-label">Trigger at Minute</label>
-                                <input
-                                  type="number"
-                                  className="form-input"
-                                  min="0"
-                                  max="59"
-                                  value={rule.triggerAtMinute} onFocus={() => setFocusedField('trigger_rules')} onBlur={() => setFocusedField(null)}
-                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtMinute', Number(e.target.value))}
-                                />
-                              </div>
-                            </div>
-                          )}
-
-                          {rule.interval === 'Weeks' && (
-                            <div className="form-row anim">
-                              <div className="form-group">
-                                <label className="form-label">Weeks Between Triggers (1 - 52)</label>
-                                <input
-                                  type="number"
-                                  className="form-input"
-                                  min="1"
-                                  max="52"
-                                  value={rule.weeksBetween}
-                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'weeksBetween', Number(e.target.value))}
-                                />
-                              </div>
-                              <div className="form-group" style={{ flex: '2 1 100%' }}>
-                                <label className="form-label">Trigger on Weekdays</label>
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                  {weekdayOptions.map(day => (
-                                    <div
-                                      key={day}
-                                      onClick={() => toggleWeekdayAtIndex(index, day)}
-                                      style={{
-                                        padding: '6px 12px',
-                                        borderRadius: '4px',
-                                        fontSize: '12px',
-                                        cursor: 'pointer',
-                                        backgroundColor: rule.triggerOnWeekdays.includes(day) ? 'rgba(0, 229, 200, 0.2)' : 'rgba(255,255,255,0.05)',
-                                        border: `1px solid ${rule.triggerOnWeekdays.includes(day) ? '#00e5c8' : 'transparent'}`,
-                                        color: rule.triggerOnWeekdays.includes(day) ? '#fff' : '#b2bec3',
-                                        transition: 'all 0.2s'
-                                      }}
-                                    >
-                                      {day}
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {rule.interval === 'Months' && (
-                            <div className="form-row anim">
-                              <div className="form-group">
-                                <label className="form-label">Months Between Triggers (1 - 12)</label>
-                                <input
-                                  type="number"
-                                  className="form-input"
-                                  min="1"
-                                  max="12"
-                                  value={rule.monthsBetween}
-                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'monthsBetween', Number(e.target.value))}
-                                />
-                              </div>
-                              <div className="form-group">
-                                <label className="form-label">Trigger at Day of Month</label>
-                                <input
-                                  type="number"
-                                  className="form-input"
-                                  min="1"
-                                  max="31"
-                                  value={rule.triggerAtDayOfMonth}
-                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtDayOfMonth', Number(e.target.value))}
-                                />
-                              </div>
-                              <div className="form-group">
-                                <label className="form-label">Trigger at Hour</label>
-                                <select
-                                  className="form-input"
-                                  value={rule.triggerAtHour}
-                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtHour', e.target.value)}
-                                >
-                                  {hourOptions.map(h => (
-                                    <option key={h} value={h}>{h}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            </div>
-                          )}
-
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
+
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-                <Button onClick={() => validateAndNext(3)}>← Retour</Button>
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <Button variant="secondary" onClick={handleDeploy} disabled={isDeploying}>
-                    Passer et Déployer
-                  </Button>
-                  <Button variant="primary" onClick={handleDeploy} disabled={isDeploying || formData.trigger_rules.length === 0}>
-                    {isDeploying ? 'Déploiement en cours...' : agentToEdit ? 'Sauvegarder les modifications' : '🚀 Lancer le déploiement n8n'}
-                  </Button>
-                </div>
+                <Button onClick={() => setStep(1)}>← Retour</Button>
+                <Button 
+                  variant="primary" 
+                  onClick={handleDeploy} 
+                  disabled={isDeploying || formData.target_agent_ids.length === 0}
+                  style={{
+                    opacity: formData.target_agent_ids.length === 0 ? 0.5 : 1,
+                    cursor: formData.target_agent_ids.length === 0 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isDeploying ? 'Enregistrement…' : 'Enregistrer & Continuer →'}
+                </Button>
               </div>
             </div>
           )}
 
-
           {/* VirtualMind Floating Guide */}
           <VMindGuide
-            isOpen={!!focusedField || showStep2Guide}
-            title={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].title : showStep2Guide ? "Briefing de l'Agent" : undefined}
-            message={focusedField ? VIRTUAL_MIND_GUIDE[focusedField].text : showStep2Guide ? "Cette section est cruciale. Les réponses que vous donnerez ici définiront le contexte global et la compréhension de l'IA. Soyez le plus précis possible, car ces informations impacteront directement la qualité des emails générés." : null}
-            mood={focusedField ? getMoodForField(focusedField) : showStep2Guide ? 'convinced' : undefined}
+            isOpen={!!(focusedField && VIRTUAL_MIND_GUIDE[focusedField])}
+            title={focusedField && VIRTUAL_MIND_GUIDE[focusedField] ? VIRTUAL_MIND_GUIDE[focusedField].title : undefined}
+            message={focusedField && VIRTUAL_MIND_GUIDE[focusedField] ? VIRTUAL_MIND_GUIDE[focusedField].text : null}
+            mood="focused"
           />
 
         </div>
       </div>
+
+      {/* ── POST-DEPLOYMENT ACTIVATION DIALOGUE MODAL ── */}
+      <AnimatePresence>
+        {showActivationDialogue && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              top: 0, left: 0, right: 0, bottom: 0,
+              background: 'rgba(6, 17, 31, 0.85)',
+              backdropFilter: 'blur(16px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 99999,
+              padding: 20
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              style={{
+                width: '100%',
+                maxWidth: 480,
+                background: 'linear-gradient(135deg, rgba(12, 28, 48, 0.95) 0%, rgba(6, 17, 31, 0.98) 100%)',
+                border: '1.5px solid rgba(0, 229, 200, 0.3)',
+                borderRadius: 20,
+                padding: 32,
+                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 229, 200, 0.1)',
+                textAlign: 'center',
+                position: 'relative'
+              }}
+            >
+              <button
+                onClick={handleDeployOnly}
+                style={{
+                  position: 'absolute',
+                  top: 16,
+                  right: 16,
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--muted)',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={20} />
+              </button>
+
+              <div style={{
+                width: 56,
+                height: 56,
+                borderRadius: 16,
+                background: 'rgba(0, 229, 200, 0.12)',
+                border: '1px solid rgba(0, 229, 200, 0.3)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 20px',
+                color: '#00E5C8'
+              }}>
+                <CheckCircle2 size={28} />
+              </div>
+
+              <h2 style={{ fontSize: 20, fontWeight: 700, color: '#F0F4F8', marginBottom: 8 }}>
+                Agent Déployé avec Succès !
+              </h2>
+              <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 28, lineHeight: 1.5 }}>
+                L'agent <strong>{formData.agent_name}</strong> a été enregistré. Souhaitez-vous l'activer dès maintenant ?
+              </p>
+
+              {activationChoice === 'prompt' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <button
+                    onClick={() => setActivationChoice('activate')}
+                    style={{
+                      padding: '14px 20px',
+                      borderRadius: 12,
+                      background: 'linear-gradient(135deg, #00E5C8 0%, #00B8A0 100%)',
+                      color: '#06111F',
+                      fontWeight: 700,
+                      fontSize: 14,
+                      border: 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 10,
+                      transition: 'all 0.2s ease',
+                      boxShadow: '0 4px 15px rgba(0, 229, 200, 0.3)'
+                    }}
+                  >
+                    <Zap size={18} />
+                    <span>Activer l'Agent Maintenant</span>
+                  </button>
+
+                  <button
+                    onClick={handleDeployOnly}
+                    style={{
+                      padding: '14px 20px',
+                      borderRadius: 12,
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      color: '#F0F4F8',
+                      fontWeight: 600,
+                      fontSize: 14,
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 10,
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <Save size={18} color="var(--muted)" />
+                    <span>Déployer Uniquement (Sans activation)</span>
+                  </button>
+                </div>
+              )}
+
+              {activationChoice === 'activate' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ fontSize: 13, color: '#00E5C8', fontWeight: 600, marginBottom: 2 }}>
+                    Comment souhaitez-vous exécuter l'agent ?
+                  </div>
+
+                  {/* Option A: Run Dialogue */}
+                  <div
+                    onClick={handleRunOnceNow}
+                    style={{
+                      padding: '16px 20px',
+                      borderRadius: 14,
+                      background: 'linear-gradient(135deg, rgba(0, 229, 200, 0.08) 0%, rgba(6, 17, 31, 0.6) 100%)',
+                      border: '1.5px solid rgba(0, 229, 200, 0.4)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 14,
+                      textAlign: 'left',
+                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2), 0 0 15px rgba(0, 229, 200, 0.08)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0, 229, 200, 0.18) 0%, rgba(6, 17, 31, 0.8) 100%)';
+                      e.currentTarget.style.borderColor = '#00E5C8';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 229, 200, 0.25)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0, 229, 200, 0.08) 0%, rgba(6, 17, 31, 0.6) 100%)';
+                      e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.4)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.2), 0 0 15px rgba(0, 229, 200, 0.08)';
+                    }}
+                  >
+                    <div style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 12,
+                      background: 'rgba(0, 229, 200, 0.15)',
+                      border: '1px solid rgba(0, 229, 200, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#00E5C8',
+                      flexShrink: 0
+                    }}>
+                      <Play size={20} fill="#00E5C8" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#F0F4F8', marginBottom: 3 }}>
+                        Exécuter une fois maintenant
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.3 }}>
+                        Lancement immédiat du ciblage et extraction d'un batch de leads
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Option B: Start Dialogue */}
+                  <div
+                    onClick={handleScheduleNow}
+                    style={{
+                      padding: '16px 20px',
+                      borderRadius: 14,
+                      background: 'linear-gradient(135deg, rgba(0, 229, 200, 0.08) 0%, rgba(6, 17, 31, 0.6) 100%)',
+                      border: '1.5px solid rgba(0, 229, 200, 0.4)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 14,
+                      textAlign: 'left',
+                      transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.2), 0 0 15px rgba(0, 229, 200, 0.08)'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0, 229, 200, 0.18) 0%, rgba(6, 17, 31, 0.8) 100%)';
+                      e.currentTarget.style.borderColor = '#00E5C8';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(0, 229, 200, 0.25)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0, 229, 200, 0.08) 0%, rgba(6, 17, 31, 0.6) 100%)';
+                      e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.4)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.2), 0 0 15px rgba(0, 229, 200, 0.08)';
+                    }}
+                  >
+                    <div style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 12,
+                      background: 'rgba(0, 229, 200, 0.15)',
+                      border: '1px solid rgba(0, 229, 200, 0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#00E5C8',
+                      flexShrink: 0
+                    }}>
+                      <CalendarClock size={20} color="#00E5C8" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#F0F4F8', marginBottom: 3 }}>
+                        Planifier l'exécution récurrente
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.3 }}>
+                        Activation en mode autopilote continu selon votre fréquence de planification
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Return Button */}
+                  <button
+                    onClick={() => setActivationChoice('prompt')}
+                    style={{
+                      marginTop: 6,
+                      padding: '10px 16px',
+                      borderRadius: 10,
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      color: '#8A99AD',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                      e.currentTarget.style.color = '#F0F4F8';
+                    }}
+                    onMouseOut={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                      e.currentTarget.style.color = '#8A99AD';
+                    }}
+                  >
+                    <ArrowLeft size={16} />
+                    <span>Retour aux choix d'activation</span>
+                  </button>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* VirtualMind Floating Guide */}
+      <VMindGuide
+        isOpen={
+          !!(focusedField && VIRTUAL_MIND_GUIDE[focusedField]) ||
+          (step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0)
+        }
+        title={
+          step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0
+            ? "Duo Indispensable : Agent de Prospection Requis"
+            : focusedField && VIRTUAL_MIND_GUIDE[focusedField]
+              ? VIRTUAL_MIND_GUIDE[focusedField].title
+              : undefined
+        }
+        message={
+          step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0
+            ? "Votre Chasseur (Sourcing Agent) a besoin d'un Closer (Prospect Agent) à qui transmettre ses leads qualifiés. Cliquez sur le bouton ci-dessous pour aller dans le Marketplace et découvrir l'Agent de Prospection !"
+            : focusedField && VIRTUAL_MIND_GUIDE[focusedField]
+              ? VIRTUAL_MIND_GUIDE[focusedField].text
+              : null
+        }
+        mood={
+          step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0
+            ? 'curious'
+            : 'focused'
+        }
+        showBackdrop={false}
+        onClose={() => setFocusedField(null)}
+      >
+        {step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0 && (
+          <div className="vmind-guide-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
+            <button
+              type="button"
+              className="vmind-guide-btn-primary"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('vmind_guide_target_marketplace', 'prospection');
+                }
+                onCancel();
+              }}
+            >
+              <CyberIcon name="zap" size={13} color="currentColor" />
+              <span>Trouver dans le Marketplace</span>
+              <CyberIcon name="arrow-right" size={13} color="currentColor" />
+            </button>
+          </div>
+        )}
+      </VMindGuide>
+
+      {/* ── RUN ONCE (EXECUTION) MODAL ── */}
+      {showExecutionModal && deployedAgent && (
+        <SourcingAgentExecutionModal
+          agent={deployedAgent}
+          hideTargetAgentsSelection={true}
+          onClose={() => {
+            setShowExecutionModal(false);
+            onCancel();
+          }}
+          onToast={(msg) => showToast(msg, 'ok')}
+        />
+      )}
+
+      {/* ── SCHEDULE (START BUTTON POPUP) MODAL ── */}
+      {showScheduleModal && deployedAgent && (
+        <SourcingAgentScheduleModal
+          agent={deployedAgent}
+          onClose={() => {
+            setShowScheduleModal(false);
+            onCancel();
+          }}
+          onConfirm={async (params) => {
+            await handleActivateSchedule(deployedAgent, params);
+            setShowScheduleModal(false);
+            onCancel();
+          }}
+          onEditSchedule={() => {
+            setShowScheduleModal(false);
+          }}
+          onToast={(msg) => console.log(msg)}
+        />
+      )}
     </div>
   );
 };

@@ -35,6 +35,16 @@ import { VsellRevenuClientBarChart } from './TableauCroiseKpi/VsellRevenuClientB
 import { VsellFidelisationChartCard } from './TableauCroiseKpi/VsellFidelisationChartCard';
 import { VsellPipelineFunnelCard } from './TableauCroiseKpi/VsellPipelineFunnelCard';
 import { VfinTresorerieCard } from './TableauCroiseKpi/VfinTresorerieCard';
+import { VbuyFacturesAReglerCard } from './TableauCroiseKpi/VbuyFacturesAReglerCard';
+import { VbuyAchatsDuMoisCard } from './TableauCroiseKpi/VbuyAchatsDuMoisCard';
+import { VbuyFournisseursEnRetardCard } from './TableauCroiseKpi/VbuyFournisseursEnRetardCard';
+import { VbuyCommandesEnAttenteCard } from './TableauCroiseKpi/VbuyCommandesEnAttenteCard';
+import { VbuyRepartitionCategoriePieCard } from './TableauCroiseKpi/VbuyRepartitionCategoriePieCard';
+import { VmoveDossiersOuvertsCard } from './TableauCroiseKpi/VmoveDossiersOuvertsCard';
+import { VmoveDossiersEnRetardCard } from './TableauCroiseKpi/VmoveDossiersEnRetardCard';
+import { VmoveVolumeTransporteurCard } from './TableauCroiseKpi/VmoveVolumeTransporteurCard';
+import { VmoveBlNonFacturesCard } from './TableauCroiseKpi/VmoveBlNonFacturesCard';
+import { VmoveActiveFlowsMapCard } from './TableauCroiseKpi/VmoveActiveFlowsMapCard';
 interface RightPanelProps {
   logs: LogEntry[];
   onInsertPrompt: (text: string) => void;
@@ -44,7 +54,7 @@ interface RightPanelProps {
 import { KpiCacheProvider, useKpis } from '../../shared/contexts/KpiCacheContext';
 
 const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, activeAgentId }) => {
-  const { startDate, endDate, updateGlobalDates, error, clearError, fetchKpis } = useKpis();
+  const { startDate, endDate, updateGlobalDates, error, clearError, fetchKpis, kpisByAgent } = useKpis();
   const [performances, setPerformances] = React.useState<Record<string, number>>({
     VDATA: 0,
     VFIN: 0,
@@ -63,49 +73,29 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
     VMOVE: 0,
   });
 
-  const fetchDomainPerformance = async () => {
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-      const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || 'DEMO';
+  // Extract domain performances dynamically from n8n IA execution cache
+  React.useEffect(() => {
+    const vdataData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
+    const toolData = vdataData.get_score_global_vdata_kpi || vdataData;
+    const kpis = toolData?.kpis || toolData?.data?.kpis;
 
-      const response = await fetch(`${baseUrl}/api/tools/get-score-global-vdata-kpi`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`, },
-        body: JSON.stringify({ 
-          client_id: clientId,
-          startDate,
-          endDate
-        }),
-      });
+    if (kpis && Array.isArray(kpis)) {
+      const scoreGlobal = kpis.find((k: any) => k.label === 'Score qualité global')?.value ?? 0;
+      const scoreLivraison = kpis.find((k: any) => k.label === 'Taux livraison')?.value ?? 0;
+      const scoreFinance = kpis.find((k: any) => k.label === 'Score impayés')?.value ?? 0;
 
-      if (response.ok) {
-        const resJson = await response.json();
-        if (resJson.ok && resJson.data) {
-          const kpis = resJson.data.kpis;
-          const scoreGlobal = kpis?.find((k: any) => k.label === 'Score qualité global')?.value ?? 0;
-          const scoreLivraison = kpis?.find((k: any) => k.label === 'Taux livraison')?.value ?? 0;
-          const scoreFinance = kpis?.find((k: any) => k.label === 'Score impayés')?.value ?? 0;
-
-          setPerformances(prev => ({
-            ...prev,
-            VDATA: scoreGlobal,
-            VMOVE: scoreLivraison,
-            VFIN: scoreFinance,
-          }));
-        }
-      }
-    } catch (err) {
-      console.error("Failed to fetch domain performances:", err);
+      setPerformances(prev => ({
+        ...prev,
+        VDATA: scoreGlobal,
+        VMOVE: scoreLivraison,
+        VFIN: scoreFinance,
+      }));
     }
-  };
+  }, [kpisByAgent]);
 
   React.useEffect(() => {
     if (activeAgentId === 'VDATA') {
-      const timer = setTimeout(() => {
-        fetchDomainPerformance();
-      }, 800);
-      return () => clearTimeout(timer);
+      fetchKpis('VDATA', false, 'get_score_global_vdata_kpi');
     }
   }, [activeAgentId, startDate, endDate]);
 
@@ -247,30 +237,6 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
             </div>
           </div>
         )}
-        {activeAgentId !== 'VDATA' && activeAgentId !== 'VFIN' && activeAgentId !== 'VSELL' && (
-          <>
-            <MiniKpi label="Trésorerie" dotColor="var(--green)" val="842K TND" delta="▲ +3.2%" deltaType="up" />
-            <MiniKpi label="Impayés" dotColor="var(--red)" val="218K TND" delta="▲ +8 clients" deltaType="warning" />
-            <MiniKpi label="Dossiers Ouverts" dotColor="var(--amber)" val="43" delta="⚠ 7 en retard" deltaType="warning" />
-            <MiniKpi label="CA Mois" dotColor="var(--cyan)" val="1.847M" delta="▲ +12.3%" deltaType="up" />
-            <MiniKpi label="BL Non Facturés" dotColor="var(--purple)" val="14" delta="▼ à traiter" deltaType="down" />
-
-            <div style={{ marginTop: '12px', fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginBottom: '4px' }}>
-              CA 6 DERNIERS MOIS (TND)
-            </div>
-            <div className="mini-chart">
-              <div className="bar" style={{ height: '55%' }}></div>
-              <div className="bar" style={{ height: '70%' }}></div>
-              <div className="bar" style={{ height: '60%' }}></div>
-              <div className="bar" style={{ height: '80%' }}></div>
-              <div className="bar" style={{ height: '65%' }}></div>
-              <div className="bar current" style={{ height: '100%' }}></div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '8px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginTop: '3px' }}>
-              <span>Nov</span><span>Déc</span><span>Jan</span><span>Fév</span><span>Mar</span><span>Avr ●</span>
-            </div>
-          </>
-        )}
         <ScoreGlobalCard activeAgentId={activeAgentId} />
         <VsellTopClientsCard activeAgentId={activeAgentId} />
         <VsellNewClientsCard activeAgentId={activeAgentId} />
@@ -284,6 +250,16 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
         <VfinMarginCard activeAgentId={activeAgentId} />
         <VfinTopClientsCard activeAgentId={activeAgentId} />
         <VfinTresorerieCard activeAgentId={activeAgentId} />
+        <VbuyFacturesAReglerCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VbuyAchatsDuMoisCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VbuyFournisseursEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VbuyCommandesEnAttenteCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VbuyRepartitionCategoriePieCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VmoveBlNonFacturesCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VmoveActiveFlowsMapCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VmoveDossiersOuvertsCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VmoveDossiersEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+        <VmoveVolumeTransporteurCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
         <VolumeLineChart activeAgentId={activeAgentId} />
         <DeliveryRateKpi activeAgentId={activeAgentId} /> 
         <MultiIndicatorsCard activeAgentId={activeAgentId} />

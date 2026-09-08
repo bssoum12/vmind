@@ -5,23 +5,195 @@ import { LiveAgent } from '../AgentsView';
 import { OnboardingChat } from '../../wizard/components/OnboardingChat';
 import { VMindGuide } from '@/shared/management/components/VMindGuide';
 
+export interface TriggerRule {
+  interval: string;
+  secondsBetween: number;
+  minutesBetween: number;
+  hoursBetween: number;
+  daysBetween: number;
+  weeksBetween: number;
+  monthsBetween: number;
+  triggerAtMinute: number;
+  triggerAtHour: string;
+  triggerOnWeekdays: string[];
+  triggerAtDayOfMonth: number;
+}
+
+const hourOptions = [
+  '12am', '1am', '2am', '3am', '4am', '5am', '6am', '7am', '8am', '9am', '10am', '11am',
+  '12pm', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', '7pm', '8pm', '9pm', '10pm', '11pm'
+];
+
+const weekdayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 interface SourcingAgentScheduleModalProps {
   agent: LiveAgent;
   onClose: () => void;
-  onConfirm: () => void;
-  onEditSchedule: () => void;
+  onConfirm: (params?: any) => void;
+  onEditSchedule?: () => void;
   onToast: (msg: string, type?: 'ok' | 'err') => void;
 }
 
 export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSchedule, onToast }: SourcingAgentScheduleModalProps) {
+  const savedMission = (
+    agent?.config?.agent_mission || 
+    (agent as any)?.agent_mission || 
+    (agent as any)?.parameters?.agent_mission || 
+    (agent as any)?.agentSettings?.agent_mission || 
+    ''
+  ).trim();
+
+  const [sourcingSummary, setSourcingSummary] = useState<string>(() => savedMission || '');
   const [step, setStep] = useState<'chat' | 'config' | 'schedule'>('chat');
-  const [sourcingSummary, setSourcingSummary] = useState('');
-  
-  // Sourcing Execution Parameters (Just for context/display before scheduling)
+
+  // Sourcing Execution Parameters
   const [allowExistingCompanies, setAllowExistingCompanies] = useState(false);
   const [leadsToFind, setLeadsToFind] = useState<number>(50);
   const [leadsPerCompany, setLeadsPerCompany] = useState<number>(2);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [triggerRules, setTriggerRules] = useState<TriggerRule[]>(() => {
+    if (Array.isArray(agent.trigger_rules) && agent.trigger_rules.length > 0) {
+      return agent.trigger_rules;
+    }
+    return [
+      {
+        interval: 'Days',
+        secondsBetween: 30,
+        minutesBetween: 5,
+        hoursBetween: 1,
+        daysBetween: 1,
+        weeksBetween: 1,
+        monthsBetween: 1,
+        triggerAtMinute: 0,
+        triggerAtHour: '8am',
+        triggerOnWeekdays: ['Monday'],
+        triggerAtDayOfMonth: 1
+      }
+    ];
+  });
+
+  const [availableProspectAgents, setAvailableProspectAgents] = useState<any[]>([]);
+  const [isCustomizingTargets, setIsCustomizingTargets] = useState(false);
+  const [selectedTargetAgentIds, setSelectedTargetAgentIds] = useState<string[]>(() => {
+    const ids = agent?.config?.target_agent_ids || (agent as any)?.target_agent_ids || [];
+    return Array.isArray(ids) ? ids.map(id => String(id)) : [];
+  });
+
+  React.useEffect(() => {
+    const fetchProspectAgents = async () => {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const tokenStr = localStorage.getItem('vmind_session');
+        let token = tokenStr;
+        if (tokenStr?.trim().startsWith("{")) {
+          try { token = JSON.parse(tokenStr).token; } catch (e) { }
+        }
+        const res = await fetch(`${baseUrl}/api/list-agents`, {
+          headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && Array.isArray(data.agents)) {
+            setAvailableProspectAgents(data.agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement')));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch prospect agents:", err);
+      }
+    };
+    fetchProspectAgents();
+  }, []);
+
+  const getAgentTargetId = (pa: any): string => {
+    if (!pa) return '';
+    return String(pa.uuid || pa.agent_id || pa.id || pa.agent_name || '');
+  };
+
+  const isAgentSelected = (pa: any): boolean => {
+    if (!pa || !selectedTargetAgentIds || selectedTargetAgentIds.length === 0) return false;
+    const paUuid = String(pa.uuid || '').toLowerCase();
+    const paAgentId = String(pa.agent_id || '').toLowerCase();
+    const paName = String(pa.agent_name || pa.nom || '').toLowerCase();
+
+    return selectedTargetAgentIds.some(id => {
+      const sId = String(id).toLowerCase();
+      return (paUuid && sId === paUuid) || (paAgentId && sId === paAgentId) || (paName && sId === paName);
+    });
+  };
+
+  React.useEffect(() => {
+    const mission = (
+      agent?.config?.agent_mission || 
+      (agent as any)?.agent_mission || 
+      (agent as any)?.parameters?.agent_mission || 
+      (agent as any)?.agentSettings?.agent_mission || 
+      ''
+    ).trim();
+    if (mission && !sourcingSummary) {
+      setSourcingSummary(mission);
+    }
+  }, [agent]);
+
+  const toggleTargetAgent = (pa: any) => {
+    if (!pa) return;
+    const targetUuid = String(pa.uuid || pa.agent_id || pa.agent_name);
+    setSelectedTargetAgentIds(prev => {
+      if (isAgentSelected(pa)) {
+        return prev.filter(id => {
+          const sId = String(id).toLowerCase();
+          return sId !== String(pa.uuid || '').toLowerCase() &&
+                 sId !== String(pa.agent_id || '').toLowerCase() &&
+                 sId !== String(pa.agent_name || pa.nom || '').toLowerCase();
+        });
+      } else {
+        return [...prev, targetUuid];
+      }
+    });
+  };
+
+  const addTriggerRule = () => {
+    setTriggerRules(prev => [
+      ...prev,
+      {
+        interval: 'Days',
+        secondsBetween: 30,
+        minutesBetween: 5,
+        hoursBetween: 1,
+        daysBetween: 1,
+        weeksBetween: 1,
+        monthsBetween: 1,
+        triggerAtMinute: 0,
+        triggerAtHour: '8am',
+        triggerOnWeekdays: ['Monday'],
+        triggerAtDayOfMonth: 1
+      }
+    ]);
+  };
+
+  const removeTriggerRule = (index: number) => {
+    setTriggerRules(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateTriggerRuleAtIndex = (index: number, key: keyof TriggerRule, value: any) => {
+    setTriggerRules(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], [key]: value };
+      return copy;
+    });
+  };
+
+  const toggleWeekdayAtIndex = (index: number, day: string) => {
+    setTriggerRules(prev => {
+      const copy = [...prev];
+      const currentDays = copy[index].triggerOnWeekdays || [];
+      const updatedDays = currentDays.includes(day)
+        ? currentDays.filter(d => d !== day)
+        : [...currentDays, day];
+      copy[index] = { ...copy[index], triggerOnWeekdays: updatedDays };
+      return copy;
+    });
+  };
 
   const handleChatConfirm = (summary: string) => {
     setSourcingSummary(summary);
@@ -29,7 +201,10 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
   };
 
   const handleConfigConfirm = () => {
-    // Validate inputs
+    if (!selectedTargetAgentIds || selectedTargetAgentIds.length === 0) {
+      onToast("Veuillez sélectionner au moins un Target Agent pour recevoir les leads.", "err");
+      return;
+    }
     if (leadsToFind <= 0 || leadsToFind > 100) {
       onToast("Le nombre de leads doit être entre 1 et 100", "err");
       return;
@@ -38,13 +213,30 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
       onToast("Le nombre de leads par entreprise doit être entre 1 et 10", "err");
       return;
     }
+    if (leadsPerCompany > leadsToFind) {
+      onToast("Le nombre de leads par entreprise ne peut pas dépasser le volume total de leads.", "err");
+      return;
+    }
     setStep('schedule');
   };
 
   const handleConfirm = async () => {
+    if (!selectedTargetAgentIds || selectedTargetAgentIds.length === 0) {
+      onToast("Veuillez sélectionner au moins un Target Agent pour recevoir les leads.", "err");
+      setStep('config');
+      return;
+    }
     setIsSubmitting(true);
     try {
-      await onConfirm();
+      await onConfirm({
+        sourcingSummary,
+        totalLeads: leadsToFind,
+        leadsPerCompany,
+        ignoreDuplicates: allowExistingCompanies,
+        target_agent_ids: selectedTargetAgentIds,
+        update_defaults: true,
+        trigger_rules: triggerRules
+      });
     } finally {
       setIsSubmitting(false);
       onClose();
@@ -55,11 +247,32 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
     if (!agent.trigger_rules || agent.trigger_rules.length === 0) return 'Aucune planification définie';
     const r = agent.trigger_rules[0];
     const interval = r.interval;
-    if (interval === 'Minutes') return `Toutes les ${r.minutesBetween || '?'} min`;
-    if (interval === 'Hours') return `Toutes les ${r.hoursBetween || '?'} h`;
-    if (interval === 'Days') return `Chaque ${r.daysBetween > 1 ? r.daysBetween + ' jours' : 'jour'} à ${r.triggerAtHour || '08'}h`;
-    if (interval === 'Weeks') return `Hebdo (${(r.triggerOnWeekdays || []).join(', ')}) à ${r.triggerAtHour || '08'}h`;
-    if (interval === 'Months') return `Mensuel le ${r.triggerAtDayOfMonth || 1} à ${r.triggerAtHour || '08'}h`;
+    const minPad = String(r.triggerAtMinute ?? 0).padStart(2, '0');
+    
+    if (interval === 'Minutes') {
+      const step = Number(r.minutesBetween) || 5;
+      return step <= 1 ? 'Toutes les minutes' : `Toutes les ${step} min`;
+    }
+    if (interval === 'Hours') {
+      const step = Number(r.hoursBetween) || 1;
+      const minInfo = r.triggerAtMinute !== undefined && r.triggerAtMinute !== null ? ` (à min ${minPad})` : '';
+      return step <= 1 ? `Chaque heure${minInfo}` : `Toutes les ${step} h${minInfo}`;
+    }
+    if (interval === 'Days') {
+      const step = Number(r.daysBetween) || 1;
+      const hour = r.triggerAtHour || '08';
+      return step <= 1 ? `Chaque jour à ${hour}h${minPad}` : `Tous les ${step} jours à ${hour}h${minPad}`;
+    }
+    if (interval === 'Weeks') {
+      const days = (r.triggerOnWeekdays || ['Monday']).join(', ');
+      const hour = r.triggerAtHour || '08';
+      return `Hebdo (${days}) à ${hour}h${minPad}`;
+    }
+    if (interval === 'Months') {
+      const dom = r.triggerAtDayOfMonth || 1;
+      const hour = r.triggerAtHour || '08';
+      return `Mensuel (le ${dom}) à ${hour}h${minPad}`;
+    }
     return interval;
   };
 
@@ -75,16 +288,16 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
           zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}
       >
-        <VMindGuide 
+        <VMindGuide
           isOpen={true}
           mood={step === 'chat' ? 'focused' : 'convinced'}
           title="Mode Autopilote Sourcing"
           message={
-            step === 'chat' 
+            step === 'chat'
               ? "Étape 1 : Définition de la Cible. Vérifiez avec moi le profil exact de votre candidat idéal."
               : step === 'config'
-              ? "Étape 2 : Configuration. Vérifiez le résumé de notre échange et ajustez les paramètres avant d'activer la planification."
-              : "Étape 3 : Activation de la Planification. L'agent se réveillera automatiquement aux horaires prévus pour exécuter sa mission de sourcing sans aucune intervention de votre part."
+                ? "Étape 2 : Configuration. Vérifiez le résumé de notre échange et ajustez les paramètres avant d'activer la planification."
+                : "Étape 3 : Activation de la Planification. L'agent se réveillera automatiquement aux horaires prévus pour exécuter sa mission de sourcing sans aucune intervention de votre part."
           }
         />
 
@@ -121,8 +334,67 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
             </button>
           </div>
 
+          {/* Step Tabs */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+            <button
+              onClick={() => setStep('chat')}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                border: `1px solid ${step === 'chat' ? 'rgba(0, 229, 200, 0.4)' : 'rgba(255,255,255,0.08)'}`,
+                cursor: 'pointer',
+                background: step === 'chat' ? 'rgba(0, 229, 200, 0.15)' : 'rgba(255,255,255,0.03)',
+                color: step === 'chat' ? '#00E5C8' : 'var(--muted)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              💬 Étape 1 : Assistant Ciblage
+            </button>
+            <button
+              onClick={() => setStep('config')}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                border: `1px solid ${step === 'config' ? 'rgba(0, 229, 200, 0.4)' : 'rgba(255,255,255,0.08)'}`,
+                cursor: 'pointer',
+                background: step === 'config' ? 'rgba(0, 229, 200, 0.15)' : 'rgba(255,255,255,0.03)',
+                color: step === 'config' ? '#00E5C8' : 'var(--muted)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              ⚙️ Étape 2 : Configuration
+            </button>
+            <button
+              onClick={() => {
+                if (selectedTargetAgentIds.length === 0) {
+                  onToast("Veuillez d'abord sélectionner au moins un Target Agent à l'Étape 2.", "err");
+                  setStep('config');
+                } else {
+                  setStep('schedule');
+                }
+              }}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                border: `1px solid ${step === 'schedule' ? 'rgba(0, 229, 200, 0.4)' : 'rgba(255,255,255,0.08)'}`,
+                cursor: 'pointer',
+                background: step === 'schedule' ? 'rgba(0, 229, 200, 0.15)' : 'rgba(255,255,255,0.03)',
+                color: step === 'schedule' ? '#00E5C8' : 'var(--muted)',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              📅 Étape 3 : Planification
+            </button>
+          </div>
+
           <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 24, paddingRight: 4 }}>
-            
+
             {step === 'chat' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -130,19 +402,14 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
                     <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, background: 'rgba(255,255,255,0.1)', borderRadius: '50%', color: '#fff', fontSize: 10 }}>1</span>
                     Étape 1 : Ciblage & Stratégie
                   </div>
-                  <button
-                    onClick={() => handleChatConfirm("COMPANY_TARGET: Companies in Europe in the Tech Industry\\nLEAD_TARGET: Chief Technology Officers in executive department with a executive seniority & he is a decision_maker")}
-                    style={{ background: 'rgba(255, 71, 87, 0.1)', border: '1px solid rgba(255, 71, 87, 0.3)', color: '#FF4757', padding: '4px 12px', borderRadius: 6, fontSize: 11, cursor: 'pointer', fontWeight: 600 }}
-                  >
-                    Skip (Test Only)
-                  </button>
                 </div>
 
-                <div style={{ height: '480px', flex: 1 }}>
-                  <OnboardingChat 
-                    initialMission="" 
-                    onConfirm={handleChatConfirm} 
-                    apiEndpoint="/api/sourcing-agent/execution-chat" 
+                <div style={{ flex: 1, minHeight: 400, border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, overflow: 'hidden' }}>
+                  <OnboardingChat
+                    key={`${agent?.uuid || agent?.agent_name}_${sourcingSummary ? 'with_mission' : 'empty'}`}
+                    initialMission={sourcingSummary}
+                    onConfirm={handleChatConfirm}
+                    apiEndpoint="/api/sourcing-agent/execution-chat"
                   />
                 </div>
               </motion.div>
@@ -150,166 +417,645 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
 
             {step === 'config' && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#00E5C8', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, background: 'rgba(0,229,200,0.2)', borderRadius: '50%', color: '#00E5C8', fontSize: 10 }}>2</span>
-                  Étape 2 : Paramétrage
+                <div style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, color: '#00E5C8', fontWeight: 600, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, background: 'rgba(0,229,200,0.2)', borderRadius: '50%', color: '#00E5C8', fontSize: 11 }}>2</span>
+                  Configuration des Paramètres de Sourcing
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
-                  
-                  {/* Left Column: Summary */}
-                  <div style={{ flex: 1, minWidth: 300 }}>
-                    <div style={{ padding: '16px 20px', background: 'rgba(0, 229, 200, 0.05)', border: '1px solid rgba(0, 229, 200, 0.2)', borderRadius: 12 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                        <Target size={18} color="#00E5C8" />
-                        <span style={{ fontSize: 14, fontWeight: 600, color: '#00E5C8' }}>Ciblage Défini</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Summary from Chat */}
+                  <div style={{ background: 'rgba(0, 229, 200, 0.04)', padding: 18, borderRadius: 12, border: '1px solid rgba(0, 229, 200, 0.2)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Target size={16} color="#00E5C8" />
+                        <label style={{ fontSize: 12, fontWeight: 600, color: '#00E5C8', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                          Ciblage Enregistré
+                        </label>
                       </div>
-                      <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                        {sourcingSummary}
-                      </div>
-                      <button 
-                        onClick={() => setStep('chat')} 
-                        style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, textDecoration: 'underline', marginTop: 16, cursor: 'pointer', padding: 0 }}
+                      <button
+                        type="button"
+                        onClick={() => setStep('chat')}
+                        style={{
+                          background: 'rgba(0, 229, 200, 0.1)',
+                          border: '1px solid rgba(0, 229, 200, 0.3)',
+                          color: '#00E5C8',
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = 'rgba(0, 229, 200, 0.2)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = 'rgba(0, 229, 200, 0.1)';
+                        }}
                       >
-                        Modifier le ciblage
+                        Modifier avec l'IA 💬
                       </button>
+                    </div>
+                    <div style={{ margin: 0, fontSize: 13, color: '#F0F4F8', whiteSpace: 'pre-wrap', lineHeight: 1.6, maxHeight: 120, overflowY: 'auto', background: 'rgba(6, 17, 31, 0.5)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                      {sourcingSummary || "Recherche ciblée par défaut selon les paramètres de l'agent."}
                     </div>
                   </div>
 
-                  {/* Right Column: Parameters */}
-                  <div style={{ flex: 1, minWidth: 300, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    
-                    <div style={{ display: 'flex', gap: 12 }}>
-                      <div style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: 16, borderRadius: 12 }}>
-                        <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                          Total Leads
-                        </label>
-                        <input 
-                          type="number" 
-                          min={1} max={100} 
-                          value={leadsToFind}
-                          onChange={(e) => setLeadsToFind(Number(e.target.value))}
-                          style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 14 }}
-                        />
-                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>Max 100 leads par exécution</div>
-                      </div>
-
-                      <div style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: 16, borderRadius: 12 }}>
-                        <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                          Leads / Entreprise
-                        </label>
-                        <input 
-                          type="number" 
-                          min={1} max={10} 
-                          value={leadsPerCompany}
-                          onChange={(e) => setLeadsPerCompany(Number(e.target.value))}
-                          style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 14 }}
-                        />
-                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>Max 10 leads/entreprise</div>
-                      </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    {/* Leads to Find */}
+                    <div style={{ background: 'rgba(0,0,0,0.2)', padding: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#F0F4F8', marginBottom: 6 }}>
+                        Volume de leads par exécution (Max 100)
+                      </label>
+                      <span style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                        Nombre de candidats à sourcer à chaque cycle planifié.
+                      </span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={leadsToFind}
+                        onChange={(e) => {
+                          const newTotal = Math.max(1, Math.min(100, parseInt(e.target.value) || 1));
+                          setLeadsToFind(newTotal);
+                          if (leadsPerCompany > newTotal) {
+                            setLeadsPerCompany(Math.min(10, newTotal));
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          background: 'rgba(255,255,255,0.05)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          padding: '10px 14px',
+                          borderRadius: 8,
+                          color: '#F0F4F8',
+                          fontSize: 14,
+                          fontWeight: 600,
+                          outline: 'none'
+                        }}
+                      />
                     </div>
 
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', background: 'rgba(255,255,255,0.02)', padding: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'} onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}>
-                      <div style={{ paddingTop: 2 }}>
-                        <input 
-                          type="checkbox" 
-                          checked={allowExistingCompanies}
-                          onChange={(e) => setAllowExistingCompanies(e.target.checked)}
-                          style={{ width: 16, height: 16, accentColor: 'var(--cyan)', cursor: 'pointer' }}
-                        />
-                      </div>
+                    {/* Leads per Company */}
+                    <div style={{ background: 'rgba(0,0,0,0.2)', padding: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#F0F4F8', marginBottom: 6 }}>
+                        Leads par entreprise (Max {Math.min(10, leadsToFind)})
+                      </label>
+                      <span style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
+                        Limite maximale de profils extraits par société ciblée (≤ Total).
+                      </span>
+                      <input
+                        type="number"
+                        min="1"
+                        max={Math.min(10, leadsToFind)}
+                        value={leadsPerCompany}
+                        onChange={(e) => {
+                          const maxAllowed = Math.min(10, leadsToFind);
+                          const val = parseInt(e.target.value) || 1;
+                          setLeadsPerCompany(Math.max(1, Math.min(maxAllowed, val)));
+                        }}
+                        style={{
+                          width: '100%',
+                          background: 'rgba(255,255,255,0.05)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          padding: '10px 14px',
+                          borderRadius: 8,
+                          color: '#F0F4F8',
+                          fontSize: 14,
+                          fontWeight: 600,
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Options */}
+                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={allowExistingCompanies}
+                        onChange={(e) => setAllowExistingCompanies(e.target.checked)}
+                        style={{ accentColor: 'var(--cyan)', width: 16, height: 16, cursor: 'pointer' }}
+                      />
                       <div>
-                        <div style={{ fontSize: 13, color: '#fff', fontWeight: 500 }}>Ignorer les doublons d'entreprises</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.4 }}>
-                          Autorise l'IA à rechercher de nouveaux leads dans des entreprises déjà prospectées.
-                        </div>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: '#F0F4F8', display: 'block' }}>
+                          Autoriser les entreprises déjà prospectées
+                        </span>
+                        <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>
+                          Permet de sourcer de nouveaux contacts dans des sociétés existantes de votre base de données.
+                        </span>
                       </div>
                     </label>
 
+                    {/* Target Prospect Agents Section */}
+                    <div style={{
+                      marginTop: 4,
+                      padding: 14,
+                      borderRadius: 10,
+                      background: 'rgba(0, 229, 200, 0.04)',
+                      border: '1px solid rgba(0, 229, 200, 0.15)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Target size={16} color="#00E5C8" />
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#F0F4F8' }}>
+                            Target Agents (Destinataires des Leads)
+                          </span>
+                          <span style={{
+                            fontSize: 11,
+                            padding: '2px 6px',
+                            borderRadius: 10,
+                            background: selectedTargetAgentIds.length > 0 ? 'rgba(0, 229, 200, 0.15)' : 'rgba(255, 71, 87, 0.15)',
+                            color: selectedTargetAgentIds.length > 0 ? '#00E5C8' : '#FF4757',
+                            fontWeight: 600
+                          }}>
+                            {selectedTargetAgentIds.length} sélectionné{selectedTargetAgentIds.length > 1 ? 's' : ''}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomizingTargets(!isCustomizingTargets)}
+                          style={{
+                            background: isCustomizingTargets ? 'var(--cyan)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isCustomizingTargets ? '#000' : 'var(--muted)',
+                            border: `1px solid ${isCustomizingTargets ? 'var(--cyan)' : 'rgba(255, 255, 255, 0.1)'}`,
+                            borderRadius: 6,
+                            padding: '4px 10px',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6
+                          }}
+                        >
+                          {isCustomizingTargets ? '✓ Terminer' : '⚙️ Modifier'}
+                        </button>
+                      </div>
+
+                      {/* Current Target Agents Summary Pills */}
+                      {!isCustomizingTargets && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                          {selectedTargetAgentIds.length === 0 ? (
+                            <div style={{
+                              padding: '8px 12px',
+                              borderRadius: 8,
+                              background: 'rgba(255, 71, 87, 0.08)',
+                              border: '1px dashed rgba(255, 71, 87, 0.35)',
+                              color: '#FF4757',
+                              fontSize: 12,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 8,
+                              width: '100%'
+                            }}>
+                              <span>⚠️</span>
+                              <span>Au moins 1 Target Agent requis pour activer la planification. Cliquez sur <strong>Modifier</strong> ci-dessus.</span>
+                            </div>
+                          ) : (
+                            availableProspectAgents
+                              .filter(pa => isAgentSelected(pa))
+                              .map(pa => (
+                                <span
+                                  key={pa.uuid || pa.agent_id || pa.agent_name}
+                                  style={{
+                                    fontSize: 11,
+                                    padding: '3px 8px',
+                                    borderRadius: 6,
+                                    background: 'rgba(0, 229, 200, 0.1)',
+                                    color: '#00E5C8',
+                                    border: '1px solid rgba(0, 229, 200, 0.25)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 4
+                                  }}
+                                >
+                                  🎯 {pa.agent_name}
+                                </span>
+                              ))
+                          )}
+                        </div>
+                      )}
+
+                      {/* Interactive Selection List (when customizing) */}
+                      {isCustomizingTargets && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}
+                        >
+                          <div style={{ fontSize: 12, color: '#F0F4F8', lineHeight: 1.4 }}>
+                            Sélectionnez les <strong>Prospect Agents</strong> qui recevront et qualifieront les leads extraits :
+                          </div>
+
+                          {availableProspectAgents.length === 0 ? (
+                            <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                              Aucun agent de prospection actif disponible.
+                            </div>
+                          ) : (
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 6,
+                              maxHeight: 150,
+                              overflowY: 'auto',
+                              background: 'rgba(0, 0, 0, 0.2)',
+                              padding: '8px 10px',
+                              borderRadius: 8,
+                              border: '1px solid rgba(255, 255, 255, 0.05)'
+                            }}>
+                              {availableProspectAgents.map((pa: any) => {
+                                const isChecked = isAgentSelected(pa);
+                                return (
+                                  <label
+                                    key={pa.uuid || pa.agent_id || pa.agent_name}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 10,
+                                      cursor: 'pointer',
+                                      fontSize: 12,
+                                      color: isChecked ? '#00E5C8' : '#F0F4F8',
+                                      padding: '6px 8px',
+                                      borderRadius: 6,
+                                      background: isChecked ? 'rgba(0, 229, 200, 0.08)' : 'transparent',
+                                      border: isChecked ? '1px solid rgba(0, 229, 200, 0.2)' : '1px solid transparent',
+                                      transition: 'all 0.15s'
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => toggleTargetAgent(pa)}
+                                      style={{ accentColor: 'var(--cyan)', cursor: 'pointer', width: 14, height: 14 }}
+                                    />
+                                    <span style={{ fontWeight: isChecked ? 600 : 400 }}>{pa.agent_name}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </motion.div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 <div style={{ marginTop: 24 }}>
-                  <button
-                    onClick={handleConfigConfirm}
-                    className="btn"
-                    style={{
-                      width: '100%',
-                      background: 'var(--cyan)',
-                      color: '#000',
-                      border: 'none',
-                      padding: '16px',
-                      borderRadius: 12,
-                      fontSize: 15,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 12,
-                      transition: 'all 0.2s',
-                      boxShadow: '0 4px 12px rgba(0, 229, 200, 0.2)'
-                    }}
-                  >
-                    Suivant : Validation de la Planification →
-                  </button>
+                  {(() => {
+                    const isTargetMissing = selectedTargetAgentIds.length === 0;
+                    return (
+                      <button
+                        onClick={handleConfigConfirm}
+                        disabled={isTargetMissing}
+                        className="btn"
+                        style={{
+                          width: '100%',
+                          background: isTargetMissing ? 'rgba(255, 255, 255, 0.1)' : 'var(--cyan)',
+                          color: isTargetMissing ? 'var(--muted)' : '#000',
+                          border: 'none',
+                          padding: '16px',
+                          borderRadius: 12,
+                          fontSize: 15,
+                          fontWeight: 600,
+                          cursor: isTargetMissing ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 12,
+                          transition: 'all 0.2s',
+                          opacity: isTargetMissing ? 0.6 : 1,
+                          boxShadow: isTargetMissing ? 'none' : '0 4px 12px rgba(0, 229, 200, 0.2)'
+                        }}
+                      >
+                        {isTargetMissing ? (
+                          <>
+                            <span>⚠️</span>
+                            Sélectionnez au moins 1 Target Agent pour continuer
+                          </>
+                        ) : (
+                          <>Suivant : Validation de la Planification →</>
+                        )}
+                      </button>
+                    );
+                  })()}
                 </div>
               </motion.div>
             )}
 
             {step === 'schedule' && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-                <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, color: '#00E5C8', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, background: 'rgba(0,229,200,0.2)', borderRadius: '50%', color: '#00E5C8', fontSize: 10 }}>3</span>
-                  Étape 3 : Planification
-                </div>
-                
-                <div style={{ display: 'flex', gap: 24, alignItems: 'stretch' }}>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <div style={{ flex: 1, padding: 24, background: 'rgba(0, 229, 200, 0.05)', border: '1px solid rgba(0, 229, 200, 0.2)', borderRadius: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
-                      <CalendarClock size={32} color="#00E5C8" style={{ marginBottom: 12 }} />
-                      <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 4 }}>Planification Actuelle</div>
-                      <div style={{ fontSize: 18, fontWeight: 700, color: '#00E5C8', marginBottom: 16 }}>
-                        {getReadableCron()}
-                      </div>
-                      <button
-                        onClick={onEditSchedule}
-                        style={{ background: 'none', border: '1px solid rgba(0, 229, 200, 0.3)', color: '#00E5C8', padding: '6px 12px', borderRadius: 8, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, transition: 'all 0.2s' }}
-                        onMouseOver={(e) => e.currentTarget.style.background = 'rgba(0, 229, 200, 0.1)'}
-                        onMouseOut={(e) => e.currentTarget.style.background = 'none'}
-                      >
-                        <Settings size={14} /> Modifier la planification
-                      </button>
-                    </div>
-
-                    <button
-                      onClick={handleConfirm}
-                      disabled={isSubmitting || !agent.trigger_rules || agent.trigger_rules.length === 0}
-                      style={{
-                        width: '100%', padding: '16px', borderRadius: 12, border: 'none',
-                        background: isSubmitting || !agent.trigger_rules || agent.trigger_rules.length === 0 ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #00E5C8, #00A69C)',
-                        color: isSubmitting || !agent.trigger_rules || agent.trigger_rules.length === 0 ? 'rgba(255,255,255,0.4)' : '#000',
-                        fontWeight: 700, fontSize: 15, cursor: isSubmitting || !agent.trigger_rules || agent.trigger_rules.length === 0 ? 'not-allowed' : 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                        boxShadow: isSubmitting || !agent.trigger_rules || agent.trigger_rules.length === 0 ? 'none' : '0 4px 15px rgba(0, 229, 200, 0.3)',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      {isSubmitting ? (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
-                            ⏳
-                          </motion.div>
-                          Activation en cours...
-                        </span>
-                      ) : (
-                        <>
-                          <Play size={18} fill="currentColor" />
-                          Activer le Sourcing Continu
-                        </>
-                      )}
-                    </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                  <div style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 1, color: '#00E5C8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 22, height: 22, background: 'rgba(0,229,200,0.2)', borderRadius: '50%', color: '#00E5C8', fontSize: 11 }}>3</span>
+                    Règles d'Exécution Automatique
                   </div>
+                  <button
+                    type="button"
+                    onClick={addTriggerRule}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: 'rgba(0, 229, 200, 0.1)',
+                      border: '1px solid rgba(0, 229, 200, 0.3)',
+                      borderRadius: '8px',
+                      color: '#00E5C8',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <span>+</span> Ajouter une règle
+                  </button>
+                </div>
+
+                {triggerRules.length === 0 ? (
+                  <div style={{ padding: '30px', textAlign: 'center', color: 'var(--muted)', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                    Aucune règle de déclenchement définie. L'agent s'exécutera uniquement à la demande.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '420px', overflowY: 'auto', paddingRight: '4px' }}>
+                    {triggerRules.map((rule, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          padding: '20px',
+                          backgroundColor: 'rgba(0,0,0,0.25)',
+                          borderRadius: '12px',
+                          border: '1px solid rgba(255,255,255,0.08)',
+                          position: 'relative'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'rgba(255,255,255,0.8)' }}>
+                            ⚡ Règle d'Intervalle #{index + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeTriggerRule(index)}
+                            style={{
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              color: '#ff7675',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              padding: '4px',
+                              opacity: 0.8
+                            }}
+                            title="Supprimer la règle"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+
+                        <div style={{ marginBottom: 12 }}>
+                          <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase' }}>
+                            Fréquence d'exécution
+                          </label>
+                          <select
+                            style={{
+                              width: '100%',
+                              background: 'rgba(0,0,0,0.3)',
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              padding: '10px 14px',
+                              borderRadius: 8,
+                              color: '#fff',
+                              outline: 'none',
+                              fontSize: 13
+                            }}
+                            value={rule.interval}
+                            onChange={(e) => updateTriggerRuleAtIndex(index, 'interval', e.target.value)}
+                          >
+                            <option value="Seconds">Secondes</option>
+                            <option value="Minutes">Minutes</option>
+                            <option value="Hours">Heures</option>
+                            <option value="Days">Jours</option>
+                            <option value="Weeks">Semaines</option>
+                            <option value="Months">Mois</option>
+                          </select>
+                        </div>
+
+                        <div style={{ padding: '12px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
+                          {rule.interval === 'Seconds' && (
+                            <div>
+                              <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Délai en secondes entre chaque exécution (1 - 59)</label>
+                              <input
+                                type="number"
+                                min="1" max="59"
+                                style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 13 }}
+                                value={rule.secondsBetween}
+                                onChange={(e) => updateTriggerRuleAtIndex(index, 'secondsBetween', Number(e.target.value))}
+                              />
+                            </div>
+                          )}
+
+                          {rule.interval === 'Minutes' && (
+                            <div>
+                              <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Délai en minutes entre chaque exécution (1 - 59)</label>
+                              <input
+                                type="number"
+                                min="1" max="59"
+                                style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 13 }}
+                                value={rule.minutesBetween}
+                                onChange={(e) => updateTriggerRuleAtIndex(index, 'minutesBetween', Number(e.target.value))}
+                              />
+                            </div>
+                          )}
+
+                          {rule.interval === 'Hours' && (
+                            <div style={{ display: 'flex', gap: 12 }}>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Délai en heures entre chaque exécution (1 - 23)</label>
+                                <input
+                                  type="number"
+                                  min="1" max="23"
+                                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 13 }}
+                                  value={rule.hoursBetween}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'hoursBetween', Number(e.target.value))}
+                                />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Minute précise d'exécution</label>
+                                <input
+                                  type="number"
+                                  min="0" max="59"
+                                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 13 }}
+                                  value={rule.triggerAtMinute}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtMinute', Number(e.target.value))}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {rule.interval === 'Days' && (
+                            <div style={{ display: 'flex', gap: 12 }}>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Intervalle en jours entre chaque exécution (1 - 31)</label>
+                                <input
+                                  type="number"
+                                  min="1" max="31"
+                                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 13 }}
+                                  value={rule.daysBetween}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'daysBetween', Number(e.target.value))}
+                                />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Heure d'exécution</label>
+                                <select
+                                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 13 }}
+                                  value={rule.triggerAtHour}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtHour', e.target.value)}
+                                >
+                                  {hourOptions.map(h => (
+                                    <option key={h} value={h}>{h}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Minute précise d'exécution</label>
+                                <input
+                                  type="number"
+                                  min="0" max="59"
+                                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 13 }}
+                                  value={rule.triggerAtMinute}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtMinute', Number(e.target.value))}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {rule.interval === 'Weeks' && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                              <div>
+                                <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Intervalle en semaines entre chaque exécution (1 - 52)</label>
+                                <input
+                                  type="number"
+                                  min="1" max="52"
+                                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 13 }}
+                                  value={rule.weeksBetween}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'weeksBetween', Number(e.target.value))}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Jours d'exécution dans la semaine</label>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                  {weekdayOptions.map(day => (
+                                    <div
+                                      key={day}
+                                      onClick={() => toggleWeekdayAtIndex(index, day)}
+                                      style={{
+                                        padding: '6px 12px',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        cursor: 'pointer',
+                                        backgroundColor: rule.triggerOnWeekdays.includes(day) ? 'rgba(0, 229, 200, 0.2)' : 'rgba(255,255,255,0.05)',
+                                        border: `1px solid ${rule.triggerOnWeekdays.includes(day) ? '#00e5c8' : 'transparent'}`,
+                                        color: rule.triggerOnWeekdays.includes(day) ? '#fff' : '#b2bec3',
+                                        transition: 'all 0.2s'
+                                      }}
+                                    >
+                                      {day}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {rule.interval === 'Months' && (
+                            <div style={{ display: 'flex', gap: 12 }}>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Intervalle en mois entre chaque exécution (1 - 12)</label>
+                                <input
+                                  type="number"
+                                  min="1" max="12"
+                                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 13 }}
+                                  value={rule.monthsBetween}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'monthsBetween', Number(e.target.value))}
+                                />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Jour du mois (1 - 31)</label>
+                                <input
+                                  type="number"
+                                  min="1" max="31"
+                                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 13 }}
+                                  value={rule.triggerAtDayOfMonth}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtDayOfMonth', Number(e.target.value))}
+                                />
+                              </div>
+                              <div style={{ flex: 1 }}>
+                                <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Heure d'exécution</label>
+                                <select
+                                  style={{ width: '100%', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 13 }}
+                                  value={rule.triggerAtHour}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtHour', e.target.value)}
+                                >
+                                  {hourOptions.map(h => (
+                                    <option key={h} value={h}>{h}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                          )}
+
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ marginTop: 20 }}>
+                  {(() => {
+                    const isTargetMissing = selectedTargetAgentIds.length === 0;
+                    const isDisabled = isSubmitting || triggerRules.length === 0 || isTargetMissing;
+                    return (
+                      <button
+                        onClick={handleConfirm}
+                        disabled={isDisabled}
+                        style={{
+                          width: '100%', padding: '16px', borderRadius: 12, border: 'none',
+                          background: isDisabled ? 'rgba(255,255,255,0.1)' : 'linear-gradient(135deg, #00E5C8, #00A69C)',
+                          color: isDisabled ? 'rgba(255,255,255,0.4)' : '#06111F',
+                          fontWeight: 700, fontSize: 15, cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                          boxShadow: isDisabled ? 'none' : '0 4px 15px rgba(0, 229, 200, 0.3)',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        {isSubmitting ? (
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
+                              ⏳
+                            </motion.div>
+                            Activation en cours...
+                          </span>
+                        ) : isTargetMissing ? (
+                          <>
+                            <span>⚠️</span>
+                            Sélectionnez au moins 1 Target Agent à l'Étape 2
+                          </>
+                        ) : (
+                          <>
+                            <Play size={18} fill="currentColor" />
+                            Activer le Sourcing Continu
+                          </>
+                        )}
+                      </button>
+                    );
+                  })()}
                 </div>
               </motion.div>
             )}

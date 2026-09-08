@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
+import { Terminal, RefreshCw } from 'lucide-react';
 
 interface Log {
   id?: number;
@@ -18,7 +20,7 @@ interface LogsViewProps {
 export default function LogsView({ logs }: LogsViewProps) {
   const [levelFilter, setLevelFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   const limit = 50;
   const [displayCount, setDisplayCount] = useState(limit);
 
@@ -43,8 +45,8 @@ export default function LogsView({ logs }: LogsViewProps) {
   // Filter and prepare logs
   const terminalLogs = logs
     .filter(log => levelFilter === 'All' || log.statut === levelFilter)
-    .filter(log => 
-      searchQuery === '' || 
+    .filter(log =>
+      searchQuery === '' ||
       log.message.toLowerCase().includes(searchQuery.toLowerCase()) ||
       log.workflow_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       log.etape.toLowerCase().includes(searchQuery.toLowerCase())
@@ -54,20 +56,39 @@ export default function LogsView({ logs }: LogsViewProps) {
 
   return (
     <div className="fade-in">
-      <div className="view-header">
-        <div className="view-title">
-          <h1>Journaux d&apos;Exécution</h1>
-          <p>Suivi en temps réel des actions menées par les agents VMIND (Collecte, Qualification, Prospection)</p>
+      <div className="view-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: 'rgba(0, 229, 200, 0.1)',
+            border: '1px solid rgba(0, 229, 200, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#00E5C8',
+            flexShrink: 0
+          }}>
+            <Terminal size={22} />
+          </div>
+          <div className="view-title">
+            <h1 style={{ margin: 0 }}>Journaux d&apos;Exécution</h1>
+            <p style={{ margin: '0.25rem 0 0 0' }}>Suivi en temps réel des actions menées par les agents VMIND (Collecte, Qualification, Prospection)</p>
+          </div>
         </div>
-        <button className="btn btn-secondary" onClick={() => {}}>
-          🔄 Actualiser les Logs
+        <button className="btn btn-secondary" onClick={() => { }} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          <RefreshCw size={14} />
+          <span>Actualiser les Logs</span>
         </button>
       </div>
 
       {/* Filters */}
       <div className="filters-bar">
         <div className="search-input-wrapper" style={{ flex: 2 }}>
-          <span className="search-icon">🔍</span>
+          <span className="search-icon" style={{ display: 'flex', alignItems: 'center' }}>
+            <CyberIcon name="search" size={14} color="var(--text-muted)" />
+          </span>
           <input
             type="text"
             placeholder="Rechercher par message, étape, ID de workflow..."

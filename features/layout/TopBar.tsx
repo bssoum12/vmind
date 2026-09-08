@@ -15,8 +15,10 @@ export const TopBar: React.FC = () => {
   const [roleLabel, setRoleLabel] = useState('');
   const [avatarInitials, setAvatarInitials] = useState('VM');
   const [isErpConnected, setIsErpConnected] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const checkTokens = () => {
       try {
         const token = localStorage.getItem('vmind_session');
@@ -109,23 +111,41 @@ export const TopBar: React.FC = () => {
           <span>{clock}</span>
         </div>
 
-        <div className="mode-switcher">
+        <div className="mode-switcher" style={{ position: 'relative', zIndex: 10 }}>
           <button 
-            className={`mode-btn ${mode === 'ASSISTANT' ? 'active' : ''}`}
-            onClick={() => setMode('ASSISTANT')}
+            type="button"
+            className={`mode-btn ${mounted && mode === 'ASSISTANT' ? 'active' : ''}`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMode('ASSISTANT');
+              if (typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                if (url.searchParams.has('view') || url.searchParams.has('mode')) {
+                  url.searchParams.delete('view');
+                  url.searchParams.delete('mode');
+                  const newUrl = url.pathname + (url.search ? url.search : '');
+                  window.history.replaceState({}, '', newUrl);
+                }
+              }
+            }}
           >
             Assistant
           </button>
           <button 
-            className={`mode-btn ${mode === 'MANAGEMENT' ? 'active' : ''}`}
-            onClick={() => setMode('MANAGEMENT')}
+            type="button"
+            className={`mode-btn ${mounted && mode === 'MANAGEMENT' ? 'active' : ''}`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMode('MANAGEMENT');
+            }}
           >
             Management
           </button>
         </div>
       </div>
       <div className="topbar-right">
-        <div className="tb-btn" title="Notifications">🔔</div>
         <div className="tb-btn" title="Paramètres du profil" onClick={handleGoToProfile} style={{ cursor: 'pointer' }}>⚙</div>
         <div style={{ position: 'relative' }}>
           <div 

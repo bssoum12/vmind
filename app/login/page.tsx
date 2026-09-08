@@ -442,6 +442,23 @@ export default function LoginPage() {
   const [time, setTime] = useState('');
   const router = useRouter();
 
+  const formatUserFriendlyError = (err: any, fallbackMessage: string = "Une erreur est survenue."): string => {
+    const rawMsg = (err?.message || "").toString();
+    const lower = rawMsg.toLowerCase();
+    
+    if (lower.includes("failed to fetch") || lower.includes("fetch failed") || lower.includes("econnrefused") || lower.includes("networkerror")) {
+      return "Impossible de contacter le serveur VMIND. Veuillez vérifier votre connexion ou que le serveur est démarré.";
+    }
+    if (lower.includes("invalid credentials") || lower.includes("identifiants invalides") || lower.includes("unauthorized")) {
+      return "Identifiant ou mot de passe incorrect.";
+    }
+    if (lower.includes("jwt malformed") || lower.includes("invalid token")) {
+      return "Session expirée ou invalide. Veuillez vous reconnecter.";
+    }
+    
+    return rawMsg || fallbackMessage;
+  };
+
   // Signup State
   const [showSignup, setShowSignup] = useState(false);
   const [signupFirstName, setSignupFirstName] = useState('');
@@ -546,7 +563,7 @@ export default function LoginPage() {
       setSignupPhone('');
       setIsUsernameAvailable(null);
     } catch (err: any) {
-      setSignupError(err.message);
+      setSignupError(formatUserFriendlyError(err, "Une erreur s'est produite lors de l'inscription."));
     } finally {
       setSignupLoading(false);
     }
@@ -576,18 +593,10 @@ export default function LoginPage() {
     return () => clearInterval(t);
   }, []);
 
-  // Load remembered username on mount
+  // Ensure login fields start completely clean and un-prefilled on mount
   useEffect(() => {
-    try {
-      const remembered = localStorage.getItem('vmind_remembered_username');
-      const shouldRemember = localStorage.getItem('vmind_remember_me') === 'true';
-      if (shouldRemember && remembered) {
-        setUsername(remembered);
-        setRememberMe(true);
-      }
-    } catch (e) {
-      console.error("Error reading rememberMe from localStorage:", e);
-    }
+    setUsername('');
+    setPassword('');
   }, []);
 
 
@@ -621,7 +630,7 @@ export default function LoginPage() {
 
       window.location.href = '/';
     } catch (err: any) {
-      setError(err.message);
+      setError(formatUserFriendlyError(err, "Identifiant ou mot de passe incorrect."));
     } finally {
       setLoading(false);
     }
@@ -679,7 +688,7 @@ export default function LoginPage() {
       setForgotSuccess(data.message);
       setForgotPasswordStep(2);
     } catch (err: any) {
-      setForgotError(err.message);
+      setForgotError(formatUserFriendlyError(err, "Erreur lors de l'envoi de la demande."));
     } finally {
       setForgotLoading(false);
     }
@@ -719,7 +728,7 @@ export default function LoginPage() {
         setForgotError('');
       }, 2000);
     } catch (err: any) {
-      setForgotError(err.message);
+      setForgotError(formatUserFriendlyError(err, "Erreur de réinitialisation."));
     } finally {
       setForgotLoading(false);
     }
@@ -735,13 +744,42 @@ export default function LoginPage() {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0,
+      minHeight: '100vh',
+      width: '100vw',
       background: `radial-gradient(ellipse 120% 80% at 28% 60%, #071424 0%, ${bg} 55%, #03080f 100%)`,
       display: 'flex', flexDirection: 'column',
       fontFamily: "'Inter', -apple-system, sans-serif",
-      color: white, overflow: 'hidden',
+      color: white,
+      overflowY: 'auto',
+      overflowX: 'hidden',
     }}>
       <PremiumBackground />
+
+      {/* Responsive layout styles */}
+      <style jsx global>{`
+        @media (max-width: 1024px) {
+          .login-main-container {
+            flex-direction: column !important;
+            overflow-y: auto !important;
+            padding-bottom: 40px !important;
+          }
+          .login-left-panel {
+            width: 100% !important;
+            padding: 32px 24px !important;
+            align-items: center !important;
+            text-align: center !important;
+          }
+          .login-right-panel {
+            width: 100% !important;
+            padding: 16px 24px 40px !important;
+          }
+        }
+        @media (max-height: 850px) {
+          .login-main-container {
+            overflow-y: auto !important;
+          }
+        }
+      `}</style>
 
       {/* ═══ HEADER ═══ */}
       <header style={{
@@ -762,11 +800,7 @@ export default function LoginPage() {
           <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: cyan }}>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: cyan, boxShadow: `0 0 8px ${cyan}`, display: 'inline-block' }} />
             ERP Connecté
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: cyan, border: '1px solid rgba(0,229,200,0.3)', padding: '2px 9px', borderRadius: '4px' }}>
-            <span style={{ width: '5px', height: '5px', borderRadius: '50%', border: `1px solid ${cyan}`, display: 'inline-block' }} />
-            TraLIS v3.2
-          </span>
+          </span>          
           <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Shield size={10} /> Accès Sécurisé
           </span>
@@ -779,10 +813,10 @@ export default function LoginPage() {
       </header>
 
       {/* ═══ MAIN ═══ */}
-      <main style={{ position: 'relative', zIndex: 10, display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <main className="login-main-container" style={{ position: 'relative', zIndex: 10, display: 'flex', flex: 1, overflowY: 'auto' }}>
 
         {/* ── LEFT (58%) ── */}
-        <div style={{ width: '58%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 2% 32px 8%' }}>
+        <div className="login-left-panel" style={{ width: '58%', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '32px 2% 32px 8%' }}>
 
           {/* Brand headline */}
           <div style={{ marginBottom: '6px' }}>
@@ -827,7 +861,7 @@ export default function LoginPage() {
         </div>
 
         {/* ── RIGHT (42%) — Card ── */}
-        <div style={{ width: '42%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 6% 32px 2%' }}>
+        <div className="login-right-panel" style={{ width: '42%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 6% 32px 2%' }}>
           <div className="anim-card" style={{
             width: '100%', maxWidth: '590px',
             background: 'linear-gradient(160deg, rgba(8,20,38,0.98) 0%, rgba(4,12,24,0.99) 100%)',
@@ -1077,7 +1111,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <form onSubmit={handleLogin} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                   {error && (
                     <div style={{ padding: '11px 14px', background: 'rgba(255,71,87,0.08)', border: '1px solid rgba(255,71,87,0.4)', color: '#ff6b7a', borderRadius: '10px', fontSize: '13px', textAlign: 'center' }}>
                       {error}
@@ -1090,7 +1124,7 @@ export default function LoginPage() {
                     <div style={{ position: 'relative' }}>
                       <User size={16} color={muted} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                       <input type="text" className="vmind-input" value={username} onChange={e => setUsername(e.target.value)}
-                        placeholder="Saisissez votre nom d'utilisateur" required suppressHydrationWarning={true} />
+                        placeholder="Saisissez votre nom d'utilisateur" required autoComplete="off" name="vmind_user_id_field" suppressHydrationWarning={true} />
                     </div>
                   </div>
 
@@ -1101,7 +1135,7 @@ export default function LoginPage() {
                       <Lock size={16} color={muted} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                       <input type={showPassword ? 'text' : 'password'} className="vmind-input" style={{ paddingRight: '48px' }}
                         value={password} onChange={e => setPassword(e.target.value)}
-                        placeholder="Veuillez entrer ce champ" required suppressHydrationWarning={true} />
+                        placeholder="Veuillez entrer ce champ" required autoComplete="new-password" name="vmind_user_pwd_field" suppressHydrationWarning={true} />
                       <div onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: muted, transition: 'color .2s' }}>
                         {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
                       </div>

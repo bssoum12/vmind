@@ -27,7 +27,14 @@ export function useProspectSocket(onDbUpdate?: (payload: any) => void) {
     subscribersCount++;
 
     if (!sharedSocket) {
-      const token = localStorage.getItem('vmind_session');
+      let rawToken = localStorage.getItem('vmind_session') || localStorage.getItem('vmind_mcp_token');
+      let token = rawToken;
+      if (rawToken && rawToken.trim().startsWith('{')) {
+        try {
+          token = JSON.parse(rawToken).token || rawToken;
+        } catch (e) {}
+      }
+
       if (token) {
         sharedSocket = io(SOCKET_URL, {
           auth: { token },

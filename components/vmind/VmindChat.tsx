@@ -24,7 +24,8 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'get_dossier_detail': 'VDATA',
   'get_expedition_status': 'VDATA',
   'get_customer_profile': 'VDATA',
-  'get_purchase_invoice_detail': 'VDATA',
+  'get_purchase_invoice_detail': 'VBUY',
+  'get_vbuy_kpi_factures_a_regler': 'VBUY',
   'search_cotations': 'VDATA',
   'get_aged_balance': 'VDATA',
   'get_overdue_alerts': 'VDATA',
@@ -54,7 +55,41 @@ const TOOL_TO_AGENT: Record<string, string> = {
   'MCP_Client1_get_pipeline_status': 'VSELL',
   'get_churn_risk_clients': 'VSELL',
   'Client1_get_churn_risk_clients': 'VSELL',
-  'MCP_Client1_get_churn_risk_clients': 'VSELL',
+  'Client1_get_vbuy_kpi_factures_a_regler_cette_semaine': 'VBUY',
+  'MCP_Client1_get_vbuy_kpi_factures_a_regler_cette_semaine': 'VBUY',
+  'get_vbuy_kpi_montant_total_achats_ce_mois': 'VBUY',
+  'Client1_get_vbuy_kpi_montant_total_achats_ce_mois': 'VBUY',
+  'MCP_Client1_get_vbuy_kpi_montant_total_achats_ce_mois': 'VBUY',
+  'get_vbuy_top_fournisseurs': 'VBUY',
+  'Client1_get_vbuy_top_fournisseurs': 'VBUY',
+  'MCP_Client1_get_vbuy_top_fournisseurs': 'VBUY',
+  'get_vbuy_fournisseurs_en_retard': 'VBUY',
+  'Client1_get_vbuy_fournisseurs_en_retard': 'VBUY',
+  'MCP_Client1_get_vbuy_fournisseurs_en_retard': 'VBUY',
+  'get_vbuy_commandes_en_attente': 'VBUY',
+  'Client1_get_vbuy_commandes_en_attente': 'VBUY',
+  'MCP_Client1_get_vbuy_commandes_en_attente': 'VBUY',
+  'get_vbuy_repartition_categories': 'VBUY',
+  'Client1_get_vbuy_repartition_categories': 'VBUY',
+  'MCP_Client1_get_vbuy_repartition_categories': 'VBUY',
+  'get_vmove_dossiers_actifs': 'VMOVE',
+  'Client1_get_vmove_dossiers_actifs': 'VMOVE',
+  'MCP_Client1_get_vmove_dossiers_actifs': 'VMOVE',
+  'get_vmove_dossiers_retard': 'VMOVE',
+  'Client1_get_vmove_dossiers_retard': 'VMOVE',
+  'MCP_Client1_get_vmove_dossiers_retard': 'VMOVE',
+  'get_vmove_dossiers_en_cours_client': 'VMOVE',
+  'Client1_get_vmove_dossiers_en_cours_client': 'VMOVE',
+  'MCP_Client1_get_vmove_dossiers_en_cours_client': 'VMOVE',
+  'get_vmove_top_transporteurs_ponctualite': 'VMOVE',
+  'Client1_get_vmove_top_transporteurs_ponctualite': 'VMOVE',
+  'MCP_Client1_get_vmove_top_transporteurs_ponctualite': 'VMOVE',
+  'get_vmove_top_ports_retards': 'VMOVE',
+  'Client1_get_vmove_top_ports_retards': 'VMOVE',
+  'MCP_Client1_get_vmove_top_ports_retards': 'VMOVE',
+  'get_vmove_suggestion_bl_non_factures': 'VMOVE',
+  'Client1_get_vmove_suggestion_bl_non_factures': 'VMOVE',
+  'MCP_Client1_get_vmove_suggestion_bl_non_factures': 'VMOVE',
 };
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -78,7 +113,42 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   'MCP_Client1_get_pipeline_status': 'État du Pipeline',
   'get_churn_risk_clients': 'Risque de Départ Clients',
   'Client1_get_churn_risk_clients': 'Risque de Départ Clients',
-  'MCP_Client1_get_churn_risk_clients': 'Risque de Départ Clients',
+  'get_vbuy_kpi_factures_a_regler_cette_semaine': 'Factures à régler cette semaine',
+  'Client1_get_vbuy_kpi_factures_a_regler_cette_semaine': 'Factures à régler cette semaine',
+  'MCP_Client1_get_vbuy_kpi_factures_a_regler_cette_semaine': 'Factures à régler cette semaine',
+  'get_vbuy_kpi_montant_total_achats_ce_mois': 'Montant Achats Ce Mois',
+  'Client1_get_vbuy_kpi_montant_total_achats_ce_mois': 'Montant Achats Ce Mois',
+  'MCP_Client1_get_vbuy_kpi_montant_total_achats_ce_mois': 'Montant Achats Ce Mois',
+  'get_vbuy_top_fournisseurs': 'Top 5 Fournisseurs (VBUY)',
+  'Client1_get_vbuy_top_fournisseurs': 'Top 5 Fournisseurs (VBUY)',
+  'MCP_Client1_get_vbuy_top_fournisseurs': 'Top 5 Fournisseurs (VBUY)',
+  'get_vbuy_fournisseurs_en_retard': 'Retards de Livraison (VBUY)',
+  'Client1_get_vbuy_fournisseurs_en_retard': 'Retards de Livraison (VBUY)',
+  'MCP_Client1_get_vbuy_fournisseurs_en_retard': 'Retards de Livraison (VBUY)',
+  'get_vbuy_commandes_en_attente': 'Commandes en attente (VBUY)',
+  'Client1_get_vbuy_commandes_en_attente': 'Commandes en attente (VBUY)',
+  'MCP_Client1_get_vbuy_commandes_en_attente': 'Commandes en attente (VBUY)',
+  'get_vbuy_repartition_categories': 'Catégories d\'Achats (VBUY)',
+  'Client1_get_vbuy_repartition_categories': 'Catégories d\'Achats (VBUY)',
+  'MCP_Client1_get_vbuy_repartition_categories': 'Catégories d\'Achats (VBUY)',
+  'get_vmove_dossiers_actifs': 'Dossiers Actifs (Exploitation)',
+  'Client1_get_vmove_dossiers_actifs': 'Dossiers Actifs (Exploitation)',
+  'MCP_Client1_get_vmove_dossiers_actifs': 'Dossiers Actifs (Exploitation)',
+  'get_vmove_dossiers_retard': 'Dossiers en retard (Exploitation)',
+  'Client1_get_vmove_dossiers_retard': 'Dossiers en retard (Exploitation)',
+  'MCP_Client1_get_vmove_dossiers_retard': 'Dossiers en retard (Exploitation)',
+  'get_vmove_dossiers_en_cours_client': 'Dossiers actifs par client (Exploitation)',
+  'Client1_get_vmove_dossiers_en_cours_client': 'Dossiers actifs par client (Exploitation)',
+  'MCP_Client1_get_vmove_dossiers_en_cours_client': 'Dossiers actifs par client (Exploitation)',
+  'get_vmove_top_transporteurs_ponctualite': 'Top transporteurs (Ponctualité)',
+  'Client1_get_vmove_top_transporteurs_ponctualite': 'Top transporteurs (Ponctualité)',
+  'MCP_Client1_get_vmove_top_transporteurs_ponctualite': 'Top transporteurs (Ponctualité)',
+  'get_vmove_top_ports_retards': 'Top ports (Retards)',
+  'Client1_get_vmove_top_ports_retards': 'Top ports (Retards)',
+  'MCP_Client1_get_vmove_top_ports_retards': 'Top ports (Retards)',
+  'get_vmove_suggestion_bl_non_factures': 'BL Non Facturés (Exploitation)',
+  'Client1_get_vmove_suggestion_bl_non_factures': 'BL Non Facturés (Exploitation)',
+  'MCP_Client1_get_vmove_suggestion_bl_non_factures': 'BL Non Facturés (Exploitation)',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -113,10 +183,30 @@ const VSELL_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Risque de départ ?": "Quels clients présentent un risque de départ selon leur historique ?"
 };
 
+const VBUY_FAST_TRACK_REGISTRY: Record<string, string> = {
+  "Factures à régler (7j) ?": "Combien de factures fournisseurs sont à régler cette semaine ?",
+  "Montant achats ce mois ?": "Quel est le montant total des achats ce mois ?",
+  "Top 5 fournisseurs ?": "Quels sont les 5 principaux fournisseurs par volume d'achat ?",
+  "Délais de livraison dépassés ?": "Quels fournisseurs ont des délais de livraison dépassés ?",
+  "Commandes en attente de réception ?": "Quelles commandes fournisseurs sont en attente de réception ?",
+  "Rpartition par catgorie (Trimestre) ?": "Quelle est la rpartition des achats par catgorie ce trimestre ?"
+};
+
+const VMOVE_FAST_TRACK_REGISTRY: Record<string, string> = {
+  "Dossiers en acheminement ?": "Combien de dossiers sont en cours d'acheminement ?",
+  "Dossiers en retard ETA ?": "Quels dossiers sont en retard par rapport à la date ETA ?",
+  "Dossiers clients en cours ?": "Affiche les dossiers en cours par client",
+  "Top transporteurs (Ponctualité) ?": "Quel transporteur a le meilleur taux de ponctualité ce mois ?",
+  "Top ports (Retards) ?": "Quels sont les ports avec le plus de retards ce trimestre ?",
+  "BL non facturés ?": "Combien de BL ne sont pas encore facturés ?"
+};
+
 const FAST_TRACK_REGISTRY: Record<string, string> = {
   ...VDATA_FAST_TRACK_REGISTRY,
   ...VFIN_FAST_TRACK_REGISTRY,
-  ...VSELL_FAST_TRACK_REGISTRY
+  ...VSELL_FAST_TRACK_REGISTRY,
+  ...VBUY_FAST_TRACK_REGISTRY,
+  ...VMOVE_FAST_TRACK_REGISTRY
 };
 
 const formatTime = (dateString?: string) => {
@@ -352,11 +442,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         setMessages((prev) => [...prev, {
           id: `err-${Date.now()}`,
           sender: 'vm',
-          text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
+          text: response?.message || 'Erreur de traitement. Veuillez relancer la demande d\'analyse.',
           time: formatTime(), rawDate: new Date().toISOString(),
           error: response?.error || 'NO_RESPONSE',
           response_type: 'error',
-          title: response?.title || 'Erreur n8n'
+          title: response?.title || 'Erreur d\'analyse'
         }]);
       } else {
         const toolUsed = response.tool_used as string;
@@ -387,7 +477,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
         sender: 'vm',
-        text: `Erreur de communication avec n8n : ${error.message}`,
+        text: error?.message || 'Erreur de connexion. Le service d\'analyse est temporairement inaccessible.',
         time: formatTime(), rawDate: new Date().toISOString(),
         error: error.message,
       }]);
@@ -475,11 +565,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         setMessages((prev) => [...prev, {
           id: `err-${Date.now()}`,
           sender: 'vm',
-          text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
+          text: response?.message || 'Erreur de traitement. Veuillez relancer la demande d\'analyse.',
           time: formatTime(), rawDate: new Date().toISOString(),
           error: response?.error || 'NO_RESPONSE',
           response_type: 'error',
-          title: response?.title || 'Erreur n8n'
+          title: response?.title || 'Erreur d\'analyse'
         }]);
       } else {
         const toolUsed = response.tool_used as string;
@@ -508,7 +598,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
         sender: 'vm',
-        text: `Erreur de communication avec n8n : ${error.message}`,
+        text: error?.message || 'Erreur de connexion. Le service d\'analyse est temporairement inaccessible.',
         time: formatTime(), rawDate: new Date().toISOString(),
         error: error.message,
       }]);
@@ -717,6 +807,52 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         {activeAgentId === 'VSELL' && (
           <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
             {Object.keys(VSELL_FAST_TRACK_REGISTRY).map((label) => (
+              <button
+                key={label}
+                onClick={() => handleFastTrackClick(label)}
+                className="suggestion-chip"
+                style={{
+                  flexShrink: 0,
+                  background: agentBgColor,
+                  color: agentColor,
+                  borderColor: agentBorderColor,
+                  boxShadow: `0 0 10px ${agentColor}20`,
+                }}
+                disabled={isLoading}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* VBUY Suggestions */}
+        {activeAgentId === 'VBUY' && (
+          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+            {Object.keys(VBUY_FAST_TRACK_REGISTRY).map((label) => (
+              <button
+                key={label}
+                onClick={() => handleFastTrackClick(label)}
+                className="suggestion-chip"
+                style={{
+                  flexShrink: 0,
+                  background: agentBgColor,
+                  color: agentColor,
+                  borderColor: agentBorderColor,
+                  boxShadow: `0 0 10px ${agentColor}20`,
+                }}
+                disabled={isLoading}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* VMOVE Suggestions */}
+        {activeAgentId === 'VMOVE' && (
+          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+            {Object.keys(VMOVE_FAST_TRACK_REGISTRY).map((label) => (
               <button
                 key={label}
                 onClick={() => handleFastTrackClick(label)}

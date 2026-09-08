@@ -46,7 +46,8 @@ export async function sendVmindMessage(message: string, conversationId: string, 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
   const proxyUrl = `${baseUrl}/api/n8n-proxy`;
 
-  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId });
+  const agentCode = (agentId || "VFIN").toUpperCase();
+  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode });
 
   let mcp_token;
   if (typeof window !== "undefined") {
@@ -97,6 +98,7 @@ export async function sendVmindMessage(message: string, conversationId: string, 
         vmind_session_id: sessionId,
         conversation_id: conversationId,
         agent_id: agentId,
+        agent: agentCode,
         mcp_token
       }),
       signal
@@ -104,7 +106,13 @@ export async function sendVmindMessage(message: string, conversationId: string, 
 
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.message || `Erreur Proxy (${response.status})`);
+      let rawMsg = errData.message || `Erreur de communication (${response.status})`;
+      if (rawMsg.includes("n8n responded with status") || rawMsg.includes("status 500") || response.status === 500) {
+        rawMsg = "Erreur de traitement. Veuillez relancer la demande d'analyse.";
+      } else if (rawMsg.toLowerCase().includes("fetch failed") || rawMsg.toLowerCase().includes("failed to fetch") || rawMsg.toLowerCase().includes("econnrefused")) {
+        rawMsg = "Erreur de connexion. Le service d'analyse est temporairement inaccessible.";
+      }
+      throw new Error(rawMsg);
     }
 
     const data = await response.json();
@@ -133,6 +141,10 @@ export async function sendVmindMessage(message: string, conversationId: string, 
       return { ok: false, error: 'ABORTED', message: 'Requete annulée' } as unknown as VmindN8nResponse;
     }
     console.error("❌ [n8n-api] FETCH ERROR:", error);
+    let msg = error?.message || "";
+    if (msg.toLowerCase().includes("fetch failed") || msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("econnrefused")) {
+      throw new Error("Erreur de connexion. Le service d'analyse est temporairement inaccessible.");
+    }
     throw error;
   }
 }
@@ -197,7 +209,8 @@ export async function resetReminders(invoiceRefs: string[]): Promise<any> {
   return response.json();
 }
 
-// ─── Agent Management APIs ────────────────────────────────────────────────────
+// ─── Agent Management APIs ──────────
+// ──────────────────────────────────────────
  
 const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
 
@@ -210,9 +223,31 @@ export async function getAgents(): Promise<any[]> {
   const res = await fetch(`${getBaseUrl()}/api/list-agents`, {
     headers: getAuthHeaders()
   });
-  if (!res.ok) throw new Error(`Failed to fetch agents (${res.status})`);
+  if (!res.ok) throw new Error(`Impossible de récupérer la liste des agents (${res.status})`);
   const data = await res.json();
   return data.agents || [];
+}
+
+export interface MarketplaceStatsResponse {
+  ok: boolean;
+  templateDeployments: Record<string, number>;
+  sidebarStats: {
+    executionsToday: number;
+    activeAgentsCount: number;
+    successRate: number;
+  };
+}
+
+export async function getMarketplaceStats(): Promise<MarketplaceStatsResponse> {
+  try {
+    const res = await fetch(`${getBaseUrl()}/api/analytics/marketplace-stats`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
+    return res.json();
+  } catch (_) {
+    return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
+  }
 }
 
 /**
@@ -225,24 +260,33 @@ export async function pauseAgent(agentName: string): Promise<any> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to pause agent (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la mise en pause de l'agent (${res.status})`);
   }
-  return res.json();
+  const result = await res.json();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
+  }
+  return result;
 }
 
 /**
  * Resumes a paused agent — recreates its QStash schedule from stored trigger_rules
  */
-export async function resumeAgent(agentName: string): Promise<any> {
+export async function resumeAgent(agentName: string, params?: any): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/resume-agent/${encodeURIComponent(agentName)}`, {
     method: "POST",
-    headers: getAuthHeaders()
+    headers: getAuthHeaders(params ? { "Content-Type": "application/json" } : {}),
+    body: params ? JSON.stringify(params) : undefined
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to resume agent (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la reprise de l'agent (${res.status})`);
   }
-  return res.json();
+  const result = await res.json();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
+  }
+  return result;
 }
 
 /**
@@ -255,9 +299,13 @@ export async function deleteAgent(agentName: string): Promise<any> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to delete agent (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la suppression de l'agent (${res.status})`);
   }
-  return res.json();
+  const result = await res.json();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
+  }
+  return result;
 }
 
 /**
@@ -275,7 +323,7 @@ export async function updateAgentConfig(agentName: string, recoveryConfig: objec
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to update agent config (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la mise à jour de la configuration (${res.status})`);
   }
   return res.json();
 }
@@ -290,7 +338,7 @@ export async function runAgentNow(agentName: string): Promise<any> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to trigger agent run (${res.status})`);
+    throw new Error(err.error || `Erreur lors du lancement de l'agent (${res.status})`);
   }
   return res.json();
 }
@@ -305,7 +353,7 @@ export async function getProspectAgentStats(agentId: string): Promise<any> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to fetch agent stats (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la récupération des statistiques (${res.status})`);
   }
   return res.json();
 }
@@ -321,7 +369,7 @@ export async function qualifyManualProspects(agentId: string, mode: 'pending_onl
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to qualify prospects manually (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la qualification manuelle des prospects (${res.status})`);
   }
   return res.json();
 }
@@ -339,10 +387,12 @@ export async function triggerAIQualificationAllPending(agentId: string): Promise
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to trigger AI qualification (${res.status})`);
+    throw new Error(err.error || `Erreur lors de la qualification automatique des prospects (${res.status})`);
   }
   return res.json();
 }
+
+
 
 /**
  * Appelle l'agent n8n KPI via le Proxy sécurisé du Backend
@@ -397,7 +447,15 @@ export async function fetchN8nKpis(
  */
 export async function triggerSourcingRun(
   agentId: string, 
-  params: { sourcingSummary: string; totalLeads: number; leadsPerCompany: number; ignoreDuplicates: boolean }
+  params: {
+    sourcingSummary?: string;
+    totalLeads?: number;
+    leadsPerCompany?: number;
+    ignoreDuplicates?: boolean;
+    target_agent_ids?: (string | number)[];
+    update_defaults?: boolean;
+    [key: string]: any;
+  }
 ): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/sourcing-agent/run/${encodeURIComponent(agentId)}`, {
     method: "POST",
@@ -406,8 +464,181 @@ export async function triggerSourcingRun(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Failed to trigger sourcing agent (${res.status})`);
+    throw new Error(err.error || `Erreur lors du déclenchement de l'agent de sourcing (${res.status})`);
   }
   return res.json();
 }
 
+/**
+ * Trigger immediate execution for Prospect Agent (Auto Mode)
+ */
+export async function triggerProspectAutoMode(agentId: string): Promise<any> {
+  const res = await fetch(`${getBaseUrl()}/api/run/${encodeURIComponent(agentId)}`, {
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ mode: "auto" })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Erreur lors du déclenchement de l'agent de prospection (${res.status})`);
+  }
+  return res.json();
+}
+
+
+/**
+ * Récupère le KPI VBUY #1 : Factures à régler (TND)
+ */
+export async function getVbuyKpiFacturesARegler(
+  clientId: string = "DEMO",
+  horizon: string = "1m",
+  startDate?: string,
+  endDate?: string
+): Promise<any> {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-factures-a-regler`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      client_id: clientId,
+      horizon,
+      startDate,
+      endDate
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur VBUY KPI (${response.status})`);
+  }
+
+  const json = await response.json();
+  return json?.data || json;
+}
+
+/**
+ * Récupère le KPI VBUY #2 : Achats du mois (TND)
+ */
+export async function getVbuyKpiAchatsDuMois(
+  clientId: string = "DEMO",
+  startDate?: string,
+  endDate?: string
+): Promise<any> {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-achats-du-mois`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      client_id: clientId,
+      startDate,
+      endDate
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur VBUY KPI Achats (${response.status})`);
+  }
+
+  const json = await response.json();
+  return json?.data || json;
+}
+
+/**
+ * Récupère le KPI VBUY #3 : Fournisseurs en retard de livraison
+ */
+export async function getVbuyKpiFournisseursEnRetardLivraison(
+  clientId: string = "DEMO",
+  startDate?: string,
+  endDate?: string
+): Promise<any> {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-fournisseurs-en-retard-livraison`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      client_id: clientId,
+      startDate,
+      endDate
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur VBUY KPI Fournisseurs en retard (${response.status})`);
+  }
+
+  const json = await response.json();
+  return json?.data || json;
+}
+
+/**
+ * Récupère le KPI VBUY #4 : Commandes en attente de réception
+ */
+export async function getVbuyKpiCommandesEnAttente(
+  clientId: string = "DEMO",
+  startDate?: string,
+  endDate?: string
+): Promise<any> {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-commandes-en-attente`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      client_id: clientId,
+      startDate,
+      endDate
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur VBUY KPI Commandes en attente (${response.status})`);
+  }
+
+  const json = await response.json();
+  return json?.data || json;
+}
+
+/**
+ * Récupère le KPI VBUY #5 : Répartition des dépenses par catégorie (Pie Chart)
+ */
+export async function getVbuyKpiRepartitionParCategorie(
+  clientId: string = "DEMO",
+  startDate?: string,
+  endDate?: string
+): Promise<any> {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-repartition-par-categorie`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      client_id: clientId,
+      startDate,
+      endDate
+    })
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || `Erreur VBUY KPI Répartition Catégorie (${response.status})`);
+  }
+
+  const json = await response.json();
+  return json?.data || json;
+}

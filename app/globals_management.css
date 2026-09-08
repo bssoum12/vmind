@@ -1,3 +1,27 @@
+.shell,
+.shell * {
+  cursor: default;
+  caret-color: transparent;
+}
+
+.shell input,
+.shell textarea,
+.shell select,
+.shell [contenteditable="true"] {
+  cursor: text;
+  caret-color: var(--cyan, #00E5C8);
+}
+
+.shell button,
+.shell a,
+.shell .btn,
+.shell [role="button"],
+.shell .aside-item,
+.shell .row-btn,
+.shell .filter-select {
+  cursor: pointer;
+}
+
 .shell {
   display: flex;
   height: calc(100vh - 52px);
@@ -121,28 +145,31 @@
   font-weight: 500;
 }
 
-/* â”€â”€ CONTENT â”€â”€ */
+/* ── CONTENT ── */
 .content {
   flex: 1;
-  overflow-y: hidden;
-  overflow-x: visible;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
+
 .right-panel {
   overflow-y: auto;
-  overflow-x: visible;
+  overflow-x: hidden;
 }
+
 .rp-section {
   position: relative;
   overflow: visible;
 }
-.content > div {
+
+.content>div {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  height: 100%;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 /* â”€â”€ PAGE HEADER â”€â”€ */
@@ -249,6 +276,92 @@
   border-radius: 2px;
 }
 
+.onboarding-chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 229, 200, 0.4) rgba(6, 17, 31, 0.4);
+  scroll-behavior: smooth;
+}
+
+.onboarding-chat-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.onboarding-chat-scroll::-webkit-scrollbar-track {
+  background: rgba(6, 17, 31, 0.4);
+  border-radius: 8px;
+}
+
+.onboarding-chat-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(0, 229, 200, 0.4) 0%, rgba(0, 168, 255, 0.3) 100%);
+  border-radius: 8px;
+  border: 1px solid rgba(0, 229, 200, 0.2);
+  transition: all 0.2s ease;
+}
+
+.onboarding-chat-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(0, 229, 200, 0.8) 0%, rgba(0, 168, 255, 0.7) 100%);
+  border: 1px solid rgba(0, 229, 200, 0.4);
+  box-shadow: 0 0 10px rgba(0, 229, 200, 0.5);
+}
+
+/* Custom Cyber Range Slider */
+.vmind-range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  accent-color: var(--cyan, #00E5C8);
+  caret-color: transparent !important;
+  user-select: none;
+  background: rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.vmind-range-slider::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.vmind-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: #00E5C8;
+  border: 2px solid #06111F;
+  box-shadow: 0 0 8px rgba(0, 229, 200, 0.7);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vmind-range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 14px rgba(0, 229, 200, 0.9);
+}
+
+.vmind-range-slider::-moz-range-track {
+  height: 6px;
+  border-radius: 4px;
+  background: transparent;
+}
+
+.vmind-range-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #00E5C8;
+  border: 2px solid #06111F;
+  box-shadow: 0 0 8px rgba(0, 229, 200, 0.7);
+  cursor: pointer;
+}
+
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    VIEW: MARKETPLACE
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
@@ -296,7 +409,8 @@
   transition: all 0.2s;
 }
 
-.chip:hover, .chip.on {
+.chip:hover,
+.chip.on {
   border-color: var(--cyan);
   color: var(--cyan);
   background: var(--cyana);
@@ -504,7 +618,8 @@
   z-index: 0;
 }
 
-.wstep.done::after, .wstep.active::after {
+.wstep.done::after,
+.wstep.active::after {
   background: var(--cyan);
   opacity: 0.4;
 }
@@ -1219,11 +1334,16 @@ textarea.form-input {
   display: inline-block;
 }
 
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
     transform: translateY(6px);
   }
+
   to {
     opacity: 1;
     transform: none;
@@ -1258,9 +1378,12 @@ textarea.form-input {
 }
 
 @keyframes pulse {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.3);
   }
+
   50% {
     box-shadow: 0 0 0 12px transparent;
   }

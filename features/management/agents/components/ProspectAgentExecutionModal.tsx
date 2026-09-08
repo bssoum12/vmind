@@ -26,7 +26,7 @@ export function ProspectAgentExecutionModal({ agent, onClose, onToast }: Prospec
   const [isAIEvaluating, setIsAIEvaluating] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const publicId = (agent as any).agent_id;
+  const publicId = agent.uuid || (agent as any).agent_id;
 
   const fetchStats = async () => {
     try {

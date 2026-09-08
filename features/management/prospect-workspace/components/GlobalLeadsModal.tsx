@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useProspectSocket } from '../hooks/useProspectSocket';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
+import { Database } from 'lucide-react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
@@ -158,20 +160,40 @@ export default function GlobalLeadsModal({ isOpen, agentId, onClose, onSuccess }
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.05)'
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem' }}>
-                    <div>
-                        <h2 style={{ fontSize: '1.75rem', fontWeight: 800, background: 'linear-gradient(135deg, #e0e7ff, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                            <span style={{ fontSize: '1.5rem' }}>✨</span> Base de Prospects Globale
-                        </h2>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.5rem', fontWeight: 500 }}>
-                            Sélectionnez les prospects existants de votre base pour les assigner à cet agent.
-                        </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <div style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 12,
+                            background: 'rgba(129, 140, 248, 0.12)',
+                            border: '1px solid rgba(129, 140, 248, 0.3)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#818cf8',
+                            flexShrink: 0
+                        }}>
+                            <Database size={22} />
+                        </div>
+                        <div>
+                            <h2 style={{ fontSize: '1.75rem', fontWeight: 800, background: 'linear-gradient(135deg, #e0e7ff, #818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', margin: 0 }}>
+                                Base de Prospects Globale
+                            </h2>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.25rem', fontWeight: 500, margin: 0 }}>
+                                Sélectionnez les prospects existants de votre base pour les assigner à cet agent.
+                            </p>
+                        </div>
                     </div>
-                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '1.25rem', cursor: 'pointer', transition: 'all 0.2s ease' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'white'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'var(--text-muted)'; }}>✕</button>
+                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', cursor: 'pointer', transition: 'all 0.2s ease' }} onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'white'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'var(--text-muted)'; }}>
+                        <CyberIcon name="close" size={16} />
+                    </button>
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                     <div style={{ flex: 2, position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>🔍</span>
+                        <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
+                            <CyberIcon name="search" size={15} color="var(--text-muted)" />
+                        </span>
                         <input
                             type="text"
                             placeholder="Rechercher par nom, entreprise, email..."
@@ -290,8 +312,9 @@ export default function GlobalLeadsModal({ isOpen, agentId, onClose, onSuccess }
                                         </td>
                                         <td style={{ padding: '1rem' }}>
                                             {lead.has_access ? (
-                                                <span style={{ padding: '0.3rem 0.6rem', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '6px', fontSize: '0.8rem', color: '#34d399', fontWeight: 600 }}>
-                                                    ✓ Déjà assigné
+                                                <span style={{ padding: '0.3rem 0.6rem', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '6px', fontSize: '0.8rem', color: '#34d399', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                                                    <CyberIcon name="check" size={12} color="#34d399" />
+                                                    <span>Déjà assigné</span>
                                                 </span>
                                             ) : (
                                                 <span style={{ padding: '0.3rem 0.6rem', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.2)', borderRadius: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -311,9 +334,10 @@ export default function GlobalLeadsModal({ isOpen, agentId, onClose, onSuccess }
                         className="btn btn-secondary"
                         disabled={page === 1}
                         onClick={() => setPage(p => Math.max(1, p - 1))}
-                        style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: page === 1 ? 'rgba(255,255,255,0.2)' : 'white', cursor: page === 1 ? 'not-allowed' : 'pointer' }}
+                        style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: page === 1 ? 'rgba(255,255,255,0.2)' : 'white', cursor: page === 1 ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                     >
-                        ← Précédent
+                        <CyberIcon name="arrow-right" size={13} style={{ transform: 'rotate(180deg)' }} />
+                        <span>Précédent</span>
                     </button>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <span style={{ padding: '0.6rem 1.2rem', background: 'rgba(99, 102, 241, 0.1)', color: '#818cf8', borderRadius: '8px', fontWeight: 600, border: '1px solid rgba(99, 102, 241, 0.2)' }}>
@@ -324,9 +348,10 @@ export default function GlobalLeadsModal({ isOpen, agentId, onClose, onSuccess }
                         className="btn btn-secondary"
                         disabled={page >= totalPages}
                         onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                        style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: page >= totalPages ? 'rgba(255,255,255,0.2)' : 'white', cursor: page >= totalPages ? 'not-allowed' : 'pointer' }}
+                        style={{ padding: '0.6rem 1.2rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: page >= totalPages ? 'rgba(255,255,255,0.2)' : 'white', cursor: page >= totalPages ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                     >
-                        Suivant →
+                        <span>Suivant</span>
+                        <CyberIcon name="arrow-right" size={13} />
                     </button>
                 </div>
             </div>
