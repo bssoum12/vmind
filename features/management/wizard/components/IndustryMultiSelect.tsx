@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, X, Check } from 'lucide-react';
-import { INDUSTRIES } from '@/shared/constants/industries';
+import { useIcpOptions } from '../hooks/useIcpOptions';
 
 interface IndustryMultiSelectProps {
   selectedIndustries: string[];
@@ -60,10 +60,12 @@ export const IndustryMultiSelect: React.FC<IndustryMultiSelectProps> = ({
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '');
 
+  const { industries } = useIcpOptions();
+
   const allAvailableIndustries = useMemo(() => {
-    const withoutSpecial = INDUSTRIES.filter((i: string) => i !== ALL_INDUSTRIES_OPTION);
+    const withoutSpecial = industries.filter((i: string) => i !== ALL_INDUSTRIES_OPTION);
     return [ALL_INDUSTRIES_OPTION, ...withoutSpecial];
-  }, []);
+  }, [industries]);
 
   const filteredIndustries = useMemo(() => {
     if (!searchTerm.trim()) return allAvailableIndustries;

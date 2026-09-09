@@ -347,12 +347,19 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
   const validateAndNext = async (nextStep: number) => {
     if (step === 1 && nextStep === 2) {
       if (!formData.agent_name.trim()) {
-        alert("Veuillez saisir un nom pour l'agent.");
+        showToast("Veuillez saisir un nom pour l'agent.", "err");
         return;
       }
+
+      const currentOriginalName = agentToEdit?.agent_name || agentToEdit?.nom;
+      if (isEditMode && currentOriginalName && currentOriginalName.trim().toLowerCase() === formData.agent_name.trim().toLowerCase()) {
+        setStep(nextStep);
+        return;
+      }
+
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-        const endpoint = `${baseUrl}/api/sourcing-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (editUuid ? `?excludeUuid=${encodeURIComponent(String(editUuid))}` : '');
+        const endpoint = `${baseUrl}/api/sourcing-agent/check-name/${encodeURIComponent(formData.agent_name.trim())}` + (editUuid ? `?excludeUuid=${encodeURIComponent(String(editUuid))}` : '');
 
         const token = localStorage.getItem('vmind_session');
         const res = await fetch(endpoint, {

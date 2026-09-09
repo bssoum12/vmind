@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, X, Check, Plus } from 'lucide-react';
-import { JOB_TITLES } from '@/shared/constants/jobTitles';
+import { useIcpOptions } from '../hooks/useIcpOptions';
 
 interface JobTitleMultiSelectProps {
   selectedJobTitles: string[];
@@ -61,10 +61,12 @@ export const JobTitleMultiSelect: React.FC<JobTitleMultiSelectProps> = ({
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '');
 
+  const { jobTitles } = useIcpOptions();
+
   const allAvailableTitles = useMemo(() => {
-    const withoutSpecial = JOB_TITLES.filter((t: string) => t !== ALL_JOB_TITLES_OPTION && t !== DECISION_MAKER_SPECIAL_TITLE);
+    const withoutSpecial = jobTitles.filter((t: string) => t !== ALL_JOB_TITLES_OPTION && t !== DECISION_MAKER_SPECIAL_TITLE);
     return [ALL_JOB_TITLES_OPTION, DECISION_MAKER_SPECIAL_TITLE, ...withoutSpecial];
-  }, []);
+  }, [jobTitles]);
 
   const filteredJobTitles = useMemo(() => {
     if (!searchTerm.trim()) return allAvailableTitles;

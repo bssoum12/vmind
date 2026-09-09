@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useMode } from '@/shared/contexts/ModeContext';
 import { jwtDecode } from 'jwt-decode';
@@ -153,7 +153,7 @@ function UnauthorizedView({ onBackToLogin, onBackToDashboard }: { onBackToLogin:
   );
 }
 
-export default function Home() {
+function HomeContent() {
   const { mode, setMode } = useMode();
   const [isMounted, setIsMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -475,5 +475,34 @@ export default function Home() {
       </div>
       <GlobalMaxRemindersPopup />
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        position: 'fixed', inset: 0,
+        backgroundColor: '#050B16',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 99999
+      }}>
+        <div className="spinner" style={{
+          width: '40px', height: '40px',
+          border: '2px solid rgba(0, 229, 200, 0.1)',
+          borderTopColor: '#00E5C8',
+          borderRadius: '50%',
+          animation: 'spinRing 1s linear infinite'
+        }} />
+        <style jsx global>{`
+          @keyframes spinRing {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
   );
 }

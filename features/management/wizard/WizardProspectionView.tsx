@@ -285,6 +285,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     workflow_timezone: string;
     prospection_config: {
       agent_mission: string;
+      signature_logo?: any;
       icp: {
         secteur_activite: string[];
         taille_min: number | null;
@@ -310,12 +311,19 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
   const [formData, setFormData] = useState<ProspectFormData>(() => {
     if (isEditMode && agentToEdit && agentToEdit.config) {
       const cfg = agentToEdit.config;
+      let initialSignature = cfg.signature_email || '';
+      const logoData = cfg.signature_logo || agentToEdit.signature_logo;
+      if (initialSignature && logoData?.data && initialSignature.includes('cid:signature_logo')) {
+        const dataUri = `data:${logoData.mimeType || 'image/png'};base64,${logoData.data}`;
+        initialSignature = initialSignature.replace(/src=["']cid:signature_logo["']/g, `src="${dataUri}"`);
+      }
       return {
         agent_name: agentToEdit.agent_name || 'Agent de Prospection',
         run_mode: agentToEdit.run_mode || 'prospection',
         workflow_timezone: agentToEdit.workflow_timezone || 'Africa/Tunis',
         prospection_config: {
           agent_mission: cfg.agent_mission || '',
+          signature_logo: logoData || null,
           icp: {
             secteur_activite: cfg.icp?.secteur_activite || [],
             taille_min: cfg.icp?.taille_min !== undefined ? cfg.icp.taille_min : null,
@@ -329,7 +337,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
             poids_pays: cfg.icp?.poids_pays ?? 25
           },
           campaign: {
-            signature_email: cfg.signature_email || '',
+            signature_email: initialSignature,
             default_cc: cfg.default_cc || '',
             delai_envois: cfg.delai_envois ?? 30,
             email_recap: cfg.email_recap || ''
@@ -527,9 +535,16 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
         alert("Veuillez saisir un nom pour l'agent.");
         return;
       }
+
+      const currentOriginalName = agentToEdit?.agent_name || agentToEdit?.nom;
+      if (isEditMode && currentOriginalName && currentOriginalName.trim().toLowerCase() === formData.agent_name.trim().toLowerCase()) {
+        setStep(nextStep);
+        return;
+      }
+
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (editUuid ? `?excludeUuid=${encodeURIComponent(String(editUuid))}` : '');
+        const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name.trim())}` + (editUuid ? `?excludeUuid=${encodeURIComponent(String(editUuid))}` : '');
 
         const token = localStorage.getItem('vmind_session');
         const res = await fetch(endpoint, {
@@ -624,22 +639,26 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       const editUuid = agentToEdit?.uuid || agentToEdit?.agent_id;
-      const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name)}` + (editUuid ? `?excludeUuid=${editUuid}` : '');
+      const currentOriginalName = agentToEdit?.agent_name || agentToEdit?.nom;
 
-      const token = localStorage.getItem('vmind_session');
-      const res = await fetch(endpoint, {
-        headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
-      });
+      if (!editUuid || !currentOriginalName || currentOriginalName.trim().toLowerCase() !== formData.agent_name.trim().toLowerCase()) {
+        const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name.trim())}` + (editUuid ? `?excludeUuid=${encodeURIComponent(String(editUuid))}` : '');
 
-      if (!res.ok) {
-        throw new Error("Erreur serveur lors de la vérification du nom.");
-      }
+        const token = localStorage.getItem('vmind_session');
+        const res = await fetch(endpoint, {
+          headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+        });
 
-      const data = await res.json();
-      if (!data.available) {
-        alert("Un agent avec ce nom existe déjà. Veuillez choisir un autre nom.");
-        if (step !== 1) setStep(1);
-        return;
+        if (!res.ok) {
+          throw new Error("Erreur serveur lors de la vérification du nom.");
+        }
+
+        const data = await res.json();
+        if (!data.available) {
+          alert("Un agent avec ce nom existe déjà. Veuillez choisir un autre nom.");
+          if (step !== 1) setStep(1);
+          return;
+        }
       }
     } catch (err) {
       console.error("Failed to check agent name", err);
