@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, X, Check } from 'lucide-react';
-import { COUNTRIES, Country } from '@/shared/constants/countries';
+import { Country } from '@/shared/constants/countries';
+import { useIcpOptions } from '../hooks/useIcpOptions';
 
 interface CountryMultiSelectProps {
   selectedCountries: string[];
@@ -60,9 +61,11 @@ export const CountryMultiSelect: React.FC<CountryMultiSelectProps> = ({
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '');
 
+  const { countries } = useIcpOptions();
+
   const allAvailableCountries = useMemo(() => {
-    return [{ name: ALL_ZONES_OPTION, code: 'GLOBAL' } as Country, ...COUNTRIES];
-  }, []);
+    return [{ name: ALL_ZONES_OPTION, code: 'GLOBAL' } as Country, ...countries];
+  }, [countries]);
 
   const filteredCountries = useMemo(() => {
     if (!searchTerm.trim()) return allAvailableCountries;
