@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { StatusDot } from '../../components/ui/StatusDot';
 import { useClock } from '../../shared/hooks/useClock';
 import { useMode } from '@/shared/contexts/ModeContext';
@@ -8,6 +9,7 @@ import { jwtDecode } from 'jwt-decode';
 import { LogOut, User } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
+  const pathname = usePathname();
   const clock = useClock();
   const { mode, setMode } = useMode();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -93,6 +95,9 @@ export const TopBar: React.FC = () => {
     setMode('MANAGEMENT');
     window.dispatchEvent(new CustomEvent('switch-management-view', { detail: 'profile' }));
   };
+
+  // Hide TopBar on the login page
+  if (pathname === '/login') return null;
 
   return (
     <div className="topbar">
