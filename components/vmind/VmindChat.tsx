@@ -339,15 +339,24 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   ]);
 
   useEffect(() => {
-    // Initialisation du message et de l'heure de bienvenue uniquement côté client
-    setMessages(prev => prev.map(m =>
-      m.id === 'init-1' ? { 
-        ...m, 
+    // Initialisation du message et de l'heure de bienvenue selon l'agent actif
+    if (!activeConversationId) {
+      setMessages([{ 
+        id: 'init-1', 
+        sender: 'vm', 
         text: getWelcomeMessage(),
         time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) 
-      } : m
-    ));
-  }, [activeAgentId]);
+      }]);
+    } else {
+      setMessages(prev => prev.map(m =>
+        m.id === 'init-1' ? { 
+          ...m, 
+          text: getWelcomeMessage(),
+          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) 
+        } : m
+      ));
+    }
+  }, [activeAgentId, activeConversationId]);
 
   useEffect(() => {
     if (initialPrompt) {

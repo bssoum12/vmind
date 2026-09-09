@@ -228,6 +228,28 @@ export async function getAgents(): Promise<any[]> {
   return data.agents || [];
 }
 
+export interface MarketplaceStatsResponse {
+  ok: boolean;
+  templateDeployments: Record<string, number>;
+  sidebarStats: {
+    executionsToday: number;
+    activeAgentsCount: number;
+    successRate: number;
+  };
+}
+
+export async function getMarketplaceStats(): Promise<MarketplaceStatsResponse> {
+  try {
+    const res = await fetch(`${getBaseUrl()}/api/analytics/marketplace-stats`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
+    return res.json();
+  } catch (_) {
+    return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
+  }
+}
+
 /**
  * Pauses an agent — removes its QStash schedule but keeps config in Redis
  */
@@ -240,7 +262,11 @@ export async function pauseAgent(agentName: string): Promise<any> {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Erreur lors de la mise en pause de l'agent (${res.status})`);
   }
-  return res.json();
+  const result = await res.json();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
+  }
+  return result;
 }
 
 /**
@@ -256,7 +282,11 @@ export async function resumeAgent(agentName: string, params?: any): Promise<any>
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Erreur lors de la reprise de l'agent (${res.status})`);
   }
-  return res.json();
+  const result = await res.json();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
+  }
+  return result;
 }
 
 /**
@@ -271,7 +301,11 @@ export async function deleteAgent(agentName: string): Promise<any> {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Erreur lors de la suppression de l'agent (${res.status})`);
   }
-  return res.json();
+  const result = await res.json();
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
+  }
+  return result;
 }
 
 /**
