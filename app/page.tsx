@@ -245,7 +245,6 @@ function HomeContent() {
   // Management Mode State
 
   const searchParams = useSearchParams();
-  const hasInitializedFromUrl = React.useRef(false);
 
   const [currentView, setCurrentView] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -254,27 +253,41 @@ function HomeContent() {
     return 'market';
   });
 
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('vmind_wizard_template') || null;
+    }
+    return null;
+  });
+
   useEffect(() => {
-    if (!searchParams || hasInitializedFromUrl.current) return;
+    if (!searchParams) return;
     const viewParam = searchParams.get('view');
     const modeParam = searchParams.get('mode');
+    const templateParam = searchParams.get('template');
 
-    if (viewParam || modeParam) {
-      hasInitializedFromUrl.current = true;
-    }
-
-    if (modeParam === 'management' || modeParam === 'MANAGEMENT' || viewParam) {
+    if (modeParam === 'management' || modeParam === 'MANAGEMENT' || viewParam || templateParam) {
       setMode('MANAGEMENT');
-      if (viewParam) {
-        setCurrentView(viewParam);
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('vmind_current_view', viewParam);
-          sessionStorage.setItem('vmind_mode', 'MANAGEMENT');
-          localStorage.setItem('vmind_mode', 'MANAGEMENT');
-        }
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('vmind_mode', 'MANAGEMENT');
+        localStorage.setItem('vmind_mode', 'MANAGEMENT');
       }
     } else if (modeParam === 'assistant' || modeParam === 'ASSISTANT') {
       setMode('ASSISTANT');
+    }
+
+    if (viewParam) {
+      setCurrentView(viewParam);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('vmind_current_view', viewParam);
+      }
+    }
+
+    if (templateParam) {
+      setSelectedTemplate(templateParam);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('vmind_wizard_template', templateParam);
+      }
     }
   }, [searchParams, setMode]);
 
@@ -290,7 +303,6 @@ function HomeContent() {
     return () => window.removeEventListener('switch-management-view', handleSwitchManagementView);
   }, [setMode]);
 
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('all');
 
   const handleNavigate = (view: string) => {
@@ -325,6 +337,10 @@ function HomeContent() {
     setEditingAgent(agent || null);
     setInitialWizardStep(initialStep);
     setCurrentView('wizard');
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('vmind_current_view', 'wizard');
+      sessionStorage.setItem('vmind_wizard_template', templateId);
+    }
   };
 
   const handleCancelWizard = () => {
@@ -332,6 +348,8 @@ function HomeContent() {
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('vmind_editing_agent');
       sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
+      sessionStorage.removeItem('vmind_wizard_template');
+      sessionStorage.removeItem('vmind_sourcing_target_agent');
     }
     setCurrentView(hasPostDeploy ? 'agents' : 'market');
     setSelectedTemplate(null);

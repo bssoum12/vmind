@@ -5,6 +5,8 @@ import { LiveAgent } from '../AgentsView';
 import { OnboardingChat } from '../../wizard/components/OnboardingChat';
 import { VMindGuide } from '@/shared/management/components/VMindGuide';
 import { triggerSourcingRun } from '@/shared/api/n8n-api';
+import { extractIcpFromAgent, buildSourcingConclusionFromIcp } from '../../wizard/helpers/sourcingIcpHelper';
+import { useProspectSocket } from '../../prospect-workspace/hooks/useProspectSocket';
 
 interface SourcingAgentExecutionModalProps {
   agent: LiveAgent;
@@ -31,17 +33,37 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
   const [leadsToFind, setLeadsToFind] = useState<number>(50);
   const [leadsPerCompany, setLeadsPerCompany] = useState<number>(2);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [liveIsExecuting, setLiveIsExecuting] = useState<boolean>(() => !!agent?.is_executing);
+
+  useProspectSocket((payload) => {
+    if (typeof payload.is_executing === 'boolean' && (payload.agent_id || payload.uuid)) {
+      const targetId = String(payload.uuid || payload.agent_id || '').toLowerCase();
+      const aUuid = String(agent.uuid || '').toLowerCase();
+      const aAgentId = String(agent.agent_id || '').toLowerCase();
+      const aName = String(agent.agent_name || (agent as any).nom || '').toLowerCase();
+
+      if (targetId === aUuid || targetId === aAgentId || targetId === aName) {
+        setLiveIsExecuting(payload.is_executing);
+      }
+    }
+  });
 
   const [availableProspectAgents, setAvailableProspectAgents] = useState<any[]>([]);
+  const [isLoadingProspects, setIsLoadingProspects] = useState<boolean>(true);
   const [isCustomizingTargets, setIsCustomizingTargets] = useState(false);
   const [selectedTargetAgentIds, setSelectedTargetAgentIds] = useState<string[]>(() => {
     const rawIds = agent?.config?.target_agent_ids || (agent as any)?.target_agent_ids || [];
     return Array.isArray(rawIds) ? rawIds.map(id => String(id)) : [];
   });
 
+  const autoConcludedRef = React.useRef(false);
+  const userModifiedChatRef = React.useRef(false);
+
   React.useEffect(() => {
+    let isMounted = true;
     const fetchProspectAgents = async () => {
       try {
+        setIsLoadingProspects(true);
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
         const tokenStr = localStorage.getItem('vmind_session');
         let token = tokenStr;
@@ -51,7 +73,7 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
         const res = await fetch(`${baseUrl}/api/list-agents`, {
           headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
         });
-        if (res.ok) {
+        if (res.ok && isMounted) {
           const data = await res.json();
           if (data.ok && Array.isArray(data.agents)) {
             setAvailableProspectAgents(data.agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement')));
@@ -59,9 +81,14 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
         }
       } catch (err) {
         console.error("Failed to fetch prospect agents:", err);
+      } finally {
+        if (isMounted) {
+          setIsLoadingProspects(false);
+        }
       }
     };
     fetchProspectAgents();
+    return () => { isMounted = false; };
   }, []);
 
   const getAgentTargetId = (pa: any): string => {
@@ -81,6 +108,39 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
     });
   };
 
+  // Auto-conclude targeting from target Prospect Agent's ICP when exactly 1 target agent is selected
+  React.useEffect(() => {
+    if (userModifiedChatRef.current) return;
+
+    if (selectedTargetAgentIds.length === 1 && availableProspectAgents.length > 0) {
+      const targetId = selectedTargetAgentIds[0].toLowerCase();
+      const targetAgent = availableProspectAgents.find((pa: any) => {
+        const paUuid = String(pa.uuid || '').toLowerCase();
+        const paAgentId = String(pa.agent_id || '').toLowerCase();
+        const paName = String(pa.agent_name || pa.nom || '').toLowerCase();
+        return (paUuid && paUuid === targetId) || (paAgentId && paAgentId === targetId) || (paName && paName === targetId);
+      });
+
+      if (targetAgent) {
+        const icp = extractIcpFromAgent(targetAgent);
+        if (icp) {
+          const autoConclusion = buildSourcingConclusionFromIcp(icp);
+          if (autoConclusion) {
+            setSourcingSummary(autoConclusion);
+            autoConcludedRef.current = true;
+            return;
+          }
+        }
+      }
+    }
+
+    // If more than 1 target agent is selected (or 0) and we previously auto-concluded, revert to open chat or saved mission
+    if (selectedTargetAgentIds.length !== 1 && autoConcludedRef.current) {
+      setSourcingSummary(savedMission || '');
+      autoConcludedRef.current = false;
+    }
+  }, [selectedTargetAgentIds, availableProspectAgents, savedMission]);
+
   React.useEffect(() => {
     const mission = (
       agent?.config?.agent_mission || 
@@ -89,7 +149,7 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
       (agent as any)?.agentSettings?.agent_mission || 
       ''
     ).trim();
-    if (mission && !sourcingSummary) {
+    if (mission && !sourcingSummary && !autoConcludedRef.current) {
       setSourcingSummary(mission);
     }
   }, [agent]);
@@ -117,6 +177,11 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
   };
 
   const handleExecute = async () => {
+    if (isExecuting || liveIsExecuting || !!agent?.is_executing) {
+      onToast("Cet agent est déjà en cours d'exécution. Veuillez patienter...", "err");
+      return;
+    }
+
     // Validate inputs
     if (!hideTargetAgentsSelection && (!selectedTargetAgentIds || selectedTargetAgentIds.length === 0)) {
       onToast("Veuillez sélectionner au moins un Target Agent pour recevoir les leads.", "err");
@@ -226,12 +291,22 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                 </div>
 
                 <div style={{ height: '480px', flex: 1 }}>
-                  <OnboardingChat
-                    key={`${agent?.uuid || agent?.agent_name}_${sourcingSummary ? 'with_mission' : 'empty'}`}
-                    initialMission={sourcingSummary}
-                    onConfirm={handleChatConfirm}
-                    apiEndpoint="/api/sourcing-agent/execution-chat"
-                  />
+                  {isLoadingProspects && !sourcingSummary ? (
+                    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'var(--navy2)', borderRadius: 12, border: '1px solid var(--border)' }}>
+                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
+                        <Search size={24} color="var(--cyan)" />
+                      </motion.div>
+                      <span style={{ fontSize: 13, color: 'var(--muted)' }}>Synchronisation des paramètres du profil cible...</span>
+                    </div>
+                  ) : (
+                    <OnboardingChat
+                      key={`${agent?.uuid || agent?.agent_name}_${selectedTargetAgentIds.join('_')}_${sourcingSummary ? 'with_mission' : 'empty'}`}
+                      initialMission={sourcingSummary}
+                      onConfirm={handleChatConfirm}
+                      onModify={() => { userModifiedChatRef.current = true; }}
+                      apiEndpoint="/api/sourcing-agent/execution-chat"
+                    />
+                  )}
                 </div>
               </motion.div>
             )}
@@ -500,37 +575,39 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
 
                 <div style={{ marginTop: 24 }}>
                   {(() => {
+                    const isCurrentlyExecuting = isExecuting || liveIsExecuting || !!agent?.is_executing;
                     const isTargetMissing = !hideTargetAgentsSelection && selectedTargetAgentIds.length === 0;
+                    const isDisabled = isCurrentlyExecuting || isTargetMissing;
                     return (
                       <button
                         onClick={handleExecute}
-                        disabled={isExecuting || isTargetMissing}
+                        disabled={isDisabled}
                         className="btn"
                         style={{
                           width: '100%',
-                          background: isTargetMissing ? 'rgba(255, 255, 255, 0.1)' : 'var(--cyan)',
-                          color: isTargetMissing ? 'var(--muted)' : '#000',
+                          background: isDisabled ? 'rgba(255, 255, 255, 0.1)' : 'var(--cyan)',
+                          color: isDisabled ? 'var(--muted)' : '#000',
                           border: 'none',
                           padding: '16px',
                           borderRadius: 12,
                           fontSize: 15,
                           fontWeight: 600,
-                          cursor: isExecuting || isTargetMissing ? 'not-allowed' : 'pointer',
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: 12,
                           transition: 'all 0.2s',
-                          opacity: isExecuting || isTargetMissing ? 0.6 : 1,
-                          boxShadow: isTargetMissing ? 'none' : '0 4px 12px rgba(0, 229, 200, 0.2)'
+                          opacity: isDisabled ? 0.6 : 1,
+                          boxShadow: isDisabled ? 'none' : '0 4px 12px rgba(0, 229, 200, 0.2)'
                         }}
                       >
-                        {isExecuting ? (
+                        {isCurrentlyExecuting ? (
                           <>
                             <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
                               <Database size={20} />
                             </motion.div>
-                            Lancement de la recherche...
+                            Recherche en cours d'exécution...
                           </>
                         ) : isTargetMissing ? (
                           <>

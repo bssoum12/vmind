@@ -12,7 +12,6 @@ import {
   Download, 
   RefreshCw, 
   Sparkles, 
-  ShieldCheck, 
   Target, 
   Copy, 
   Check, 
@@ -66,9 +65,8 @@ export default function LeadsView({ leads, onOpenLead, onRefresh }: LeadsViewPro
     ).length;
     
     const uniqueCompanies = new Set(leads.map(l => (l.entreprise || '').trim().toLowerCase()).filter(Boolean)).size;
-    const qualified = leads.filter(l => l.est_qualifie === true || l.statut === 'Qualifié' || (l.score ?? 0) >= 70).length;
 
-    return { total, decisionMakers, uniqueCompanies, qualified };
+    return { total, decisionMakers, uniqueCompanies };
   }, [leads]);
 
   const filteredLeads = useMemo(() => {
@@ -229,7 +227,7 @@ export default function LeadsView({ leads, onOpenLead, onRefresh }: LeadsViewPro
       {/* 2. SOURCING KPI TELEMETRY CARDS */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
         gap: '14px',
         marginBottom: '24px'
       }}>
@@ -364,51 +362,6 @@ export default function LeadsView({ leads, onOpenLead, onRefresh }: LeadsViewPro
             </div>
             <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#F0F4F8', lineHeight: 1.2 }}>
               {stats.uniqueCompanies}
-            </div>
-          </div>
-        </div>
-
-        {/* Pre-Qualified / Auto-Qualified */}
-        <div style={{
-          position: 'relative',
-          background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.85) 0%, rgba(12, 28, 52, 0.6) 100%)',
-          backdropFilter: 'blur(16px)',
-          border: '1px solid rgba(255, 255, 255, 0.08)',
-          borderRadius: '14px',
-          padding: '16px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-          overflow: 'hidden'
-        }}>
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: '15%',
-            right: '15%',
-            height: '1px',
-            background: 'linear-gradient(90deg, transparent, #A855F7, transparent)',
-            opacity: 0.4
-          }} />
-          <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '10px',
-            background: 'rgba(168, 85, 247, 0.1)',
-            border: '1px solid rgba(168, 85, 247, 0.25)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#A855F7'
-          }}>
-            <ShieldCheck size={20} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
-              Auto-Qualifiés
-            </div>
-            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#F0F4F8', lineHeight: 1.2 }}>
-              {stats.qualified} <span style={{ fontSize: '0.8rem', color: '#00E5A0', fontWeight: 500 }}>(100%)</span>
             </div>
           </div>
         </div>

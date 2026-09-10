@@ -401,7 +401,7 @@ export default function AgentWorkspacePage() {
         ) : (
           <div style={{ padding: '2.5rem', maxWidth: '1600px', margin: '0 auto' }}>
             {activeTab === 'dashboard' && <DashboardView leads={leads} campaigns={campaigns} threshold={60} agent={agentData} />}
-            {activeTab === 'leads' && <LeadsView leads={leads} threshold={60} onOpenLead={handleOpenLead} onRefresh={fetchData} isNavTutorialActive={navTutorialStep > 0} />}
+            {activeTab === 'leads' && <LeadsView leads={leads} threshold={60} onOpenLead={handleOpenLead} onRefresh={fetchData} isNavTutorialActive={navTutorialStep > 0} agent={agentData} />}
             {activeTab === 'outbox' && <CampaignsView campaigns={campaigns} onRefresh={fetchData} defaultCc="" onOpenLeadById={handleOpenLeadById} />}
             {activeTab === 'logs' && <LogsView logs={logs} />}
           </div>

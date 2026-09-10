@@ -22,6 +22,7 @@ import { ProspectAgentExecutionModal } from './components/ProspectAgentExecution
 import { SourcingAgentExecutionModal } from './components/SourcingAgentExecutionModal';
 import { ProspectAgentScheduleModal } from './components/ProspectAgentScheduleModal';
 import { SourcingAgentScheduleModal } from './components/SourcingAgentScheduleModal';
+import { DeleteAgentConfirmModal } from './components/DeleteAgentConfirmModal';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
 import { useToast } from '@/shared/contexts/ToastContext';
 
@@ -359,6 +360,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   // Auto Mode Modal State
   const [runModalAgent, setRunModalAgent] = useState<LiveAgent | null>(null);
   const [scheduleModalAgent, setScheduleModalAgent] = useState<LiveAgent | null>(null);
+  const [deleteModalAgent, setDeleteModalAgent] = useState<LiveAgent | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   // Tutorial state
   const [tutorialStep, setTutorialStep] = useState<number>(0);
@@ -628,22 +631,34 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     }
   };
 
-  const handleDelete = async (agent: LiveAgent) => {
-    if (!window.confirm(`Supprimer définitivement "${agent.agent_name}" ?`)) return;
-    setActionLoading(agent.agent_name);
+  const handleDelete = (agent: LiveAgent) => {
+    setDeleteModalAgent(agent);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteModalAgent) return;
+    setIsDeleting(true);
+    setActionLoading(deleteModalAgent.agent_name);
     try {
-      await deleteAgent(agent.agent_name);
-      showToast(`Agent "${agent.agent_name}" supprimé.`);
-      if (selected?.agent_name === agent.agent_name) setSelected(null);
+      await deleteAgent(deleteModalAgent.agent_name);
+      showToast(`Agent "${deleteModalAgent.agent_name}" supprimé avec succès.`);
+      if (selected?.agent_name === deleteModalAgent.agent_name) setSelected(null);
+      setDeleteModalAgent(null);
       await refresh();
     } catch (e: any) {
       showToast(e.message, 'err');
     } finally {
+      setIsDeleting(false);
       setActionLoading(null);
     }
   };
 
   const handleRunNow = async (agent: LiveAgent) => {
+    if (agent.is_executing) {
+      showToast("Cet agent est déjà en cours d'exécution.", 'err');
+      return;
+    }
+
     if (agent.run_mode === 'prospection' || agent.run_mode === 'sourcing') {
       const publicId = (agent as any).agent_id;
       if (!publicId) {
@@ -1219,11 +1234,16 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
             <div style={{ marginTop: 20, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 className="btn"
-                style={{ flex: 1, fontSize: 12 }}
+                style={{
+                  flex: 1,
+                  fontSize: 12,
+                  opacity: selected.is_executing ? 0.5 : 1,
+                  cursor: selected.is_executing ? 'not-allowed' : 'pointer'
+                }}
                 onClick={() => handleRunNow(selected)}
-                disabled={actionLoading === selected.agent_name}
+                disabled={actionLoading === selected.agent_name || !!selected.is_executing}
               >
-                ▶ Exécuter maintenant
+                {selected.is_executing ? '⚡ En cours...' : '▶ Exécuter maintenant'}
               </button>
               <button
                 className="row-btn"
@@ -1348,6 +1368,15 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           }}
         />
       )}
+
+      {/* ── DELETE CONFIRMATION MODAL ── */}
+      <DeleteAgentConfirmModal
+        isOpen={!!deleteModalAgent}
+        agent={deleteModalAgent}
+        onClose={() => setDeleteModalAgent(null)}
+        onConfirm={handleConfirmDelete}
+        isDeleting={isDeleting}
+      />
 
     </div>
   );

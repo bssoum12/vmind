@@ -13,9 +13,10 @@ interface OnboardingChatProps {
   initialMission: string;
   onConfirm: (mission: string) => void;
   apiEndpoint?: string;
+  onModify?: () => void;
 }
 
-export function OnboardingChat({ initialMission, onConfirm, apiEndpoint }: OnboardingChatProps) {
+export function OnboardingChat({ initialMission, onConfirm, apiEndpoint, onModify }: OnboardingChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -116,6 +117,7 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint }: Onboa
 
   const handleModifyClick = () => {
     setSummary(null);
+    onModify?.();
     const modifyPrompt = "Bien sûr ! Quels éléments souhaitez-vous modifier ou affiner dans ce ciblage ? (Ex : pays/région, secteur d'activité, intitulé du poste, département, seniorité ou rôle de décideur)";
     setMessages(prev => [
       ...prev,

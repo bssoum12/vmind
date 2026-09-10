@@ -408,7 +408,7 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
                 onClick={handleSendEmail}
                 disabled={isSending}
               >
-                {isSending ? 'Envoi...' : '✉ Ouvrir & Envoyer'}
+                {isSending ? 'Envoi...' : '✉ Envoyer'}
               </button>
             </div>
 

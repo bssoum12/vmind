@@ -209,6 +209,14 @@ export default function LeadDetailDrawer({
         }, 3500);
       }
     }
+
+    // 3. Email sent trigger
+    if (payload.table === 'prospect_agent_emails_envoyes') {
+      const targetLeadId = payload.new?.lead_id || payload.old?.lead_id;
+      if (!targetLeadId || targetLeadId === lead.id) {
+        onRefresh();
+      }
+    }
   });
 
   useEffect(() => {
@@ -1223,17 +1231,22 @@ export default function LeadDetailDrawer({
               <div style={{ background: 'rgba(6, 17, 31, 0.6)', padding: '10px 12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ fontSize: '0.72rem', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Emails Déjà Envoyés</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{
-                    background: (lead.emails_count && lead.emails_count > 0) ? 'rgba(0, 229, 200, 0.15)' : 'rgba(255,255,255,0.06)',
-                    color: (lead.emails_count && lead.emails_count > 0) ? '#00E5C8' : '#94A3B8',
-                    border: `1px solid ${(lead.emails_count && lead.emails_count > 0) ? 'rgba(0, 229, 200, 0.35)' : 'rgba(255,255,255,0.1)'}`,
-                    padding: '2px 8px',
-                    borderRadius: '12px',
-                    fontWeight: 700,
-                    fontSize: '0.8rem'
-                  }}>
-                    {lead.emails_count || 0}
-                  </span>
+                  {(() => {
+                    const sentCount = lead.agent_emails_count ?? lead.emails_count ?? 0;
+                    return (
+                      <span style={{
+                        background: sentCount > 0 ? 'rgba(0, 229, 200, 0.15)' : 'rgba(255,255,255,0.06)',
+                        color: sentCount > 0 ? '#00E5C8' : '#94A3B8',
+                        border: `1px solid ${sentCount > 0 ? 'rgba(0, 229, 200, 0.35)' : 'rgba(255,255,255,0.1)'}`,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        fontWeight: 700,
+                        fontSize: '0.8rem'
+                      }}>
+                        {sentCount}
+                      </span>
+                    );
+                  })()}
                   <span style={{ fontSize: '0.78rem', color: '#94A3B8' }}>délivré(s)</span>
                 </div>
               </div>
