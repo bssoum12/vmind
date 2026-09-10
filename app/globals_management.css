@@ -374,10 +374,13 @@
   border-radius: 10px;
   padding: 10px 16px;
   margin-bottom: 24px;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .market-search input {
   flex: 1;
+  min-width: 140px;
   background: transparent;
   border: none;
   outline: none;
@@ -437,9 +440,21 @@
 
 .agent-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   margin-bottom: 28px;
+}
+
+@media (max-width: 1200px) {
+  .agent-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .agent-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* Agent template card */
@@ -1404,3 +1419,293 @@ textarea.form-input {
 .info-box strong {
   color: var(--white);
 }
+
+/* ── Agents table base ── */
+.agents-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.agents-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 680px;
+}
+
+.agents-table th,
+.agents-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.agents-table th {
+  font-family: var(--FT);
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  background: var(--navy3);
+}
+
+/* Sticky Column 1 (Agent) */
+.agents-table th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 6;
+  background: var(--navy3);
+  min-width: 240px;
+  max-width: 240px;
+}
+
+.agents-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: #06111F;
+  min-width: 240px;
+  max-width: 240px;
+}
+
+/* Sticky Column 2 (Statut) */
+.agents-table th:nth-child(2) {
+  position: sticky;
+  left: 240px;
+  z-index: 6;
+  background: var(--navy3);
+  min-width: 130px;
+  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.agents-table td:nth-child(2) {
+  position: sticky;
+  left: 240px;
+  z-index: 4;
+  background: #06111F;
+  min-width: 130px;
+  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.agents-table tr:hover td:first-child,
+.agents-table tr:hover td:nth-child(2) {
+  background: #08172A;
+}
+
+.agents-table th:last-child,
+.agents-table td:last-child {
+  min-width: 140px;
+  text-align: right;
+}
+
+/* ── Registration table base & Custom Visible Scrollbars ── */
+.reg-table-outer,
+.agents-table-wrap,
+.exec-panel {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 229, 200, 0.45) rgba(4, 12, 24, 0.85);
+}
+
+.reg-table-outer::-webkit-scrollbar,
+.agents-table-wrap::-webkit-scrollbar,
+.exec-panel::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.reg-table-outer::-webkit-scrollbar-track,
+.agents-table-wrap::-webkit-scrollbar-track,
+.exec-panel::-webkit-scrollbar-track {
+  background: rgba(4, 12, 24, 0.85);
+  border-radius: 4px;
+}
+
+.reg-table-outer::-webkit-scrollbar-thumb,
+.agents-table-wrap::-webkit-scrollbar-thumb,
+.exec-panel::-webkit-scrollbar-thumb {
+  background: rgba(0, 229, 200, 0.45);
+  border-radius: 4px;
+  border: 1px solid rgba(0, 229, 200, 0.25);
+}
+
+.reg-table-outer::-webkit-scrollbar-thumb:hover,
+.agents-table-wrap::-webkit-scrollbar-thumb:hover,
+.exec-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 229, 200, 0.8);
+  box-shadow: 0 0 10px rgba(0, 229, 200, 0.6);
+}
+
+/* ── Profile View Layout ── */
+.profile-scroll-wrap {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px;
+}
+
+.profile-hud-column {
+  width: 260px;
+  max-width: 280px;
+  flex-shrink: 0;
+}
+
+.profile-form-column {
+  flex: 1;
+  max-width: 580px;
+  min-width: 320px;
+}
+
+.profile-metrics-column {
+  width: 240px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 1150px) {
+  .profile-scroll-wrap {
+    flex-direction: column !important;
+    align-items: center !important;
+    padding: 16px 12px !important;
+  }
+  .profile-hud-column {
+    width: 100% !important;
+    max-width: 540px !important;
+  }
+  .profile-form-column {
+    width: 100% !important;
+    max-width: 540px !important;
+    min-width: 0 !important;
+  }
+  .profile-metrics-column {
+    width: 100% !important;
+    max-width: 540px !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════
+   RESPONSIVE — Small windows
+══════════════════════════════════════════════════════ */
+
+@media (max-width: 1024px) {
+  /* ── Sidebar: compact on tablets ── */
+  .aside {
+    width: 200px;
+    min-width: 180px;
+  }
+}
+
+@media (max-width: 768px) {
+  /* ── Aside: off-canvas drawer on mobile ── */
+  .aside {
+    position: fixed;
+    top: 52px;
+    bottom: 0;
+    left: 0;
+    width: 260px;
+    min-width: 260px;
+    z-index: 10005;
+    background: var(--navy2);
+    box-shadow: none;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex !important;
+  }
+
+  .mobile-sidebar-open .aside {
+    transform: translateX(0);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.9), 0 0 20px rgba(0, 229, 200, 0.15);
+  }
+
+  .shell {
+    flex-direction: column;
+  }
+
+  /* ── Content: full width ── */
+  .content {
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* ── Page header: stack vertically ── */
+  .page-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+
+  .page-title {
+    font-size: 13px;
+  }
+
+  .page-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .page-actions .btn {
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ── Tabs: allow scroll ── */
+  .tabs-bar {
+    padding: 0 12px;
+    overflow-x: auto;
+    gap: 0;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tabs-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 10px 12px;
+  }
+
+  /* ── Scroll area: reduce padding ── */
+  .scroll {
+    padding: 16px 12px;
+    flex-direction: column !important;
+  }
+
+  /* ── Market search: wrap ── */
+  .market-search {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  /* ── Form rows: single column ── */
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* ── Tables: horizontal scroll ── */
+  .agents-table-wrap,
+  .reg-table-wrap,
+  .log-table-wrap,
+  table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* ── Modal: full width ── */
+  .modal-box {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: 0 auto;
+  }
+}
+

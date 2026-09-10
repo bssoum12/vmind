@@ -37,6 +37,7 @@ export const ProfileView: React.FC = () => {
   const [avatarInitials, setAvatarInitials] = useState('HA');
   const [connectors, setConnectors] = useState<ConnectorInfo[]>([]);
   const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
+  const [mobileTab, setMobileTab] = useState<'form' | 'hud' | 'erp' | 'all'>('form');
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -266,19 +267,63 @@ export const ProfileView: React.FC = () => {
             Gérez vos informations personnelles et la sécurité du compte
           </div>
         </div>
+      </div>
 
-
+      {/* ── RESPONSIVE SUB-TAB SWITCHER (Visible on screens <= 1150px) ── */}
+      <div className="profile-mobile-nav" style={{
+        gap: '8px',
+        padding: '12px 16px',
+        background: 'rgba(5, 14, 28, 0.95)',
+        borderBottom: '1px solid rgba(0, 229, 200, 0.15)',
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        justifyContent: 'center',
+        flexWrap: 'wrap',
+        zIndex: 20
+      }}>
+        {[
+          { id: 'form', label: 'Informations & Sécurité', icon: <User size={14} /> },
+          { id: 'hud', label: 'Identité HUD', icon: <Shield size={14} /> },
+          { id: 'erp', label: 'Connecteur & Agents', icon: <Server size={14} /> },
+          { id: 'all', label: 'Vue Complète', icon: <Cpu size={14} /> },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setMobileTab(tab.id as any)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 14px',
+              borderRadius: '8px',
+              fontSize: '11.5px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              fontFamily: 'inherit',
+              border: mobileTab === tab.id ? '1px solid #00E5C8' : '1px solid rgba(0, 229, 200, 0.18)',
+              background: mobileTab === tab.id ? 'rgba(0, 229, 200, 0.15)' : 'rgba(3, 10, 22, 0.8)',
+              color: mobileTab === tab.id ? '#00E5C8' : '#8FA3B8',
+              boxShadow: mobileTab === tab.id ? '0 0 12px rgba(0, 229, 200, 0.25)' : 'none',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {tab.icon}
+            <span>{tab.label}</span>
+          </button>
+        ))}
       </div>
 
       {/* ══════════════════════════════════════════════
           MAIN LAYOUT
       ══════════════════════════════════════════════ */}
       <div
-        className="scroll"
+        className="scroll profile-scroll-wrap"
         style={{
           flex: 1, overflowY: 'auto', zIndex: 10,
-          padding: '28px 32px',
-          display: 'flex', gap: '28px',
+          padding: '24px',
+          display: 'flex', gap: '24px',
           alignItems: 'flex-start', justifyContent: 'center'
         }}
       >
@@ -286,7 +331,7 @@ export const ProfileView: React.FC = () => {
         {/* ───────────────────────────────────────────
             LEFT — HOLOGRAPHIC IDENTITY HUD
         ─────────────────────────────────────────── */}
-        <div style={{ flex: 1, maxWidth: '280px', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px', alignSelf: 'center' }}>
+        <div className={`profile-hud-column ${mobileTab !== 'hud' && mobileTab !== 'all' ? 'profile-hide-mobile' : ''}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', gap: '20px', alignSelf: 'flex-start', minWidth: '240px' }}>
 
           {/* Hologram orb */}
           <div style={{ position: 'relative', width: '220px', height: '220px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -403,14 +448,15 @@ export const ProfileView: React.FC = () => {
         {/* ───────────────────────────────────────────
             CENTER — PROFILE FORM CARD
         ─────────────────────────────────────────── */}
-        <div style={{
-          flex: 1, maxWidth: '570px', marginBottom: '32px',
+        <div className={`profile-form-column ${mobileTab !== 'form' && mobileTab !== 'all' ? 'profile-hide-mobile' : ''}`} style={{
+          flex: 1.2, marginBottom: '32px',
           background: 'linear-gradient(155deg, rgba(7,18,36,0.95) 0%, rgba(3,10,22,0.98) 100%)',
           border: '1px solid rgba(0,229,200,0.32)',
           borderRadius: '16px', padding: '28px 32px',
           position: 'relative',
           boxShadow: '0 0 50px rgba(0,229,200,0.12), 0 24px 60px rgba(0,0,0,0.9)',
-          backdropFilter: 'blur(18px)'
+          backdropFilter: 'blur(18px)',
+          minWidth: '280px'
         }}>
           {/* Corner brackets */}
           {[
@@ -426,7 +472,7 @@ export const ProfileView: React.FC = () => {
           <div style={{ position: 'absolute', top: 0, left: '18%', right: '18%', height: '1px', background: `linear-gradient(90deg, transparent, ${cyan}, transparent)`, opacity: 0.65 }} />
 
           {/* User badge */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '26px', paddingBottom: '20px', borderBottom: '1px solid rgba(0,229,200,0.12)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '26px', paddingBottom: '20px', borderBottom: '1px solid rgba(0,229,200,0.12)', flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', width: '66px', height: '66px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="66" height="66" viewBox="0 0 100 100" style={{ position: 'absolute', inset: 0 }}>
                 <polygon points="50 3,93 25,93 75,50 97,7 75,7 25" fill="rgba(0,229,200,0.07)" stroke={cyan} strokeWidth="2.5" />
@@ -436,7 +482,7 @@ export const ProfileView: React.FC = () => {
               </span>
             </div>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 <h2 style={{ margin: 0, fontSize: '21px', fontWeight: 800, color: '#FFFFFF' }}>
                   {firstName || lastName ? `${firstName} ${lastName}`.trim() : username || 'Utilisateur'}
                 </h2>
@@ -444,7 +490,7 @@ export const ProfileView: React.FC = () => {
                   @{username || 'user'}
                 </span>
               </div>
-              <div style={{ fontSize: '12px', color: '#7A96AE', marginTop: '5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ fontSize: '12px', color: '#7A96AE', marginTop: '5px', display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
                 <Shield size={13} color={cyan} />
                 Rôle : <span style={{ color: '#FFFFFF', fontWeight: 700 }}>{roleLabel || 'Administrateur'}</span>
               </div>
@@ -467,7 +513,7 @@ export const ProfileView: React.FC = () => {
           <form id="profile-form" onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
             {/* Row: Prénom + Nom */}
-            <div style={{ display: 'flex', gap: '16px' }}>
+            <div className="profile-name-row" style={{ display: 'flex', gap: '16px' }}>
               {[
                 { lbl: 'PRÉNOM', val: firstName, set: setFirstName, type: 'text' },
                 { lbl: 'NOM',    val: lastName,  set: setLastName,  type: 'text' },
@@ -597,7 +643,7 @@ export const ProfileView: React.FC = () => {
             </div>
 
             {/* Actions */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '20px', borderTop: '1px solid rgba(0,229,200,0.12)', marginTop: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '20px', borderTop: '1px solid rgba(0,229,200,0.12)', marginTop: '6px', flexWrap: 'wrap', gap: '12px' }}>
               <button
                 type="button"
                 onClick={handleLogout}
@@ -631,7 +677,7 @@ export const ProfileView: React.FC = () => {
         {/* ───────────────────────────────────────────
             RIGHT — LIVE METRICS (without STATUT SESSION card)
         ─────────────────────────────────────────── */}
-        <div style={{ width: '240px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '4px' }}>
+        <div className={`profile-metrics-column ${mobileTab !== 'erp' && mobileTab !== 'all' ? 'profile-hide-mobile' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: '14px', paddingTop: '4px', minWidth: '240px' }}>
 
           {/* ERP Connector */}
           <div style={{
@@ -715,7 +761,7 @@ export const ProfileView: React.FC = () => {
 
       </div>
 
-      {/* Keyframe animations injected */}
+      {/* Keyframe animations and responsive styles injected */}
       <style>{`
         @keyframes ring-cw  { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes ring-ccw { from { transform: rotate(0deg); } to { transform: rotate(-360deg); } }
@@ -728,6 +774,58 @@ export const ProfileView: React.FC = () => {
         @keyframes dot-blink {
           0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
           40%            { opacity: 1;   transform: scale(1.3); }
+        }
+
+        @media (max-width: 1150px) {
+          .profile-mobile-nav {
+            display: flex !important;
+          }
+          .profile-scroll-wrap {
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            padding: 16px 12px 40px !important;
+          }
+          .profile-hud-column {
+            width: 100% !important;
+            max-width: 480px !important;
+            margin: 0 auto 24px !important;
+          }
+          .profile-form-column {
+            width: 100% !important;
+            max-width: 680px !important;
+            margin: 0 auto !important;
+            padding: 24px 18px !important;
+          }
+          .profile-metrics-column {
+            width: 100% !important;
+            max-width: 480px !important;
+            margin: 0 auto !important;
+          }
+          .profile-hide-mobile {
+            display: none !important;
+          }
+        }
+
+        @media (min-width: 1151px) {
+          .profile-mobile-nav {
+            display: none !important;
+          }
+          .profile-hud-column,
+          .profile-form-column,
+          .profile-metrics-column {
+            display: flex !important;
+          }
+          .profile-hide-mobile {
+            display: flex !important;
+          }
+        }
+
+        @media (max-width: 600px) {
+          .profile-name-row {
+            flex-direction: column !important;
+            gap: 16px !important;
+          }
         }
       `}</style>
     </div>

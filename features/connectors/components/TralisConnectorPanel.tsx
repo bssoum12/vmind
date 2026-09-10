@@ -145,56 +145,76 @@ const AGENT_COLORS: Record<string, { bg: string; color: string }> = {
 function ToolRow({ tool, isAuthorized }: { tool: ToolMeta; isAuthorized: boolean }) {
   const badge = isAuthorized ? AUTH_BADGE[tool.authLevel] : AUTH_BADGE['denied'];
   const agentStyle = AGENT_COLORS[tool.agent] || { bg: 'rgba(255,255,255,0.05)', color: '#8FA3B8' };
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
     <div
+      className="tool-row-item"
       style={{
-        display: 'flex', alignItems: 'center',
-        padding: '14px 20px',
-        gap: '16px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 18px',
+        gap: '12px',
         borderBottom: '1px solid rgba(255,255,255,0.04)',
-        transition: 'background 0.15s',
-        opacity: isAuthorized ? 1 : 0.4,
+        transition: 'all 0.2s ease',
+        opacity: isAuthorized ? 1 : 0.45,
+        background: isHovered ? 'rgba(0, 229, 200, 0.04)' : 'transparent',
+        position: 'relative',
+        cursor: 'default',
+        flexWrap: 'wrap',
       }}
-      onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
-      onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Icon */}
-      <div style={{
-        color: isAuthorized ? '#8FA3B8' : '#4A5E72',
-        flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
-        fontSize: '12px', width: '100px',
-      }}>
-        {ACCESS_ICON[tool.accessType]}
-        <span style={{ marginLeft: '4px' }}>{ACCESS_LABEL[tool.accessType]}</span>
-      </div>
-
-      {/* Name + description */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: isAuthorized ? '#fff' : '#6A7E95', marginBottom: '2px' }}>
-          {tool.name}
+      {/* Left: Icon + Name + Description */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '220px' }}>
+        <div style={{
+          color: isAuthorized ? '#00E5C8' : '#4A5E72',
+          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: '28px', height: '28px', borderRadius: '6px',
+          background: 'rgba(0, 229, 200, 0.06)',
+          border: '1px solid rgba(0, 229, 200, 0.15)',
+        }}>
+          {ACCESS_ICON[tool.accessType]}
         </div>
-        <div style={{ fontSize: '12px', color: '#6A7E95', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {tool.description}
+
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: isAuthorized ? '#FFFFFF' : '#6A7E95', fontFamily: 'monospace' }}>
+              {tool.name}
+            </span>
+            <span style={{ fontSize: '10px', color: '#6A7E95', background: 'rgba(255,255,255,0.04)', padding: '1px 6px', borderRadius: '4px' }}>
+              {ACCESS_LABEL[tool.accessType]}
+            </span>
+          </div>
+          <div style={{ fontSize: '11.5px', color: '#8FA3B8', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {tool.description}
+          </div>
         </div>
       </div>
 
-      {/* Agent badge */}
+      {/* Right: Agent Badge & Auth Badge (fluid hover transition) */}
       <div style={{
-        padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700,
-        background: agentStyle.bg, color: agentStyle.color,
-        flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: '8px',
+        flexShrink: 0, marginLeft: 'auto',
+        transition: 'all 0.2s ease',
       }}>
-        {tool.agent}
-      </div>
+        <div style={{
+          padding: '3px 8px', borderRadius: '6px', fontSize: '10.5px', fontWeight: 800,
+          background: agentStyle.bg, color: agentStyle.color,
+          border: `1px solid ${agentStyle.color}40`,
+          letterSpacing: '0.04em',
+        }}>
+          {tool.agent}
+        </div>
 
-      {/* Auth badge */}
-      <div style={{
-        padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-        background: badge.bg, color: badge.color,
-        flexShrink: 0, whiteSpace: 'nowrap',
-      }}>
-        {badge.label}
+        <div style={{
+          padding: '4px 10px', borderRadius: '14px', fontSize: '11px', fontWeight: 600,
+          background: badge.bg, color: badge.color,
+          border: `1px solid ${badge.color}35`,
+          whiteSpace: 'nowrap',
+        }}>
+          {badge.label}
+        </div>
       </div>
     </div>
   );
@@ -236,9 +256,15 @@ function ToolSection({ title, tools, authorizedNames, collapsible = false }: {
         </div>
         {collapsible && (open ? <ChevronUp size={16} color="#6A7E95" /> : <ChevronDown size={16} color="#6A7E95" />)}
       </div>
-      {open && tools.map(tool => (
-        <ToolRow key={tool.name} tool={tool} isAuthorized={authorizedNames.has(tool.name)} />
-      ))}
+      {open && (
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+          <div style={{ minWidth: '540px' }}>
+            {tools.map(tool => (
+              <ToolRow key={tool.name} tool={tool} isAuthorized={authorizedNames.has(tool.name)} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -386,7 +412,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: '900px' }}>
+    <div className="connector-panel-inner">
 
       {/* ── HEADER ─────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
@@ -495,19 +521,6 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
             <span style={{ fontSize: '12px', color: '#6A7E95' }}>
               {authorizedToolNames.size} outil{authorizedToolNames.size !== 1 ? 's' : ''} autorisé{authorizedToolNames.size !== 1 ? 's' : ''} sur {dynamicMetadata.length} disponibles
             </span>
-          </div>
-
-          {/* Column header */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '16px',
-            padding: '8px 20px', fontSize: '11px', color: '#6A7E95',
-            textTransform: 'uppercase', letterSpacing: '0.05em',
-            borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '8px',
-          }}>
-            <span style={{ width: '100px' }}>Type d'accès</span>
-            <span style={{ flex: 1 }}>Outil</span>
-            <span style={{ width: '50px', textAlign: 'center' }}>Agent</span>
-            <span style={{ width: '160px', textAlign: 'right' }}>Autorisation</span>
           </div>
 
           <ToolSection
