@@ -14,7 +14,6 @@ import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/comp
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { getAgents } from '@/shared/api/n8n-api';
 import { useProspectSocket } from '../../../features/management/prospect-workspace/hooks/useProspectSocket';
-
 import '../../../features/management/prospect-workspace/workspace.scss';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
