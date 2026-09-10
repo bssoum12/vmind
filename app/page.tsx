@@ -304,9 +304,22 @@ function HomeContent() {
   }, [setMode]);
 
   const [activeCategory, setActiveCategory] = useState('all');
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const handleToggle = () => setMobileSidebarOpen(prev => !prev);
+    const handleClose = () => setMobileSidebarOpen(false);
+    window.addEventListener('toggle-mobile-sidebar', handleToggle);
+    window.addEventListener('close-mobile-sidebar', handleClose);
+    return () => {
+      window.removeEventListener('toggle-mobile-sidebar', handleToggle);
+      window.removeEventListener('close-mobile-sidebar', handleClose);
+    };
+  }, []);
 
   const handleNavigate = (view: string) => {
     setCurrentView(view);
+    setMobileSidebarOpen(false);
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('vmind_current_view', view);
     }
@@ -406,14 +419,30 @@ function HomeContent() {
   if (mode === 'ASSISTANT') {
     return (
       <ConversationsProvider>
-        <main className="main-container anim">
-          <AssistantSidebar onInsertPrompt={handleInsertPrompt} activeAgentId={activeAgentId} onAgentClick={setActiveAgentId} />
+        <main className={`main-container anim ${mobileSidebarOpen ? 'mobile-sidebar-open' : ''}`}>
+          {mobileSidebarOpen && (
+            <div 
+              className="mobile-sidebar-backdrop show" 
+              onClick={() => setMobileSidebarOpen(false)} 
+            />
+          )}
+          <AssistantSidebar 
+            onInsertPrompt={handleInsertPrompt} 
+            activeAgentId={activeAgentId} 
+            onAgentClick={(id) => {
+              setActiveAgentId(id);
+              setMobileSidebarOpen(false);
+            }} 
+          />
           
           <div className="content assistant-layout" style={{ display: assistantView === 'chat' ? 'flex' : 'none' }}>
             <VmindChat
               initialPrompt={insertPrompt}
               onOpenVoice={() => setVoiceShow(true)}
-              onAgentActive={setActiveAgentId}
+              onAgentActive={(id) => {
+                setActiveAgentId(id);
+                setMobileSidebarOpen(false);
+              }}
               activeAgentId={activeAgentId}
               clientId={clientId}
             />
@@ -424,7 +453,7 @@ function HomeContent() {
             />
           </div>
           
-          <div style={{ display: assistantView === 'connectors' ? 'block' : 'none', flex: 1, height: '100%' }}>
+          <div style={{ display: assistantView === 'connectors' ? 'block' : 'none', flex: 1, height: '100%', minWidth: 0 }}>
             <ConnectorsHub />
           </div>
 
@@ -437,12 +466,24 @@ function HomeContent() {
 
   // MANAGEMENT MODE
   return (
-    <main className="main-container anim">
+    <main className={`main-container anim ${mobileSidebarOpen ? 'mobile-sidebar-open' : ''}`}>
+      {mobileSidebarOpen && (
+        <div 
+          className="mobile-sidebar-backdrop show" 
+          onClick={() => setMobileSidebarOpen(false)} 
+        />
+      )}
       <ManagementSidebar
         currentView={currentView}
-        onNavigate={handleNavigate}
+        onNavigate={(view) => {
+          handleNavigate(view);
+          setMobileSidebarOpen(false);
+        }}
         activeCategory={activeCategory}
-        onSelectCategory={handleSelectCategory}
+        onSelectCategory={(cat) => {
+          handleSelectCategory(cat);
+          setMobileSidebarOpen(false);
+        }}
       />
       <div className="content management-layout">
         <div className="view-container">
@@ -450,13 +491,19 @@ function HomeContent() {
             <MarketplaceView
               onDeploy={handleDeploy}
               activeCategory={activeCategory}
-              onSelectCategory={handleSelectCategory}
+              onSelectCategory={(cat) => {
+                handleSelectCategory(cat);
+                setMobileSidebarOpen(false);
+              }}
             />
           )}
 
           {currentView === 'agents' && (
             <AgentsView
-              onNavigate={setCurrentView}
+              onNavigate={(view) => {
+                setCurrentView(view);
+                setMobileSidebarOpen(false);
+              }}
               onConfigure={(templateId, agent, step) => handleDeploy(templateId, agent, step)}
             />
           )}
