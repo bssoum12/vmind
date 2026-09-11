@@ -1203,16 +1203,28 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           }}
         >
           <textarea
-            className="input-field w-full bg-transparent p-3 pr-24 text-sm text-gray-200 placeholder-gray-500 outline-none resize-none max-h-32"
-            rows={1}
+            className="input-field w-full bg-transparent pl-4 pr-[100px] text-sm text-gray-200 placeholder-gray-500 outline-none resize-none"
+            style={{ 
+              paddingTop: '16px', 
+              paddingBottom: '16px', 
+              lineHeight: '20px',
+              minHeight: '52px',
+              height: '52px',
+              maxHeight: '120px',
+              overflowY: 'auto'
+            }}
             placeholder="Posez votre question métier..."
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              e.target.style.height = '52px';
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+            }}
             onKeyDown={handleKeyDown}
             disabled={isLoading}
           />
 
-          <div className="input-actions absolute right-2 flex items-center gap-1.5">
+          <div className="input-actions absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
             <button
               type="button"
               className="voice-btn relative flex items-center justify-center transition-all duration-200"
