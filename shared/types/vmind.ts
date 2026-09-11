@@ -52,6 +52,7 @@ export type VmindN8nResponse = {
   details: any;
   raw: any;
   error: any;
+  text?: string;
   alerts?: VmindAlert[];
   report_url?: string | null;
   report_filename?: string | null;
