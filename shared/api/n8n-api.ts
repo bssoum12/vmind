@@ -49,18 +49,17 @@ export async function sendVmindMessage(message: string, conversationId: string, 
   const agentCode = (agentId || "VFIN").toUpperCase();
   console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode });
 
-  let mcp_token;
+  let mcp_token = "";
+  let session_token = "";
   if (typeof window !== "undefined") {
     try {
-      mcp_token = localStorage.getItem("vmind_mcp_token");
-      if (!mcp_token || mcp_token === "null") {
-        const sessionStr = localStorage.getItem("vmind_session");
-        if (sessionStr) {
-          try {
-            mcp_token = JSON.parse(sessionStr).token;
-          } catch(e2) {
-             mcp_token = sessionStr; // Fallback in case vmind_session is just the raw token string
-          }
+      mcp_token = localStorage.getItem("vmind_mcp_token") || "";
+      const sessionStr = localStorage.getItem("vmind_session");
+      if (sessionStr) {
+        try {
+          session_token = JSON.parse(sessionStr).token || sessionStr;
+        } catch(e2) {
+          session_token = sessionStr;
         }
       }
     } catch (e) {
@@ -68,13 +67,15 @@ export async function sendVmindMessage(message: string, conversationId: string, 
     }
   }
 
+  const effectiveAuthToken = mcp_token || session_token;
+
   try {
-    if (!mcp_token) {
-      console.warn("⚠️ [n8n-api] Aucun mcp_token trouvé. Blocage de l'appel vers n8n.");
+    if (!effectiveAuthToken) {
+      console.warn("⚠️ [n8n-api] Aucun token d'authentification trouvé. Blocage de l'appel vers n8n.");
       return {
         ok: false,
         response_type: "error",
-        message: "Veuillez activer votre session dans le Connecteur MCP (Panneau de gauche) avant de poser une question.",
+        message: "Veuillez vous connecter avant de poser une question.",
         tool_used: null,
         title: "Connexion requise",
         kpis: [],
@@ -82,7 +83,7 @@ export async function sendVmindMessage(message: string, conversationId: string, 
         chart: { type: null, title: "", description: "", xKey: "", yKey: "", data: [] },
         details: null,
         raw: null,
-        error: "MCP_NOT_CONNECTED"
+        error: "AUTH_REQUIRED"
       } as VmindN8nResponse;
     }
 
@@ -90,7 +91,7 @@ export async function sendVmindMessage(message: string, conversationId: string, 
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(mcp_token ? { "Authorization": `Bearer ${mcp_token}` } : {})
+        ...(effectiveAuthToken ? { "Authorization": `Bearer ${effectiveAuthToken}` } : {})
       },
       body: JSON.stringify({
         message,
@@ -99,7 +100,7 @@ export async function sendVmindMessage(message: string, conversationId: string, 
         conversation_id: conversationId,
         agent_id: agentId,
         agent: agentCode,
-        mcp_token
+        mcp_token: mcp_token || ""
       }),
       signal
     });

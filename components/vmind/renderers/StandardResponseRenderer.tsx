@@ -123,6 +123,41 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
     );
   }
 
+  const detailsStr = typeof details === 'string' ? details : JSON.stringify(details || '');
+  const textStr = typeof text === 'string' ? text : '';
+  const isForbidden =
+    error === 'FORBIDDEN' ||
+    error === 'FORBIDDEN_TOOL_EXECUTION' ||
+    error === 'UNAUTHORIZED_TOOL_EXECUTION' ||
+    detailsStr.includes('FORBIDDEN_TOOL_EXECUTION') ||
+    detailsStr.includes('UNAUTHORIZED_TOOL_EXECUTION') ||
+    detailsStr.includes('status": "unauthorized') ||
+    detailsStr.includes('status":"unauthorized') ||
+    detailsStr.includes("Vous n'avez pas les permissions nécessaires") ||
+    textStr.includes('FORBIDDEN_TOOL_EXECUTION');
+
+  if (isForbidden) {
+    return (
+      <div style={{
+        padding: '12px 14px',
+        backgroundColor: 'rgba(255, 170, 0, 0.06)',
+        border: '1px solid rgba(255, 170, 0, 0.25)',
+        borderRadius: '8px',
+        color: '#ffdd88',
+        fontSize: '13px',
+        lineHeight: 1.5,
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '8px'
+      }}>
+        <span style={{ fontSize: '15px' }}>ℹ️</span>
+        <div>
+          Vous n'avez pas l'autorisation d'accéder aux données TraLIS en direct pour cet agent. Je reste à votre disposition pour toute question méthodologique ou conseil métier dans ce domaine.
+        </div>
+      </div>
+    );
+  }
+
   const hasKpis = Boolean(kpis && kpis.length > 0);
   const hasTable = Boolean(table && hasRows(table.rows));
   const hasChart = Boolean(chart && hasChartData(chart.data));

@@ -20,31 +20,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
   const { conversations, activeConversationId, setActiveConversationId, createNewConversation, resetToNewConversation, renameConversation, deleteConversation } = useConversations();
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [isErpConnected, setIsErpConnected] = useState<boolean>(false);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   const updatePermissions = () => {
     try {
-      // 1. Read live allowed agents from ConnectorsHub synchronization if available
-      const storedAllowedAgents = localStorage.getItem('vmind_allowed_agents');
+      const mcpToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_mcp_token') : null;
+      setIsErpConnected(Boolean(mcpToken));
 
-      // Prioritize MCP Token if it exists, otherwise fall back to VMIND Session
-      const mcpToken = localStorage.getItem('vmind_mcp_token');
-      const sessionToken = localStorage.getItem('vmind_session');
-      
-      let tokenToUse = null;
-      if (mcpToken) {
-        tokenToUse = mcpToken;
-      } else if (sessionToken) {
-        // Handle both raw JWT or JSON format in vmind_session
-        if (sessionToken.startsWith('eyJ')) {
-          tokenToUse = sessionToken;
-        } else {
-          try {
-            const parsed = JSON.parse(sessionToken);
-            tokenToUse = parsed.token || parsed.access_token || parsed.user?.token;
-          } catch (e) {
-            tokenToUse = null;
-          }
+      const storedAllowedAgents = typeof window !== 'undefined' ? localStorage.getItem('vmind_allowed_agents') : null;
+      if (storedAllowedAgents) {
+        try {
+          setAllowedAgents(JSON.parse(storedAllowedAgents));
+        } catch (e) {
+          setAllowedAgents([]);
         }
+      } else {
+        setAllowedAgents([]);
+      }
+
+      const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
+      let tokenToUse = mcpToken || sessionToken;
+      if (tokenToUse && tokenToUse.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(tokenToUse);
+          tokenToUse = parsed.token || parsed.access_token || parsed.user?.token;
+        } catch (e) {}
       }
 
       if (tokenToUse) {
@@ -52,29 +53,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
         if (decoded.username) {
           setUsername(decoded.username);
         }
+        setIsAdmin(Boolean(decoded.roles && decoded.roles.includes('Administrators')));
 
-        // If we have live database allowed agents, use them directly (respecting PostgreSQL)
-        if (storedAllowedAgents) {
-          try {
-            setAllowedAgents(JSON.parse(storedAllowedAgents));
-            return;
-          } catch (e) {
-            // fallback
-          }
-        }
-
-        if (decoded.allowedAgents) {
+        if (!storedAllowedAgents && decoded.allowedAgents) {
           setAllowedAgents(decoded.allowedAgents);
-        } else {
-          setAllowedAgents([]);
         }
-      } else {
-        // Optionnel : rediriger vers /login si aucun token
-        window.location.href = '/login';
       }
     } catch (e) {
       console.error("Erreur de décodage du token dans la sidebar", e);
-      window.location.href = '/login';
     }
   };
 
@@ -84,9 +70,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
     return () => window.removeEventListener('mcp-session-updated', updatePermissions);
   }, []);
 
-  const visibleAgents = Object.values(AGENTS).filter(agent => 
-    allowedAgents.includes(agent.id)
-  );
+  const visibleAgents = Object.values(AGENTS);
 
   return (
     <div className="sidebar">
@@ -122,27 +106,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
 
       <div className="nav-section">Agents IA ({visibleAgents.length})</div>
 
-      {visibleAgents.length === 0 ? (
-        <div style={{
-          padding: '12px 14px',
-          fontSize: '11px',
-          color: 'var(--muted)',
-          fontStyle: 'italic',
-          lineHeight: 1.45,
-          border: '1px dashed rgba(255,255,255,0.06)',
-          borderRadius: '8px',
-          margin: '6px 14px',
-          textAlign: 'center',
-          background: 'rgba(255,255,255,0.01)',
-        }}>
-          Aucun agent autorisé pour votre profil.
-        </div>
-      ) : (
-        
-        visibleAgents.map((agent) => {
-          const agentConvs = conversations.filter(c => c.agent_id === agent.id);
-          const isActiveAgent = activeAgentId === agent.id;
-          return (
+      {visibleAgents.map((agent) => {
+        const agentConvs = conversations.filter(c => c.agent_id === agent.id);
+        const isActiveAgent = activeAgentId === agent.id;
+        const isAgentAllowed = isErpConnected && (isAdmin || allowedAgents.includes(agent.id));
+
+        return (
           <div key={agent.id} style={{ display: 'flex', flexDirection: 'column' }}>
             <div
               className={`nav-item ${isActiveAgent ? 'agent-card-active' : ''}`}
@@ -177,14 +146,47 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
                   {agent.icon}
                 </span>
               </IconBox>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '12px', color: 'var(--white)', fontWeight: 600 }}>{agent.name}</div>
-                <div style={{ fontSize: '9px', color: 'var(--muted)' }}>{agent.desc}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--white)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {agent.name}
+                  </span>
+                  {isAgentAllowed ? (
+                    <span style={{
+                      fontSize: '8px',
+                      padding: '1px 5px',
+                      borderRadius: '4px',
+                      background: 'rgba(0, 240, 255, 0.1)',
+                      color: '#00f0ff',
+                      border: '1px solid rgba(0, 240, 255, 0.25)',
+                      fontWeight: 600,
+                      letterSpacing: '0.03em',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      ERP
+                    </span>
+                  ) : (
+                    <span style={{
+                      fontSize: '8px',
+                      padding: '1px 5px',
+                      borderRadius: '4px',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      color: 'var(--muted)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      fontWeight: 500,
+                      whiteSpace: 'nowrap'
+                    }}>
+                      Conseil
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize: '9px', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agent.desc}</div>
               </div>
               <div style={{
                 width: '6px', height: '6px', borderRadius: '50%',
-                background: isActiveAgent ? agent.color : 'var(--muted)',
-                boxShadow: isActiveAgent ? `0 0 6px ${agent.color}` : 'none'
+                background: isActiveAgent ? agent.color : (isAgentAllowed ? '#00f0ff' : 'var(--muted)'),
+                boxShadow: isActiveAgent ? `0 0 6px ${agent.color}` : 'none',
+                flexShrink: 0
               }}></div>
             </div>
 
@@ -304,9 +306,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
             )}
           </div>
         );
-        })
-
-      )}
+      })}
     </div>
   );
 };

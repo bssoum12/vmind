@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { fetchN8nKpis } from '../api/n8n-api';
+import { jwtDecode } from 'jwt-decode';
 
 interface KpiCacheContextType {
   startDate: string; // Format YYYYMMDD
@@ -59,6 +60,31 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
   const clearError = () => setError(null);
 
+  // Helper to check if user has ERP connected and agent is allowed
+  const isAgentKpiAllowed = (agentId: string) => {
+    if (typeof window === "undefined") return false;
+    const mcpToken = localStorage.getItem("vmind_mcp_token");
+    if (!mcpToken) return false;
+    
+    const stored = localStorage.getItem("vmind_allowed_agents");
+    if (stored) {
+      try {
+        const allowed: string[] = JSON.parse(stored);
+        return allowed.includes(agentId.toUpperCase());
+      } catch (e) {}
+    }
+    
+    try {
+      const decoded: any = jwtDecode(mcpToken);
+      if (decoded.roles && decoded.roles.includes("Administrators")) return true;
+      if (decoded.allowedAgents) {
+        return decoded.allowedAgents.includes(agentId.toUpperCase());
+      }
+    } catch (e) {}
+    
+    return false;
+  };
+
   const fetchKpis = async (agentId: string, force = false, targetTool?: string) => {
     if (!isAuthenticated()) {
       return;
@@ -66,6 +92,12 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
     const upperAgent = agentId.toUpperCase();
     activeAgentRef.current = upperAgent;
+
+    if (!isAgentKpiAllowed(upperAgent)) {
+      console.log(`[KPI CONTEXT] KPIs not allowed for agent ${upperAgent} (ERP not connected or agent not authorized)`);
+      setLoadingByAgent(prev => ({ ...prev, [agentId]: false }));
+      return;
+    }
 
     // Clear any previous debounce timeout
     if (debounceTimeoutRef.current) {
@@ -189,6 +221,11 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     const lowerAgent = currentAgent.toLowerCase();
     if (lowerAgent !== 'vdata' && lowerAgent !== 'vfin' && lowerAgent !== 'vsell' && lowerAgent !== 'vbuy' && lowerAgent !== 'vmove') return;
 
+    if (!isAgentKpiAllowed(currentAgent)) {
+      setLoadingByAgent(prev => ({ ...prev, [lowerAgent]: false }));
+      return;
+    }
+
     // Clear previous debounce timeout
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -208,6 +245,25 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       }
     };
   }, [startDate, endDate, activeAgentId]);
+
+  // Instantly clear or refetch KPI cache when MCP session connects/disconnects
+  useEffect(() => {
+    const handleMcpUpdate = () => {
+      const mcpToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_mcp_token') : null;
+      if (!mcpToken) {
+        // Disconnected from ERP: immediately wipe cached KPIs & errors
+        setKpisByAgent({});
+        setError(null);
+        setLoadingByAgent({});
+      } else {
+        // Connected: trigger refetch for active agent
+        const currentAgent = (activeAgentId || 'VDATA').toLowerCase();
+        fetchKpis(currentAgent);
+      }
+    };
+    window.addEventListener('mcp-session-updated', handleMcpUpdate);
+    return () => window.removeEventListener('mcp-session-updated', handleMcpUpdate);
+  }, [activeAgentId]);
 
   return (
     <KpiCacheContext.Provider
