@@ -5,10 +5,15 @@ import { createPortal } from 'react-dom';
 import { useParams, useSearchParams } from 'next/navigation';
 import GlobalLeadsModal from './GlobalLeadsModal';
 import { LeadsEmptyState } from './LeadsEmptyState';
+import { SourcingAgentExecutionModal } from '../../agents/components/SourcingAgentExecutionModal';
+import { SourcingLauncherModal } from './SourcingLauncherModal';
 import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { Database, FileSpreadsheet, ScanLine, UserPlus, Zap, Globe, Sparkles, UploadCloud, Target, CheckCircle2, X } from 'lucide-react';
 import { useProspectSocket } from '../hooks/useProspectSocket';
+import { getAgents } from '@/shared/api/n8n-api';
+import { useToast } from '@/shared/contexts/ToastContext';
+import { LiveAgent } from '../../agents/AgentsView';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
@@ -52,6 +57,7 @@ interface LeadsViewProps {
   onOpenLead: (lead: Lead) => void;
   onRefresh: () => void;
   isNavTutorialActive?: boolean;
+  agent?: any;
 }
 
 const StyledCheckbox = ({ checked, onChange, isIndeterminate }: { checked: boolean, onChange: (e: any) => void, isIndeterminate?: boolean }) => (
@@ -103,9 +109,53 @@ function formatUserFacingMessage(raw?: string): string {
   return clean || "Analyse du prospect en cours...";
 }
 
-export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isNavTutorialActive }: LeadsViewProps) {
+export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isNavTutorialActive, agent }: LeadsViewProps) {
   const { agentId } = useParams();
   const searchParams = useSearchParams();
+  const { showToast } = useToast();
+
+  const [executingSourcingAgent, setExecutingSourcingAgent] = useState<LiveAgent | null>(null);
+  const [isSourcingLauncherOpen, setIsSourcingLauncherOpen] = useState(false);
+  const [allSourcingAgents, setAllSourcingAgents] = useState<any[]>([]);
+  const [isLoadingSourcingCheck, setIsLoadingSourcingCheck] = useState(false);
+
+  const handleOpenSourcing = async () => {
+    setIsLoadingSourcingCheck(true);
+    try {
+      const agents = await getAgents();
+      const sourcingAgents = (agents || []).filter(
+        (a: any) => a.run_mode === 'sourcing'
+      );
+      setAllSourcingAgents(sourcingAgents);
+
+      const currentId = String(agentId || agent?.uuid || agent?.agent_id || '').toLowerCase();
+      const currentName = String(agent?.agent_name || agent?.nom || '').toLowerCase();
+
+      // Find Sourcing agents that already target this Prospect agent
+      const targetingAgents = sourcingAgents.filter((sa: any) => {
+        const rawTargets = sa?.config?.target_agent_ids || sa?.target_agent_ids || [];
+        if (!Array.isArray(rawTargets)) return false;
+        return rawTargets.some((id: any) => {
+          const sId = String(id).toLowerCase();
+          return (currentId && sId === currentId) || (currentName && sId === currentName);
+        });
+      });
+
+      if (targetingAgents.length === 1) {
+        if (targetingAgents[0].is_executing) {
+          showToast(`L'agent de sourcing "${targetingAgents[0].agent_name}" est déjà en cours d'exécution ⚡`, 'info');
+        }
+        setExecutingSourcingAgent(targetingAgents[0]);
+      } else {
+        setIsSourcingLauncherOpen(true);
+      }
+    } catch (err: any) {
+      console.error("Failed to load sourcing agents:", err);
+      setIsSourcingLauncherOpen(true);
+    } finally {
+      setIsLoadingSourcingCheck(false);
+    }
+  };
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -1515,6 +1565,7 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
         <LeadsEmptyState
           onOpenImport={() => setShowImportConsole(true)}
           onOpenGlobalModal={() => setIsGlobalModalOpen(true)}
+          onOpenSourcing={handleOpenSourcing}
         />
       ) : (
         <>
@@ -1879,6 +1930,33 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
         agentId={agentId as string}
         onClose={() => setIsGlobalModalOpen(false)}
         onSuccess={onRefresh}
+      />
+
+      {/* Sourcing Agent Direct Execution Modal */}
+      {executingSourcingAgent && (
+        <SourcingAgentExecutionModal
+          agent={executingSourcingAgent}
+          onClose={() => setExecutingSourcingAgent(null)}
+          onSuccess={() => {
+            setExecutingSourcingAgent(null);
+            onRefresh();
+          }}
+          onToast={(msg, type) => {
+            showToast(msg, type === 'err' ? 'error' : 'success');
+          }}
+          hideTargetAgentsSelection={true}
+        />
+      )}
+
+      {/* Sourcing Launcher / Connection Modal */}
+      <SourcingLauncherModal
+        isOpen={isSourcingLauncherOpen}
+        onClose={() => setIsSourcingLauncherOpen(false)}
+        prospectAgent={agent || { uuid: agentId, agent_id: agentId }}
+        sourcingAgents={allSourcingAgents}
+        onSelectAndRun={(selectedSourcingAgent) => {
+          setExecutingSourcingAgent(selectedSourcingAgent);
+        }}
       />
     </div>
   );

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, AlertTriangle, Link2, Shield, X, Database, ChevronDown, ChevronUp, Eye, EyeOff, FileEdit, Zap } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Link2, Shield, ShieldCheck, X, Database, ChevronDown, ChevronUp, Eye, EyeOff, FileEdit, Zap } from 'lucide-react';
+import { Turnstile } from '@marsidev/react-turnstile';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -145,56 +146,76 @@ const AGENT_COLORS: Record<string, { bg: string; color: string }> = {
 function ToolRow({ tool, isAuthorized }: { tool: ToolMeta; isAuthorized: boolean }) {
   const badge = isAuthorized ? AUTH_BADGE[tool.authLevel] : AUTH_BADGE['denied'];
   const agentStyle = AGENT_COLORS[tool.agent] || { bg: 'rgba(255,255,255,0.05)', color: '#8FA3B8' };
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
     <div
+      className="tool-row-item"
       style={{
-        display: 'flex', alignItems: 'center',
-        padding: '14px 20px',
-        gap: '16px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '12px 18px',
+        gap: '12px',
         borderBottom: '1px solid rgba(255,255,255,0.04)',
-        transition: 'background 0.15s',
-        opacity: isAuthorized ? 1 : 0.4,
+        transition: 'all 0.2s ease',
+        opacity: isAuthorized ? 1 : 0.45,
+        background: isHovered ? 'rgba(0, 229, 200, 0.04)' : 'transparent',
+        position: 'relative',
+        cursor: 'default',
+        flexWrap: 'wrap',
       }}
-      onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}
-      onMouseOut={e => e.currentTarget.style.background = 'transparent'}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Icon */}
-      <div style={{
-        color: isAuthorized ? '#8FA3B8' : '#4A5E72',
-        flexShrink: 0, display: 'flex', alignItems: 'center', gap: '4px',
-        fontSize: '12px', width: '100px',
-      }}>
-        {ACCESS_ICON[tool.accessType]}
-        <span style={{ marginLeft: '4px' }}>{ACCESS_LABEL[tool.accessType]}</span>
-      </div>
-
-      {/* Name + description */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '13px', fontWeight: 600, color: isAuthorized ? '#fff' : '#6A7E95', marginBottom: '2px' }}>
-          {tool.name}
+      {/* Left: Icon + Name + Description */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '220px' }}>
+        <div style={{
+          color: isAuthorized ? '#00E5C8' : '#4A5E72',
+          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: '28px', height: '28px', borderRadius: '6px',
+          background: 'rgba(0, 229, 200, 0.06)',
+          border: '1px solid rgba(0, 229, 200, 0.15)',
+        }}>
+          {ACCESS_ICON[tool.accessType]}
         </div>
-        <div style={{ fontSize: '12px', color: '#6A7E95', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {tool.description}
+
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: isAuthorized ? '#FFFFFF' : '#6A7E95', fontFamily: 'monospace' }}>
+              {tool.name}
+            </span>
+            <span style={{ fontSize: '10px', color: '#6A7E95', background: 'rgba(255,255,255,0.04)', padding: '1px 6px', borderRadius: '4px' }}>
+              {ACCESS_LABEL[tool.accessType]}
+            </span>
+          </div>
+          <div style={{ fontSize: '11.5px', color: '#8FA3B8', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {tool.description}
+          </div>
         </div>
       </div>
 
-      {/* Agent badge */}
+      {/* Right: Agent Badge & Auth Badge (fluid hover transition) */}
       <div style={{
-        padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 700,
-        background: agentStyle.bg, color: agentStyle.color,
-        flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: '8px',
+        flexShrink: 0, marginLeft: 'auto',
+        transition: 'all 0.2s ease',
       }}>
-        {tool.agent}
-      </div>
+        <div style={{
+          padding: '3px 8px', borderRadius: '6px', fontSize: '10.5px', fontWeight: 800,
+          background: agentStyle.bg, color: agentStyle.color,
+          border: `1px solid ${agentStyle.color}40`,
+          letterSpacing: '0.04em',
+        }}>
+          {tool.agent}
+        </div>
 
-      {/* Auth badge */}
-      <div style={{
-        padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-        background: badge.bg, color: badge.color,
-        flexShrink: 0, whiteSpace: 'nowrap',
-      }}>
-        {badge.label}
+        <div style={{
+          padding: '4px 10px', borderRadius: '14px', fontSize: '11px', fontWeight: 600,
+          background: badge.bg, color: badge.color,
+          border: `1px solid ${badge.color}35`,
+          whiteSpace: 'nowrap',
+        }}>
+          {badge.label}
+        </div>
       </div>
     </div>
   );
@@ -236,9 +257,15 @@ function ToolSection({ title, tools, authorizedNames, collapsible = false }: {
         </div>
         {collapsible && (open ? <ChevronUp size={16} color="#6A7E95" /> : <ChevronDown size={16} color="#6A7E95" />)}
       </div>
-      {open && tools.map(tool => (
-        <ToolRow key={tool.name} tool={tool} isAuthorized={authorizedNames.has(tool.name)} />
-      ))}
+      {open && (
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', width: '100%' }}>
+          <div style={{ minWidth: '540px' }}>
+            {tools.map(tool => (
+              <ToolRow key={tool.name} tool={tool} isAuthorized={authorizedNames.has(tool.name)} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -272,6 +299,17 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   const [loginLoading, setLoginLoading]   = useState(false);
   const [loginError, setLoginError]       = useState('');
   const [errorMessage]                    = useState('Impossible de joindre le serveur MCP.');
+
+  // Cloudflare Turnstile state
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '1x00000000000000000000AA';
+
+  useEffect(() => {
+    if (showModal) {
+      setTurnstileToken('');
+      setLoginError('');
+    }
+  }, [showModal]);
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
@@ -332,7 +370,12 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
       const res = await fetch(`${baseUrl}/api/mcp/auth/login`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ username: loginUsername, password: loginPassword, client_id: loginClientId }),
+        body: JSON.stringify({ 
+          username: loginUsername, 
+          password: loginPassword, 
+          client_id: loginClientId,
+          turnstileToken 
+        }),
       });
 
       const data = await res.json();
@@ -386,7 +429,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: '900px' }}>
+    <div className="connector-panel-inner">
 
       {/* ── HEADER ─────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
@@ -495,19 +538,6 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
             <span style={{ fontSize: '12px', color: '#6A7E95' }}>
               {authorizedToolNames.size} outil{authorizedToolNames.size !== 1 ? 's' : ''} autorisé{authorizedToolNames.size !== 1 ? 's' : ''} sur {dynamicMetadata.length} disponibles
             </span>
-          </div>
-
-          {/* Column header */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '16px',
-            padding: '8px 20px', fontSize: '11px', color: '#6A7E95',
-            textTransform: 'uppercase', letterSpacing: '0.05em',
-            borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '8px',
-          }}>
-            <span style={{ width: '100px' }}>Type d'accès</span>
-            <span style={{ flex: 1 }}>Outil</span>
-            <span style={{ width: '50px', textAlign: 'center' }}>Agent</span>
-            <span style={{ width: '160px', textAlign: 'right' }}>Autorisation</span>
           </div>
 
           <ToolSection
@@ -639,6 +669,58 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
                 </div>
               )})}
 
+              {/* ── CLOUDFLARE ZERO TRUST / TURNSTILE VERIFICATION ── */}
+              <div style={{
+                padding: '12px 14px',
+                background: 'rgba(5, 15, 30, 0.75)',
+                border: '1px solid rgba(0, 229, 200, 0.22)',
+                borderRadius: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                boxShadow: 'inset 0 0 16px rgba(0, 229, 200, 0.04)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                      <path d="M18.5 19H6.5C4.01 19 2 16.99 2 14.5c0-2.22 1.6-4.07 3.73-4.43C6.35 6.54 9.38 4 13 4c3.95 0 7.23 2.96 7.74 6.84C22.28 11.41 23.5 12.82 23.5 14.5c0 2.49-2.01 4.5-5 4.5z" fill="url(#cf-grad-modal)" />
+                      <defs>
+                        <linearGradient id="cf-grad-modal" x1="2" y1="4" x2="23.5" y2="19" gradientUnits="userSpaceOnUse">
+                          <stop stopColor="#F6821F" />
+                          <stop offset="1" stopColor="#FAAE40" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>Cloudflare Turnstile</span>
+                        <span style={{ fontSize: '9px', background: 'rgba(246, 130, 31, 0.15)', color: '#F6821F', padding: '1px 5px', borderRadius: '4px', border: '1px solid rgba(246, 130, 31, 0.3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Zero Trust</span>
+                      </div>
+                      <div style={{ fontSize: '10.5px', color: '#6A7E95' }}>
+                        Sécurisation de la passerelle connecteur ERP
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ShieldCheck size={14} color={turnstileToken ? '#00E5C8' : '#6A7E95'} />
+                    <span style={{ fontSize: '10.5px', fontWeight: 600, color: turnstileToken ? '#00E5C8' : '#8FA3B8' }}>
+                      {turnstileToken ? 'Vérifié' : 'Requis'}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', minHeight: '65px', alignItems: 'center' }}>
+                  <Turnstile
+                    key={showModal ? 'modal-open' : 'modal-closed'}
+                    siteKey={siteKey}
+                    options={{ theme: 'dark', size: 'normal' }}
+                    onSuccess={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken('')}
+                    onError={() => setTurnstileToken('')}
+                  />
+                </div>
+              </div>
+
               {loginError && (
                 <div style={{
                   color: '#ff4757', fontSize: '13px',
@@ -651,18 +733,23 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
                 </div>
               )}
 
-              <button type="submit" disabled={loginLoading} style={{
-                width: '100%',
-                background: 'rgba(255,255,255,0.05)',
-                color: '#fff',
-                border: '1px solid rgba(255,255,255,0.12)',
-                padding: '13px', borderRadius: '12px',
-                fontSize: '14px', fontWeight: 600, cursor: 'pointer',
-                marginTop: '4px', transition: 'background 0.2s',
-                opacity: loginLoading ? 0.7 : 1,
-              }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-                onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+              <button 
+                type="submit" 
+                disabled={loginLoading || !turnstileToken} 
+                style={{
+                  width: '100%',
+                  background: (!turnstileToken || loginLoading)
+                    ? 'rgba(255,255,255,0.05)'
+                    : 'linear-gradient(90deg, #00E5C8 0%, #21F3D6 100%)',
+                  color: (!turnstileToken || loginLoading) ? '#8FA3B8' : '#021010',
+                  border: (!turnstileToken || loginLoading) ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                  padding: '13px', borderRadius: '12px',
+                  fontSize: '14px', fontWeight: 700, 
+                  cursor: (!turnstileToken || loginLoading) ? 'not-allowed' : 'pointer',
+                  marginTop: '4px', transition: 'all 0.2s',
+                  opacity: loginLoading ? 0.7 : 1,
+                  boxShadow: (turnstileToken && !loginLoading) ? '0 0 18px rgba(0, 229, 200, 0.25)' : 'none',
+                }}
               >
                 {loginLoading ? 'Connexion…' : 'Se connecter'}
               </button>

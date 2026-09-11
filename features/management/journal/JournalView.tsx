@@ -342,13 +342,13 @@ export const JournalView: React.FC = () => {
       </div>
 
       <div className="scroll">
-        <div className="exec-panel" style={{ marginTop: 0, padding: 0, overflow: 'hidden', background: 'rgba(20, 27, 45, 0.7)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
-          <div style={{ width: '100%' }}>
+        <div className="exec-panel" style={{ marginTop: 0, padding: 0, overflowX: 'auto', WebkitOverflowScrolling: 'touch', background: 'rgba(20, 27, 45, 0.7)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '12px' }}>
+          <div style={{ width: '100%', minWidth: '720px' }}>
 
             {/* Table Header */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '160px 250px 1fr 110px',
+              gridTemplateColumns: '150px 220px 1fr 110px',
               gap: '1rem',
               padding: '0.85rem 1.25rem',
               background: 'rgba(10, 15, 28, 0.8)',
@@ -389,7 +389,7 @@ export const JournalView: React.FC = () => {
                 return (
                   <div key={log.id} style={{
                     display: 'grid',
-                    gridTemplateColumns: '160px 250px 1fr 110px',
+                    gridTemplateColumns: '150px 220px 1fr 110px',
                     gap: '1rem',
                     alignItems: 'center',
                     padding: '0.75rem 1.25rem',

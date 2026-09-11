@@ -25,6 +25,7 @@ export function ProspectAgentExecutionModal({ agent, onClose, onToast }: Prospec
   const [stats, setStats] = useState<any>(null);
   const [isAIEvaluating, setIsAIEvaluating] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isExecuting, setIsExecuting] = useState<boolean>(() => !!agent?.is_executing);
 
   const publicId = agent.uuid || (agent as any).agent_id;
 
@@ -48,6 +49,17 @@ export function ProspectAgentExecutionModal({ agent, onClose, onToast }: Prospec
   }, [publicId]);
 
   useProspectSocket((payload) => {
+    if (typeof payload.is_executing === 'boolean' && (payload.agent_id || payload.uuid)) {
+      const targetId = String(payload.uuid || payload.agent_id || '').toLowerCase();
+      const aUuid = String(agent.uuid || '').toLowerCase();
+      const aAgentId = String(agent.agent_id || '').toLowerCase();
+      const aName = String(agent.agent_name || (agent as any).nom || '').toLowerCase();
+
+      if (targetId === aUuid || targetId === aAgentId || targetId === aName) {
+        setIsExecuting(payload.is_executing);
+      }
+    }
+
     getProspectAgentStats(publicId).then(newStats => {
       setStats(newStats);
       setStep(currentStep => {
@@ -91,6 +103,10 @@ export function ProspectAgentExecutionModal({ agent, onClose, onToast }: Prospec
   };
 
   const executeAutoMode = async () => {
+    if (actionLoading || isExecuting || !!agent.is_executing) {
+      onToast("Cet agent est déjà en cours d'exécution.", 'err');
+      return;
+    }
     setActionLoading(true);
     try {
       await triggerProspectAutoMode(publicId);
@@ -325,21 +341,27 @@ export function ProspectAgentExecutionModal({ agent, onClose, onToast }: Prospec
                         </button>
                         <button
                           onClick={executeAutoMode}
-                          disabled={!!actionLoading || stats.qualified_leads === 0}
+                          disabled={!!actionLoading || stats.qualified_leads === 0 || isExecuting || !!agent.is_executing}
                           style={{
-                            background: 'var(--cyan)', color: '#000', padding: '16px', fontSize: 16, fontWeight: 700,
+                            background: (isExecuting || !!agent.is_executing) ? 'rgba(255, 255, 255, 0.1)' : 'var(--cyan)',
+                            color: (isExecuting || !!agent.is_executing) ? 'var(--muted)' : '#000',
+                            padding: '16px', fontSize: 16, fontWeight: 700,
                             width: '70%', borderRadius: 12, border: 'none',
-                            cursor: stats.qualified_leads === 0 ? 'not-allowed' : 'pointer',
-                            boxShadow: stats.qualified_leads === 0 ? 'none' : '0 0 20px rgba(0, 229, 200, 0.4)',
+                            cursor: (stats.qualified_leads === 0 || isExecuting || !!agent.is_executing) ? 'not-allowed' : 'pointer',
+                            boxShadow: (stats.qualified_leads === 0 || isExecuting || !!agent.is_executing) ? 'none' : '0 0 20px rgba(0, 229, 200, 0.4)',
                             display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12,
-                            opacity: (actionLoading || stats.qualified_leads === 0) ? 0.5 : 1, transition: 'all 0.2s',
-                            filter: stats.qualified_leads === 0 ? 'grayscale(100%)' : 'none'
+                            opacity: (actionLoading || stats.qualified_leads === 0 || isExecuting || !!agent.is_executing) ? 0.5 : 1, transition: 'all 0.2s',
+                            filter: (stats.qualified_leads === 0 && !isExecuting && !agent.is_executing) ? 'grayscale(100%)' : 'none'
                           }}
-                          onMouseOver={(e) => { if (stats.qualified_leads > 0) e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 229, 200, 0.6)' }}
-                          onMouseOut={(e) => { if (stats.qualified_leads > 0) e.currentTarget.style.boxShadow = '0 0 20px rgba(0, 229, 200, 0.4)' }}
+                          onMouseOver={(e) => { if (stats.qualified_leads > 0 && !isExecuting && !agent.is_executing) e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 229, 200, 0.6)' }}
+                          onMouseOut={(e) => { if (stats.qualified_leads > 0 && !isExecuting && !agent.is_executing) e.currentTarget.style.boxShadow = '0 0 20px rgba(0, 229, 200, 0.4)' }}
                         >
-                          <Play size={20} fill="#000" />
-                          {actionLoading ? 'Lancement en cours...' : 'Lancer la campagne d\'emails'}
+                          <Play size={20} fill={(isExecuting || !!agent.is_executing) ? 'var(--muted)' : '#000'} />
+                          {isExecuting || !!agent.is_executing
+                            ? '⚡ Campagne déjà en cours...'
+                            : actionLoading
+                            ? 'Lancement en cours...'
+                            : "Lancer la campagne d'emails"}
                         </button>
                       </div>
                     </motion.div>

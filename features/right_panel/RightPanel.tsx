@@ -52,9 +52,57 @@ interface RightPanelProps {
 }
 
 import { KpiCacheProvider, useKpis } from '../../shared/contexts/KpiCacheContext';
+import { jwtDecode } from 'jwt-decode';
 
 const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, activeAgentId }) => {
   const { startDate, endDate, updateGlobalDates, error, clearError, fetchKpis, kpisByAgent } = useKpis();
+  const [isErpConnected, setIsErpConnected] = React.useState<boolean>(false);
+  const [allowedAgents, setAllowedAgents] = React.useState<string[]>([]);
+  const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
+
+  const checkPermissions = () => {
+    if (typeof window === 'undefined') return;
+    const mcpToken = localStorage.getItem('vmind_mcp_token');
+    const connected = Boolean(mcpToken);
+    setIsErpConnected(connected);
+
+    const storedAllowed = localStorage.getItem('vmind_allowed_agents');
+    if (storedAllowed) {
+      try {
+        setAllowedAgents(JSON.parse(storedAllowed));
+      } catch (e) {
+        setAllowedAgents([]);
+      }
+    } else {
+      setAllowedAgents([]);
+    }
+
+    const token = mcpToken || localStorage.getItem('vmind_session');
+    if (token) {
+      try {
+        let raw = token;
+        if (token.startsWith('{')) raw = JSON.parse(token).token;
+        const decoded: any = jwtDecode(raw);
+        setIsAdmin(Boolean(decoded.roles && decoded.roles.includes('Administrators')));
+        if (!storedAllowed && decoded.allowedAgents) {
+          setAllowedAgents(decoded.allowedAgents);
+        }
+      } catch (e) {
+        setIsAdmin(false);
+      }
+    } else {
+      setIsAdmin(false);
+    }
+  };
+
+  React.useEffect(() => {
+    checkPermissions();
+    window.addEventListener('mcp-session-updated', checkPermissions);
+    return () => window.removeEventListener('mcp-session-updated', checkPermissions);
+  }, []);
+
+  const isKpiAuthorized = isErpConnected && (isAdmin || allowedAgents.includes(activeAgentId || 'VDATA'));
+
   const [performances, setPerformances] = React.useState<Record<string, number>>({
     VDATA: 0,
     VFIN: 0,
@@ -94,10 +142,10 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
   }, [kpisByAgent]);
 
   React.useEffect(() => {
-    if (activeAgentId === 'VDATA') {
+    if (activeAgentId === 'VDATA' && isKpiAuthorized) {
       fetchKpis('VDATA', false, 'get_score_global_vdata_kpi');
     }
-  }, [activeAgentId, startDate, endDate]);
+  }, [activeAgentId, startDate, endDate, isKpiAuthorized]);
 
   React.useEffect(() => {
     const duration = 1200;
@@ -148,127 +196,226 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
           </span>
         </div>
 
-        {/* Global Date Picker for VDATA only */}
-        {activeAgentId === 'VDATA' && (
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-              <label style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: '4px' }}>Début</label>
-              <input 
-                type="date" 
-                value={toInputValue(startDate)}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/-/g, '');
-                  if (val.length === 8) updateGlobalDates(val, endDate);
-                }}
-                style={{
-                  background: 'var(--navy3)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  color: 'var(--white)',
-                  fontSize: '11px',
-                  fontFamily: 'var(--font-mono)',
-                  padding: '4px 8px',
-                  outline: 'none'
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-              <label style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: '4px' }}>Fin</label>
-              <input 
-                type="date" 
-                value={toInputValue(endDate)}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/-/g, '');
-                  if (val.length === 8) updateGlobalDates(startDate, val);
-                }}
-                style={{
-                  background: 'var(--navy3)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '4px',
-                  color: 'var(--white)',
-                  fontSize: '11px',
-                  fontFamily: 'var(--font-mono)',
-                  padding: '4px 8px',
-                  outline: 'none'
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Global Error Banner */}
-        {error && (
-          <div style={{ 
-            background: 'rgba(255, 71, 87, 0.12)', 
-            border: '1px solid rgba(255, 71, 87, 0.3)', 
-            color: 'var(--red)', 
-            fontSize: '10px', 
-            padding: '6px 12px', 
-            borderRadius: '4px', 
-            marginBottom: '16px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <span>{error}</span>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <button 
+        {!isKpiAuthorized ? (
+          !isErpConnected ? (
+            <div style={{
+              padding: '24px 16px',
+              backgroundColor: 'rgba(6, 17, 31, 0.7)',
+              backgroundImage: 'radial-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 0)',
+              backgroundSize: '12px 12px',
+              border: '1px solid rgba(0, 240, 255, 0.16)',
+              borderRadius: '10px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '12px',
+              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4)',
+              margin: '8px 0 16px 0'
+            }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: 'rgba(0, 240, 255, 0.08)',
+                border: '1px solid rgba(0, 240, 255, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '20px'
+              }}>
+                🔌
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--white)' }}>
+                Connecteur ERP Requis
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5', maxWidth: '280px' }}>
+                Connectez votre connecteur ERP pour débloquer les indicateurs de performance en temps réel et les outils avancés de cet agent.
+              </div>
+              <button
                 onClick={() => {
-                  const lowerAgent = (activeAgentId || 'VDATA').toLowerCase();
-                  fetchKpis(lowerAgent, true);
-                }} 
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  color: 'var(--red)', 
-                  cursor: 'pointer', 
-                  fontWeight: 'bold', 
-                  fontSize: '14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  padding: 0,
-                  transform: 'translateY(-0.5px)'
+                  window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'connectors' }));
                 }}
-                title="Réessayer"
+                style={{
+                  marginTop: '4px',
+                  padding: '7px 14px',
+                  borderRadius: '6px',
+                  background: 'rgba(0, 240, 255, 0.12)',
+                  border: '1px solid rgba(0, 240, 255, 0.3)',
+                  color: '#00f0ff',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(0, 240, 255, 0.2)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(0, 240, 255, 0.12)'}
               >
-                ↻
+                Accéder aux Connecteurs →
               </button>
-              <button onClick={clearError} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', padding: 0 }}>✕</button>
             </div>
-          </div>
+          ) : (
+            <div style={{
+              padding: '20px 16px',
+              backgroundColor: 'rgba(255, 170, 0, 0.04)',
+              border: '1px solid rgba(255, 170, 0, 0.2)',
+              borderRadius: '10px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '10px',
+              margin: '8px 0 16px 0'
+            }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '8px',
+                background: 'rgba(255, 170, 0, 0.1)',
+                border: '1px solid rgba(255, 170, 0, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px'
+              }}>
+                🔒
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffaa00' }}>
+                Accès aux données restreint
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' }}>
+                Accès aux données et indicateurs TraLIS non autorisé pour cet agent. Vous pouvez échanger avec l'agent pour des questions métier ou contacter un administrateur.
+              </div>
+            </div>
+          )
+        ) : (
+          <>
+            {/* Global Date Picker for VDATA only */}
+            {activeAgentId === 'VDATA' && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  <label style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: '4px' }}>Début</label>
+                  <input 
+                    type="date" 
+                    value={toInputValue(startDate)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/-/g, '');
+                      if (val.length === 8) updateGlobalDates(val, endDate);
+                    }}
+                    style={{
+                      background: 'var(--navy3)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '4px',
+                      color: 'var(--white)',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                      padding: '4px 8px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  <label style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: '4px' }}>Fin</label>
+                  <input 
+                    type="date" 
+                    value={toInputValue(endDate)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/-/g, '');
+                      if (val.length === 8) updateGlobalDates(startDate, val);
+                    }}
+                    style={{
+                      background: 'var(--navy3)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '4px',
+                      color: 'var(--white)',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                      padding: '4px 8px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Global Error Banner */}
+            {error && (
+              <div style={{ 
+                background: 'rgba(255, 71, 87, 0.12)', 
+                border: '1px solid rgba(255, 71, 87, 0.3)', 
+                color: 'var(--red)', 
+                fontSize: '10px', 
+                padding: '6px 12px', 
+                borderRadius: '4px', 
+                marginBottom: '16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span>{error}</span>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => {
+                      const lowerAgent = (activeAgentId || 'VDATA').toLowerCase();
+                      fetchKpis(lowerAgent, true);
+                    }} 
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      color: 'var(--red)', 
+                      cursor: 'pointer', 
+                      fontWeight: 'bold', 
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 0,
+                      transform: 'translateY(-0.5px)'
+                    }}
+                    title="Réessayer"
+                  >
+                    ↻
+                  </button>
+                  <button onClick={clearError} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', padding: 0 }}>✕</button>
+                </div>
+              </div>
+            )}
+            <ScoreGlobalCard activeAgentId={activeAgentId} />
+            <VsellTopClientsCard activeAgentId={activeAgentId} />
+            <VsellNewClientsCard activeAgentId={activeAgentId} />
+            <VsellInactiveClientsCard activeAgentId={activeAgentId} />
+            <VsellRevenuClientBarChart activeAgentId={activeAgentId} />
+            <VsellFidelisationChartCard activeAgentId={activeAgentId} />
+            <VsellPipelineFunnelCard activeAgentId={activeAgentId} />
+            <VfinMonthlyRevenueCard activeAgentId={activeAgentId} />
+            <VfinOverdueCard activeAgentId={activeAgentId} />
+            <VfinSixMonthChartCard activeAgentId={activeAgentId} />
+            <VfinMarginCard activeAgentId={activeAgentId} />
+            <VfinTopClientsCard activeAgentId={activeAgentId} />
+            <VfinTresorerieCard activeAgentId={activeAgentId} />
+            <VbuyFacturesAReglerCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+            <VbuyAchatsDuMoisCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+            <VbuyFournisseursEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+            <VbuyCommandesEnAttenteCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+            <VbuyRepartitionCategoriePieCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+            <VmoveBlNonFacturesCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+            <VmoveActiveFlowsMapCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+            <VmoveDossiersOuvertsCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+            <VmoveDossiersEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+            <VmoveVolumeTransporteurCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+            <VolumeLineChart activeAgentId={activeAgentId} />
+            <DeliveryRateKpi activeAgentId={activeAgentId} /> 
+            <MultiIndicatorsCard activeAgentId={activeAgentId} />
+            <LatestReportCard activeAgentId={activeAgentId} />
+            <AlertsCard activeAgentId={activeAgentId} />
+          </>
         )}
-        <ScoreGlobalCard activeAgentId={activeAgentId} />
-        <VsellTopClientsCard activeAgentId={activeAgentId} />
-        <VsellNewClientsCard activeAgentId={activeAgentId} />
-        <VsellInactiveClientsCard activeAgentId={activeAgentId} />
-        <VsellRevenuClientBarChart activeAgentId={activeAgentId} />
-        <VsellFidelisationChartCard activeAgentId={activeAgentId} />
-        <VsellPipelineFunnelCard activeAgentId={activeAgentId} />
-        <VfinMonthlyRevenueCard activeAgentId={activeAgentId} />
-        <VfinOverdueCard activeAgentId={activeAgentId} />
-        <VfinSixMonthChartCard activeAgentId={activeAgentId} />
-        <VfinMarginCard activeAgentId={activeAgentId} />
-        <VfinTopClientsCard activeAgentId={activeAgentId} />
-        <VfinTresorerieCard activeAgentId={activeAgentId} />
-        <VbuyFacturesAReglerCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-        <VbuyAchatsDuMoisCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-        <VbuyFournisseursEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-        <VbuyCommandesEnAttenteCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-        <VbuyRepartitionCategoriePieCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-        <VmoveBlNonFacturesCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-        <VmoveActiveFlowsMapCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-        <VmoveDossiersOuvertsCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-        <VmoveDossiersEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-        <VmoveVolumeTransporteurCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-        <VolumeLineChart activeAgentId={activeAgentId} />
-        <DeliveryRateKpi activeAgentId={activeAgentId} /> 
-        <MultiIndicatorsCard activeAgentId={activeAgentId} />
-        <LatestReportCard activeAgentId={activeAgentId} />
-        <AlertsCard activeAgentId={activeAgentId} />
       </div>
 
       {/* Performance par Domaine */}
-      {activeAgentId === 'VDATA' && (
+      {activeAgentId === 'VDATA' && isKpiAuthorized && (
         <div className="rp-section">
           <div className="rp-title" style={{ marginBottom: '14px' }}>Performance par Domaine</div>
         
@@ -464,17 +611,19 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
     )}
 
       {/* Activity Log */}
-      <div className="rp-section">
-        <div className="rp-title">Journal d'Activité</div>
-        <div id="activity-log">
-          {logs.map((log) => (
-            <div key={log.id} className="log-item">
-              <div className="log-time">{log.time}</div>
-              <div className="log-text"><span>{log.agent}</span> — {log.action}</div>
-            </div>
-          ))}
+      {logs && logs.length > 0 && (
+        <div className="rp-section">
+          <div className="rp-title">Journal d'Activité</div>
+          <div id="activity-log">
+            {logs.map((log) => (
+              <div key={log.id} className="log-item">
+                <div className="log-time">{log.time}</div>
+                <div className="log-text"><span>{log.agent}</span> — {log.action}</div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

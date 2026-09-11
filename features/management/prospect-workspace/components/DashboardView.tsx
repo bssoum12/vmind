@@ -260,6 +260,23 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
           const icp = agentConfig.icp || {};
           const mission = agentConfig.agent_mission || '';
 
+          const parseList = (val: any): string[] => {
+            if (!val) return [];
+            if (Array.isArray(val)) return val.filter(Boolean).map(String);
+            if (typeof val === 'string') {
+              try {
+                const parsed = JSON.parse(val);
+                if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
+              } catch (_) {}
+              return val.split(',').map((s: string) => s.trim()).filter(Boolean);
+            }
+            return [];
+          };
+
+          const postesList = parseList(icp.poste_contact);
+          const secteursList = parseList(icp.secteur_activite);
+          const zonesList = parseList(icp.zone_geo);
+
           const poids = [
             { label: 'Secteur d\'Activité', value: icp.poids_secteur || 25, color: '#3B82F6', icon: <Building2 size={16} color="#3B82F6" /> },
             { label: 'Poste du Contact', value: icp.poids_poste || 25, color: '#10B981', icon: <User size={16} color="#10B981" /> },
@@ -362,7 +379,7 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
                   <div className="label">Filtres Spécifiques Actifs</div>
                   <div className="value-container">
                     <span className="value-blue">
-                      {(icp.poste_contact?.length || 0) + (icp.secteur_activite?.length || 0) + (icp.zone_geo?.length || 0)}
+                      {postesList.length + secteursList.length + zonesList.length}
                     </span>
                     <span className="unit">règles de ciblage</span>
                   </div>
@@ -398,9 +415,9 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
                   <div className="target-title green" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <User size={15} color="#10B981" /> Postes Ciblés
                   </div>
-                  {icp.poste_contact && icp.poste_contact.length > 0 ? (
+                  {postesList.length > 0 ? (
                     <div className="tags-wrapper">
-                      {icp.poste_contact.map((p: string, i: number) => (
+                      {postesList.map((p: string, i: number) => (
                         <span key={i} className="tag tag-green">{p}</span>
                       ))}
                     </div>
@@ -414,9 +431,9 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
                   <div className="target-title blue" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Building2 size={15} color="#3B82F6" /> Secteurs d'Activité
                   </div>
-                  {icp.secteur_activite && icp.secteur_activite.length > 0 ? (
+                  {secteursList.length > 0 ? (
                     <div className="tags-wrapper">
-                      {icp.secteur_activite.map((s: string, i: number) => (
+                      {secteursList.map((s: string, i: number) => (
                         <span key={i} className="tag tag-blue">{s}</span>
                       ))}
                     </div>
@@ -430,9 +447,9 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
                   <div className="target-title purple" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Globe size={15} color="#8B5CF6" /> Zones Géographiques
                   </div>
-                  {icp.zone_geo && icp.zone_geo.length > 0 ? (
+                  {zonesList.length > 0 ? (
                     <div className="tags-wrapper">
-                      {icp.zone_geo.map((z: string, i: number) => (
+                      {zonesList.map((z: string, i: number) => (
                         <span key={i} className="tag tag-purple">{z}</span>
                       ))}
                     </div>

@@ -146,21 +146,14 @@ export const ConnectorsHub: React.FC = () => {
   };
 
   return (
-    <div style={{
-      display: 'flex',
-      width: '100%',
-      height: '100%',
-      backgroundColor: '#050B16',
-      color: '#fff',
-      fontFamily: "'Inter', sans-serif",
-    }}>
+    <div className="connectors-hub-wrap">
       <ConnectorsCatalog
         activeConnector={activeConnector}
         onSelectConnector={setActiveConnector}
         tralisConnected={tralisStatus === 'connected'}
       />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '40px' }}>
+      <div className="connectors-content-panel">
         {/* 
           IMPORTANT: We always render TralisConnectorPanel (hidden via CSS when 
           inactive) so it never unmounts and never loses its parent-managed state.

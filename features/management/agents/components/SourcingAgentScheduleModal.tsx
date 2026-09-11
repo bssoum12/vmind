@@ -4,6 +4,7 @@ import { X, CalendarClock, Settings, Play, Database, Target } from 'lucide-react
 import { LiveAgent } from '../AgentsView';
 import { OnboardingChat } from '../../wizard/components/OnboardingChat';
 import { VMindGuide } from '@/shared/management/components/VMindGuide';
+import { extractIcpFromAgent, buildSourcingConclusionFromIcp } from '../../wizard/helpers/sourcingIcpHelper';
 
 export interface TriggerRule {
   interval: string;
@@ -74,15 +75,21 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
   });
 
   const [availableProspectAgents, setAvailableProspectAgents] = useState<any[]>([]);
+  const [isLoadingProspects, setIsLoadingProspects] = useState<boolean>(true);
   const [isCustomizingTargets, setIsCustomizingTargets] = useState(false);
   const [selectedTargetAgentIds, setSelectedTargetAgentIds] = useState<string[]>(() => {
     const ids = agent?.config?.target_agent_ids || (agent as any)?.target_agent_ids || [];
     return Array.isArray(ids) ? ids.map(id => String(id)) : [];
   });
 
+  const autoConcludedRef = React.useRef(false);
+  const userModifiedChatRef = React.useRef(false);
+
   React.useEffect(() => {
+    let isMounted = true;
     const fetchProspectAgents = async () => {
       try {
+        setIsLoadingProspects(true);
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
         const tokenStr = localStorage.getItem('vmind_session');
         let token = tokenStr;
@@ -92,7 +99,7 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
         const res = await fetch(`${baseUrl}/api/list-agents`, {
           headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
         });
-        if (res.ok) {
+        if (res.ok && isMounted) {
           const data = await res.json();
           if (data.ok && Array.isArray(data.agents)) {
             setAvailableProspectAgents(data.agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement')));
@@ -100,9 +107,14 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
         }
       } catch (err) {
         console.error("Failed to fetch prospect agents:", err);
+      } finally {
+        if (isMounted) {
+          setIsLoadingProspects(false);
+        }
       }
     };
     fetchProspectAgents();
+    return () => { isMounted = false; };
   }, []);
 
   const getAgentTargetId = (pa: any): string => {
@@ -122,6 +134,39 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
     });
   };
 
+  // Auto-conclude targeting from target Prospect Agent's ICP when exactly 1 target agent is selected
+  React.useEffect(() => {
+    if (userModifiedChatRef.current) return;
+
+    if (selectedTargetAgentIds.length === 1 && availableProspectAgents.length > 0) {
+      const targetId = selectedTargetAgentIds[0].toLowerCase();
+      const targetAgent = availableProspectAgents.find((pa: any) => {
+        const paUuid = String(pa.uuid || '').toLowerCase();
+        const paAgentId = String(pa.agent_id || '').toLowerCase();
+        const paName = String(pa.agent_name || pa.nom || '').toLowerCase();
+        return (paUuid && paUuid === targetId) || (paAgentId && paAgentId === targetId) || (paName && paName === targetId);
+      });
+
+      if (targetAgent) {
+        const icp = extractIcpFromAgent(targetAgent);
+        if (icp) {
+          const autoConclusion = buildSourcingConclusionFromIcp(icp);
+          if (autoConclusion) {
+            setSourcingSummary(autoConclusion);
+            autoConcludedRef.current = true;
+            return;
+          }
+        }
+      }
+    }
+
+    // If more than 1 target agent is selected (or 0) and we previously auto-concluded, revert to open chat or saved mission
+    if (selectedTargetAgentIds.length !== 1 && autoConcludedRef.current) {
+      setSourcingSummary(savedMission || '');
+      autoConcludedRef.current = false;
+    }
+  }, [selectedTargetAgentIds, availableProspectAgents, savedMission]);
+
   React.useEffect(() => {
     const mission = (
       agent?.config?.agent_mission || 
@@ -130,7 +175,7 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
       (agent as any)?.agentSettings?.agent_mission || 
       ''
     ).trim();
-    if (mission && !sourcingSummary) {
+    if (mission && !sourcingSummary && !autoConcludedRef.current) {
       setSourcingSummary(mission);
     }
   }, [agent]);
@@ -405,12 +450,22 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
                 </div>
 
                 <div style={{ flex: 1, minHeight: 400, border: '1px solid rgba(255,255,255,0.05)', borderRadius: 16, overflow: 'hidden' }}>
-                  <OnboardingChat
-                    key={`${agent?.uuid || agent?.agent_name}_${sourcingSummary ? 'with_mission' : 'empty'}`}
-                    initialMission={sourcingSummary}
-                    onConfirm={handleChatConfirm}
-                    apiEndpoint="/api/sourcing-agent/execution-chat"
-                  />
+                  {isLoadingProspects && !sourcingSummary ? (
+                    <div style={{ height: '100%', minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'var(--navy2)' }}>
+                      <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
+                        <Target size={24} color="var(--cyan)" />
+                      </motion.div>
+                      <span style={{ fontSize: 13, color: 'var(--muted)' }}>Synchronisation des paramètres du profil cible...</span>
+                    </div>
+                  ) : (
+                    <OnboardingChat
+                      key={`${agent?.uuid || agent?.agent_name}_${selectedTargetAgentIds.join('_')}_${sourcingSummary ? 'with_mission' : 'empty'}`}
+                      initialMission={sourcingSummary}
+                      onConfirm={handleChatConfirm}
+                      onModify={() => { userModifiedChatRef.current = true; }}
+                      apiEndpoint="/api/sourcing-agent/execution-chat"
+                    />
+                  )}
                 </div>
               </motion.div>
             )}

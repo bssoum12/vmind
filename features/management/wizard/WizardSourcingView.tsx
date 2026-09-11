@@ -90,9 +90,12 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
     }
 
     if (initialTargetIds.length === 0 && typeof window !== 'undefined') {
+      const savedSourcingTarget = sessionStorage.getItem('vmind_sourcing_target_agent');
       const savedLinkUuid = sessionStorage.getItem('vmind_guide_link_prospect_uuid');
       const savedLinkName = sessionStorage.getItem('vmind_guide_link_prospect_name');
-      if (savedLinkUuid) {
+      if (savedSourcingTarget) {
+        initialTargetIds = [savedSourcingTarget];
+      } else if (savedLinkUuid) {
         initialTargetIds = [savedLinkUuid];
       } else if (savedLinkName) {
         initialTargetIds = [savedLinkName];
@@ -108,6 +111,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
           } catch (e) {}
         }
       }
+      sessionStorage.removeItem('vmind_sourcing_target_agent');
       sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
       sessionStorage.removeItem('vmind_guide_link_prospect_name');
     }

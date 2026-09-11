@@ -22,6 +22,7 @@ import { ProspectAgentExecutionModal } from './components/ProspectAgentExecution
 import { SourcingAgentExecutionModal } from './components/SourcingAgentExecutionModal';
 import { ProspectAgentScheduleModal } from './components/ProspectAgentScheduleModal';
 import { SourcingAgentScheduleModal } from './components/SourcingAgentScheduleModal';
+import { DeleteAgentConfirmModal } from './components/DeleteAgentConfirmModal';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
 import { useToast } from '@/shared/contexts/ToastContext';
 
@@ -359,6 +360,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   // Auto Mode Modal State
   const [runModalAgent, setRunModalAgent] = useState<LiveAgent | null>(null);
   const [scheduleModalAgent, setScheduleModalAgent] = useState<LiveAgent | null>(null);
+  const [deleteModalAgent, setDeleteModalAgent] = useState<LiveAgent | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   // Tutorial state
   const [tutorialStep, setTutorialStep] = useState<number>(0);
@@ -628,22 +631,34 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     }
   };
 
-  const handleDelete = async (agent: LiveAgent) => {
-    if (!window.confirm(`Supprimer définitivement "${agent.agent_name}" ?`)) return;
-    setActionLoading(agent.agent_name);
+  const handleDelete = (agent: LiveAgent) => {
+    setDeleteModalAgent(agent);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteModalAgent) return;
+    setIsDeleting(true);
+    setActionLoading(deleteModalAgent.agent_name);
     try {
-      await deleteAgent(agent.agent_name);
-      showToast(`Agent "${agent.agent_name}" supprimé.`);
-      if (selected?.agent_name === agent.agent_name) setSelected(null);
+      await deleteAgent(deleteModalAgent.agent_name);
+      showToast(`Agent "${deleteModalAgent.agent_name}" supprimé avec succès.`);
+      if (selected?.agent_name === deleteModalAgent.agent_name) setSelected(null);
+      setDeleteModalAgent(null);
       await refresh();
     } catch (e: any) {
       showToast(e.message, 'err');
     } finally {
+      setIsDeleting(false);
       setActionLoading(null);
     }
   };
 
   const handleRunNow = async (agent: LiveAgent) => {
+    if (agent.is_executing) {
+      showToast("Cet agent est déjà en cours d'exécution.", 'err');
+      return;
+    }
+
     if (agent.run_mode === 'prospection' || agent.run_mode === 'sourcing') {
       const publicId = (agent as any).agent_id;
       if (!publicId) {
@@ -823,12 +838,12 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           <div className="page-sub">Gérez et surveillez vos employés virtuels en temps réel</div>
         </div>
         <div className="page-actions" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button className="btn" onClick={restartTutorial} style={{ background: 'rgba(0, 229, 200, 0.1)', color: '#00E5C8', border: '1px solid rgba(0, 229, 200, 0.3)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <Info size={13} />
+          <button className="btn" onClick={restartTutorial} style={{ background: 'rgba(0, 229, 200, 0.1)', color: '#00E5C8', border: '1px solid rgba(0, 229, 200, 0.3)', display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '11px', padding: '4px 10px', height: '28px', whiteSpace: 'nowrap' }}>
+            <Info size={12} />
             Relancer le tutoriel
           </button>
-          <button className="btn" onClick={refresh} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <RefreshCw size={13} />
+          <button className="btn" onClick={refresh} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '11px', padding: '4px 10px', height: '28px', whiteSpace: 'nowrap' }}>
+            <RefreshCw size={12} />
             Rafraîchir
           </button>
         </div>
@@ -837,7 +852,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
       <div className="scroll" style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
 
         {/* ── Table ── */}
-        <div className="agents-table-wrap" style={{ flex: 1, minWidth: 0, overflow: tutorialStep > 0 ? 'visible' : 'hidden' }}>
+        <div className="agents-table-wrap" style={{ flex: 1, minWidth: 0, width: '100%', overflowX: tutorialStep > 0 ? 'visible' : 'auto', WebkitOverflowScrolling: 'touch' }}>
           {loading && (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--muted)' }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
@@ -867,14 +882,14 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           )}
 
           {!loading && agents.length > 0 && (
-            <table className="agents-table">
+            <table className="agents-table" style={{ width: '100%', minWidth: '780px', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left', fontSize: '13px' }}>
               <thead>
-                <tr>
-                  <th>Agent</th>
-                  <th>Planification</th>
-                  <th>Statut</th>
-                  <th>Dernière exéc.</th>
-                  <th>Actions</th>
+                <tr style={{ borderBottom: '1px solid rgba(0, 229, 200, 0.12)', color: '#00E5C8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
+                  <th style={{ padding: '10px 16px', position: 'sticky', left: 0, zIndex: 6, background: '#091B33', width: '220px', minWidth: '220px' }}>Agent</th>
+                  <th style={{ padding: '10px 16px', position: 'sticky', left: '220px', zIndex: 6, background: '#091B33', width: '130px', minWidth: '130px', boxShadow: '4px 0 10px rgba(0,0,0,0.45)' }}>Statut</th>
+                  <th style={{ padding: '10px 16px', minWidth: '150px' }}>Planification</th>
+                  <th style={{ padding: '10px 16px', minWidth: '140px' }}>Dernière exéc.</th>
+                  <th style={{ padding: '10px 16px', textAlign: 'right', minWidth: '160px' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -901,13 +916,14 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         pointerEvents: tutorialStep > 0 ? 'none' : undefined,
                         background: isTutorialActive && tutorialStep === 1 ? 'rgba(0, 229, 200, 0.12)' : isSelected ? 'rgba(0,229,160,0.06)' : undefined,
                         borderLeft: isSelected ? '3px solid #00E5A0' : '3px solid transparent',
+                        borderBottom: '1px solid rgba(255,255,255,0.03)',
                         transition: 'all .15s',
                         position: isTutorialActive ? 'relative' : undefined,
                         zIndex: isTutorialActive ? 10001 : undefined,
                         boxShadow: isTutorialActive && tutorialStep === 1 ? '0 0 0 4px rgba(0, 229, 200, 0.85)' : undefined,
                       }}
                     >
-                      <td>
+                      <td style={{ padding: '12px 16px', position: 'sticky', left: 0, zIndex: 4, background: '#061426', width: '220px', minWidth: '220px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
                           {isTutorialActive && tutorialStep === 1 && (
                             <VMindGuideArrow
@@ -941,13 +957,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         </div>
                       </td>
 
-                      <td>
-                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                          {agent.schedule_id ? triggerRuleSummary(agent.trigger_rules) : 'Aucune règle'}
-                        </div>
-                      </td>
-
-                      <td>
+                      <td style={{ padding: '12px 16px', position: 'sticky', left: '220px', zIndex: 4, background: '#061426', width: '130px', minWidth: '130px', boxShadow: '4px 0 10px rgba(0,0,0,0.45)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           {agent.is_executing ? (
                             <span style={{
@@ -976,11 +986,17 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         </div>
                       </td>
 
-                      <td style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                          {agent.schedule_id ? triggerRuleSummary(agent.trigger_rules) : 'Aucune règle'}
+                        </div>
+                      </td>
+
+                      <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--muted)' }}>
                         {formatDate(agent.lastExecuted)}
                       </td>
 
-                      <td onClick={e => e.stopPropagation()}>
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
                         <div className="row-actions">
                           {/* Run Now - Tutorial Step 3 */}
                           <button
@@ -1219,11 +1235,16 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
             <div style={{ marginTop: 20, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 className="btn"
-                style={{ flex: 1, fontSize: 12 }}
+                style={{
+                  flex: 1,
+                  fontSize: 12,
+                  opacity: selected.is_executing ? 0.5 : 1,
+                  cursor: selected.is_executing ? 'not-allowed' : 'pointer'
+                }}
                 onClick={() => handleRunNow(selected)}
-                disabled={actionLoading === selected.agent_name}
+                disabled={actionLoading === selected.agent_name || !!selected.is_executing}
               >
-                ▶ Exécuter maintenant
+                {selected.is_executing ? '⚡ En cours...' : '▶ Exécuter maintenant'}
               </button>
               <button
                 className="row-btn"
@@ -1348,6 +1369,15 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           }}
         />
       )}
+
+      {/* ── DELETE CONFIRMATION MODAL ── */}
+      <DeleteAgentConfirmModal
+        isOpen={!!deleteModalAgent}
+        agent={deleteModalAgent}
+        onClose={() => setDeleteModalAgent(null)}
+        onConfirm={handleConfirmDelete}
+        isDeleting={isDeleting}
+      />
 
     </div>
   );
