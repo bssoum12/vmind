@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, AlertTriangle, Link2, Shield, X, Database, ChevronDown, ChevronUp, Eye, EyeOff, FileEdit, Zap } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Link2, Shield, ShieldCheck, X, Database, ChevronDown, ChevronUp, Eye, EyeOff, FileEdit, Zap } from 'lucide-react';
+import { Turnstile } from '@marsidev/react-turnstile';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -299,6 +300,17 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   const [loginError, setLoginError]       = useState('');
   const [errorMessage]                    = useState('Impossible de joindre le serveur MCP.');
 
+  // Cloudflare Turnstile state
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '1x00000000000000000000AA';
+
+  useEffect(() => {
+    if (showModal) {
+      setTurnstileToken('');
+      setLoginError('');
+    }
+  }, [showModal]);
+
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
   // Convenience aliases
@@ -358,7 +370,12 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
       const res = await fetch(`${baseUrl}/api/mcp/auth/login`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ username: loginUsername, password: loginPassword, client_id: loginClientId }),
+        body: JSON.stringify({ 
+          username: loginUsername, 
+          password: loginPassword, 
+          client_id: loginClientId,
+          turnstileToken 
+        }),
       });
 
       const data = await res.json();
@@ -652,6 +669,58 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
                 </div>
               )})}
 
+              {/* ── CLOUDFLARE ZERO TRUST / TURNSTILE VERIFICATION ── */}
+              <div style={{
+                padding: '12px 14px',
+                background: 'rgba(5, 15, 30, 0.75)',
+                border: '1px solid rgba(0, 229, 200, 0.22)',
+                borderRadius: '14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                boxShadow: 'inset 0 0 16px rgba(0, 229, 200, 0.04)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                      <path d="M18.5 19H6.5C4.01 19 2 16.99 2 14.5c0-2.22 1.6-4.07 3.73-4.43C6.35 6.54 9.38 4 13 4c3.95 0 7.23 2.96 7.74 6.84C22.28 11.41 23.5 12.82 23.5 14.5c0 2.49-2.01 4.5-5 4.5z" fill="url(#cf-grad-modal)" />
+                      <defs>
+                        <linearGradient id="cf-grad-modal" x1="2" y1="4" x2="23.5" y2="19" gradientUnits="userSpaceOnUse">
+                          <stop stopColor="#F6821F" />
+                          <stop offset="1" stopColor="#FAAE40" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, color: '#FFFFFF', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>Cloudflare Turnstile</span>
+                        <span style={{ fontSize: '9px', background: 'rgba(246, 130, 31, 0.15)', color: '#F6821F', padding: '1px 5px', borderRadius: '4px', border: '1px solid rgba(246, 130, 31, 0.3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Zero Trust</span>
+                      </div>
+                      <div style={{ fontSize: '10.5px', color: '#6A7E95' }}>
+                        Sécurisation de la passerelle connecteur ERP
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ShieldCheck size={14} color={turnstileToken ? '#00E5C8' : '#6A7E95'} />
+                    <span style={{ fontSize: '10.5px', fontWeight: 600, color: turnstileToken ? '#00E5C8' : '#8FA3B8' }}>
+                      {turnstileToken ? 'Vérifié' : 'Requis'}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', minHeight: '65px', alignItems: 'center' }}>
+                  <Turnstile
+                    key={showModal ? 'modal-open' : 'modal-closed'}
+                    siteKey={siteKey}
+                    options={{ theme: 'dark', size: 'normal' }}
+                    onSuccess={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken('')}
+                    onError={() => setTurnstileToken('')}
+                  />
+                </div>
+              </div>
+
               {loginError && (
                 <div style={{
                   color: '#ff4757', fontSize: '13px',
@@ -664,18 +733,23 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
                 </div>
               )}
 
-              <button type="submit" disabled={loginLoading} style={{
-                width: '100%',
-                background: 'rgba(255,255,255,0.05)',
-                color: '#fff',
-                border: '1px solid rgba(255,255,255,0.12)',
-                padding: '13px', borderRadius: '12px',
-                fontSize: '14px', fontWeight: 600, cursor: 'pointer',
-                marginTop: '4px', transition: 'background 0.2s',
-                opacity: loginLoading ? 0.7 : 1,
-              }}
-                onMouseOver={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
-                onMouseOut={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+              <button 
+                type="submit" 
+                disabled={loginLoading || !turnstileToken} 
+                style={{
+                  width: '100%',
+                  background: (!turnstileToken || loginLoading)
+                    ? 'rgba(255,255,255,0.05)'
+                    : 'linear-gradient(90deg, #00E5C8 0%, #21F3D6 100%)',
+                  color: (!turnstileToken || loginLoading) ? '#8FA3B8' : '#021010',
+                  border: (!turnstileToken || loginLoading) ? '1px solid rgba(255,255,255,0.12)' : 'none',
+                  padding: '13px', borderRadius: '12px',
+                  fontSize: '14px', fontWeight: 700, 
+                  cursor: (!turnstileToken || loginLoading) ? 'not-allowed' : 'pointer',
+                  marginTop: '4px', transition: 'all 0.2s',
+                  opacity: loginLoading ? 0.7 : 1,
+                  boxShadow: (turnstileToken && !loginLoading) ? '0 0 18px rgba(0, 229, 200, 0.25)' : 'none',
+                }}
               >
                 {loginLoading ? 'Connexion…' : 'Se connecter'}
               </button>
