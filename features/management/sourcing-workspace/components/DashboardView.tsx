@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Users, TrendingUp, Building2, Calendar, PauseCircle, Search, CheckCircle2, Activity, Clock, Zap, Bot, ExternalLink, Target, AlertTriangle } from 'lucide-react';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
 
 interface Lead {
   id: number;
@@ -18,6 +19,7 @@ interface DashboardViewProps {
   agent?: any;
   allAgents?: any[];
   threshold?: number;
+  onConnectProspect?: () => void;
 }
 
 function parseHourString(rawHour: any): string {
@@ -162,7 +164,8 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
   logs = [],
   agent,
   allAgents = [],
-  threshold = 60
+  threshold = 60,
+  onConnectProspect
 }) => {
   const targetAgentList = React.useMemo(() => {
     const rawTargets = agent?.target_agent_ids || agent?.config?.target_agent_ids || [];
@@ -569,11 +572,13 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
                   fontWeight: 600,
                   padding: '2px 10px',
                   borderRadius: '12px',
-                  background: targetAgentList.length > 0 ? 'rgba(0, 229, 200, 0.12)' : 'rgba(255, 184, 0, 0.12)',
-                  color: targetAgentList.length > 0 ? '#00E5C8' : '#FFB800',
-                  border: targetAgentList.length > 0 ? '1px solid rgba(0, 229, 200, 0.3)' : '1px solid rgba(255, 184, 0, 0.3)'
+                  background: targetAgentList.length > 0 ? 'rgba(0, 229, 200, 0.12)' : 'rgba(56, 189, 248, 0.12)',
+                  color: targetAgentList.length > 0 ? '#00E5C8' : '#38BDF8',
+                  border: targetAgentList.length > 0 ? '1px solid rgba(0, 229, 200, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)'
                 }}>
-                  {targetAgentList.length} {targetAgentList.length > 1 ? 'Agents Assignés' : 'Agent Assigné'}
+                  {targetAgentList.length > 0 
+                    ? `${targetAgentList.length} ${targetAgentList.length > 1 ? 'Agents Assignés' : 'Agent Assigné'}`
+                    : 'Mode Autonome (0 Agent)'}
                 </span>
               </div>
               <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '3px 0 0 0', lineHeight: 1.4 }}>
@@ -586,10 +591,10 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
         {/* Empty State vs. Interactive Cards Grid */}
         {targetAgentList.length === 0 ? (
           <div style={{
-            padding: '28px',
+            padding: '24px 28px',
             borderRadius: '14px',
-            background: 'rgba(255, 184, 0, 0.03)',
-            border: '1px dashed rgba(255, 184, 0, 0.3)',
+            background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.05) 0%, rgba(0, 229, 200, 0.03) 100%)',
+            border: '1px dashed rgba(56, 189, 248, 0.3)',
             display: 'flex',
             alignItems: 'center',
             gap: 18
@@ -598,25 +603,63 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
               width: 44,
               height: 44,
               borderRadius: 12,
-              background: 'rgba(255, 184, 0, 0.1)',
-              border: '1px solid rgba(255, 184, 0, 0.25)',
+              background: 'rgba(56, 189, 248, 0.1)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#FFB800',
-              fontSize: 22,
+              color: '#38BDF8',
               flexShrink: 0
             }}>
-              ⚠️
+              <CyberIcon name="zap" size={20} color="#38BDF8" />
             </div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#FFB800' }}>
-                Aucun Target Agent configuré
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#38BDF8' }}>
+                Mode Autonome Actif
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: 4, lineHeight: 1.4 }}>
-                Les leads sourcés sont conservés dans votre base centrale mais ne sont pas encore transmis automatiquement à un agent de prospection. Vous pouvez en sélectionner lors du prochain lancement ou dans la planification.
+              <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: 4, lineHeight: 1.4, maxWidth: 640 }}>
+                Pour automatiser l&apos;envoi de vos campagnes d&apos;emails, vous pouvez associer un <strong>Agent de Prospection</strong> lors du prochain lancement ou dans la planification Autopilot.
               </div>
             </div>
+            <button
+              type="button"
+              onClick={onConnectProspect || (() => {
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('vmind_guide_target_marketplace', 'prospection');
+                  sessionStorage.setItem('vmind_current_view', 'market');
+                  sessionStorage.setItem('vmind_mode', 'MANAGEMENT');
+                }
+                window.location.href = '/?view=market';
+              })}
+              style={{
+                marginLeft: 'auto',
+                padding: '9px 16px',
+                borderRadius: 10,
+                background: 'rgba(56, 189, 248, 0.12)',
+                border: '1px solid rgba(56, 189, 248, 0.35)',
+                color: '#38BDF8',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s ease',
+                flexShrink: 0
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = 'rgba(56, 189, 248, 0.22)';
+                e.currentTarget.style.borderColor = '#38BDF8';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)';
+                e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+              }}
+            >
+              <span>Connecter un Agent de Prospection</span>
+              <ExternalLink size={13} />
+            </button>
           </div>
         ) : (
           <div style={{

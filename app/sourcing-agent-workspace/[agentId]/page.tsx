@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, LayoutDashboard, Users, Mail, Activity } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, Users, Mail, Activity, ArrowUpRight, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import DashboardView from '../../../features/management/sourcing-workspace/components/DashboardView';
 import LeadsView from '../../../features/management/sourcing-workspace/components/LeadsView';
@@ -10,6 +11,9 @@ import LogsView from '../../../features/management/sourcing-workspace/components
 import LeadDetailDrawer from '../../../features/management/sourcing-workspace/components/LeadDetailDrawer';
 import { getAgents } from '@/shared/api/n8n-api';
 import { useProspectSocket } from '../../../features/management/prospect-workspace/hooks/useProspectSocket';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
+import { VMindGuide } from '@/shared/management/components/VMindGuide';
+import { useToast } from '@/shared/contexts/ToastContext';
 
 import '../../../features/management/prospect-workspace/workspace.scss'; // Reuse styling
 
@@ -19,8 +23,19 @@ export default function SourcingAgentWorkspacePage() {
   const { agentId } = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const linkedToast = sessionStorage.getItem('vmind_post_deploy_linked_toast');
+      if (linkedToast) {
+        showToast(linkedToast, 'success');
+        sessionStorage.removeItem('vmind_post_deploy_linked_toast');
+      }
+    }
+  }, [showToast]);
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
@@ -128,6 +143,49 @@ export default function SourcingAgentWorkspacePage() {
   const handleOpenLead = (lead: any) => {
     setSelectedLead(lead);
     setIsDrawerOpen(true);
+  };
+
+  const [showConnectChoiceModal, setShowConnectChoiceModal] = useState(false);
+
+  const availableProspectAgents = React.useMemo(() => {
+    return (allAgents || []).filter(
+      (a: any) =>
+        a.run_mode === 'prospection' ||
+        a.run_mode === 'prospect' ||
+        (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement')
+    );
+  }, [allAgents]);
+
+  const handleDeployNewProspect = () => {
+    if (typeof window !== 'undefined') {
+      const sourcingUuid = String(agentData?.uuid || agentId);
+      const sourcingName = String(agentData?.agent_name || agentName);
+      sessionStorage.setItem('vmind_guide_origin_sourcing_uuid', sourcingUuid);
+      sessionStorage.setItem('vmind_guide_origin_sourcing_name', sourcingName);
+      sessionStorage.setItem('vmind_guide_target_marketplace', 'prospection');
+      sessionStorage.setItem('vmind_current_view', 'market');
+      sessionStorage.setItem('vmind_mode', 'MANAGEMENT');
+    }
+    router.push('/?view=market');
+  };
+
+  const handleConnectExisting = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('vmind_editing_agent', JSON.stringify(agentData));
+      sessionStorage.setItem('vmind_wizard_step', '2');
+      sessionStorage.setItem('vmind_current_view', 'wizard');
+      sessionStorage.setItem('vmind_mode', 'MANAGEMENT');
+    }
+    router.push('/?view=wizard');
+  };
+
+  const handleConnectProspectClick = () => {
+    if (availableProspectAgents.length === 0) {
+      // If user has no deployed prospect agent, automatically route to marketplace without asking!
+      handleDeployNewProspect();
+    } else {
+      setShowConnectChoiceModal(true);
+    }
   };
 
   const targetAgentNames = React.useMemo(() => {
@@ -266,12 +324,360 @@ export default function SourcingAgentWorkspacePage() {
           </div>
         ) : (
           <div style={{ padding: '2.5rem', maxWidth: '1600px', margin: '0 auto' }}>
-            {activeTab === 'dashboard' && <DashboardView leads={leads} logs={logs} agent={agentData} allAgents={allAgents} threshold={0} />}
+            {targetAgentNames.length === 0 && (
+              <div style={{
+                marginBottom: '24px',
+                padding: '14px 22px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.08) 0%, rgba(6, 17, 31, 0.6) 100%)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '16px',
+                flexWrap: 'wrap'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <CyberIcon name="zap" size={14} color="#38BDF8" />
+                  </div>
+                  <span style={{ fontSize: '13px', color: '#E2E8F0', lineHeight: 1.4 }}>
+                    Connectez un Agent de Prospection pour automatiser l&apos;envoi de vos campagnes d&apos;emails.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleConnectProspectClick}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    color: '#38BDF8',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s ease',
+                    whiteSpace: 'nowrap'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.background = 'rgba(56, 189, 248, 0.25)';
+                    e.currentTarget.style.borderColor = '#38BDF8';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)';
+                    e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+                  }}
+                >
+                  <span>Connecter un Agent de Prospection</span>
+                  <ArrowUpRight size={14} />
+                </button>
+              </div>
+            )}
+            {activeTab === 'dashboard' && (
+              <DashboardView
+                leads={leads}
+                logs={logs}
+                agent={agentData}
+                allAgents={allAgents}
+                threshold={0}
+                onConnectProspect={handleConnectProspectClick}
+              />
+            )}
             {activeTab === 'leads' && <LeadsView leads={leads} onOpenLead={handleOpenLead} onRefresh={fetchData} />}
             {activeTab === 'logs' && <LogsView logs={logs} />}
           </div>
         )}
       </div>
+
+      {/* CHOICE MODAL: CONNECT EXISTING OR DEPLOY NEW PROSPECT AGENT */}
+      <AnimatePresence>
+        {showConnectChoiceModal && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 10000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '24px'
+            }}
+          >
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowConnectChoiceModal(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(3, 8, 16, 0.82)',
+                backdropFilter: 'blur(12px)',
+                cursor: 'pointer'
+              }}
+            />
+
+            {/* Modal Dialog Box */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              style={{
+                position: 'relative',
+                zIndex: 10001,
+                width: '100%',
+                maxWidth: '680px',
+                background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.98) 0%, rgba(13, 27, 48, 0.96) 100%)',
+                border: '1px solid rgba(0, 229, 200, 0.3)',
+                borderRadius: '24px',
+                padding: '32px',
+                boxShadow: '0 24px 64px rgba(0, 0, 0, 0.6), 0 0 32px rgba(0, 229, 200, 0.15)',
+                color: '#F0F4F8',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '24px'
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: '12px',
+                    background: 'linear-gradient(135deg, rgba(0, 229, 200, 0.15) 0%, rgba(56, 189, 248, 0.15) 100%)',
+                    border: '1px solid rgba(0, 229, 200, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#00E5C8',
+                    boxShadow: '0 0 16px rgba(0, 229, 200, 0.2)'
+                  }}>
+                    <CyberIcon name="target" size={24} color="#00E5C8" />
+                  </div>
+                  <div>
+                    <h2 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: '#F0F4F8', letterSpacing: '-0.3px' }}>
+                      Associer un Agent de Prospection
+                    </h2>
+                    <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '4px 0 0 0', lineHeight: 1.4 }}>
+                      Choisissez comment connecter votre flux de leads avec un Closer automatisé.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowConnectChoiceModal(false)}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '10px',
+                    width: 34,
+                    height: 34,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--muted)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.color = '#F0F4F8';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.color = 'var(--muted)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                  }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Options Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px' }}>
+                {/* Option 1: Associer un Agent Existant */}
+                <div
+                  onClick={handleConnectExisting}
+                  style={{
+                    background: 'rgba(6, 17, 31, 0.65)',
+                    border: '1px solid rgba(0, 229, 200, 0.25)',
+                    borderRadius: '16px',
+                    padding: '22px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                    position: 'relative'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#00E5C8';
+                    e.currentTarget.style.transform = 'translateY(-3px)';
+                    e.currentTarget.style.boxShadow = '0 12px 28px rgba(0, 229, 200, 0.15)';
+                    e.currentTarget.style.background = 'rgba(0, 229, 200, 0.04)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.25)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.background = 'rgba(6, 17, 31, 0.65)';
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: '10px',
+                        background: 'rgba(0, 229, 200, 0.12)',
+                        border: '1px solid rgba(0, 229, 200, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#00E5C8'
+                      }}>
+                        <CyberIcon name="target" size={20} color="#00E5C8" />
+                      </div>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: '8px',
+                        background: 'rgba(0, 229, 200, 0.12)',
+                        color: '#00E5C8',
+                        border: '1px solid rgba(0, 229, 200, 0.25)'
+                      }}>
+                        {availableProspectAgents.length} {availableProspectAgents.length > 1 ? 'disponibles' : 'disponible'}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#F0F4F8' }}>
+                      Associer un Agent Existant
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--muted)', lineHeight: 1.45 }}>
+                      Sélectionnez l&apos;un de vos agents de prospection déjà configurés pour recevoir immédiatement vos contacts sourcés.
+                    </div>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#00E5C8',
+                    marginTop: '4px'
+                  }}>
+                    <span>Configurer l&apos;attribution</span>
+                    <ArrowUpRight size={14} />
+                  </div>
+                </div>
+
+                {/* Option 2: Déployer un Nouvel Agent */}
+                <div
+                  onClick={handleDeployNewProspect}
+                  style={{
+                    background: 'rgba(6, 17, 31, 0.65)',
+                    border: '1px solid rgba(56, 189, 248, 0.25)',
+                    borderRadius: '16px',
+                    padding: '22px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '16px',
+                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                    position: 'relative'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#38BDF8';
+                    e.currentTarget.style.transform = 'translateY(-3px)';
+                    e.currentTarget.style.boxShadow = '0 12px 28px rgba(56, 189, 248, 0.15)';
+                    e.currentTarget.style.background = 'rgba(56, 189, 248, 0.04)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.25)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.background = 'rgba(6, 17, 31, 0.65)';
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: '10px',
+                        background: 'rgba(56, 189, 248, 0.12)',
+                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#38BDF8'
+                      }}>
+                        <CyberIcon name="rocket" size={20} color="#38BDF8" />
+                      </div>
+                      <span style={{
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: '8px',
+                        background: 'rgba(56, 189, 248, 0.12)',
+                        color: '#38BDF8',
+                        border: '1px solid rgba(56, 189, 248, 0.25)'
+                      }}>
+                        Marketplace
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#F0F4F8' }}>
+                      Déployer un Nouvel Agent
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'var(--muted)', lineHeight: 1.45 }}>
+                      Accédez au Marketplace pour créer un nouvel agent Closer avec un ICP et des séquences d&apos;emails sur mesure.
+                    </div>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: '#38BDF8',
+                    marginTop: '4px'
+                  }}>
+                    <span>Découvrir dans le Marketplace</span>
+                    <ArrowUpRight size={14} />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Accompanying VMindGuide */}
+            <VMindGuide
+              isOpen={showConnectChoiceModal}
+              onClose={() => setShowConnectChoiceModal(false)}
+              mood="convinced"
+              title="Optimisation du Pipeline"
+              message="Vous possédez déjà des agents de prospection actifs. Souhaitez-vous associer un agent existant ou en créer un nouveau dans le Marketplace ?"
+              showBackdrop={false}
+            />
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* DRAWER */}
       {selectedLead && (

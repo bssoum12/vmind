@@ -277,9 +277,10 @@ function HomeContent() {
     }
 
     if (viewParam) {
-      setCurrentView(viewParam);
+      const normalizedView = viewParam === 'marketplace' ? 'market' : viewParam;
+      setCurrentView(normalizedView);
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('vmind_current_view', viewParam);
+        sessionStorage.setItem('vmind_current_view', normalizedView);
       }
     }
 
@@ -321,10 +322,16 @@ function HomeContent() {
       if (savedAgentStr) {
         try {
           const agentObj = JSON.parse(savedAgentStr);
+          const savedStepStr = sessionStorage.getItem('vmind_wizard_step');
+          const savedStep = savedStepStr ? parseInt(savedStepStr, 10) : undefined;
           setEditingAgent(agentObj);
           setSelectedTemplate(agentObj.run_mode || 'prospection');
+          if (savedStep) {
+            setInitialWizardStep(savedStep);
+          }
           setCurrentView('wizard');
           sessionStorage.removeItem('vmind_editing_agent');
+          sessionStorage.removeItem('vmind_wizard_step');
         } catch (e) {
           console.error("Failed to parse saved editing agent:", e);
         }
@@ -349,6 +356,7 @@ function HomeContent() {
       sessionStorage.removeItem('vmind_editing_agent');
       sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
       sessionStorage.removeItem('vmind_wizard_template');
+      sessionStorage.removeItem('vmind_wizard_step');
       sessionStorage.removeItem('vmind_sourcing_target_agent');
     }
     setCurrentView(hasPostDeploy ? 'agents' : 'market');
@@ -446,7 +454,7 @@ function HomeContent() {
       />
       <div className="content management-layout">
         <div className="view-container">
-          {currentView === 'market' && (
+          {(currentView === 'market' || currentView === 'marketplace') && (
             <MarketplaceView
               onDeploy={handleDeploy}
               activeCategory={activeCategory}

@@ -141,7 +141,28 @@ function TargetAgentsBadge({ targets }: { targets: string[] }) {
   const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
 
-  if (!targets || targets.length === 0) return null;
+  if (!targets || targets.length === 0) {
+    return (
+      <span
+        style={{
+          fontSize: 10,
+          padding: '2px 8px',
+          borderRadius: 6,
+          background: 'rgba(56, 189, 248, 0.1)',
+          color: '#38BDF8',
+          border: '1px solid rgba(56, 189, 248, 0.25)',
+          fontWeight: 500,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5
+        }}
+        title="Agent opérant en mode autonome (aucun agent de prospection cible assigné)."
+      >
+        <CyberIcon name="zap" size={10} color="#38BDF8" />
+        <span>Mode Autonome</span>
+      </span>
+    );
+  }
 
   const firstTarget = targets[0];
   const remainingTargets = targets.slice(1);
@@ -436,6 +457,15 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     };
   }, [tutorialStep, nextTutorialStep]);
 
+  const agentHasTargetProspects = (agent: LiveAgent | null): boolean => {
+    if (!agent) return false;
+    const raw = agent.config?.target_agent_ids || 
+                (agent as any)?.target_agent_ids || 
+                (agent as any)?.parameters?.target_agent_ids ||
+                (agent as any)?.parameters?.sourcing_config?.target_agent_ids;
+    return Array.isArray(raw) && raw.length > 0;
+  };
+
   const getTutorialContent = () => {
     if (!tutorialAgent) return null;
     const isProspection = tutorialAgent.run_mode === 'prospection';
@@ -480,7 +510,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           message: isProspection
             ? "Cliquez sur 'Espace' pour ouvrir son interface dédiée. C'est ici que vous déposez vos contacts (fichiers CSV, Excel, XML... ou URL web), vérifiez les qualifications de l'IA et supervisez l'envoi de vos campagnes d'emails."
             : isSourcing
-              ? "Ouvrez l'Espace de Travail pour suivre vos profils sourcés, consulter le tableau de bord et superviser l'agent."
+              ? "Cliquez sur 'Espace' pour ouvrir son interface dédiée. C'est ici que vous retrouvez tous les leads sourcés depuis le web, suivez les statistiques d'extraction et supervisez le journal d'activité."
               : "Ouvrez l'Espace de Travail pour suivre vos données et superviser l'agent.",
           mood: 'focused' as GuideMood
         };
@@ -490,20 +520,28 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           message: isProspection
             ? "Le bouton 'Run' lance une qualification immédiate de vos contacts. Le bouton 'Start' (ou 'Pause') active ou suspend la planification automatique selon les plages configurées."
             : isSourcing
-              ? "Le bouton 'Run' lance une recherche immédiate. Le bouton 'Start' (ou 'Pause') active ou suspend la recherche continue selon vos critères."
+              ? "Le bouton 'Run' lance une recherche immédiate de leads selon vos critères. Le bouton 'Start' (ou 'Pause') active la recherche continue pour alimenter votre pipeline en continu."
               : "Le bouton 'Run' lance une tâche immédiate et 'Start' / 'Pause' gère la planification.",
           mood: 'focused' as GuideMood
         };
-      case 4:
+      case 4: {
+        const hasTargets = agentHasTargetProspects(tutorialAgent);
+        const shouldGuideProspectDuo = isSourcing && !hasTargets;
+
         return {
           title: isProspection
             ? "4. Associer un Sourcing Agent (Duo Autopilot)"
-            : "4. Configuration de l'Agent",
+            : shouldGuideProspectDuo
+              ? "4. Associer un Agent de Prospection (Duo Autopilot)"
+              : "4. Configuration de l'Agent",
           message: isProspection
             ? "Pourquoi ce 2ème agent est important ? Cet Agent de Prospection est votre closer : il qualifie et contacte vos leads, mais NE cherche PAS de prospects tout seul. Le Sourcing Agent est le chasseur qui explore le web et lui injecte des décideurs B2B en continu. Sans lui, vous devez importer vos fichiers manuellement. Avec lui, votre prospection tourne en 100% pilote automatique !"
-            : "Modifiez la configuration de cet agent et ajustez ses critères à tout moment.",
-          mood: 'convinced' as GuideMood
+            : shouldGuideProspectDuo
+              ? "Pourquoi ce 2ème agent est recommandé ? Votre Agent de Sourcing est le chasseur : il découvre et extrait des profils B2B ciblés sur le web. L'Agent de Prospection (Closer) prend automatiquement le relais pour les qualifier et leur envoyer des campagnes d'emails personnalisées. Sans lui, vous devrez exporter et contacter vos leads manuellement. Avec lui, votre prospection tourne en 100% pilote automatique !"
+              : "Votre Agent de Sourcing est déjà configuré pour alimenter votre Agent de Prospection cible. Vous pouvez ajuster vos critères de recherche et paramètres d'extraction à tout moment.",
+          mood: shouldGuideProspectDuo || isProspection ? ('convinced' as GuideMood) : ('focused' as GuideMood)
         };
+      }
       case 5:
         return {
           title: "5. Configuration & Gestion",
@@ -792,7 +830,46 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
               </>
             )}
 
-            {tutorialStep === 4 && tutorialAgent.run_mode !== 'prospection' && (
+            {tutorialStep === 4 && tutorialAgent.run_mode === 'sourcing' && !agentHasTargetProspects(tutorialAgent) && (
+              <>
+                <button
+                  type="button"
+                  className="vmind-guide-btn-primary"
+                  onClick={() => {
+                    setTutorialStep(0);
+                    setTutorialAgent(null);
+                    if (typeof window !== 'undefined') {
+                      sessionStorage.setItem('vmind_guide_target_marketplace', 'prospection');
+                      const linkId = tutorialAgent.uuid || (tutorialAgent as any).agent_id;
+                      if (linkId) {
+                        sessionStorage.setItem('vmind_guide_origin_sourcing_uuid', String(linkId));
+                      }
+                      const linkName = tutorialAgent.agent_name || (tutorialAgent as any).nom;
+                      if (linkName) {
+                        sessionStorage.setItem('vmind_guide_origin_sourcing_name', String(linkName));
+                      }
+                    }
+                    onNavigate('market');
+                  }}
+                >
+                  <CyberIcon name="zap" size={13} color="currentColor" />
+                  <span>Trouver dans le Marketplace</span>
+                  <CyberIcon name="arrow-right" size={13} color="currentColor" />
+                </button>
+                <button
+                  type="button"
+                  className="vmind-guide-btn-secondary"
+                  onClick={nextTutorialStep}
+                >
+                  <span>Passer cette étape</span>
+                </button>
+              </>
+            )}
+
+            {tutorialStep === 4 && (
+              (tutorialAgent.run_mode === 'sourcing' && agentHasTargetProspects(tutorialAgent)) ||
+              (tutorialAgent.run_mode !== 'prospection' && tutorialAgent.run_mode !== 'sourcing')
+            ) && (
               <button
                 type="button"
                 className="vmind-guide-btn-primary"
