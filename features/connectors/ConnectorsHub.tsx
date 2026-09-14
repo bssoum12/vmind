@@ -29,6 +29,7 @@ export interface McpSession {
     allowedAgents: string[];
   };
   tools: string[];
+  allTools?: any[];
 }
 
 export const ConnectorsHub: React.FC = () => {
