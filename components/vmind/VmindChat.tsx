@@ -237,11 +237,28 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   onAgentActive,
   activeAgentId = "VMIND"
 }) => {
-  const { activeConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle, refreshConversations } = useConversations();
+  const { activeConversationId, setActiveConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle, refreshConversations } = useConversations();
   const [input, setInput] = useState('');
   const [isErpConnected, setIsErpConnected] = useState<boolean>(false);
   const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+
+  const handleAgentReferralClick = (targetAgentId: string) => {
+    // 1. Retrieve the last user question in the conversation history
+    const lastUserMsg = messages.slice().reverse().find(m => m.sender === 'user');
+    const promptToCopy = lastUserMsg?.text || '';
+
+    // 2. Switch the active agent
+    onAgentActive?.(targetAgentId);
+
+    // 3. Reset active conversation to prepare a fresh session for the target agent
+    setActiveConversationId(null);
+
+    // 4. Pre-fill the chat input area with the question
+    if (promptToCopy) {
+      setInput(promptToCopy);
+    }
+  };
 
   const checkPermissions = () => {
     if (typeof window === 'undefined') return;
@@ -516,7 +533,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         setMessages((prev) => [...prev, {
           id: `vm-${Date.now()}`,
           sender: 'vm',
-          text: `ℹ️ Vous n'avez pas l'autorisation d'accéder aux données TraLIS en direct pour l'agent ${agentName}. Je reste à votre disposition pour toute question méthodologique ou conseil métier dans ce domaine.`,
+          text: `ℹ️ Vous n'avez pas l'autorisation d'accéder aux données Erp en direct pour l'agent ${agentName}. Je reste à votre disposition pour toute question méthodologique ou conseil métier dans ce domaine.`,
           time: formatTime(), rawDate: new Date().toISOString(),
           tool_used: null,
           response_type: 'full',
@@ -1170,7 +1187,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <ToolResultRenderer message={msg} />
+                      <ToolResultRenderer message={msg} onAgentClick={handleAgentReferralClick} />
                     )}
                   </div>
 

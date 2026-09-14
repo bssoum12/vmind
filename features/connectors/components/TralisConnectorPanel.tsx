@@ -54,6 +54,11 @@ const ALL_TOOL_METADATA: ToolMeta[] = [
   { name: 'analyze_delay_by_client_type',  description: 'Analyse des délais par type client', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
   { name: 'get_exploitation_kpis',         description: 'KPIs opérationnels exploitation', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
   { name: 'get_vmove_suggestion_bl_non_factures', description: 'Liste des bons de livraison non facturés', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
+  { name: 'get_vmove_top_transporteurs_ponctualite', description: 'Classement transporteurs par ponctualité', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
+  { name: 'get_vmove_top_ports_retards',   description: 'Top ports par niveau de retards', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
+  { name: 'get_vmove_dossiers_en_cours_client', description: 'Dossiers actifs par client', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
+  { name: 'get_vmove_dossiers_actifs',     description: 'Dossiers en cours d\'acheminement', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
+  { name: 'get_vmove_dossiers_retard',     description: 'Dossiers en retard ETA', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
   // VSELL
   { name: 'get_customer_profile',          description: 'Profil complet d\'un client', agent: 'VSELL', accessType: 'read', authLevel: 'always' },
   { name: 'search_cotations',              description: 'Recherche de cotations commerciales', agent: 'VSELL', accessType: 'read', authLevel: 'always' },
