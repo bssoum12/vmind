@@ -17,8 +17,30 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
   const [executionsToday, setExecutionsToday] = useState<number | null>(null);
   const [activeAgentsCount, setActiveAgentsCount] = useState<number | null>(null);
   const [successRate, setSuccessRate] = useState<number | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    let currentUserIsAdmin = false;
+    try {
+      const raw = localStorage.getItem('vmind_session') || localStorage.getItem('vmind_mcp_token');
+      if (raw) {
+        let tokenStr = raw;
+        if (!raw.startsWith('eyJ')) {
+          try {
+            const parsed = JSON.parse(raw);
+            tokenStr = parsed?.token || parsed?.access_token || parsed?.user?.token || raw;
+          } catch (e) {}
+        }
+        if (tokenStr.startsWith('eyJ')) {
+          const payload = JSON.parse(atob(tokenStr.split('.')[1]));
+          const roles = payload.roles || payload.role;
+          const roleStr = Array.isArray(roles) ? roles[0] : roles;
+          currentUserIsAdmin = (roleStr === 'Administrator' || roleStr === 'admin' || roleStr === 'Admin');
+        }
+      }
+    } catch (e) {}
+    setIsAdmin(currentUserIsAdmin);
+
     const refreshData = () => {
       getAgents()
         .then(agents => setAgentCount(agents.length))
@@ -34,17 +56,19 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
         })
         .catch(() => {});
 
-      fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/signup-requests`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.ok) {
-            const pending = data.requests.filter((r: any) => r.status === 'pending');
-            setPendingRequestsCount(pending.length);
-          } else {
-            setPendingRequestsCount(0);
-          }
-        })
-        .catch(() => setPendingRequestsCount(0));
+      if (currentUserIsAdmin) {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/signup-requests`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.ok) {
+              const pending = data.requests.filter((r: any) => r.status === 'pending');
+              setPendingRequestsCount(pending.length);
+            } else {
+              setPendingRequestsCount(0);
+            }
+          })
+          .catch(() => setPendingRequestsCount(0));
+      }
     };
 
     refreshData();
@@ -124,25 +148,30 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
           <span className="nav-badge" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted)' }}>0</span>
         )}
       </div>
-      <div 
-        className={`nav-item ${currentView === 'signup-requests' ? 'active' : ''}`} 
-        onClick={() => onNavigate('signup-requests')}
-      >
-        <div className="nav-icon">📩</div>
-        <span>Demandes d&apos;inscription</span>
-        {pendingRequestsCount !== null && pendingRequestsCount > 0 && (
-          <span className="nav-badge" style={{ background: 'rgba(255, 179, 0, 0.15)', color: '#FFB300', border: '1px solid rgba(255, 179, 0, 0.3)' }}>
-            {pendingRequestsCount}
-          </span>
-        )}
-      </div>
-      <div 
-        className={`nav-item ${currentView === 'journal' ? 'active' : ''}`}
-        onClick={() => onNavigate('journal')}
-      >
-        <div className="nav-icon">📋</div>
-        <span>Journal</span>
-      </div>
+      
+      {isAdmin && (
+        <>
+          <div 
+            className={`nav-item ${currentView === 'signup-requests' ? 'active' : ''}`} 
+            onClick={() => onNavigate('signup-requests')}
+          >
+            <div className="nav-icon">📩</div>
+            <span>Demandes d&apos;inscription</span>
+            {pendingRequestsCount !== null && pendingRequestsCount > 0 && (
+              <span className="nav-badge" style={{ background: 'rgba(255, 179, 0, 0.15)', color: '#FFB300', border: '1px solid rgba(255, 179, 0, 0.3)' }}>
+                {pendingRequestsCount}
+              </span>
+            )}
+          </div>
+          <div 
+            className={`nav-item ${currentView === 'journal' ? 'active' : ''}`}
+            onClick={() => onNavigate('journal')}
+          >
+            <div className="nav-icon">📋</div>
+            <span>Journal</span>
+          </div>
+        </>
+      )}
 
       <div className="nav-section">Catégories</div>
 

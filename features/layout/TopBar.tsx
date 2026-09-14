@@ -23,7 +23,7 @@ export const TopBar: React.FC = () => {
     setMounted(true);
     const checkTokens = () => {
       try {
-        const token = localStorage.getItem('vmind_session');
+        let token = localStorage.getItem('vmind_session');
         const mcpToken = localStorage.getItem('vmind_mcp_token');
         
         if (mcpToken) {
@@ -33,44 +33,55 @@ export const TopBar: React.FC = () => {
         }
 
         if (token) {
-          const decoded: any = jwtDecode(token);
-          if (decoded.username) {
-            setUsername(decoded.username);
-            
-            // Get initials
-            const parts = decoded.username.trim().split(/\s+/);
-            if (parts.length >= 2) {
-              setAvatarInitials((parts[0][0] + parts[1][0]).toUpperCase());
-            } else if (parts[0]) {
-              setAvatarInitials(parts[0].substring(0, 2).toUpperCase());
-            }
+          if (token.startsWith('{')) {
+            try {
+              const parsed = JSON.parse(token);
+              token = parsed.token || parsed.accessToken || token;
+            } catch {}
+          } else if (token.startsWith('"') && token.endsWith('"')) {
+            token = token.slice(1, -1);
           }
-          
-          if (decoded.roles) {
-            const roles = Array.isArray(decoded.roles)
-              ? decoded.roles
-              : typeof decoded.roles === 'string'
-                ? [decoded.roles]
-                : [];
-            // Mapping exact des noms de rôles DNN → label français affiché
-            if (roles.includes('Administrators') || roles.includes('Administrator') || roles.includes('Superusers')) {
-              setRoleLabel('Administrateur');
-            } else if (roles.some((r: string) => ['usersFinances','Service Comptabilité','usersCompta','usersDecaissement','usersEncaissements','usersReglementDivers'].includes(r))) {
-              setRoleLabel('Finance & Comptabilité');
-            } else if (roles.some((r: string) => ['usersVentes','UsersCRM','GestionnaireVente','usersClaims'].includes(r))) {
-              setRoleLabel('Commercial');
-            } else if (roles.some((r: string) => ['usersAchats'].includes(r))) {
-              setRoleLabel('Achats');
-            } else if (roles.some((r: string) => ['usersStock','usersArticles','usersStore'].includes(r))) {
-              setRoleLabel('Stock & Magasin');
-            } else if (roles.some((r: string) => ['usersExploitation','usersOMC','usersEDI'].includes(r))) {
-              setRoleLabel('Exploitation');
-            } else if (roles.some((r: string) => ['usersTiers','usersSettings'].includes(r))) {
-              setRoleLabel('Paramétrage');
-            } else if (roles.some((r: string) => ['LecteurSeulement','Extranet'].includes(r))) {
-              setRoleLabel('Lecture seule');
-            } else {
-              setRoleLabel(roles[0] || 'Utilisateur');
+
+          if (token) {
+            const decoded: any = jwtDecode(token);
+            if (decoded.username) {
+              setUsername(decoded.username);
+              
+              // Get initials
+              const parts = decoded.username.trim().split(/\s+/);
+              if (parts.length >= 2) {
+                setAvatarInitials((parts[0][0] + parts[1][0]).toUpperCase());
+              } else if (parts[0]) {
+                setAvatarInitials(parts[0].substring(0, 2).toUpperCase());
+              }
+            }
+            
+            if (decoded.roles) {
+              const roles = Array.isArray(decoded.roles)
+                ? decoded.roles
+                : typeof decoded.roles === 'string'
+                  ? [decoded.roles]
+                  : [];
+              // Mapping exact des noms de rôles DNN → label français affiché
+              if (roles.includes('Administrators') || roles.includes('Administrator') || roles.includes('Superusers')) {
+                setRoleLabel('Administrateur');
+              } else if (roles.some((r: string) => ['usersFinances','Service Comptabilité','usersCompta','usersDecaissement','usersEncaissements','usersReglementDivers'].includes(r))) {
+                setRoleLabel('Finance & Comptabilité');
+              } else if (roles.some((r: string) => ['usersVentes','UsersCRM','GestionnaireVente','usersClaims'].includes(r))) {
+                setRoleLabel('Commercial');
+              } else if (roles.some((r: string) => ['usersAchats'].includes(r))) {
+                setRoleLabel('Achats');
+              } else if (roles.some((r: string) => ['usersStock','usersArticles','usersStore'].includes(r))) {
+                setRoleLabel('Stock & Magasin');
+              } else if (roles.some((r: string) => ['usersExploitation','usersOMC','usersEDI'].includes(r))) {
+                setRoleLabel('Exploitation');
+              } else if (roles.some((r: string) => ['usersTiers','usersSettings'].includes(r))) {
+                setRoleLabel('Paramétrage');
+              } else if (roles.some((r: string) => ['LecteurSeulement','Extranet'].includes(r))) {
+                setRoleLabel('Lecture seule');
+              } else {
+                setRoleLabel(roles[0] || 'Utilisateur');
+              }
             }
           }
         }
@@ -96,8 +107,10 @@ export const TopBar: React.FC = () => {
     window.dispatchEvent(new CustomEvent('switch-management-view', { detail: 'profile' }));
   };
 
-  // Hide TopBar on the login page
-  if (pathname === '/login') return null;
+  // Hide TopBar on auth-related standalone pages
+  if (pathname === '/login' || pathname === '/reset-password' || pathname?.startsWith('/login') || pathname?.startsWith('/reset-password')) {
+    return null;
+  }
 
   return (
     <div className="topbar">
