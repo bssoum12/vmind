@@ -1,5 +1,6 @@
 import React from 'react';
 import { VmindMessage } from '@/shared/types/vmind';
+import { AGENTS } from '@/shared/constants/data';
 import { KpiRenderer } from './KpiRenderer';
 import { TableRenderer } from './TableRenderer';
 import { ChartRenderer } from './ChartRenderer';
@@ -8,7 +9,84 @@ import { MonthlyReportResultRenderer } from './MonthlyReportResultRenderer';
 
 interface StandardResponseRendererProps {
   message: VmindMessage;
+  onAgentClick?: (agentId: string) => void;
 }
+
+const renderTextWithAgentLinks = (text?: string, onAgentClick?: (agentId: string) => void) => {
+  if (!text) return null;
+
+  // Regex matches markdown links of type [Label](agent:AGENT_ID)
+  const regex = /\[(.*?)\]\(agent:([A-Za-z0-9_-]+)\)/g;
+  const elements: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    const [fullMatch, label, agentId] = match;
+    const matchIndex = match.index;
+
+    // Push text before match
+    if (matchIndex > lastIndex) {
+      elements.push(text.slice(lastIndex, matchIndex));
+    }
+
+    const agentKey = agentId.toUpperCase() as keyof typeof AGENTS;
+    const agentConfig = AGENTS[agentKey];
+    const color = agentConfig?.color || '#00f0ff';
+    const bgColor = agentConfig?.bgColor || 'rgba(0, 240, 255, 0.12)';
+
+    elements.push(
+      <button
+        key={`${agentId}-${matchIndex}`}
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onAgentClick?.(agentId.toUpperCase());
+        }}
+        className="agent-referral-link inline-flex items-center gap-1 font-semibold transition-all duration-200"
+        style={{
+          color: color,
+          textDecoration: 'underline',
+          textDecorationColor: `${color}80`,
+          textUnderlineOffset: '3px',
+          cursor: 'pointer',
+          background: 'transparent',
+          border: 'none',
+          padding: '1px 4px',
+          borderRadius: '4px',
+          fontSize: 'inherit',
+          lineHeight: 'inherit',
+          display: 'inline',
+          fontWeight: 600,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = '#ffffff';
+          e.currentTarget.style.backgroundColor = bgColor;
+          e.currentTarget.style.textDecorationColor = color;
+          e.currentTarget.style.boxShadow = `0 0 8px ${color}60`;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = color;
+          e.currentTarget.style.backgroundColor = 'transparent';
+          e.currentTarget.style.textDecorationColor = `${color}80`;
+          e.currentTarget.style.boxShadow = 'none';
+        }}
+        title={`Ouvrir une nouvelle conversation avec ${label}`}
+      >
+        {label}
+      </button>
+    );
+
+    lastIndex = matchIndex + fullMatch.length;
+  }
+
+  if (lastIndex < text.length) {
+    elements.push(text.slice(lastIndex));
+  }
+
+  return elements.length > 0 ? elements : text;
+};
 
 const GENERIC_TEXTS = new Set([
   'Voici le resultat demande.',
@@ -75,7 +153,7 @@ const KpiSentence: React.FC<{ kpi: NonNullable<VmindMessage['kpis']>[number] }> 
   );
 };
 
-export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> = ({ message }) => {
+export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> = ({ message, onAgentClick }) => {
   const {
     text,
     kpis,
@@ -113,7 +191,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
         <div className="font-bold flex items-center gap-2 mb-2">
           <span className="text-rose-500">!</span> {title || 'Erreur Systeme'}
         </div>
-        <div className="text-sm opacity-90 leading-relaxed">{text || 'Une erreur inconnue est survenue.'}</div>
+        <div className="text-sm opacity-90 leading-relaxed">{renderTextWithAgentLinks(text, onAgentClick) || 'Une erreur inconnue est survenue.'}</div>
         {error && (
           <div className="mt-2 pt-2 border-t border-rose-500/10 text-[10px] opacity-60 font-mono break-all">
             Code: {typeof error === 'object' ? JSON.stringify(error) : String(error)}
@@ -152,7 +230,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
       }}>
         <span style={{ fontSize: '15px' }}>ℹ️</span>
         <div>
-          Vous n'avez pas l'autorisation d'accéder aux données TraLIS en direct pour cet agent. Je reste à votre disposition pour toute question méthodologique ou conseil métier dans ce domaine.
+          Vous n'avez pas l'autorisation d'accéder aux données Erp en direct pour cet agent. Je reste à votre disposition pour toute question méthodologique ou conseil métier dans ce domaine.
         </div>
       </div>
     );
@@ -188,7 +266,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
       
       {shouldShowText && (
         <div style={{ color: '#e5e7eb', fontSize: '14px', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-          {text}
+          {renderTextWithAgentLinks(text, onAgentClick)}
         </div>
       )}
 
@@ -220,7 +298,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
 
       {response_type === 'clarification' && (
         <div style={{ marginTop: '8px', padding: '12px', backgroundColor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '4px', color: '#fde68a', fontSize: '12px', fontStyle: 'italic' }}>
-          {text}
+          {renderTextWithAgentLinks(text, onAgentClick)}
         </div>
       )}
     </div>

@@ -466,11 +466,45 @@ export default function LoginPage() {
   const [signupUsername, setSignupUsername] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPhone, setSignupPhone] = useState('');
+  const [phoneValidation, setPhoneValidation] = useState<{ isValid: boolean; message: string }>({ isValid: false, message: '' });
   const [isUsernameAvailable, setIsUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [signupError, setSignupError] = useState('');
   const [signupSuccess, setSignupSuccess] = useState('');
   const [signupLoading, setSignupLoading] = useState(false);
+
+  // Phone validation & format helper
+  const validatePhone = (val: string): { isValid: boolean; message: string } => {
+    if (!val || val.trim().length === 0) {
+      return { isValid: false, message: '' };
+    }
+    const digitsOnly = val.replace(/\D/g, '');
+    if (digitsOnly.length === 0) {
+      return { isValid: false, message: '✗ Chiffres requis' };
+    }
+    if (val.trim().startsWith('+')) {
+      if (digitsOnly.length < 7) {
+        return { isValid: false, message: `✗ Format international trop court (${digitsOnly.length}/7 min)` };
+      }
+      if (digitsOnly.length > 15) {
+        return { isValid: false, message: `✗ Format international trop long (${digitsOnly.length}/15 max)` };
+      }
+      return { isValid: true, message: `✓ Format international valide (${digitsOnly.length} chiffres)` };
+    }
+    if (digitsOnly.length < 8) {
+      return { isValid: false, message: `✗ 8 chiffres requis (${digitsOnly.length}/8)` };
+    }
+    if (digitsOnly.length === 8) {
+      return { isValid: true, message: '✓ Numéro local valide (8 chiffres)' };
+    }
+    return { isValid: false, message: `✗ Trop long pour un format local (${digitsOnly.length}/8 max)` };
+  };
+
+  const handlePhoneChange = (raw: string) => {
+    const sanitized = raw.replace(/[^0-9+\s\-()]/g, '');
+    setSignupPhone(sanitized);
+    setPhoneValidation(validatePhone(sanitized));
+  };
 
   // Forgot Password Flow State
   const [forgotPasswordStep, setForgotPasswordStep] = useState<0 | 1 | 2 | 3>(0);
@@ -535,6 +569,12 @@ export default function LoginPage() {
       setSignupError("Nom d'utilisateur déjà pris.");
       return;
     }
+
+    const phoneCheck = validatePhone(signupPhone);
+    if (!phoneCheck.isValid) {
+      setSignupError('Veuillez saisir un numéro de téléphone valide (8 à 15 chiffres).');
+      return;
+    }
     
     setSignupLoading(true);
     try {
@@ -561,6 +601,7 @@ export default function LoginPage() {
       setSignupUsername('');
       setSignupEmail('');
       setSignupPhone('');
+      setPhoneValidation({ isValid: false, message: '' });
       setIsUsernameAvailable(null);
     } catch (err: any) {
       setSignupError(formatUserFriendlyError(err, "Une erreur s'est produite lors de l'inscription."));
@@ -593,9 +634,22 @@ export default function LoginPage() {
     return () => clearInterval(t);
   }, []);
 
-  // Ensure login fields start completely clean and un-prefilled on mount
+  // Restore remembered username on mount if "remember me" was active
   useEffect(() => {
-    setUsername('');
+    try {
+      const isRemembered = localStorage.getItem('vmind_remember_me') === 'true';
+      const savedUsername = localStorage.getItem('vmind_remembered_username');
+      if (isRemembered && savedUsername) {
+        setUsername(savedUsername);
+        setRememberMe(true);
+      } else {
+        setUsername('');
+        setRememberMe(false);
+      }
+    } catch (e) {
+      setUsername('');
+      setRememberMe(false);
+    }
     setPassword('');
   }, []);
 
@@ -607,7 +661,7 @@ export default function LoginPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, turnstileToken }),
+        body: JSON.stringify({ username, password, turnstileToken, rememberMe }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
@@ -1270,8 +1324,27 @@ export default function LoginPage() {
 
                     {/* Téléphone */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '9px', fontWeight: 700, color: cyan, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Numéro de Téléphone</label>
-                      <input type="text" className="vmind-input" style={{ height: '44px', padding: '0 14px' }} value={signupPhone} onChange={e => setSignupPhone(e.target.value)} required />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontSize: '9px', fontWeight: 700, color: cyan, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Numéro de Téléphone</label>
+                        {signupPhone.trim().length > 0 && (
+                          <span style={{ fontSize: '9.5px', color: phoneValidation.isValid ? '#00e676' : '#ff4757', fontWeight: 600 }}>
+                            {phoneValidation.message}
+                          </span>
+                        )}
+                      </div>
+                      <input 
+                        type="tel" 
+                        className="vmind-input" 
+                        style={{ 
+                          height: '44px', 
+                          padding: '0 14px',
+                          borderColor: signupPhone.trim().length > 0 ? (phoneValidation.isValid ? 'rgba(0, 230, 118, 0.4)' : 'rgba(255, 71, 87, 0.4)') : undefined
+                        }} 
+                        value={signupPhone} 
+                        onChange={e => handlePhoneChange(e.target.value)} 
+                        placeholder="Ex: 12 345 678 ou +123 12 345 678" 
+                        required 
+                      />
                     </div>
 
                      {/* Actions */}
@@ -1289,7 +1362,23 @@ export default function LoginPage() {
                         </div>
                       )}
 
-                      <button type="submit" disabled={signupLoading || isUsernameAvailable === false || (isTurnstileConfigured && !turnstileToken)} className="cta-btn" style={{ width: '100%', height: '52px', borderRadius: '12px', border: 'none', background: signupLoading || isUsernameAvailable === false || (isTurnstileConfigured && !turnstileToken) ? 'rgba(143,163,184,0.12)' : `linear-gradient(90deg, ${cyan} 0%, ${cyan2} 100%)`, color: signupLoading || isUsernameAvailable === false || (isTurnstileConfigured && !turnstileToken) ? muted : '#021010', fontSize: '13px', fontWeight: 800, cursor: signupLoading || isUsernameAvailable === false || (isTurnstileConfigured && !turnstileToken) ? 'not-allowed' : 'pointer', boxShadow: signupLoading || isUsernameAvailable === false || (isTurnstileConfigured && !turnstileToken) ? 'none' : `0 0 20px rgba(0,229,200,0.3)` }}>
+                      <button 
+                        type="submit" 
+                        disabled={signupLoading || isUsernameAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)} 
+                        className="cta-btn" 
+                        style={{ 
+                          width: '100%', 
+                          height: '52px', 
+                          borderRadius: '12px', 
+                          border: 'none', 
+                          background: (signupLoading || isUsernameAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? 'rgba(143,163,184,0.12)' : `linear-gradient(90deg, ${cyan} 0%, ${cyan2} 100%)`, 
+                          color: (signupLoading || isUsernameAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? muted : '#021010', 
+                          fontSize: '13px', 
+                          fontWeight: 800, 
+                          cursor: (signupLoading || isUsernameAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? 'not-allowed' : 'pointer', 
+                          boxShadow: (signupLoading || isUsernameAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? 'none' : `0 0 20px rgba(0,229,200,0.3)` 
+                        }}
+                      >
                         {signupLoading ? 'ENVOI...' : 'SOUMETTRE LA DEMANDE'}
                       </button>
                       <div style={{ textAlign: 'center', fontSize: '12.5px', color: muted, marginTop: '4px' }}>

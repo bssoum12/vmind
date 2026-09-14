@@ -101,8 +101,8 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
     );
   }
 
-  const popularAgents = filteredAgents.slice(0, 6);
-  const otherAgents = filteredAgents.slice(6);
+  const popularAgents = filteredAgents.slice(0, 3);
+  const otherAgents = filteredAgents.slice(3);
 
   return (
     <div id="view-market" className="anim" style={{ position: 'relative' }}>
@@ -313,7 +313,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
           <>
             <div className="section-title" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <CyberIcon name="sparkles" size={16} color="#00E5C8" />
-              <span>Autres Modèles Disponibles</span>
+              <span>Autres Modèles Bientôt Disponibles</span>
             </div>
             <div className="agent-grid">
               {otherAgents.map((agent) => {
