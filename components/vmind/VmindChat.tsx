@@ -239,6 +239,52 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 }) => {
   const { activeConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle, refreshConversations } = useConversations();
   const [input, setInput] = useState('');
+  const [isErpConnected, setIsErpConnected] = useState<boolean>(false);
+  const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+
+  const checkPermissions = () => {
+    if (typeof window === 'undefined') return;
+    const mcpToken = localStorage.getItem('vmind_mcp_token');
+    const connected = Boolean(mcpToken);
+    setIsErpConnected(connected);
+
+    const storedAllowed = localStorage.getItem('vmind_allowed_agents');
+    if (storedAllowed) {
+      try {
+        setAllowedAgents(JSON.parse(storedAllowed));
+      } catch (e) {
+        setAllowedAgents([]);
+      }
+    } else {
+      setAllowedAgents([]);
+    }
+
+    const token = mcpToken || localStorage.getItem('vmind_session');
+    if (token) {
+      try {
+        let raw = token;
+        if (token.startsWith('{')) raw = JSON.parse(token).token;
+        const decoded: any = jwtDecode(raw);
+        setIsAdmin(Boolean(decoded.roles && decoded.roles.includes('Administrators')));
+        if (!storedAllowed && decoded.allowedAgents) {
+          setAllowedAgents(decoded.allowedAgents);
+        }
+      } catch (e) {
+        setIsAdmin(false);
+      }
+    } else {
+      setIsAdmin(false);
+    }
+  };
+
+  useEffect(() => {
+    checkPermissions();
+    window.addEventListener('mcp-session-updated', checkPermissions);
+    return () => window.removeEventListener('mcp-session-updated', checkPermissions);
+  }, []);
+
+  const isAgentAllowed = isErpConnected && (isAdmin || allowedAgents.includes(activeAgentId));
 
   // Ref toujours synchrone → garantit la valeur EXACTE de l'agent au moment du clic
   const activeAgentIdRef = useRef<string>(activeAgentId);
@@ -447,7 +493,40 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       // On utilise maintenant le format standardisé
       const isOk = response && (response.ok === true || (response.ok as any) === "true");
 
-      if (!isOk) {
+      const detailsStr = typeof response?.details === 'string' 
+        ? response.details 
+        : JSON.stringify(response?.details || '');
+      const textStr = typeof response?.text === 'string' ? response.text : '';
+      const messageStr = typeof response?.message === 'string' ? response.message : '';
+
+      const isForbidden = 
+        response?.error === 'FORBIDDEN' ||
+        response?.error === 'FORBIDDEN_TOOL_EXECUTION' ||
+        response?.error === 'UNAUTHORIZED_TOOL_EXECUTION' ||
+        detailsStr.includes('FORBIDDEN_TOOL_EXECUTION') ||
+        detailsStr.includes('UNAUTHORIZED_TOOL_EXECUTION') ||
+        detailsStr.includes('status": "unauthorized') ||
+        detailsStr.includes('status":"unauthorized') ||
+        detailsStr.includes("Vous n'avez pas les permissions nécessaires") ||
+        textStr.includes('FORBIDDEN_TOOL_EXECUTION') ||
+        messageStr.includes('FORBIDDEN_TOOL_EXECUTION');
+
+      if (isForbidden) {
+        const agentName = effectiveAgentId || activeAgentId || 'cet agent';
+        setMessages((prev) => [...prev, {
+          id: `vm-${Date.now()}`,
+          sender: 'vm',
+          text: `ℹ️ Vous n'avez pas l'autorisation d'accéder aux données TraLIS en direct pour l'agent ${agentName}. Je reste à votre disposition pour toute question méthodologique ou conseil métier dans ce domaine.`,
+          time: formatTime(), rawDate: new Date().toISOString(),
+          tool_used: null,
+          response_type: 'full',
+          title: 'Accès restreint',
+          kpis: [],
+          table: { columns: [], rows: [] },
+          chart: { type: null, title: '', description: '', xKey: '', yKey: '', data: [] },
+          details: null
+        }]);
+      } else if (!isOk) {
         setMessages((prev) => [...prev, {
           id: `err-${Date.now()}`,
           sender: 'vm',
@@ -766,119 +845,123 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         </div>
 
 
-        {/* Suggestions Zone */}
-        {activeAgentId === 'VDATA' && (
-          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
-            {Object.keys(VDATA_FAST_TRACK_REGISTRY).map((label) => (
-              <button
-                key={label}
-                onClick={() => handleFastTrackClick(label)}
-                className="suggestion-chip"
-                style={{
-                  flexShrink: 0,
-                  background: agentBgColor,
-                  color: agentColor,
-                  borderColor: agentBorderColor,
-                  boxShadow: `0 0 10px ${agentColor}20`,
-                }}
-                disabled={isLoading}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Suggestions Zone (visible only when ERP connected & agent allowed) */}
+        {isAgentAllowed && (
+          <>
+            {activeAgentId === 'VDATA' && (
+              <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+                {Object.keys(VDATA_FAST_TRACK_REGISTRY).map((label) => (
+                  <button
+                    key={label}
+                    onClick={() => handleFastTrackClick(label)}
+                    className="suggestion-chip"
+                    style={{
+                      flexShrink: 0,
+                      background: agentBgColor,
+                      color: agentColor,
+                      borderColor: agentBorderColor,
+                      boxShadow: `0 0 10px ${agentColor}20`,
+                    }}
+                    disabled={isLoading}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
-        {/* VFIN Suggestions */}
-        {activeAgentId === 'VFIN' && (
-          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
-            {Object.keys(VFIN_FAST_TRACK_REGISTRY).map((label) => (
-              <button
-                key={label}
-                onClick={() => handleFastTrackClick(label)}
-                className="suggestion-chip"
-                style={{
-                  flexShrink: 0,
-                  background: agentBgColor,
-                  color: agentColor,
-                  borderColor: agentBorderColor,
-                  boxShadow: `0 0 10px ${agentColor}20`,
-                }}
-                disabled={isLoading}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+            {/* VFIN Suggestions */}
+            {activeAgentId === 'VFIN' && (
+              <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+                {Object.keys(VFIN_FAST_TRACK_REGISTRY).map((label) => (
+                  <button
+                    key={label}
+                    onClick={() => handleFastTrackClick(label)}
+                    className="suggestion-chip"
+                    style={{
+                      flexShrink: 0,
+                      background: agentBgColor,
+                      color: agentColor,
+                      borderColor: agentBorderColor,
+                      boxShadow: `0 0 10px ${agentColor}20`,
+                    }}
+                    disabled={isLoading}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
-        {/* VSELL Suggestions */}
-        {activeAgentId === 'VSELL' && (
-          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
-            {Object.keys(VSELL_FAST_TRACK_REGISTRY).map((label) => (
-              <button
-                key={label}
-                onClick={() => handleFastTrackClick(label)}
-                className="suggestion-chip"
-                style={{
-                  flexShrink: 0,
-                  background: agentBgColor,
-                  color: agentColor,
-                  borderColor: agentBorderColor,
-                  boxShadow: `0 0 10px ${agentColor}20`,
-                }}
-                disabled={isLoading}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+            {/* VSELL Suggestions */}
+            {activeAgentId === 'VSELL' && (
+              <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+                {Object.keys(VSELL_FAST_TRACK_REGISTRY).map((label) => (
+                  <button
+                    key={label}
+                    onClick={() => handleFastTrackClick(label)}
+                    className="suggestion-chip"
+                    style={{
+                      flexShrink: 0,
+                      background: agentBgColor,
+                      color: agentColor,
+                      borderColor: agentBorderColor,
+                      boxShadow: `0 0 10px ${agentColor}20`,
+                    }}
+                    disabled={isLoading}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
-        {/* VBUY Suggestions */}
-        {activeAgentId === 'VBUY' && (
-          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
-            {Object.keys(VBUY_FAST_TRACK_REGISTRY).map((label) => (
-              <button
-                key={label}
-                onClick={() => handleFastTrackClick(label)}
-                className="suggestion-chip"
-                style={{
-                  flexShrink: 0,
-                  background: agentBgColor,
-                  color: agentColor,
-                  borderColor: agentBorderColor,
-                  boxShadow: `0 0 10px ${agentColor}20`,
-                }}
-                disabled={isLoading}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+            {/* VBUY Suggestions */}
+            {activeAgentId === 'VBUY' && (
+              <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+                {Object.keys(VBUY_FAST_TRACK_REGISTRY).map((label) => (
+                  <button
+                    key={label}
+                    onClick={() => handleFastTrackClick(label)}
+                    className="suggestion-chip"
+                    style={{
+                      flexShrink: 0,
+                      background: agentBgColor,
+                      color: agentColor,
+                      borderColor: agentBorderColor,
+                      boxShadow: `0 0 10px ${agentColor}20`,
+                    }}
+                    disabled={isLoading}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
-        {/* VMOVE Suggestions */}
-        {activeAgentId === 'VMOVE' && (
-          <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
-            {Object.keys(VMOVE_FAST_TRACK_REGISTRY).map((label) => (
-              <button
-                key={label}
-                onClick={() => handleFastTrackClick(label)}
-                className="suggestion-chip"
-                style={{
-                  flexShrink: 0,
-                  background: agentBgColor,
-                  color: agentColor,
-                  borderColor: agentBorderColor,
-                  boxShadow: `0 0 10px ${agentColor}20`,
-                }}
-                disabled={isLoading}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+            {/* VMOVE Suggestions */}
+            {activeAgentId === 'VMOVE' && (
+              <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+                {Object.keys(VMOVE_FAST_TRACK_REGISTRY).map((label) => (
+                  <button
+                    key={label}
+                    onClick={() => handleFastTrackClick(label)}
+                    className="suggestion-chip"
+                    style={{
+                      flexShrink: 0,
+                      background: agentBgColor,
+                      color: agentColor,
+                      borderColor: agentBorderColor,
+                      boxShadow: `0 0 10px ${agentColor}20`,
+                    }}
+                    disabled={isLoading}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {isLoading && (

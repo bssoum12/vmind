@@ -38,14 +38,7 @@ export const ConnectorsCatalog: React.FC<ConnectorsCatalogProps> = ({ activeConn
   }).filter(cat => cat.items.length > 0);
 
   return (
-    <div style={{
-      width: '280px',
-      borderRight: '1px solid rgba(255,255,255,0.05)',
-      background: 'rgba(5, 12, 24, 0.4)',
-      display: 'flex',
-      flexDirection: 'column',
-      padding: '24px 16px'
-    }}>
+    <div className="connectors-catalog-sidebar">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px', padding: '0 8px' }}>
         <h2 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#fff' }}>Connecteurs</h2>
         <div style={{ display: 'flex', gap: '8px' }}>

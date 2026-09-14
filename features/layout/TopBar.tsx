@@ -6,7 +6,7 @@ import { StatusDot } from '../../components/ui/StatusDot';
 import { useClock } from '../../shared/hooks/useClock';
 import { useMode } from '@/shared/contexts/ModeContext';
 import { jwtDecode } from 'jwt-decode';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, User, Menu } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
   const pathname = usePathname();
@@ -102,6 +102,14 @@ export const TopBar: React.FC = () => {
   return (
     <div className="topbar">
       <div className="topbar-brand">
+        <button 
+          type="button" 
+          className="mobile-menu-btn" 
+          title="Ouvrir le menu" 
+          onClick={() => window.dispatchEvent(new CustomEvent('toggle-mobile-sidebar'))}
+        >
+          <Menu size={18} />
+        </button>
         <div>
           <div className="brand-logo">VMIND</div>
         </div>
