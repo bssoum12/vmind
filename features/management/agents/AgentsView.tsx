@@ -145,21 +145,23 @@ function TargetAgentsBadge({ targets }: { targets: string[] }) {
     return (
       <span
         style={{
-          fontSize: 10,
+          fontSize: '10px',
+          letterSpacing: '0.02em',
           padding: '2px 8px',
-          borderRadius: 6,
-          background: 'rgba(56, 189, 248, 0.1)',
+          borderRadius: '4px',
+          background: 'rgba(56, 189, 248, 0.08)',
           color: '#38BDF8',
           border: '1px solid rgba(56, 189, 248, 0.25)',
-          fontWeight: 500,
+          fontWeight: 600,
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 5
+          gap: '4px',
+          lineHeight: '14px'
         }}
         title="Agent opérant en mode autonome (aucun agent de prospection cible assigné)."
       >
-        <CyberIcon name="zap" size={10} color="#38BDF8" />
-        <span>Mode Autonome</span>
+        <CyberIcon name="zap" size={9} color="#38BDF8" />
+        <span>Autonome</span>
       </span>
     );
   }
@@ -172,13 +174,11 @@ function TargetAgentsBadge({ targets }: { targets: string[] }) {
       const rect = btnRef.current.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
       if (spaceBelow < 220 && rect.top > 220) {
-        // Open upwards if not enough space below
         setCoords({
           bottom: window.innerHeight - rect.top + 6,
           left: Math.max(12, Math.min(rect.left, window.innerWidth - 300))
         });
       } else {
-        // Open downwards by default
         setCoords({
           top: rect.bottom + 6,
           left: Math.max(12, Math.min(rect.left, window.innerWidth - 300))
@@ -219,30 +219,31 @@ function TargetAgentsBadge({ targets }: { targets: string[] }) {
 
   return (
     <div
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, position: 'relative' }}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', verticalAlign: 'middle' }}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* 1st Agent Badge (Capped at 1) */}
       <span
         style={{
-          fontSize: 10,
+          fontSize: '10px',
           padding: '2px 8px',
-          borderRadius: 6,
-          background: 'rgba(0, 229, 200, 0.1)',
+          borderRadius: '4px',
+          background: 'rgba(0, 229, 200, 0.08)',
           color: '#00E5C8',
-          border: '1px solid rgba(0, 229, 200, 0.25)',
-          fontWeight: 500,
+          border: '1px solid rgba(0, 229, 200, 0.22)',
+          fontWeight: 600,
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 4,
-          whiteSpace: 'nowrap'
+          gap: '5px',
+          whiteSpace: 'nowrap',
+          lineHeight: '14px',
+          letterSpacing: '0.01em'
         }}
         title={`Agent Prospect Cible: ${firstTarget}`}
       >
-        🎯 {firstTarget}
+        <span style={{ fontSize: '10px', opacity: 0.9 }}>🎯</span>
+        <span>{firstTarget}</span>
       </span>
 
-      {/* +N autres Badge with Hover / Click Popover */}
       {remainingTargets.length > 0 && (
         <>
           <button
@@ -254,22 +255,24 @@ function TargetAgentsBadge({ targets }: { targets: string[] }) {
               setIsOpen(true);
             }}
             style={{
-              fontSize: 10,
-              padding: '2px 7px',
-              borderRadius: 6,
-              background: isOpen ? 'rgba(0, 229, 200, 0.25)' : 'rgba(0, 229, 200, 0.12)',
+              fontSize: '10px',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              background: isOpen ? 'rgba(0, 229, 200, 0.22)' : 'rgba(0, 229, 200, 0.08)',
               color: '#00E5C8',
-              border: '1px solid rgba(0, 229, 200, 0.35)',
-              fontWeight: 600,
+              border: '1px solid rgba(0, 229, 200, 0.3)',
+              fontWeight: 700,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 2,
+              gap: '3px',
+              lineHeight: '14px',
               transition: 'all 0.15s ease'
             }}
             title="Voir tous les agents prospect cibles"
           >
-            +{remainingTargets.length} autre{remainingTargets.length > 1 ? 's' : ''} ▾
+            <span>+{remainingTargets.length}</span>
+            <span style={{ fontSize: '8px', opacity: 0.8 }}>▼</span>
           </button>
 
           {isOpen && coords && typeof document !== 'undefined' && createPortal(
@@ -959,14 +962,14 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           )}
 
           {!loading && agents.length > 0 && (
-            <table className="agents-table" style={{ width: '100%', minWidth: '780px', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left', fontSize: '13px' }}>
+            <table className="agents-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(0, 229, 200, 0.12)', color: '#00E5C8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
-                  <th style={{ padding: '10px 16px', position: 'sticky', left: 0, zIndex: 6, background: '#091B33', width: '220px', minWidth: '220px' }}>Agent</th>
-                  <th style={{ padding: '10px 16px', position: 'sticky', left: '220px', zIndex: 6, background: '#091B33', width: '130px', minWidth: '130px', boxShadow: '4px 0 10px rgba(0,0,0,0.45)' }}>Statut</th>
-                  <th style={{ padding: '10px 16px', minWidth: '150px' }}>Planification</th>
-                  <th style={{ padding: '10px 16px', minWidth: '140px' }}>Dernière exéc.</th>
-                  <th style={{ padding: '10px 16px', textAlign: 'right', minWidth: '160px' }}>Actions</th>
+                <tr style={{ borderBottom: '1px solid rgba(0, 229, 200, 0.15)', background: 'rgba(9, 27, 51, 0.75)', color: '#00E5C8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
+                  <th style={{ padding: '12px 18px', minWidth: '320px' }}>Agent</th>
+                  <th style={{ padding: '12px 18px', width: '140px' }}>Statut</th>
+                  <th style={{ padding: '12px 18px', width: '200px' }}>Planification</th>
+                  <th style={{ padding: '12px 18px', width: '160px' }}>Dernière exéc.</th>
+                  <th style={{ padding: '12px 18px', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -991,17 +994,17 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                       style={{
                         cursor: tutorialStep > 0 ? 'default' : 'pointer',
                         pointerEvents: tutorialStep > 0 ? 'none' : undefined,
-                        background: isTutorialActive && tutorialStep === 1 ? 'rgba(0, 229, 200, 0.12)' : isSelected ? 'rgba(0,229,160,0.06)' : undefined,
-                        borderLeft: isSelected ? '3px solid #00E5A0' : '3px solid transparent',
-                        borderBottom: '1px solid rgba(255,255,255,0.03)',
-                        transition: 'all .15s',
+                        background: isTutorialActive && tutorialStep === 1 ? 'rgba(0, 229, 200, 0.12)' : isSelected ? 'rgba(0,229,160,0.08)' : 'rgba(5, 16, 30, 0.5)',
+                        borderLeft: isSelected ? '3px solid #00E5C8' : '3px solid transparent',
+                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        transition: 'background 0.2s, border-color 0.2s',
                         position: isTutorialActive ? 'relative' : undefined,
                         zIndex: isTutorialActive ? 10001 : undefined,
                         boxShadow: isTutorialActive && tutorialStep === 1 ? '0 0 0 4px rgba(0, 229, 200, 0.85)' : undefined,
                       }}
                     >
-                      <td style={{ padding: '12px 16px', position: 'sticky', left: 0, zIndex: 4, background: '#061426', width: '220px', minWidth: '220px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
+                      <td style={{ padding: '14px 18px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative' }}>
                           {isTutorialActive && tutorialStep === 1 && (
                             <VMindGuideArrow
                               direction="down"
@@ -1024,8 +1027,15 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                           </div>
                           <div>
                             <div className="agent-row-name">{agent.agent_name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                              <span>{agent.run_mode || resolveAgentType(agent)}</span>
+                            <div style={{ fontSize: '11px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+                              <span style={{
+                                textTransform: 'capitalize',
+                                color: 'var(--muted)',
+                                fontWeight: 500,
+                                fontSize: '11px'
+                              }}>
+                                {agent.run_mode || resolveAgentType(agent)}
+                              </span>
                               {agent.run_mode === 'sourcing' && (
                                 <TargetAgentsBadge targets={getTargetAgentNames(agent)} />
                               )}
@@ -1034,7 +1044,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         </div>
                       </td>
 
-                      <td style={{ padding: '12px 16px', position: 'sticky', left: '220px', zIndex: 4, background: '#061426', width: '130px', minWidth: '130px', boxShadow: '4px 0 10px rgba(0,0,0,0.45)' }}>
+                      <td style={{ padding: '14px 18px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           {agent.is_executing ? (
                             <span style={{
@@ -1073,8 +1083,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         {formatDate(agent.lastExecuted)}
                       </td>
 
-                      <td style={{ padding: '12px 16px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                        <div className="row-actions">
+                      <td style={{ padding: '14px 18px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                        <div className="row-actions" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6 }}>
                           {/* Run Now - Tutorial Step 3 */}
                           <button
                             className="row-btn"
