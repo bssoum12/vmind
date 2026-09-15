@@ -31,8 +31,8 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
   const hideTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Read current active data from Context
-  const agentData = kpisByAgent["vdata"] || {};
-  const toolData = agentData.get_delivery_rate || {};
+  const agentData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
+  const toolData = agentData.get_delivery_rate || agentData || {};
 
   const kpis = toolData.ok && toolData.kpis ? toolData.kpis : [];
   const details = toolData.details || null;

@@ -36,13 +36,13 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
   const [prevYear, setPrevYear] = useState<number>(new Date().getFullYear() - 1);
 
   // Read current active data from Context
-  const agentData = kpisByAgent["vdata"] || {};
-  const toolData = agentData.get_dossier_volume_evolution || {};
+  const agentData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
+  const toolData = agentData.get_dossier_volume_evolution || agentData || {};
 
   const activeData: ChartDataPoint[] = toolData.chart?.data || [];
   const totalDossiersCurrent = activeData.reduce((acc, d) => acc + d.value, 0);
 
-  const loading = loadingByAgent["vdata"] && !toolData.ok;
+  const loading = (loadingByAgent["vdata"] || loadingByAgent["VDATA"]) && !toolData.ok;
   const error = !loading && !toolData.ok && globalError ? globalError : "";
 
   const fetchPrevYearVolume = async () => {

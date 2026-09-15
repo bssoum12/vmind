@@ -14,6 +14,8 @@ interface KpiCacheContextType {
   fetchKpis: (agentId: string, force?: boolean, targetTool?: string) => Promise<void>;
   error: string | null;
   clearError: () => void;
+  notice: string | null;
+  clearNotice: () => void;
   activeAgentId: string;
   setActiveAgentId: (agentId: string) => void;
 }
@@ -46,6 +48,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   const [loadingByAgent, setLoadingByAgent] = useState<Record<string, boolean>>({});
   const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeAgentRef = useRef<string>('VDATA');
@@ -59,6 +62,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   };
 
   const clearError = () => setError(null);
+  const clearNotice = () => setNotice(null);
 
   // Helper to check if user has ERP connected and agent is allowed
   const isAgentKpiAllowed = (agentId: string) => {
@@ -90,12 +94,13 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       return;
     }
 
-    const upperAgent = agentId.toUpperCase();
-    activeAgentRef.current = upperAgent;
+    const agentKey = (agentId || 'vdata').toLowerCase();
+    const allowedAgentUpper = agentKey.toUpperCase();
+    activeAgentRef.current = allowedAgentUpper;
 
-    if (!isAgentKpiAllowed(upperAgent)) {
-      console.log(`[KPI CONTEXT] KPIs not allowed for agent ${upperAgent} (ERP not connected or agent not authorized)`);
-      setLoadingByAgent(prev => ({ ...prev, [agentId]: false }));
+    if (!isAgentKpiAllowed(allowedAgentUpper)) {
+      console.log(`[KPI CONTEXT] KPIs not allowed for agent ${allowedAgentUpper} (ERP not connected or agent not authorized)`);
+      setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
       return;
     }
 
@@ -104,19 +109,24 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       clearTimeout(debounceTimeoutRef.current);
     }
 
-    // Cooldown logic for force refresh (3 hours backend / UI lock)
-    if (force && targetTool) {
-      const cooldownKey = `${upperAgent}_${targetTool}`;
+    const cooldownKey = targetTool ? `${allowedAgentUpper}_${targetTool}` : `${allowedAgentUpper}_ALL`;
+
+    // Cooldown anti-spam for manual force refresh (1 hour)
+    if (force) {
       const lastRun = cooldowns[cooldownKey] || 0;
       const nowMs = Date.now();
-      if (nowMs - lastRun < 3 * 60 * 60 * 1000) {
-        console.log(`[KPI CONTEXT] Cooldown active for ${cooldownKey}. Skipping fetch.`);
+      const ONE_HOUR_MS = 60 * 60 * 1000; // 1 heure
+      if (nowMs - lastRun < ONE_HOUR_MS) {
+        const remainingMin = Math.ceil((ONE_HOUR_MS - (nowMs - lastRun)) / (60 * 1000));
+        console.log(`[KPI CONTEXT] Cooldown actif pour ${cooldownKey} (reste ${remainingMin} min). Requête conservée pour économiser les tokens.`);
+        setNotice(`Données déjà à jour. Prochaine actualisation autorisée dans ${remainingMin} min.`);
+        setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
         return;
       }
     }
 
-    // Set loading state for this agent
-    setLoadingByAgent(prev => ({ ...prev, [agentId]: true }));
+    // Set loading state for this agent (canonical lowercase key)
+    setLoadingByAgent(prev => ({ ...prev, [agentKey]: true }));
     setError(null);
 
     // Cancel in-flight HTTP request if any
@@ -131,10 +141,10 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     try {
       const clientId = "DEMO"; // Default tenant id
 
-      console.log(`[KPI CONTEXT] Fetching KPIs for ${upperAgent} (force: ${force}, tool: ${targetTool || 'ALL'})`);
+      console.log(`[KPI CONTEXT] Fetching KPIs for ${allowedAgentUpper} (force: ${force}, tool: ${targetTool || 'ALL'})`);
       const response = await fetchN8nKpis(
         {
-          allowed_agents: upperAgent,
+          allowed_agents: allowedAgentUpper,
           client_id: clientId,
           startDate,
           endDate,
@@ -145,49 +155,61 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       );
 
       // Active Selection Guard: Check if the user hasn't switched away
-      if (activeAgentRef.current !== upperAgent) {
-        console.warn(`[KPI CONTEXT] Resolved data for ${upperAgent} discarded: Active agent is now ${activeAgentRef.current}`);
+      if (activeAgentRef.current !== allowedAgentUpper) {
+        console.warn(`[KPI CONTEXT] Resolved data for ${allowedAgentUpper} discarded: Active agent is now ${activeAgentRef.current}`);
         return;
       }
 
-      // Merge new data into cache
+      // Merge new data into cache (canonical lowercase key)
       setKpisByAgent(prev => {
-        const existingAgentData = prev[agentId] || {};
+        const existingAgentData = prev[agentKey] || {};
+        let updatedAgentData: any;
         
         // If it's a specific tool refresh, nest it under the tool's name key
         if (targetTool) {
-          return {
-            ...prev,
-            [agentId]: {
-              ...existingAgentData,
-              [targetTool]: response
+          let unwrapped = response;
+          if (unwrapped && typeof unwrapped === 'object') {
+            if (unwrapped[agentKey] && unwrapped[agentKey][targetTool]) {
+              unwrapped = unwrapped[agentKey][targetTool];
+            } else if (unwrapped[allowedAgentUpper] && unwrapped[allowedAgentUpper][targetTool]) {
+              unwrapped = unwrapped[allowedAgentUpper][targetTool];
+            } else if (unwrapped[targetTool]) {
+              unwrapped = unwrapped[targetTool];
             }
+          }
+          updatedAgentData = {
+            ...existingAgentData,
+            [targetTool]: unwrapped
+          };
+        } else {
+          // Full agent load or fallback: overwrite cache (extract nested agent key if present)
+          const extractedData = response && typeof response === 'object' 
+            ? (response[agentKey] || response[allowedAgentUpper] || response) 
+            : response;
+
+          updatedAgentData = {
+            ...existingAgentData,
+            ...(typeof extractedData === 'object' ? extractedData : { data: extractedData })
           };
         }
 
-        // Full agent load or fallback: overwrite cache (extract nested agent key if present)
-        const agentKey = agentId.toLowerCase();
-        const extractedData = response && typeof response === 'object' 
-          ? (response[agentKey] || response[agentId] || response) 
-          : response;
-
         return {
           ...prev,
-          [agentId]: extractedData
+          [agentKey]: updatedAgentData
         };
       });
 
-      // Update manual cooldown if applicable
-      if (force && targetTool) {
+      // Update manual cooldown if applicable (1 heure)
+      if (force) {
         setCooldowns(prev => ({
           ...prev,
-          [`${upperAgent}_${targetTool}`]: Date.now()
+          [cooldownKey]: Date.now()
         }));
       }
 
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        console.log(`[KPI CONTEXT] Request for ${upperAgent} was aborted`);
+        console.log(`[KPI CONTEXT] Request for ${allowedAgentUpper} was aborted`);
         return; // Don't trigger error or clear loading for aborted requests
       }
       console.error(`[KPI CONTEXT] Error fetching KPIs:`, err);
@@ -198,8 +220,8 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       setError(msg);
     } finally {
       // Only reset loading if this remains the active agent
-      if (activeAgentRef.current === upperAgent) {
-        setLoadingByAgent(prev => ({ ...prev, [agentId]: false }));
+      if (activeAgentRef.current === allowedAgentUpper) {
+        setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
       }
     }
   };
@@ -277,6 +299,8 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
         fetchKpis,
         error,
         clearError,
+        notice,
+        clearNotice,
         activeAgentId,
         setActiveAgentId
       }}
