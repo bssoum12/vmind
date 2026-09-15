@@ -198,8 +198,8 @@ export default function SourcingAgentWorkspacePage() {
         (a.agent_name && a.agent_name.toLowerCase() === String(t).toLowerCase()) ||
         (a.nom && a.nom.toLowerCase() === String(t).toLowerCase())
       );
-      return match ? (match.agent_name || match.nom) : String(t);
-    });
+      return match ? (match.agent_name || match.nom) : null;
+    }).filter(Boolean) as string[];
   }, [agentData, allAgents]);
 
   return (

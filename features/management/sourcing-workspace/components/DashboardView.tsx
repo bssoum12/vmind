@@ -187,14 +187,8 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
           schedule_id: match.schedule_id
         };
       }
-      return {
-        uuid: t,
-        name: String(t),
-        status: 'stopped',
-        is_executing: false,
-        schedule_id: null
-      };
-    });
+      return null;
+    }).filter(Boolean);
   }, [agent, allAgents]);
   // Calculations
   const totalLeads = leads.length;
