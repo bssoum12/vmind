@@ -251,14 +251,20 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   const [loginLoading, setLoginLoading]   = useState(false);
   const [loginError, setLoginError]       = useState('');
   const [errorMessage]                    = useState('Impossible de joindre le serveur MCP.');
-  const [serverTools, setServerTools]     = useState<ToolMeta[]>([]);
+  const [serverTools, setServerTools]     = useState<ToolMeta[]>(session?.allTools || []);
+
+  useEffect(() => {
+    if (session?.allTools && session.allTools.length > 0) {
+      setServerTools(session.allTools);
+    }
+  }, [session?.allTools]);
 
   useEffect(() => {
     const fetchTools = async () => {
       try {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/mcp/tools/metadata`);
         const data = await res.json();
-        if (data.ok && data.tools) {
+        if (data.ok && Array.isArray(data.tools) && data.tools.length > 0) {
           setServerTools(data.tools);
         }
       } catch (err) {
