@@ -13,6 +13,7 @@ import { JobTitleMultiSelect } from './components/JobTitleMultiSelect';
 import { CountryMultiSelect } from './components/CountryMultiSelect';
 import { EmailSignatureEditor } from './components/EmailSignatureEditor';
 import { ProspectPipeline3D } from './components/ProspectPipeline3D';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
 
 interface WizardViewProps {
   templateId: string;
@@ -224,6 +225,33 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
   const router = useRouter();
   const [step, setStep] = useState(initialStep || 1);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  const [originSourcingUuid] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('vmind_guide_origin_sourcing_uuid');
+    }
+    return null;
+  });
+
+  const [originSourcingName] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('vmind_guide_origin_sourcing_name');
+    }
+    return null;
+  });
+
+  const handleCancel = () => {
+    const originUuid = originSourcingUuid;
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('vmind_guide_origin_sourcing_uuid');
+      sessionStorage.removeItem('vmind_guide_origin_sourcing_name');
+    }
+    if (originUuid) {
+      router.push(`/sourcing-agent-workspace/${originUuid}`);
+    } else {
+      onCancel();
+    }
+  };
 
   const [deployedUuid, setDeployedUuid] = useState<string | null>(null);
   const [hoveredDeployAction, setHoveredDeployAction] = useState<'sourcing' | 'workspace' | null>(null);
@@ -745,6 +773,48 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
 
       const data = await response.json().catch(() => ({}));
       const createdUuid = data.agent_id || editUuid;
+
+      const originUuid = originSourcingUuid || (typeof window !== 'undefined' ? sessionStorage.getItem('vmind_guide_origin_sourcing_uuid') : null);
+      const originName = originSourcingName || (typeof window !== 'undefined' ? sessionStorage.getItem('vmind_guide_origin_sourcing_name') : null);
+
+      if (originUuid && createdUuid) {
+        let linkSuccess = false;
+        try {
+          const linkRes = await fetch(`${baseUrl}/api/sourcing-agent/link-target/${originUuid}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token && { 'Authorization': `Bearer ${token}` })
+            },
+            body: JSON.stringify({ target_agent_uuid: createdUuid })
+          });
+
+          if (linkRes.ok) {
+            linkSuccess = true;
+          } else {
+            const errJson = await linkRes.json().catch(() => ({}));
+            console.error('[PROSPECT-WIZARD] Failed to link target agent:', linkRes.status, errJson);
+          }
+        } catch (linkErr) {
+          console.error('[PROSPECT-WIZARD] Exception linking target agent:', linkErr);
+        } finally {
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('vmind_guide_origin_sourcing_uuid');
+            sessionStorage.removeItem('vmind_guide_origin_sourcing_name');
+          }
+        }
+
+        if (typeof window !== 'undefined') {
+          if (linkSuccess) {
+            sessionStorage.setItem('vmind_post_deploy_linked_toast', `Agent de prospection « ${formData.agent_name} » déployé et associé avec succès à « ${originName || 'votre Agent de Sourcing'} » !`);
+          } else {
+            sessionStorage.setItem('vmind_post_deploy_linked_toast', `Agent de prospection « ${formData.agent_name} » déployé, mais l'association automatique à « ${originName || 'votre Agent de Sourcing'} » a échoué. Vous pouvez l'associer depuis la configuration.`);
+          }
+          router.push(`/sourcing-agent-workspace/${originUuid}`);
+          return;
+        }
+      }
+
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('vmind_post_deploy_tutorial_agent', formData.agent_name);
         sessionStorage.removeItem('vmind_editing_agent');
@@ -1046,11 +1116,37 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
           <div className="page-sub">Configurez votre agent de prospection en 4 étapes</div>
         </div>
         <div className="page-actions">
-          <Button onClick={onCancel}>← Retour Marketplace</Button>
+          <Button onClick={handleCancel}>← {originSourcingName ? `Retour ${originSourcingName}` : 'Retour Marketplace'}</Button>
         </div>
       </div>
       <div className="scroll">
         <div className="wizard-wrap">
+          {originSourcingName && (
+            <div style={{
+              marginBottom: '20px',
+              padding: '14px 20px',
+              borderRadius: '12px',
+              background: 'linear-gradient(135deg, rgba(0, 229, 200, 0.08) 0%, rgba(6, 17, 31, 0.7) 100%)',
+              border: '1px solid rgba(0, 229, 200, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              boxShadow: '0 4px 20px rgba(0, 229, 200, 0.08)'
+            }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: 'rgba(0, 229, 200, 0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#00E5C8',
+                flexShrink: 0
+              }}>
+                <CyberIcon name="target" size={18} color="#00E5C8" />
+              </div>
+              <div style={{ fontSize: '13px', color: '#E2E8F0', lineHeight: 1.45 }}>
+                <span style={{ color: '#00E5C8', fontWeight: 700 }}>Association automatique en cours :</span> Dès son déploiement, cet agent de prospection sera automatiquement associé comme destinataire (Target Agent) à votre Agent de Sourcing <strong>« {originSourcingName} »</strong>.
+              </div>
+            </div>
+          )}
           {/* STEPS */}
           <div className="wizard-steps" id="wiz-steps">
             <div className={`wstep ${step === 1 ? 'active' : step > 1 ? 'done' : ''}`}>
@@ -1099,7 +1195,6 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
                       onChange={(e) => setFormData({ ...formData, agent_name: e.target.value })}
                       placeholder="Ex: Yasmine, Mohamed, Amira..."
                     />
-                    <div className="form-hint">Ce nom sera affiché en interne pour identifier l'agent.</div>
                   </div>
                 </div>
               </div>

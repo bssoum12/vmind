@@ -15,18 +15,20 @@ import { GlobalMaxRemindersPopup } from "@/components/vmind/GlobalMaxRemindersPo
 import { ConversationsProvider } from "@/shared/contexts/ConversationsContext";
 import { useKpis } from '@/shared/contexts/KpiCacheContext';
 
-// Management Mode Components
-import { ManagementSidebar } from "@/features/management/layout/ManagementSidebar";
-import { MarketplaceView } from '@/features/management/marketplace/MarketplaceView';
-import { AgentsView } from '@/features/management/agents/AgentsView';
-import { WizardRouter } from '@/features/management/wizard/WizardRouter';
-import { JournalView } from '@/features/management/journal/JournalView';
-import { ReportsView } from '@/features/management/reports/ReportsView';
-import { IntegrationsView } from '@/features/management/integrations/IntegrationsView';
-import { ProfileView } from '@/features/management/profile/ProfileView';
-import { SignupRequestsView } from '@/features/management/signup_requests/SignupRequestsView';
+import dynamic from 'next/dynamic';
 
-import { ConnectorsHub } from '@/features/connectors/ConnectorsHub';
+// Management Mode Components (Dynamically loaded on demand for max performance)
+const ManagementSidebar = dynamic(() => import('@/features/management/layout/ManagementSidebar').then(m => m.ManagementSidebar), { ssr: false });
+const MarketplaceView = dynamic(() => import('@/features/management/marketplace/MarketplaceView').then(m => m.MarketplaceView), { ssr: false });
+const AgentsView = dynamic(() => import('@/features/management/agents/AgentsView').then(m => m.AgentsView), { ssr: false });
+const WizardRouter = dynamic(() => import('@/features/management/wizard/WizardRouter').then(m => m.WizardRouter), { ssr: false });
+const JournalView = dynamic(() => import('@/features/management/journal/JournalView').then(m => m.JournalView), { ssr: false });
+const ReportsView = dynamic(() => import('@/features/management/reports/ReportsView').then(m => m.ReportsView), { ssr: false });
+const IntegrationsView = dynamic(() => import('@/features/management/integrations/IntegrationsView').then(m => m.IntegrationsView), { ssr: false });
+const ProfileView = dynamic(() => import('@/features/management/profile/ProfileView').then(m => m.ProfileView), { ssr: false });
+const SignupRequestsView = dynamic(() => import('@/features/management/signup_requests/SignupRequestsView').then(m => m.SignupRequestsView), { ssr: false });
+
+const ConnectorsHub = dynamic(() => import('@/features/connectors/ConnectorsHub').then(m => m.ConnectorsHub), { ssr: false });
 /* ─────────────────────────────────────────────────────
    Accès Non Autorisé View (Premium VMIND Design)
 ───────────────────────────────────────────────────── */
@@ -156,20 +158,71 @@ function UnauthorizedView({ onBackToLogin, onBackToDashboard }: { onBackToLogin:
 function HomeContent() {
   const { mode, setMode } = useMode();
   const [isMounted, setIsMounted] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      let rawToken = localStorage.getItem('vmind_session');
+      if (!rawToken) return false;
+      let token = rawToken;
+      if (rawToken.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(rawToken);
+          token = parsed.token || parsed.accessToken || rawToken;
+        } catch {}
+      } else if (rawToken.startsWith('"') && rawToken.endsWith('"')) {
+        token = rawToken.slice(1, -1);
+      }
+      const decoded: any = jwtDecode(token);
+      if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  });
   const [isAuthorized, setIsAuthorized] = useState<boolean>(true);
-  const [clientId, setClientId] = useState<string>("DEMO");
+  const [clientId, setClientId] = useState<string>(() => {
+    if (typeof window === 'undefined') return "DEMO";
+    try {
+      let rawToken = localStorage.getItem('vmind_session');
+      if (!rawToken) return "DEMO";
+      let token = rawToken;
+      if (rawToken.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(rawToken);
+          token = parsed.token || parsed.accessToken || rawToken;
+        } catch {}
+      } else if (rawToken.startsWith('"') && rawToken.endsWith('"')) {
+        token = rawToken.slice(1, -1);
+      }
+      const decoded: any = jwtDecode(token);
+      return decoded.client_id || "DEMO";
+    } catch {
+      return "DEMO";
+    }
+  });
 
   useEffect(() => {
     setIsMounted(true);
 
     const checkAuth = () => {
       try {
-        const token = localStorage.getItem('vmind_session');
-        if (!token) {
+        let rawToken = localStorage.getItem('vmind_session');
+        if (!rawToken) {
           setIsAuthenticated(false);
           window.location.href = '/login';
           return;
+        }
+
+        let token = rawToken;
+        if (rawToken.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(rawToken);
+            token = parsed.token || parsed.accessToken || rawToken;
+          } catch {}
+        } else if (rawToken.startsWith('"') && rawToken.endsWith('"')) {
+          token = rawToken.slice(1, -1);
         }
 
         const decoded: any = jwtDecode(token);
@@ -194,7 +247,7 @@ function HomeContent() {
             : typeof decoded.roles === 'string'
               ? [decoded.roles]
               : [];
-          if (!roles.includes('Administrators') && !roles.includes('Utilisateur') && !roles.includes('Administrator')) {
+          if (!roles.includes('Administrators') && !roles.includes('Utilisateur') && !roles.includes('Administrator') && !roles.includes('Superusers')) {
             setIsAuthorized(false);
             return;
           }
@@ -277,9 +330,10 @@ function HomeContent() {
     }
 
     if (viewParam) {
-      setCurrentView(viewParam);
+      const normalizedView = viewParam === 'marketplace' ? 'market' : viewParam;
+      setCurrentView(normalizedView);
       if (typeof window !== 'undefined') {
-        sessionStorage.setItem('vmind_current_view', viewParam);
+        sessionStorage.setItem('vmind_current_view', normalizedView);
       }
     }
 
@@ -334,10 +388,16 @@ function HomeContent() {
       if (savedAgentStr) {
         try {
           const agentObj = JSON.parse(savedAgentStr);
+          const savedStepStr = sessionStorage.getItem('vmind_wizard_step');
+          const savedStep = savedStepStr ? parseInt(savedStepStr, 10) : undefined;
           setEditingAgent(agentObj);
           setSelectedTemplate(agentObj.run_mode || 'prospection');
+          if (savedStep) {
+            setInitialWizardStep(savedStep);
+          }
           setCurrentView('wizard');
           sessionStorage.removeItem('vmind_editing_agent');
+          sessionStorage.removeItem('vmind_wizard_step');
         } catch (e) {
           console.error("Failed to parse saved editing agent:", e);
         }
@@ -362,6 +422,7 @@ function HomeContent() {
       sessionStorage.removeItem('vmind_editing_agent');
       sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
       sessionStorage.removeItem('vmind_wizard_template');
+      sessionStorage.removeItem('vmind_wizard_step');
       sessionStorage.removeItem('vmind_sourcing_target_agent');
     }
     setCurrentView(hasPostDeploy ? 'agents' : 'market');
@@ -487,7 +548,7 @@ function HomeContent() {
       />
       <div className="content management-layout">
         <div className="view-container">
-          {currentView === 'market' && (
+          {(currentView === 'market' || currentView === 'marketplace') && (
             <MarketplaceView
               onDeploy={handleDeploy}
               activeCategory={activeCategory}

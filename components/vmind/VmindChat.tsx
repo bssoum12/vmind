@@ -237,11 +237,28 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   onAgentActive,
   activeAgentId = "VMIND"
 }) => {
-  const { activeConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle, refreshConversations } = useConversations();
+  const { activeConversationId, setActiveConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle, refreshConversations } = useConversations();
   const [input, setInput] = useState('');
   const [isErpConnected, setIsErpConnected] = useState<boolean>(false);
   const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+
+  const handleAgentReferralClick = (targetAgentId: string) => {
+    // 1. Retrieve the last user question in the conversation history
+    const lastUserMsg = messages.slice().reverse().find(m => m.sender === 'user');
+    const promptToCopy = lastUserMsg?.text || '';
+
+    // 2. Switch the active agent
+    onAgentActive?.(targetAgentId);
+
+    // 3. Reset active conversation to prepare a fresh session for the target agent
+    setActiveConversationId(null);
+
+    // 4. Pre-fill the chat input area with the question
+    if (promptToCopy) {
+      setInput(promptToCopy);
+    }
+  };
 
   const checkPermissions = () => {
     if (typeof window === 'undefined') return;
@@ -516,7 +533,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         setMessages((prev) => [...prev, {
           id: `vm-${Date.now()}`,
           sender: 'vm',
-          text: `ℹ️ Vous n'avez pas l'autorisation d'accéder aux données TraLIS en direct pour l'agent ${agentName}. Je reste à votre disposition pour toute question méthodologique ou conseil métier dans ce domaine.`,
+          text: `ℹ️ Vous n'avez pas l'autorisation d'accéder aux données Erp en direct pour l'agent ${agentName}. Je reste à votre disposition pour toute question méthodologique ou conseil métier dans ce domaine.`,
           time: formatTime(), rawDate: new Date().toISOString(),
           tool_used: null,
           response_type: 'full',
@@ -1170,7 +1187,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <ToolResultRenderer message={msg} />
+                      <ToolResultRenderer message={msg} onAgentClick={handleAgentReferralClick} />
                     )}
                   </div>
 
@@ -1203,16 +1220,28 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           }}
         >
           <textarea
-            className="input-field w-full bg-transparent p-3 pr-24 text-sm text-gray-200 placeholder-gray-500 outline-none resize-none max-h-32"
-            rows={1}
+            className="input-field w-full bg-transparent pl-4 pr-[100px] text-sm text-gray-200 placeholder-gray-500 outline-none resize-none"
+            style={{ 
+              paddingTop: '16px', 
+              paddingBottom: '16px', 
+              lineHeight: '20px',
+              minHeight: '52px',
+              height: '52px',
+              maxHeight: '120px',
+              overflowY: 'auto'
+            }}
             placeholder="Posez votre question métier..."
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              e.target.style.height = '52px';
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+            }}
             onKeyDown={handleKeyDown}
             disabled={isLoading}
           />
 
-          <div className="input-actions absolute right-2 flex items-center gap-1.5">
+          <div className="input-actions absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
             <button
               type="button"
               className="voice-btn relative flex items-center justify-center transition-all duration-200"

@@ -141,7 +141,30 @@ function TargetAgentsBadge({ targets }: { targets: string[] }) {
   const [coords, setCoords] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
 
-  if (!targets || targets.length === 0) return null;
+  if (!targets || targets.length === 0) {
+    return (
+      <span
+        style={{
+          fontSize: '10px',
+          letterSpacing: '0.02em',
+          padding: '2px 8px',
+          borderRadius: '4px',
+          background: 'rgba(56, 189, 248, 0.08)',
+          color: '#38BDF8',
+          border: '1px solid rgba(56, 189, 248, 0.25)',
+          fontWeight: 600,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          lineHeight: '14px'
+        }}
+        title="Agent opérant en mode autonome (aucun agent de prospection cible assigné)."
+      >
+        <CyberIcon name="zap" size={9} color="#38BDF8" />
+        <span>Autonome</span>
+      </span>
+    );
+  }
 
   const firstTarget = targets[0];
   const remainingTargets = targets.slice(1);
@@ -151,13 +174,11 @@ function TargetAgentsBadge({ targets }: { targets: string[] }) {
       const rect = btnRef.current.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
       if (spaceBelow < 220 && rect.top > 220) {
-        // Open upwards if not enough space below
         setCoords({
           bottom: window.innerHeight - rect.top + 6,
           left: Math.max(12, Math.min(rect.left, window.innerWidth - 300))
         });
       } else {
-        // Open downwards by default
         setCoords({
           top: rect.bottom + 6,
           left: Math.max(12, Math.min(rect.left, window.innerWidth - 300))
@@ -198,30 +219,31 @@ function TargetAgentsBadge({ targets }: { targets: string[] }) {
 
   return (
     <div
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 4, position: 'relative' }}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', verticalAlign: 'middle' }}
       onClick={(e) => e.stopPropagation()}
     >
-      {/* 1st Agent Badge (Capped at 1) */}
       <span
         style={{
-          fontSize: 10,
+          fontSize: '10px',
           padding: '2px 8px',
-          borderRadius: 6,
-          background: 'rgba(0, 229, 200, 0.1)',
+          borderRadius: '4px',
+          background: 'rgba(0, 229, 200, 0.08)',
           color: '#00E5C8',
-          border: '1px solid rgba(0, 229, 200, 0.25)',
-          fontWeight: 500,
+          border: '1px solid rgba(0, 229, 200, 0.22)',
+          fontWeight: 600,
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 4,
-          whiteSpace: 'nowrap'
+          gap: '5px',
+          whiteSpace: 'nowrap',
+          lineHeight: '14px',
+          letterSpacing: '0.01em'
         }}
         title={`Agent Prospect Cible: ${firstTarget}`}
       >
-        🎯 {firstTarget}
+        <span style={{ fontSize: '10px', opacity: 0.9 }}>🎯</span>
+        <span>{firstTarget}</span>
       </span>
 
-      {/* +N autres Badge with Hover / Click Popover */}
       {remainingTargets.length > 0 && (
         <>
           <button
@@ -233,22 +255,24 @@ function TargetAgentsBadge({ targets }: { targets: string[] }) {
               setIsOpen(true);
             }}
             style={{
-              fontSize: 10,
-              padding: '2px 7px',
-              borderRadius: 6,
-              background: isOpen ? 'rgba(0, 229, 200, 0.25)' : 'rgba(0, 229, 200, 0.12)',
+              fontSize: '10px',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              background: isOpen ? 'rgba(0, 229, 200, 0.22)' : 'rgba(0, 229, 200, 0.08)',
               color: '#00E5C8',
-              border: '1px solid rgba(0, 229, 200, 0.35)',
-              fontWeight: 600,
+              border: '1px solid rgba(0, 229, 200, 0.3)',
+              fontWeight: 700,
               cursor: 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 2,
+              gap: '3px',
+              lineHeight: '14px',
               transition: 'all 0.15s ease'
             }}
             title="Voir tous les agents prospect cibles"
           >
-            +{remainingTargets.length} autre{remainingTargets.length > 1 ? 's' : ''} ▾
+            <span>+{remainingTargets.length}</span>
+            <span style={{ fontSize: '8px', opacity: 0.8 }}>▼</span>
           </button>
 
           {isOpen && coords && typeof document !== 'undefined' && createPortal(
@@ -436,6 +460,15 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     };
   }, [tutorialStep, nextTutorialStep]);
 
+  const agentHasTargetProspects = (agent: LiveAgent | null): boolean => {
+    if (!agent) return false;
+    const raw = agent.config?.target_agent_ids || 
+                (agent as any)?.target_agent_ids || 
+                (agent as any)?.parameters?.target_agent_ids ||
+                (agent as any)?.parameters?.sourcing_config?.target_agent_ids;
+    return Array.isArray(raw) && raw.length > 0;
+  };
+
   const getTutorialContent = () => {
     if (!tutorialAgent) return null;
     const isProspection = tutorialAgent.run_mode === 'prospection';
@@ -480,7 +513,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           message: isProspection
             ? "Cliquez sur 'Espace' pour ouvrir son interface dédiée. C'est ici que vous déposez vos contacts (fichiers CSV, Excel, XML... ou URL web), vérifiez les qualifications de l'IA et supervisez l'envoi de vos campagnes d'emails."
             : isSourcing
-              ? "Ouvrez l'Espace de Travail pour suivre vos profils sourcés, consulter le tableau de bord et superviser l'agent."
+              ? "Cliquez sur 'Espace' pour ouvrir son interface dédiée. C'est ici que vous retrouvez tous les leads sourcés depuis le web, suivez les statistiques d'extraction et supervisez le journal d'activité."
               : "Ouvrez l'Espace de Travail pour suivre vos données et superviser l'agent.",
           mood: 'focused' as GuideMood
         };
@@ -490,20 +523,28 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           message: isProspection
             ? "Le bouton 'Run' lance une qualification immédiate de vos contacts. Le bouton 'Start' (ou 'Pause') active ou suspend la planification automatique selon les plages configurées."
             : isSourcing
-              ? "Le bouton 'Run' lance une recherche immédiate. Le bouton 'Start' (ou 'Pause') active ou suspend la recherche continue selon vos critères."
+              ? "Le bouton 'Run' lance une recherche immédiate de leads selon vos critères. Le bouton 'Start' (ou 'Pause') active la recherche continue pour alimenter votre pipeline en continu."
               : "Le bouton 'Run' lance une tâche immédiate et 'Start' / 'Pause' gère la planification.",
           mood: 'focused' as GuideMood
         };
-      case 4:
+      case 4: {
+        const hasTargets = agentHasTargetProspects(tutorialAgent);
+        const shouldGuideProspectDuo = isSourcing && !hasTargets;
+
         return {
           title: isProspection
             ? "4. Associer un Sourcing Agent (Duo Autopilot)"
-            : "4. Configuration de l'Agent",
+            : shouldGuideProspectDuo
+              ? "4. Associer un Agent de Prospection (Duo Autopilot)"
+              : "4. Configuration de l'Agent",
           message: isProspection
             ? "Pourquoi ce 2ème agent est important ? Cet Agent de Prospection est votre closer : il qualifie et contacte vos leads, mais NE cherche PAS de prospects tout seul. Le Sourcing Agent est le chasseur qui explore le web et lui injecte des décideurs B2B en continu. Sans lui, vous devez importer vos fichiers manuellement. Avec lui, votre prospection tourne en 100% pilote automatique !"
-            : "Modifiez la configuration de cet agent et ajustez ses critères à tout moment.",
-          mood: 'convinced' as GuideMood
+            : shouldGuideProspectDuo
+              ? "Pourquoi ce 2ème agent est recommandé ? Votre Agent de Sourcing est le chasseur : il découvre et extrait des profils B2B ciblés sur le web. L'Agent de Prospection (Closer) prend automatiquement le relais pour les qualifier et leur envoyer des campagnes d'emails personnalisées. Sans lui, vous devrez exporter et contacter vos leads manuellement. Avec lui, votre prospection tourne en 100% pilote automatique !"
+              : "Votre Agent de Sourcing est déjà configuré pour alimenter votre Agent de Prospection cible. Vous pouvez ajuster vos critères de recherche et paramètres d'extraction à tout moment.",
+          mood: shouldGuideProspectDuo || isProspection ? ('convinced' as GuideMood) : ('focused' as GuideMood)
         };
+      }
       case 5:
         return {
           title: "5. Configuration & Gestion",
@@ -792,7 +833,46 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
               </>
             )}
 
-            {tutorialStep === 4 && tutorialAgent.run_mode !== 'prospection' && (
+            {tutorialStep === 4 && tutorialAgent.run_mode === 'sourcing' && !agentHasTargetProspects(tutorialAgent) && (
+              <>
+                <button
+                  type="button"
+                  className="vmind-guide-btn-primary"
+                  onClick={() => {
+                    setTutorialStep(0);
+                    setTutorialAgent(null);
+                    if (typeof window !== 'undefined') {
+                      sessionStorage.setItem('vmind_guide_target_marketplace', 'prospection');
+                      const linkId = tutorialAgent.uuid || (tutorialAgent as any).agent_id;
+                      if (linkId) {
+                        sessionStorage.setItem('vmind_guide_origin_sourcing_uuid', String(linkId));
+                      }
+                      const linkName = tutorialAgent.agent_name || (tutorialAgent as any).nom;
+                      if (linkName) {
+                        sessionStorage.setItem('vmind_guide_origin_sourcing_name', String(linkName));
+                      }
+                    }
+                    onNavigate('market');
+                  }}
+                >
+                  <CyberIcon name="zap" size={13} color="currentColor" />
+                  <span>Trouver dans le Marketplace</span>
+                  <CyberIcon name="arrow-right" size={13} color="currentColor" />
+                </button>
+                <button
+                  type="button"
+                  className="vmind-guide-btn-secondary"
+                  onClick={nextTutorialStep}
+                >
+                  <span>Passer cette étape</span>
+                </button>
+              </>
+            )}
+
+            {tutorialStep === 4 && (
+              (tutorialAgent.run_mode === 'sourcing' && agentHasTargetProspects(tutorialAgent)) ||
+              (tutorialAgent.run_mode !== 'prospection' && tutorialAgent.run_mode !== 'sourcing')
+            ) && (
               <button
                 type="button"
                 className="vmind-guide-btn-primary"
@@ -882,14 +962,14 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           )}
 
           {!loading && agents.length > 0 && (
-            <table className="agents-table" style={{ width: '100%', minWidth: '780px', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left', fontSize: '13px' }}>
+            <table className="agents-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(0, 229, 200, 0.12)', color: '#00E5C8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
-                  <th style={{ padding: '10px 16px', position: 'sticky', left: 0, zIndex: 6, background: '#091B33', width: '220px', minWidth: '220px' }}>Agent</th>
-                  <th style={{ padding: '10px 16px', position: 'sticky', left: '220px', zIndex: 6, background: '#091B33', width: '130px', minWidth: '130px', boxShadow: '4px 0 10px rgba(0,0,0,0.45)' }}>Statut</th>
-                  <th style={{ padding: '10px 16px', minWidth: '150px' }}>Planification</th>
-                  <th style={{ padding: '10px 16px', minWidth: '140px' }}>Dernière exéc.</th>
-                  <th style={{ padding: '10px 16px', textAlign: 'right', minWidth: '160px' }}>Actions</th>
+                <tr style={{ borderBottom: '1px solid rgba(0, 229, 200, 0.15)', background: 'rgba(9, 27, 51, 0.75)', color: '#00E5C8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
+                  <th style={{ padding: '12px 18px', minWidth: '320px' }}>Agent</th>
+                  <th style={{ padding: '12px 18px', width: '140px' }}>Statut</th>
+                  <th style={{ padding: '12px 18px', width: '200px' }}>Planification</th>
+                  <th style={{ padding: '12px 18px', width: '160px' }}>Dernière exéc.</th>
+                  <th style={{ padding: '12px 18px', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -914,17 +994,17 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                       style={{
                         cursor: tutorialStep > 0 ? 'default' : 'pointer',
                         pointerEvents: tutorialStep > 0 ? 'none' : undefined,
-                        background: isTutorialActive && tutorialStep === 1 ? 'rgba(0, 229, 200, 0.12)' : isSelected ? 'rgba(0,229,160,0.06)' : undefined,
-                        borderLeft: isSelected ? '3px solid #00E5A0' : '3px solid transparent',
-                        borderBottom: '1px solid rgba(255,255,255,0.03)',
-                        transition: 'all .15s',
+                        background: isTutorialActive && tutorialStep === 1 ? 'rgba(0, 229, 200, 0.12)' : isSelected ? 'rgba(0,229,160,0.08)' : 'rgba(5, 16, 30, 0.5)',
+                        borderLeft: isSelected ? '3px solid #00E5C8' : '3px solid transparent',
+                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        transition: 'background 0.2s, border-color 0.2s',
                         position: isTutorialActive ? 'relative' : undefined,
                         zIndex: isTutorialActive ? 10001 : undefined,
                         boxShadow: isTutorialActive && tutorialStep === 1 ? '0 0 0 4px rgba(0, 229, 200, 0.85)' : undefined,
                       }}
                     >
-                      <td style={{ padding: '12px 16px', position: 'sticky', left: 0, zIndex: 4, background: '#061426', width: '220px', minWidth: '220px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, position: 'relative' }}>
+                      <td style={{ padding: '14px 18px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative' }}>
                           {isTutorialActive && tutorialStep === 1 && (
                             <VMindGuideArrow
                               direction="down"
@@ -947,8 +1027,15 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                           </div>
                           <div>
                             <div className="agent-row-name">{agent.agent_name}</div>
-                            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                              <span>{agent.run_mode || resolveAgentType(agent)}</span>
+                            <div style={{ fontSize: '11px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+                              <span style={{
+                                textTransform: 'capitalize',
+                                color: 'var(--muted)',
+                                fontWeight: 500,
+                                fontSize: '11px'
+                              }}>
+                                {agent.run_mode || resolveAgentType(agent)}
+                              </span>
                               {agent.run_mode === 'sourcing' && (
                                 <TargetAgentsBadge targets={getTargetAgentNames(agent)} />
                               )}
@@ -957,7 +1044,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         </div>
                       </td>
 
-                      <td style={{ padding: '12px 16px', position: 'sticky', left: '220px', zIndex: 4, background: '#061426', width: '130px', minWidth: '130px', boxShadow: '4px 0 10px rgba(0,0,0,0.45)' }}>
+                      <td style={{ padding: '14px 18px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           {agent.is_executing ? (
                             <span style={{
@@ -996,8 +1083,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         {formatDate(agent.lastExecuted)}
                       </td>
 
-                      <td style={{ padding: '12px 16px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                        <div className="row-actions">
+                      <td style={{ padding: '14px 18px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                        <div className="row-actions" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6 }}>
                           {/* Run Now - Tutorial Step 3 */}
                           <button
                             className="row-btn"

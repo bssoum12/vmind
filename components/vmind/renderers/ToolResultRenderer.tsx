@@ -4,8 +4,9 @@ import { StandardResponseRenderer } from './StandardResponseRenderer';
 
 interface ToolResultRendererProps {
   message: VmindMessage;
+  onAgentClick?: (agentId: string) => void;
 }
 
-export const ToolResultRenderer: React.FC<ToolResultRendererProps> = ({ message }) => {
-  return <StandardResponseRenderer message={message} />;
+export const ToolResultRenderer: React.FC<ToolResultRendererProps> = ({ message, onAgentClick }) => {
+  return <StandardResponseRenderer message={message} onAgentClick={onAgentClick} />;
 };

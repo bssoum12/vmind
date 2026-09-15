@@ -59,7 +59,7 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint, onModif
   }, []);
 
   useEffect(() => {
-    if (initialMission && !summary && messages.length === 0) {
+    if (initialMission && summary !== initialMission) {
       setSummary(initialMission);
       setMessages([
         {

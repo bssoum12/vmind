@@ -24,54 +24,6 @@ interface ToolMeta {
   authLevel: AuthLevel;
 }
 
-// ─── Tool Metadata (mirroring backend permissions.ts) ────────────────────────
-const ALL_TOOL_METADATA: ToolMeta[] = [
-  // VFIN — Lecture
-  { name: 'get_monthly_validated_revenue', description: 'Chiffre d\'affaires mensuel validé', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'get_clients_overdue_30_days',   description: 'Clients en retard depuis +30 jours', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'get_treasury_status_today',     description: 'Position de trésorerie du jour', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'get_treasury_forecast_30_days', description: 'Prévision trésorerie sur 30 jours', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'get_lowest_margin_5clients_quarter', description: '5 clients avec les plus faibles marges ce trimestre', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'compare_monthly_revenue',       description: 'Comparaison CA mensuel N vs N-1', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'get_overdue_balance',           description: 'Balance âgée des impayés', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'get_six_month_revenue_trend',   description: 'Tendance CA sur 6 mois glissants', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'compare_monthly_margin',        description: 'Comparaison marges mensuelles', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'get_top_clients_revenue',       description: 'Top clients par chiffre d\'affaires', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'get_tresorerie_position',       description: 'Position de trésorerie consolidée', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'get_aged_balance',              description: 'Balance âgée détaillée', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'get_overdue_alerts',            description: 'Alertes créances en retard', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'get_invoice_detail',            description: 'Détail d\'une facture', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  { name: 'get_margin_by_dossier',         description: 'Marge par dossier', agent: 'VFIN', accessType: 'read', authLevel: 'always' },
-  // VFIN — Action sensible
-  { name: 'print_invoice_report',          description: 'Génère et imprime un rapport de facturation', agent: 'VFIN', accessType: 'sensitive', authLevel: 'approval' },
-  // VBUY
-  { name: 'get_purchase_invoice_detail',   description: 'Détail d\'une facture d\'achat', agent: 'VBUY', accessType: 'read', authLevel: 'always' },
-  // VMOVE
-  { name: 'get_dossier_detail',            description: 'Détail d\'un dossier de transport', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
-  { name: 'get_expedition_status',         description: 'Statut d\'une expédition', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
-  { name: 'get_dossier_volume_evolution',  description: 'Évolution du volume dossiers', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
-  { name: 'get_delivery_rate',             description: 'Taux de livraison à temps', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
-  { name: 'analyze_delay_by_client_type',  description: 'Analyse des délais par type client', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
-  { name: 'get_exploitation_kpis',         description: 'KPIs opérationnels exploitation', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
-  { name: 'get_vmove_suggestion_bl_non_factures', description: 'Liste des bons de livraison non facturés', agent: 'VMOVE', accessType: 'read', authLevel: 'always' },
-  // VSELL
-  { name: 'get_customer_profile',          description: 'Profil complet d\'un client', agent: 'VSELL', accessType: 'read', authLevel: 'always' },
-  { name: 'search_cotations',              description: 'Recherche de cotations commerciales', agent: 'VSELL', accessType: 'read', authLevel: 'always' },
-  { name: 'get_commercial_kpis',           description: 'KPIs commerciaux et CRM', agent: 'VSELL', accessType: 'read', authLevel: 'always' },
-  { name: 'compare_agency_performance_jan_apr', description: 'Comparaison performance agences Jan-Avr', agent: 'VSELL', accessType: 'read', authLevel: 'always' },
-  // VDATA
-  { name: 'generate_monthly_activity_report', description: 'Rapport d\'activité mensuel global', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
-  { name: 'get_degraded_kpis',             description: 'KPIs dégradés et alertes', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
-  { name: 'get_tableau_croise',            description: 'Tableau croisé analytique', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
-  { name: 'get_score_global',              description: 'Score global de performance', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
-  { name: 'get_alerts_kpi_vdata',          description: 'Alertes KPI analytics', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
-  { name: 'list_tables',                   description: 'Liste les tables disponibles', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
-  { name: 'ping_db',                       description: 'Vérification de la connexion base de données', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
-  { name: 'list_vd_files',                 description: 'Fichiers VD disponibles', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
-  { name: 'list_e255_files',               description: 'Fichiers E255 disponibles', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
-  { name: 'read_allowed_file',             description: 'Lecture d\'un fichier autorisé', agent: 'VDATA', accessType: 'read', authLevel: 'always' },
-  { name: 'run_readonly_query',            description: 'Exécute une requête SQL en lecture seule', agent: 'VDATA', accessType: 'sensitive', authLevel: 'approval' },
-];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -299,6 +251,28 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   const [loginLoading, setLoginLoading]   = useState(false);
   const [loginError, setLoginError]       = useState('');
   const [errorMessage]                    = useState('Impossible de joindre le serveur MCP.');
+  const [serverTools, setServerTools]     = useState<ToolMeta[]>(session?.allTools || []);
+
+  useEffect(() => {
+    if (session?.allTools && session.allTools.length > 0) {
+      setServerTools(session.allTools);
+    }
+  }, [session?.allTools]);
+
+  useEffect(() => {
+    const fetchTools = async () => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/mcp/tools/metadata`);
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.tools) && data.tools.length > 0) {
+          setServerTools(data.tools);
+        }
+      } catch (err) {
+        console.error('Failed to fetch tools metadata:', err);
+      }
+    };
+    fetchTools();
+  }, []);
 
   // Cloudflare Turnstile state
   const [turnstileToken, setTurnstileToken] = useState('');
@@ -399,7 +373,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   const handleDisconnect = () => onDisconnected();
 
   // ── Build tool sections ────────────────────────────────────────────────────
-  const dynamicMetadata = [...ALL_TOOL_METADATA];
+  const dynamicMetadata = [...serverTools];
   if (authorizedToolNames && authorizedToolNames.size > 0) {
     authorizedToolNames.forEach(toolName => {
       // Exclude special dynamic client tools that duplicate existing logic
@@ -566,10 +540,6 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
           <Shield size={32} style={{ marginBottom: '16px', opacity: 0.4 }} />
           <p style={{ margin: '0 0 4px 0', fontSize: '14px', fontWeight: 600, color: '#8FA3B8' }}>
             Connecteur non activé
-          </p>
-          <p style={{ margin: 0, fontSize: '13px' }}>
-            {dynamicMetadata.length} outils ERP disponibles selon vos droits TraLIS.
-            Connectez-vous pour voir vos autorisations.
           </p>
         </div>
       )}

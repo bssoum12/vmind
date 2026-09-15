@@ -1141,6 +1141,9 @@ textarea.form-input {
 .row-actions {
   display: flex;
   gap: 6px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: nowrap;
 }
 
 .row-btn {
@@ -1456,18 +1459,16 @@ textarea.form-input {
   position: sticky;
   left: 0;
   z-index: 6;
-  background: var(--navy3);
+  background: var(--navy4);
   min-width: 240px;
-  max-width: 240px;
 }
 
 .agents-table td:first-child {
   position: sticky;
   left: 0;
   z-index: 4;
-  background: #06111F;
+  background: inherit;
   min-width: 240px;
-  max-width: 240px;
 }
 
 /* Sticky Column 2 (Statut) */
@@ -1475,23 +1476,20 @@ textarea.form-input {
   position: sticky;
   left: 240px;
   z-index: 6;
-  background: var(--navy3);
+  background: var(--navy4);
   min-width: 130px;
-  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.5);
 }
 
 .agents-table td:nth-child(2) {
   position: sticky;
   left: 240px;
   z-index: 4;
-  background: #06111F;
+  background: inherit;
   min-width: 130px;
-  box-shadow: 4px 0 10px rgba(0, 0, 0, 0.5);
 }
 
-.agents-table tr:hover td:first-child,
-.agents-table tr:hover td:nth-child(2) {
-  background: #08172A;
+.agents-table tr:hover td {
+  background: rgba(0, 229, 200, 0.05) !important;
 }
 
 .agents-table th:last-child,

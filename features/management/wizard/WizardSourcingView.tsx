@@ -10,6 +10,7 @@ import { Target, Users, Check, Bot, Zap, Save, CheckCircle2, Play, CalendarClock
 import { SourcingAgentExecutionModal } from '../agents/components/SourcingAgentExecutionModal';
 import { SourcingAgentScheduleModal } from '../agents/components/SourcingAgentScheduleModal';
 import { LiveAgent } from '../agents/AgentsView';
+import { SourcingPipeline3D } from './components/SourcingPipeline3D';
 
 import { useToast } from '@/shared/contexts/ToastContext';
 
@@ -58,6 +59,16 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
   const [deployedAgent, setDeployedAgent] = useState<LiveAgent | null>(null);
   const [showExecutionModal, setShowExecutionModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+
+  const [pipelineHoveredStage, setPipelineHoveredStage] = useState<'crawler' | 'enricher' | 'pool' | null>(null);
+  const [hasInteractedWithPipeline, setHasInteractedWithPipeline] = useState(false);
+
+  const handlePipelineStageChange = (stage: 'crawler' | 'enricher' | 'pool' | null) => {
+    setPipelineHoveredStage(stage);
+    if (stage) {
+      setHasInteractedWithPipeline(true);
+    }
+  };
 
   const template = AGENT_TEMPLATES.find(t => t.id === templateId);
   const isEditMode = Boolean(agentToEdit && (agentToEdit.uuid || (agentToEdit.agent_id && agentToEdit.agent_name && agentToEdit.agent_id !== 'sourcing' && agentToEdit.agent_id !== 'sourcing_agent')));
@@ -396,12 +407,6 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       return;
     }
 
-    if (formData.target_agent_ids.length === 0) {
-      showToast("Veuillez sélectionner au moins un agent de prospection pour recevoir les leads.", "err");
-      if (step !== 2) setStep(2);
-      return;
-    }
-
     setIsDeploying(true);
 
     const now = new Date();
@@ -434,12 +439,14 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
         body: JSON.stringify(completePayload)
       });
 
-      if (!response.ok) {
-        throw new Error(`Impossible de ${isEditMode ? 'mettre à jour' : 'déployer'} l'agent (${response.statusText})`);
-      }
-
       const resData = await response.json();
       const deployedUuid = resData.uuid || resData.agent_id || editUuid || 'sourcing_agent';
+
+      if (isEditMode) {
+        showToast("Agent mis à jour avec succès !", "ok");
+        onCancel();
+        return;
+      }
 
       const liveAgentPayload: LiveAgent = {
         agent_id: deployedUuid,
@@ -464,15 +471,27 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       setShowActivationDialogue(true);
     } catch (error: any) {
       console.error('Deployment error:', error);
-      alert(`Erreur de déploiement: ${error.message}`);
+      showToast(`Erreur de déploiement: ${error.message}`, 'err');
     } finally {
       setIsDeploying(false);
     }
   };
 
+  const navigateToAgentsWithTutorial = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('vmind_post_deploy_tutorial_agent', formData.agent_name);
+      sessionStorage.removeItem('vmind_editing_agent');
+      sessionStorage.removeItem('vmind_wizard_step');
+      sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
+      sessionStorage.removeItem('vmind_guide_link_prospect_name');
+      window.dispatchEvent(new CustomEvent('switch-management-view', { detail: 'agents' }));
+    }
+    onCancel();
+  };
+
   const handleDeployOnly = () => {
     setShowActivationDialogue(false);
-    onCancel();
+    navigateToAgentsWithTutorial();
   };
 
   const handleRunOnceNow = () => {
@@ -587,8 +606,139 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
                       onChange={(e) => setFormData({ ...formData, agent_name: e.target.value })}
                       placeholder="Ex: Sourcer IT - Paris, Chasseur SDR..."
                     />
-                    <div className="form-hint">Ce nom identifie votre agent de sourcing dans le système.</div>
                   </div>
+                </div>
+              </div>
+
+              {/* Note Pédagogique & Transparence : Comment cet agent de Sourcing fonctionne */}
+              <div
+                className="wcard"
+                style={{
+                  marginTop: '20px',
+                  background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.85) 0%, rgba(4, 12, 24, 0.95) 100%)',
+                  border: '1px solid rgba(0, 229, 200, 0.25)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: '15%',
+                    right: '15%',
+                    height: '2px',
+                    background: 'linear-gradient(90deg, transparent, #00E5C8, transparent)',
+                  }}
+                />
+
+                <div className="wcard-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="dot" style={{ backgroundColor: '#00E5C8' }}></span>
+                  <span>Génération & Extraction : Comment opère cet agent de Sourcing</span>
+                </div>
+
+                <p style={{ fontSize: '0.825rem', color: '#94A3B8', lineHeight: '1.55', margin: '0 0 1rem 0' }}>
+                  Un <strong style={{ color: '#F0F4F8' }}>Agent de Sourcing</strong> est un chasseur B2B autonome : il explore le web et les réseaux selon vos critères de ciblage, extrait et enrichit les profils (emails vérifiés, coordonnées clés), puis alimente votre vivier :
+                </p>
+
+                {/* Interactive 3D Real Pipeline (Radar Web 3D -> Scanner Laser Enrichissement -> Réservoir Central 3D) */}
+                <div style={{ position: 'relative', marginBottom: '1.25rem' }}>
+                  {!hasInteractedWithPipeline && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '-34px',
+                        right: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        zIndex: 10,
+                        pointerEvents: 'none',
+                        transition: 'opacity 0.3s ease',
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: '0.725rem',
+                          fontWeight: 700,
+                          color: '#00E5C8',
+                          background: 'rgba(6, 17, 31, 0.94)',
+                          border: '1px solid rgba(0, 229, 200, 0.4)',
+                          padding: '3px 10px',
+                          borderRadius: '16px',
+                          boxShadow: '0 0 16px rgba(0, 229, 200, 0.25)',
+                          backdropFilter: 'blur(10px)',
+                          letterSpacing: '0.02em',
+                        }}
+                      >
+                        ✨ Survolez les étapes 3D
+                      </span>
+                      <VMindGuideArrow
+                        direction="down"
+                        color="#00E5C8"
+                        style={{ width: '18px', height: '22px' }}
+                      />
+                    </div>
+                  )}
+                  <SourcingPipeline3D onStageChange={handlePipelineStageChange} />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '0.85rem' }}>
+                  {/* Option 1: Mode Autonome */}
+                  <div
+                    style={{
+                      padding: '0.9rem',
+                      borderRadius: '10px',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                      <span style={{ fontSize: '1.1rem' }}>🗄️</span>
+                      <strong style={{ color: '#00FFA0', fontSize: '0.85rem' }}>1. Mode Autonome (Réservoir Central)</strong>
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: '#94A3B8', lineHeight: '1.45', margin: 0 }}>
+                      L&apos;agent peut opérer seul sans aucun agent de prospection. Tous les leads sourcés sont conservés dans votre réservoir central, prêts à être consultés ou exportés.
+                    </p>
+                  </div>
+
+                  {/* Option 2: Liaison Prospect Closer */}
+                  <div
+                    style={{
+                      padding: '0.9rem',
+                      borderRadius: '10px',
+                      background: 'rgba(255, 255, 255, 0.02)',
+                      border: '1px solid rgba(0, 229, 200, 0.15)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+                      <span style={{ fontSize: '1.1rem' }}>🎯</span>
+                      <strong style={{ color: '#00E5C8', fontSize: '0.85rem' }}>2. Liaison Prospect Agent (Duo Piloté)</strong>
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: '#94A3B8', lineHeight: '1.45', margin: 0 }}>
+                      À l&apos;étape suivante, vous pouvez lui associer un ou plusieurs <strong>Agents de Prospection</strong> pour leur injecter automatiquement vos contacts qualifiés.
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: '0.85rem',
+                    padding: '0.6rem 0.85rem',
+                    borderRadius: '8px',
+                    background: 'rgba(0, 229, 200, 0.06)',
+                    border: '1px dashed rgba(0, 229, 200, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem',
+                    fontSize: '0.75rem',
+                    color: '#00E5C8',
+                  }}
+                >
+                  <span>💡</span>
+                  <span>
+                    Dès le déploiement terminé, l&apos;assistant <strong>VMindGuide</strong> vous proposera de lancer une première recherche immédiate ou de programmer l&apos;autopilote.
+                  </span>
                 </div>
               </div>
 
@@ -627,7 +777,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
                     <Target size={18} color="#00E5C8" />
                   </div>
                   <div style={{ fontSize: '13px', color: '#F0F4F8', lineHeight: 1.4 }}>
-                    Sélectionnez au moins un <strong>agent de prospection</strong> ci-dessous pour recevoir et contacter automatiquement les leads extraits.
+                    Sélectionnez un ou plusieurs <strong>agents de prospection</strong> pour leur transmettre automatiquement vos leads sourcés (optionnel).
                   </div>
                 </div>
 
@@ -650,15 +800,15 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
                       width: 48, height: 48, borderRadius: '50%',
                       background: 'rgba(0, 229, 200, 0.12)', border: '1px solid rgba(0, 229, 200, 0.4)',
                       color: '#00E5C8', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      margin: '0 auto 14px auto', fontSize: 22
+                      margin: '0 auto 14px auto'
                     }}>
-                      🎯
+                      <CyberIcon name="zap" size={24} color="#00E5C8" />
                     </div>
                     <div style={{ fontWeight: 700, fontSize: 16, color: '#F0F4F8', marginBottom: 8 }}>
-                      Aucun Agent de Prospection Trouvé
+                      Mode Autonome Actif (Aucun Agent de Prospection Détecté)
                     </div>
-                    <div style={{ fontSize: 13, color: '#94A3B8', lineHeight: 1.6, maxWidth: 520, margin: '0 auto 20px auto' }}>
-                      Votre Agent de Sourcing a besoin d&apos;au moins un <strong>Agent de Prospection (Closer)</strong> pour recevoir, évaluer et contacter automatiquement les leads extraits du web.
+                    <div style={{ fontSize: 13, color: '#94A3B8', lineHeight: 1.6, maxWidth: 540, margin: '0 auto 20px auto' }}>
+                      Votre Agent de Sourcing peut fonctionner en <strong>totale autonomie</strong> : il collectera et stockera tous les profils qualifiés dans votre réservoir global de leads. Vous pouvez aussi créer un <strong>Agent de Prospection</strong> pour automatiser l&apos;envoi d&apos;emails.
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, flexWrap: 'wrap', position: 'relative' }}>
@@ -758,11 +908,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
                 <Button 
                   variant="primary" 
                   onClick={handleDeploy} 
-                  disabled={isDeploying || formData.target_agent_ids.length === 0}
-                  style={{
-                    opacity: formData.target_agent_ids.length === 0 ? 0.5 : 1,
-                    cursor: formData.target_agent_ids.length === 0 ? 'not-allowed' : 'pointer'
-                  }}
+                  disabled={isDeploying}
                 >
                   {isDeploying ? 'Enregistrement…' : 'Enregistrer & Continuer →'}
                 </Button>
@@ -850,7 +996,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
                 Agent Déployé avec Succès !
               </h2>
               <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 28, lineHeight: 1.5 }}>
-                L'agent <strong>{formData.agent_name}</strong> a été enregistré. Souhaitez-vous l'activer dès maintenant ?
+                L&apos;agent <strong>{formData.agent_name}</strong> a été enregistré. Souhaitez-vous l&apos;activer dès maintenant ?
               </p>
 
               {activationChoice === 'prompt' && (
@@ -1056,29 +1202,55 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       <VMindGuide
         isOpen={
           !!(focusedField && VIRTUAL_MIND_GUIDE[focusedField]) ||
+          (step === 1 && (!hasInteractedWithPipeline || !!pipelineHoveredStage)) ||
           (step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0)
         }
         title={
-          step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0
-            ? "Duo Indispensable : Agent de Prospection Requis"
-            : focusedField && VIRTUAL_MIND_GUIDE[focusedField]
-              ? VIRTUAL_MIND_GUIDE[focusedField].title
-              : undefined
+          pipelineHoveredStage === 'crawler'
+            ? "Étape 1 : Radar Web & Découverte"
+            : pipelineHoveredStage === 'enricher'
+              ? "Étape 2 : Enrichissement & Certification IA"
+              : pipelineHoveredStage === 'pool'
+                ? "Étape 3 : Réservoir Central & Dispatch"
+                : step === 1 && !hasInteractedWithPipeline
+                  ? "Pipeline de Sourcing 3D"
+                  : step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0
+                    ? "Mode Autonome ou Duo Recommandé"
+                    : focusedField && VIRTUAL_MIND_GUIDE[focusedField]
+                      ? VIRTUAL_MIND_GUIDE[focusedField].title
+                      : undefined
         }
         message={
-          step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0
-            ? "Votre Chasseur (Sourcing Agent) a besoin d'un Closer (Prospect Agent) à qui transmettre ses leads qualifiés. Cliquez sur le bouton ci-dessous pour aller dans le Marketplace et découvrir l'Agent de Prospection !"
-            : focusedField && VIRTUAL_MIND_GUIDE[focusedField]
-              ? VIRTUAL_MIND_GUIDE[focusedField].text
-              : null
+          pipelineHoveredStage === 'crawler'
+            ? "L'agent parcourt le web, les annuaires d'entreprises et les réseaux professionnels pour repérer les décideurs correspondant exactement à vos critères de ciblage."
+            : pipelineHoveredStage === 'enricher'
+              ? "L'IA extrait, nettoie et certifie les adresses email directes, postes et données clés de chaque contact afin de garantir une délivrabilité optimale."
+              : pipelineHoveredStage === 'pool'
+                ? "Les profils qualifiés sont déposés dans votre réservoir central et peuvent être transmis automatiquement à vos agents de prospection pour l'envoi d'emails."
+                : step === 1 && !hasInteractedWithPipeline
+                  ? "Voici le moteur de votre Sourcing Agent ! Survolez chaque élément du pipeline 3D (Radar Web, Enrichissement IA, Réservoir Central) pour voir comment vos leads seront découverts."
+                  : step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0
+                    ? "Votre Sourcing Agent peut fonctionner en toute autonomie : tous les leads extraits seront stockés dans votre réservoir central. Pour automatiser l'envoi d'emails, vous pouvez également associer un Agent de Prospection depuis le Marketplace !"
+                    : focusedField && VIRTUAL_MIND_GUIDE[focusedField]
+                      ? VIRTUAL_MIND_GUIDE[focusedField].text
+                      : null
         }
         mood={
-          step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0
-            ? 'curious'
-            : 'focused'
+          pipelineHoveredStage === 'enricher'
+            ? 'convinced'
+            : pipelineHoveredStage
+              ? 'curious'
+              : step === 1 && !hasInteractedWithPipeline
+                ? 'curious'
+                : step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0
+                  ? 'curious'
+                  : 'focused'
         }
         showBackdrop={false}
-        onClose={() => setFocusedField(null)}
+        onClose={() => {
+          setFocusedField(null);
+          if (step === 1) setHasInteractedWithPipeline(true);
+        }}
       >
         {step === 2 && !loadingProspectAgents && availableProspectAgents.length === 0 && (
           <div className="vmind-guide-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14 }}>
@@ -1107,7 +1279,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
           hideTargetAgentsSelection={true}
           onClose={() => {
             setShowExecutionModal(false);
-            onCancel();
+            navigateToAgentsWithTutorial();
           }}
           onToast={(msg) => showToast(msg, 'ok')}
         />
@@ -1119,12 +1291,12 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
           agent={deployedAgent}
           onClose={() => {
             setShowScheduleModal(false);
-            onCancel();
+            navigateToAgentsWithTutorial();
           }}
           onConfirm={async (params) => {
             await handleActivateSchedule(deployedAgent, params);
             setShowScheduleModal(false);
-            onCancel();
+            navigateToAgentsWithTutorial();
           }}
           onEditSchedule={() => {
             setShowScheduleModal(false);

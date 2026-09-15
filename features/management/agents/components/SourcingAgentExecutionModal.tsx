@@ -7,6 +7,7 @@ import { VMindGuide } from '@/shared/management/components/VMindGuide';
 import { triggerSourcingRun } from '@/shared/api/n8n-api';
 import { extractIcpFromAgent, buildSourcingConclusionFromIcp } from '../../wizard/helpers/sourcingIcpHelper';
 import { useProspectSocket } from '../../prospect-workspace/hooks/useProspectSocket';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
 
 interface SourcingAgentExecutionModalProps {
   agent: LiveAgent;
@@ -56,8 +57,15 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
     return Array.isArray(rawIds) ? rawIds.map(id => String(id)) : [];
   });
 
-  const autoConcludedRef = React.useRef(false);
   const userModifiedChatRef = React.useRef(false);
+
+  const [targetIcpProposal, setTargetIcpProposal] = useState<{
+    targetAgentName: string;
+    autoConclusion: string;
+    targetAgentId: string;
+  } | null>(null);
+  const [dismissedProposalAgentIds, setDismissedProposalAgentIds] = useState<string[]>([]);
+  const [chatKey, setChatKey] = useState<number>(0);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -108,10 +116,8 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
     });
   };
 
-  // Auto-conclude targeting from target Prospect Agent's ICP when exactly 1 target agent is selected
+  // Detect if selected target Prospect Agent has an ICP differing from current plan, without silently overwriting
   React.useEffect(() => {
-    if (userModifiedChatRef.current) return;
-
     if (selectedTargetAgentIds.length === 1 && availableProspectAgents.length > 0) {
       const targetId = selectedTargetAgentIds[0].toLowerCase();
       const targetAgent = availableProspectAgents.find((pa: any) => {
@@ -125,21 +131,41 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
         const icp = extractIcpFromAgent(targetAgent);
         if (icp) {
           const autoConclusion = buildSourcingConclusionFromIcp(icp);
-          if (autoConclusion) {
-            setSourcingSummary(autoConclusion);
-            autoConcludedRef.current = true;
+          const targetKey = String(targetAgent.uuid || targetAgent.agent_id || targetAgent.agent_name || '').toLowerCase();
+          const isDifferent = autoConclusion && autoConclusion.trim() !== (sourcingSummary || '').trim();
+          const isDismissed = dismissedProposalAgentIds.includes(targetKey);
+
+          if (isDifferent && !isDismissed) {
+            setTargetIcpProposal({
+              targetAgentName: targetAgent.agent_name || targetAgent.nom || 'Agent Cible',
+              autoConclusion,
+              targetAgentId: targetKey
+            });
             return;
           }
         }
       }
     }
 
-    // If more than 1 target agent is selected (or 0) and we previously auto-concluded, revert to open chat or saved mission
-    if (selectedTargetAgentIds.length !== 1 && autoConcludedRef.current) {
-      setSourcingSummary(savedMission || '');
-      autoConcludedRef.current = false;
+    setTargetIcpProposal(null);
+  }, [selectedTargetAgentIds, availableProspectAgents, sourcingSummary, dismissedProposalAgentIds]);
+
+  const handleApplyTargetIcp = () => {
+    if (!targetIcpProposal) return;
+    const newSummary = targetIcpProposal.autoConclusion;
+    setSourcingSummary(newSummary);
+    setChatKey(prev => prev + 1);
+    userModifiedChatRef.current = false;
+    onToast(`Plan de recherche aligné sur l'ICP de « ${targetIcpProposal.targetAgentName} » !`, 'ok');
+    setTargetIcpProposal(null);
+  };
+
+  const handleDismissTargetIcp = () => {
+    if (targetIcpProposal) {
+      setDismissedProposalAgentIds(prev => [...prev, targetIcpProposal.targetAgentId]);
     }
-  }, [selectedTargetAgentIds, availableProspectAgents, savedMission]);
+    setTargetIcpProposal(null);
+  };
 
   React.useEffect(() => {
     const mission = (
@@ -149,7 +175,7 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
       (agent as any)?.agentSettings?.agent_mission || 
       ''
     ).trim();
-    if (mission && !sourcingSummary && !autoConcludedRef.current) {
+    if (mission && !sourcingSummary) {
       setSourcingSummary(mission);
     }
   }, [agent]);
@@ -157,6 +183,11 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
   const toggleTargetAgent = (pa: any) => {
     if (!pa) return;
     const targetUuid = String(pa.uuid || pa.agent_id || pa.agent_name);
+    const targetKey = targetUuid.toLowerCase();
+
+    // Re-enable prompt if user explicitly checks this agent again
+    setDismissedProposalAgentIds(prev => prev.filter(k => k !== targetKey));
+
     setSelectedTargetAgentIds(prev => {
       if (isAgentSelected(pa)) {
         return prev.filter(id => {
@@ -183,10 +214,6 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
     }
 
     // Validate inputs
-    if (!hideTargetAgentsSelection && (!selectedTargetAgentIds || selectedTargetAgentIds.length === 0)) {
-      onToast("Veuillez sélectionner au moins un Target Agent pour recevoir les leads.", "err");
-      return;
-    }
     if (leadsToFind <= 0 || leadsToFind > 100) {
       onToast("Le nombre de leads doit être entre 1 et 100", "err");
       return;
@@ -290,6 +317,82 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                   </div>
                 </div>
 
+                {targetIcpProposal && (
+                  <div style={{
+                    marginBottom: 14,
+                    padding: '12px 16px',
+                    borderRadius: 12,
+                    background: 'linear-gradient(135deg, rgba(0, 229, 200, 0.08) 0%, rgba(6, 17, 31, 0.85) 100%)',
+                    border: '1px solid rgba(0, 229, 200, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                    boxShadow: '0 4px 18px rgba(0, 229, 200, 0.08)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        background: 'rgba(0, 229, 200, 0.15)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#00E5C8', flexShrink: 0
+                      }}>
+                        <CyberIcon name="target" size={16} color="#00E5C8" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#F0F4F8' }}>
+                          Aligner le ciblage sur « {targetIcpProposal.targetAgentName} » ?
+                        </div>
+                        <div style={{ fontSize: 11, color: '#8FA3B8', marginTop: 2, lineHeight: 1.4 }}>
+                          Cet agent dispose d'un ciblage (ICP) défini. Souhaitez-vous synchroniser votre plan de recherche avec ses critères ?
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={handleApplyTargetIcp}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: 8,
+                          background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
+                          color: '#04101E',
+                          border: 'none',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          boxShadow: '0 0 12px rgba(0, 229, 200, 0.25)',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <CyberIcon name="zap" size={12} color="#04101E" />
+                        <span>Aligner sur l'ICP</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDismissTargetIcp}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 8,
+                          background: 'rgba(255, 255, 255, 0.06)',
+                          color: '#8FA3B8',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Conserver mon plan
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ height: '480px', flex: 1 }}>
                   {isLoadingProspects && !sourcingSummary ? (
                     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'var(--navy2)', borderRadius: 12, border: '1px solid var(--border)' }}>
@@ -300,7 +403,7 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                     </div>
                   ) : (
                     <OnboardingChat
-                      key={`${agent?.uuid || agent?.agent_name}_${selectedTargetAgentIds.join('_')}_${sourcingSummary ? 'with_mission' : 'empty'}`}
+                      key={`chat_${agent?.uuid || agent?.agent_name}_${chatKey}_${sourcingSummary}`}
                       initialMission={sourcingSummary}
                       onConfirm={handleChatConfirm}
                       onModify={() => { userModifiedChatRef.current = true; }}
@@ -317,6 +420,82 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                   <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, background: 'rgba(0,229,200,0.2)', borderRadius: '50%', color: '#00E5C8', fontSize: 10 }}>2</span>
                   Étape 2 : Paramétrage & Lancement
                 </div>
+
+                {targetIcpProposal && (
+                  <div style={{
+                    marginBottom: 16,
+                    padding: '12px 16px',
+                    borderRadius: 12,
+                    background: 'linear-gradient(135deg, rgba(0, 229, 200, 0.08) 0%, rgba(6, 17, 31, 0.85) 100%)',
+                    border: '1px solid rgba(0, 229, 200, 0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                    boxShadow: '0 4px 18px rgba(0, 229, 200, 0.08)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        background: 'rgba(0, 229, 200, 0.15)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#00E5C8', flexShrink: 0
+                      }}>
+                        <CyberIcon name="target" size={16} color="#00E5C8" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#F0F4F8' }}>
+                          Aligner le ciblage sur « {targetIcpProposal.targetAgentName} » ?
+                        </div>
+                        <div style={{ fontSize: 11, color: '#8FA3B8', marginTop: 2, lineHeight: 1.4 }}>
+                          Cet agent dispose d'un ciblage (ICP) défini. Souhaitez-vous synchroniser votre plan de recherche avec ses critères ?
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={handleApplyTargetIcp}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: 8,
+                          background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
+                          color: '#04101E',
+                          border: 'none',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          boxShadow: '0 0 12px rgba(0, 229, 200, 0.25)',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <CyberIcon name="zap" size={12} color="#04101E" />
+                        <span>Aligner sur l'ICP</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDismissTargetIcp}
+                        style={{
+                          padding: '6px 12px',
+                          borderRadius: 8,
+                          background: 'rgba(255, 255, 255, 0.06)',
+                          color: '#8FA3B8',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        Conserver mon plan
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
 
@@ -458,7 +637,19 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                               transition: 'all 0.2s'
                             }}
                           >
-                            <span>{isCustomizingTargets ? '✓ Terminer' : '⚙️ Modifier les Target Agents'}</span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                              {isCustomizingTargets ? (
+                                <>
+                                  <CyberIcon name="check" size={11} />
+                                  <span>Terminer</span>
+                                </>
+                              ) : (
+                                <>
+                                  <CyberIcon name="settings" size={11} />
+                                  <span>Modifier les Target Agents</span>
+                                </>
+                              )}
+                            </span>
                           </button>
                         </div>
 
@@ -469,17 +660,17 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                               <div style={{
                                 padding: '8px 12px',
                                 borderRadius: 8,
-                                background: 'rgba(255, 71, 87, 0.08)',
-                                border: '1px dashed rgba(255, 71, 87, 0.35)',
-                                color: '#FF4757',
+                                background: 'rgba(56, 189, 248, 0.08)',
+                                border: '1px dashed rgba(56, 189, 248, 0.35)',
+                                color: '#38BDF8',
                                 fontSize: 12,
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: 8,
                                 width: '100%'
                               }}>
-                                <span>⚠️</span>
-                                <span>Au moins 1 Target Agent requis pour lancer la prospection. Cliquez sur <strong>Modifier</strong> ci-dessus.</span>
+                                <CyberIcon name="zap" size={12} color="#38BDF8" />
+                                <span><strong>Mode autonome :</strong> Aucun agent de prospection assigné. Cliquez sur <strong>Modifier</strong> pour en sélectionner.</span>
                               </div>
                             ) : (
                               availableProspectAgents
@@ -576,8 +767,8 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                 <div style={{ marginTop: 24 }}>
                   {(() => {
                     const isCurrentlyExecuting = isExecuting || liveIsExecuting || !!agent?.is_executing;
-                    const isTargetMissing = !hideTargetAgentsSelection && selectedTargetAgentIds.length === 0;
-                    const isDisabled = isCurrentlyExecuting || isTargetMissing;
+                    const isStandalone = !hideTargetAgentsSelection && selectedTargetAgentIds.length === 0;
+                    const isDisabled = isCurrentlyExecuting;
                     return (
                       <button
                         onClick={handleExecute}
@@ -609,15 +800,15 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                             </motion.div>
                             Recherche en cours d'exécution...
                           </>
-                        ) : isTargetMissing ? (
+                        ) : isStandalone ? (
                           <>
-                            <span>⚠️</span>
-                            Sélectionnez au moins 1 Target Agent pour lancer
+                            <Play size={18} fill="#000" />
+                            Lancer l&apos;extraction (Mode Autonome)
                           </>
                         ) : (
                           <>
                             <Play size={18} fill="#000" />
-                            Lancer l'extraction de Leads
+                            Lancer l&apos;extraction de Leads
                           </>
                         )}
                       </button>
