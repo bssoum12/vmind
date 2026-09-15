@@ -27,13 +27,13 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
     const hideTimeout = React.useRef<NodeJS.Timeout | null>(null);
 
     // Read current active data from Context
-    const agentData = kpisByAgent["vdata"] || {};
-    const toolData = agentData.get_tableau_croise || {};
+    const agentData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
+    const toolData = agentData.get_tableau_croise || agentData || {};
     
     const kpis = toolData.ok && toolData.kpis ? (toolData.kpis as Kpi[]) : [];
     const exportData = toolData.data?.exportData || null;
 
-    const loading = loadingByAgent["vdata"] && !toolData.ok;
+    const loading = (loadingByAgent["vdata"] || loadingByAgent["VDATA"]) && !toolData.ok;
     const error = !loading && !toolData.ok && globalError ? globalError : "";
 
     const updateCoords = () => {

@@ -55,7 +55,7 @@ import { KpiCacheProvider, useKpis } from '../../shared/contexts/KpiCacheContext
 import { jwtDecode } from 'jwt-decode';
 
 const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, activeAgentId }) => {
-  const { startDate, endDate, updateGlobalDates, error, clearError, fetchKpis, kpisByAgent } = useKpis();
+  const { startDate, endDate, updateGlobalDates, error, clearError, notice, clearNotice, fetchKpis, kpisByAgent, loadingByAgent } = useKpis();
   const [isErpConnected, setIsErpConnected] = React.useState<boolean>(false);
   const [allowedAgents, setAllowedAgents] = React.useState<string[]>([]);
   const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
@@ -184,16 +184,61 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
     <div className="right-panel">
       {/* KPIs Live */}
       <div className="rp-section">
-        <div className="rp-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>
-            {activeAgentId === 'VDATA' 
-              ? 'DONNEES & ANALYTICS - Temps Réel' 
-              : activeAgentId === 'VFIN' 
-                ? 'FINANCE & COMPTABILITE - Temps Réel' 
-                : activeAgentId === 'VSELL'
-                  ? 'COMMERCIAL - Temps Réel'
-                  : 'KPIs Temps Réel'}
-          </span>
+        {/* Header with Section Title & Prominent Refresh Action */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', gap: '8px' }}>
+          <div className="rp-title" style={{ margin: 0, flex: 1, minWidth: 0, overflow: 'hidden' }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {activeAgentId === 'VDATA' 
+                ? 'DONNÉES & ANALYTICS' 
+                : activeAgentId === 'VFIN' 
+                  ? 'FINANCE & COMPTABILITÉ' 
+                  : activeAgentId === 'VSELL'
+                    ? 'COMMERCIAL'
+                    : activeAgentId === 'VBUY'
+                      ? 'ACHATS & FOURNISSEURS'
+                      : activeAgentId === 'VMOVE'
+                        ? 'LOGISTIQUE & LIVRAISONS'
+                        : 'INDICATEURS CLÉS'}
+            </span>
+          </div>
+          {isKpiAuthorized && (
+            <button
+              onClick={() => {
+                const agentKey = (activeAgentId || 'vdata').toLowerCase();
+                fetchKpis(agentKey, true);
+              }}
+              disabled={loadingByAgent[(activeAgentId || 'vdata').toLowerCase()]}
+              title="Actualiser les indicateurs en direct depuis l'ERP (n8n)"
+              style={{
+                background: loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] ? 'rgba(0, 240, 255, 0.04)' : 'rgba(0, 240, 255, 0.1)',
+                border: '1px solid rgba(0, 240, 255, 0.35)',
+                borderRadius: '6px',
+                color: '#00f0ff',
+                cursor: loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] ? 'not-allowed' : 'pointer',
+                padding: '5px 10px',
+                fontSize: '11px',
+                fontWeight: 600,
+                fontFamily: 'var(--font-mono)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease',
+                flexShrink: 0,
+                boxShadow: '0 2px 8px rgba(0, 240, 255, 0.12)'
+              }}
+              onMouseOver={(e) => !loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] && (e.currentTarget.style.background = 'rgba(0, 240, 255, 0.22)')}
+              onMouseOut={(e) => !loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] && (e.currentTarget.style.background = 'rgba(0, 240, 255, 0.1)')}
+            >
+              <span style={{ 
+                display: 'inline-block', 
+                fontSize: '12px',
+                animation: loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] ? 'spin 1s linear infinite' : 'none' 
+              }}>
+                🔄
+              </span>
+              <span>{loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] ? 'Actualisation...' : 'Actualiser'}</span>
+            </button>
+          )}
         </div>
 
         {!isKpiAuthorized ? (
@@ -338,6 +383,34 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                     }}
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Global Notice Banner (e.g. Cooldown) */}
+            {notice && (
+              <div style={{
+                background: 'rgba(0, 240, 255, 0.08)',
+                border: '1px solid rgba(0, 240, 255, 0.25)',
+                color: '#00f0ff',
+                fontSize: '11px',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                marginBottom: '14px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>⏳</span>
+                  <span>{notice}</span>
+                </div>
+                <button 
+                  onClick={clearNotice} 
+                  style={{ background: 'none', border: 'none', color: '#00f0ff', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', padding: '0 4px' }}
+                >
+                  ✕
+                </button>
               </div>
             )}
 

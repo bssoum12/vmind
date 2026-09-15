@@ -37,14 +37,14 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
   const [animProgress, setAnimProgress] = useState(0);
 
   // Read current active year data from Context
-  const agentData = kpisByAgent["vdata"] || {};
-  const toolData = agentData.get_score_global_vdata_kpi || {};
+  const agentData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
+  const toolData = agentData.get_score_global_vdata_kpi || agentData || {};
   
   const scoreQualite = toolData.ok && toolData.kpis ? (toolData.kpis.find((k: any) => k.label === "Score qualité global")?.value ?? null) : null;
-  const statut = toolData.details?.statut ?? "Critique";
+  const statut = toolData.details?.statut ?? (toolData.ok ? "Aucune donnée" : "En attente");
   const details = toolData.details || null;
   
-  const loading = loadingByAgent["vdata"] && !toolData.ok;
+  const loading = (loadingByAgent["vdata"] || loadingByAgent["VDATA"]) && !toolData.ok;
   const error = !loading && !toolData.ok && globalError ? globalError : "";
 
   // Count-up progress animation
@@ -123,10 +123,13 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
   }, [hovered]);
 
   const fetchPrevYearData = async () => {
+    if (typeof window === "undefined") return;
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+    const clientId = "DEMO";
+
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
-      const pYear = new Date().getFullYear() - 1;
+      const currentYear = new Date().getFullYear();
+      const pYear = currentYear - 1;
       setPrevYear(pYear);
       const prevStart = `${pYear}0101`;
       const prevEnd = `${pYear}1231`;
@@ -173,9 +176,9 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
   }
 
   // Determine status styling
-  let glowClass = "glow-card-red";
-  let statusColor = "#ff3b30";
-  let pulseClass = "pulse-text-red";
+  let glowClass = "glow-card-cyan";
+  let statusColor = "rgba(0, 240, 255, 0.4)";
+  let pulseClass = "";
 
   if (scoreQualite !== null) {
     if (scoreQualite >= 85) {
@@ -190,6 +193,10 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
       glowClass = "glow-card-amber";
       statusColor = "#ffb800";
       pulseClass = "pulse-text-amber";
+    } else {
+      glowClass = "glow-card-red";
+      statusColor = "#ff3b30";
+      pulseClass = "pulse-text-red";
     }
   }
 
