@@ -662,6 +662,7 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
             gap: '16px'
           }}>
             {targetAgentList.map((target, idx) => {
+              if (!target) return null;
               const isExec = target.is_executing;
               const isPaused = target.status === 'paused';
               const isScheduled = target.schedule_id || target.status === 'running';
