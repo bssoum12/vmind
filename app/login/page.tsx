@@ -469,6 +469,8 @@ export default function LoginPage() {
   const [phoneValidation, setPhoneValidation] = useState<{ isValid: boolean; message: string }>({ isValid: false, message: '' });
   const [isUsernameAvailable, setIsUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
+  const [isEmailAvailable, setIsEmailAvailable] = useState<boolean | null>(null);
+  const [checkingEmail, setCheckingEmail] = useState(false);
   const [signupError, setSignupError] = useState('');
   const [signupSuccess, setSignupSuccess] = useState('');
   const [signupLoading, setSignupLoading] = useState(false);
@@ -531,6 +533,35 @@ export default function LoginPage() {
     setTurnstileToken('');
   }, [showSignup, forgotPasswordStep]);
 
+  // Debounced Email Check
+  useEffect(() => {
+    if (!signupEmail || signupEmail.trim().length < 5 || !signupEmail.includes('@')) {
+      setIsEmailAvailable(null);
+      return;
+    }
+    setCheckingEmail(true);
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+        const res = await fetch(`${baseUrl}/api/auth/vmind/check-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: signupEmail }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          setIsEmailAvailable(data.available);
+        }
+      } catch (err) {
+        console.error("Error checking email availability:", err);
+      } finally {
+        setCheckingEmail(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [signupEmail]);
+
   // Debounced Username Check
   useEffect(() => {
     if (!signupUsername || signupUsername.trim().length < 3) {
@@ -570,6 +601,11 @@ export default function LoginPage() {
       return;
     }
 
+    if (isEmailAvailable === false) {
+      setSignupError("Cette adresse email est déjà utilisée.");
+      return;
+    }
+
     const phoneCheck = validatePhone(signupPhone);
     if (!phoneCheck.isValid) {
       setSignupError('Veuillez saisir un numéro de téléphone valide (8 à 15 chiffres).');
@@ -603,6 +639,7 @@ export default function LoginPage() {
       setSignupPhone('');
       setPhoneValidation({ isValid: false, message: '' });
       setIsUsernameAvailable(null);
+      setIsEmailAvailable(null);
     } catch (err: any) {
       setSignupError(formatUserFriendlyError(err, "Une erreur s'est produite lors de l'inscription."));
     } finally {
@@ -1318,8 +1355,26 @@ export default function LoginPage() {
 
                     {/* Email */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <label style={{ fontSize: '9px', fontWeight: 700, color: cyan, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Adresse Email</label>
-                      <input type="email" className="vmind-input" style={{ height: '44px', padding: '0 14px' }} value={signupEmail} onChange={e => setSignupEmail(e.target.value)} required />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <label style={{ fontSize: '9px', fontWeight: 700, color: cyan, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Adresse Email</label>
+                        {signupEmail.trim().length >= 5 && signupEmail.includes('@') && (
+                          <span style={{ fontSize: '9.5px', color: checkingEmail ? muted : isEmailAvailable ? '#00e676' : '#ff4757', fontWeight: 600 }}>
+                            {checkingEmail ? 'Vérification...' : isEmailAvailable ? '✓ Disponible' : '✗ Déjà utilisé'}
+                          </span>
+                        )}
+                      </div>
+                      <input 
+                        type="email" 
+                        className="vmind-input" 
+                        style={{ 
+                          height: '44px', 
+                          padding: '0 14px',
+                          borderColor: (signupEmail.trim().length >= 5 && signupEmail.includes('@') && isEmailAvailable === false) ? 'rgba(255, 71, 87, 0.4)' : undefined
+                        }} 
+                        value={signupEmail} 
+                        onChange={e => setSignupEmail(e.target.value)} 
+                        required 
+                      />
                     </div>
 
                     {/* Téléphone */}
@@ -1364,19 +1419,19 @@ export default function LoginPage() {
 
                       <button 
                         type="submit" 
-                        disabled={signupLoading || isUsernameAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)} 
+                        disabled={signupLoading || isUsernameAvailable === false || isEmailAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)} 
                         className="cta-btn" 
                         style={{ 
                           width: '100%', 
                           height: '52px', 
                           borderRadius: '12px', 
                           border: 'none', 
-                          background: (signupLoading || isUsernameAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? 'rgba(143,163,184,0.12)' : `linear-gradient(90deg, ${cyan} 0%, ${cyan2} 100%)`, 
-                          color: (signupLoading || isUsernameAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? muted : '#021010', 
+                          background: (signupLoading || isUsernameAvailable === false || isEmailAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? 'rgba(143,163,184,0.12)' : `linear-gradient(90deg, ${cyan} 0%, ${cyan2} 100%)`, 
+                          color: (signupLoading || isUsernameAvailable === false || isEmailAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? muted : '#021010', 
                           fontSize: '13px', 
                           fontWeight: 800, 
-                          cursor: (signupLoading || isUsernameAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? 'not-allowed' : 'pointer', 
-                          boxShadow: (signupLoading || isUsernameAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? 'none' : `0 0 20px rgba(0,229,200,0.3)` 
+                          cursor: (signupLoading || isUsernameAvailable === false || isEmailAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? 'not-allowed' : 'pointer', 
+                          boxShadow: (signupLoading || isUsernameAvailable === false || isEmailAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? 'none' : `0 0 20px rgba(0,229,200,0.3)` 
                         }}
                       >
                         {signupLoading ? 'ENVOI...' : 'SOUMETTRE LA DEMANDE'}
