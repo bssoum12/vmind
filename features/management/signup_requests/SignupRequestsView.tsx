@@ -19,7 +19,7 @@ export const SignupRequestsView: React.FC = () => {
   const [requests, setRequests] = useState<SignupRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Search, Filters & Sorting state
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
@@ -145,7 +145,7 @@ export const SignupRequestsView: React.FC = () => {
     if (sortField !== field) {
       return <span style={{ opacity: 0.3, marginLeft: '6px', fontSize: '10px' }}>⇅</span>;
     }
-    return sortDirection === 'asc' 
+    return sortDirection === 'asc'
       ? <span style={{ color: '#00E5C8', marginLeft: '6px', fontSize: '10px' }}>▲</span>
       : <span style={{ color: '#00E5C8', marginLeft: '6px', fontSize: '10px' }}>▼</span>;
   };
@@ -232,7 +232,7 @@ export const SignupRequestsView: React.FC = () => {
           transform: translateY(0);
         }
       `}</style>
-      
+
       {/* Header */}
       <div className="page-head" style={{ marginBottom: '20px', padding: '0 0 16px', background: 'transparent', borderBottom: '1px solid var(--border)' }}>
         <div>
@@ -561,7 +561,7 @@ export const SignupRequestsView: React.FC = () => {
           </div>
         </div>
       )}
-      
+
       {/* Approval Details Modal */}
       {selectedReq && (
         <div style={{
