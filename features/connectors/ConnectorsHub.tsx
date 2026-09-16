@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ConnectorsCatalog } from './components/ConnectorsCatalog';
 import { TralisConnectorPanel } from './components/TralisConnectorPanel';
+import { OdooConnectorPanel } from './components/OdooConnectorPanel';
 import { ComingSoonPanel } from './components/ComingSoonPanel';
 import { jwtDecode } from 'jwt-decode';
 
@@ -169,8 +170,11 @@ export const ConnectorsHub: React.FC = () => {
           />
         </div>
 
-        {activeConnector === 'odoo' && <ComingSoonPanel name="Odoo MCP" />}
-        {activeConnector === 'web'   && <ComingSoonPanel name="Recherche Web" />}
+        <div style={{ display: activeConnector === 'odoo' ? 'block' : 'none' }}>
+          <OdooConnectorPanel />
+        </div>
+
+        {activeConnector === 'web' && <ComingSoonPanel name="Recherche Web" />}
       </div>
     </div>
   );

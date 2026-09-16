@@ -173,13 +173,14 @@ function ToolRow({ tool, isAuthorized }: { tool: ToolMeta; isAuthorized: boolean
   );
 }
 
-function ToolSection({ title, tools, authorizedNames, collapsible = false }: {
+function ToolSection({ title, tools, authorizedNames, collapsible = false, defaultOpen = false }: {
   title: string;
   tools: ToolMeta[];
   authorizedNames: Set<string>;
   collapsible?: boolean;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(defaultOpen);
   if (tools.length === 0) return null;
 
   return (
@@ -413,8 +414,9 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
             background: 'rgba(0, 229, 200, 0.08)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             border: '1px solid rgba(0, 229, 200, 0.15)',
+            padding: '6px',
           }}>
-            <Database size={24} color="#00E5C8" />
+            <img src="/logo-tralis-mcp.png" alt="TraLIS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
           <div>
             <h1 style={{ fontSize: '22px', fontWeight: 800, margin: '0 0 4px 0' }}>TraLIS MCP</h1>
