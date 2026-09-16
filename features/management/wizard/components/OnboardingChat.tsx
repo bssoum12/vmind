@@ -16,6 +16,80 @@ interface OnboardingChatProps {
   onModify?: () => void;
 }
 
+/**
+ * Parses COMPANY_TARGET and LEAD_TARGET from the raw summary text.
+ */
+function parseMissionTargets(text: string): { company?: string; lead?: string; isStructured: boolean } {
+  if (!text) return { isStructured: false };
+  const hasCompany = text.includes('COMPANY_TARGET:');
+  const hasLead = text.includes('LEAD_TARGET:');
+  if (!hasCompany && !hasLead) return { isStructured: false };
+
+  let company: string | undefined;
+  let lead: string | undefined;
+
+  if (hasCompany && hasLead) {
+    const compPart = text.substring(text.indexOf('COMPANY_TARGET:') + 'COMPANY_TARGET:'.length, text.indexOf('LEAD_TARGET:')).trim();
+    const leadPart = text.substring(text.indexOf('LEAD_TARGET:') + 'LEAD_TARGET:'.length).trim();
+    company = compPart;
+    lead = leadPart;
+  } else if (hasCompany) {
+    company = text.substring(text.indexOf('COMPANY_TARGET:') + 'COMPANY_TARGET:'.length).trim();
+  } else if (hasLead) {
+    lead = text.substring(text.indexOf('LEAD_TARGET:') + 'LEAD_TARGET:'.length).trim();
+  }
+
+  return { company, lead, isStructured: Boolean(company || lead) };
+}
+
+/**
+ * Formats structured targets into a single fluid, natural sentence for the user.
+ * Example: "Recherche de Directeurs Logistiques, Responsables Supply Chain, CEO au sein d'entreprises du secteur logistique et transport basées en France et Tunisie."
+ */
+function buildNaturalSentence(company?: string, lead?: string): string {
+  if (!company && !lead) return '';
+
+  let cleanCompany = (company || '').trim().replace(/\.+$/, '');
+  let cleanLead = (lead || '').trim().replace(/\.+$/, '');
+
+  // Lowercase "Entreprises" if it starts the company string
+  cleanCompany = cleanCompany.replace(/^entreprises\s+/i, '');
+
+  if (cleanLead && cleanCompany) {
+    // E.g. "Recherche de [Profils] au sein d'entreprises de [Secteur / Pays]"
+    return `Recherche de ${cleanLead} au sein d'entreprises ${cleanCompany.startsWith('du ') || cleanCompany.startsWith('de ') || cleanCompany.startsWith('en ') ? cleanCompany : `du secteur ${cleanCompany}`}.`;
+  }
+
+  if (cleanLead) {
+    return `Recherche de ${cleanLead}.`;
+  }
+
+  return `Recherche au sein d'entreprises ${cleanCompany}.`;
+}
+
+/**
+ * Formats structured targets into a clean natural presentation for the user.
+ */
+function FormattedTargetView({ content }: { content: string; isDark?: boolean }) {
+  const { company, lead, isStructured } = parseMissionTargets(content);
+
+  if (!isStructured) {
+    return <span style={{ whiteSpace: 'pre-wrap' }}>{content}</span>;
+  }
+
+  const naturalText = buildNaturalSentence(company, lead);
+
+  return (
+    <div style={{
+      fontSize: '0.95rem',
+      lineHeight: 1.6,
+      color: 'var(--text, #F0F4F8)'
+    }}>
+      {naturalText}
+    </div>
+  );
+}
+
 export function OnboardingChat({ initialMission, onConfirm, apiEndpoint, onModify }: OnboardingChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -52,7 +126,7 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint, onModif
       setMessages([
         {
           role: 'assistant',
-          content: `Voici le ciblage actuellement configuré pour votre agent :\n\n${initialMission}\n\nVous pouvez valider ce ciblage directement ou m'indiquer vos modifications dans le chat ci-dessous.`
+          content: initialMission
         }
       ]);
     }
@@ -64,7 +138,7 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint, onModif
       setMessages([
         {
           role: 'assistant',
-          content: `Voici le ciblage actuellement configuré pour votre agent :\n\n${initialMission}\n\nVous pouvez valider ce ciblage directement ou m'indiquer vos modifications dans le chat ci-dessous.`
+          content: initialMission
         }
       ]);
     }
@@ -85,7 +159,7 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint, onModif
       const endpoint = apiEndpoint || '/api/prospect-agent/onboarding-chat';
       const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           ...(token && { 'Authorization': `Bearer ${token}` })
         },
@@ -132,7 +206,7 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint, onModif
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '500px', height: '100%', maxHeight: '650px', backgroundColor: 'var(--navy2)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '500px', height: '100%', maxHeight: '620px', backgroundColor: 'var(--navy2)', borderRadius: '12px', border: '1px solid var(--border)', overflow: 'hidden' }}>
       <style>{`
         .onboarding-chat-scroll {
           scrollbar-width: thin;
@@ -159,28 +233,31 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint, onModif
           box-shadow: 0 0 10px rgba(0, 229, 200, 0.5);
         }
       `}</style>
-      <div 
-        className="onboarding-chat-scroll" 
+      <div
+        className="onboarding-chat-scroll"
         style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}
       >
         {messages.filter(m => m.role !== 'system').map((msg, idx) => (
-          <div key={idx} style={{ display: 'flex', gap: '12px', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
+          <div key={idx} style={{ display: 'flex', gap: '12px', alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: msg.role === 'user' ? '80%' : '90%' }}>
             {msg.role === 'assistant' && (
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(0, 229, 200, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--cyan)' }}>
                 <Bot size={18} />
               </div>
             )}
-            <div style={{ 
-              padding: '12px 16px', 
-              borderRadius: '12px', 
+            <div style={{
+              padding: '12px 16px',
+              borderRadius: '12px',
               background: msg.role === 'user' ? 'var(--cyan)' : 'rgba(255, 255, 255, 0.03)',
               color: msg.role === 'user' ? '#000' : 'var(--text)',
               border: msg.role === 'assistant' ? '1px solid var(--border)' : 'none',
               fontSize: '0.95rem',
-              lineHeight: 1.5,
-              whiteSpace: 'pre-wrap'
+              lineHeight: 1.5
             }}>
-              {msg.content}
+              {msg.role === 'assistant' ? (
+                <FormattedTargetView content={msg.content} />
+              ) : (
+                <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
+              )}
             </div>
           </div>
         ))}
@@ -198,9 +275,13 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint, onModif
       </div>
 
       {summary ? (
-        <div style={{ padding: '1.5rem', borderTop: '1px solid var(--border)', background: 'rgba(0, 229, 200, 0.05)' }}>
-          <h4 style={{ color: 'var(--cyan)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}><Check size={18} /> Résumé de la mission</h4>
-          <p className="onboarding-chat-scroll" style={{ color: 'var(--text)', fontSize: '0.95rem', marginBottom: '16px', lineHeight: 1.5, maxHeight: '160px', overflowY: 'auto', whiteSpace: 'pre-wrap' }}>{summary}</p>
+        <div style={{ padding: '1.25rem 1.5rem', borderTop: '1px solid var(--border)', background: 'rgba(0, 229, 200, 0.04)' }}>
+          <h4 style={{ color: 'var(--cyan)', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: 600 }}>
+            <Check size={18} /> Résumé du ciblage validé
+          </h4>
+          <div style={{ marginBottom: '14px' }}>
+            <FormattedTargetView content={summary} isDark={true} />
+          </div>
           <div style={{ display: 'flex', gap: '12px' }}>
             <Button variant="primary" onClick={() => onConfirm(summary)} style={{ flex: 1 }}>
               Confirmer & Continuer

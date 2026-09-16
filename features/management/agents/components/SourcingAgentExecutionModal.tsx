@@ -19,10 +19,10 @@ interface SourcingAgentExecutionModalProps {
 
 export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast, hideTargetAgentsSelection = false }: SourcingAgentExecutionModalProps) {
   const savedMission = (
-    agent?.config?.agent_mission || 
-    (agent as any)?.agent_mission || 
-    (agent as any)?.parameters?.agent_mission || 
-    (agent as any)?.agentSettings?.agent_mission || 
+    agent?.config?.agent_mission ||
+    (agent as any)?.agent_mission ||
+    (agent as any)?.parameters?.agent_mission ||
+    (agent as any)?.agentSettings?.agent_mission ||
     ''
   ).trim();
 
@@ -169,10 +169,10 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
 
   React.useEffect(() => {
     const mission = (
-      agent?.config?.agent_mission || 
-      (agent as any)?.agent_mission || 
-      (agent as any)?.parameters?.agent_mission || 
-      (agent as any)?.agentSettings?.agent_mission || 
+      agent?.config?.agent_mission ||
+      (agent as any)?.agent_mission ||
+      (agent as any)?.parameters?.agent_mission ||
+      (agent as any)?.agentSettings?.agent_mission ||
       ''
     ).trim();
     if (mission && !sourcingSummary) {
@@ -193,8 +193,8 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
         return prev.filter(id => {
           const sId = String(id).toLowerCase();
           return sId !== String(pa.uuid || '').toLowerCase() &&
-                 sId !== String(pa.agent_id || '').toLowerCase() &&
-                 sId !== String(pa.agent_name || pa.nom || '').toLowerCase();
+            sId !== String(pa.agent_id || '').toLowerCase() &&
+            sId !== String(pa.agent_name || pa.nom || '').toLowerCase();
         });
       } else {
         return [...prev, targetUuid];

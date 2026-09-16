@@ -17,7 +17,7 @@ interface VisualSignatureState {
   email: string;
   website: string;
   logoUrl: string;
-  theme: 'sidebar' | 'classic' | 'minimal';
+  theme: 'sidebar' | 'classic' | 'minimal' | 'banner';
 }
 
 const SIGNATURE_PRESETS = [
@@ -64,6 +64,21 @@ const SIGNATURE_PRESETS = [
   <a href="https://www.virtualdev.tn" style="color: #008f7d; text-decoration: none; font-size: 12px;">www.virtualdev.tn</a>
 </p>`,
   },
+  {
+    name: 'Avec Bannière',
+    html: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; color: #1E293B; line-height: 1.4;">
+  <p style="margin: 0 0 6px 0;">
+    <strong style="font-size: 15px; color: #0F172A;">Hamdi Triki</strong><br>
+    <span style="color: #008f7d; font-weight: 600;">Directeur Commercial</span> | <strong>VIRTUALDEV</strong>
+  </p>
+  <p style="margin: 0 0 10px 0; font-size: 12px; color: #64748B;">
+    Mob: +216 29 400 566 &nbsp;•&nbsp; E-mail: <a href="mailto:hamdi.triki@virtualdev.tn" style="color: #008f7d; text-decoration: none;">hamdi.triki@virtualdev.tn</a> &nbsp;•&nbsp; <a href="https://www.virtualdev.tn" style="color: #00E5C8; text-decoration: none;">www.virtualdev.tn</a>
+  </p>
+  <div style="margin-top: 12px; max-width: 600px;">
+    <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80" alt="Bannière" width="600" style="max-width: 100%; width: 100%; height: auto; display: block; border-radius: 6px; border: 0;" />
+  </div>
+</div>`,
+  },
 ];
 
 export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
@@ -95,6 +110,19 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
 
     if (!fullName && !company && !phone && !email && !logoUrl) {
       return '';
+    }
+
+    if (theme === 'banner') {
+      return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1E293B; line-height: 1.4;">
+  <p style="margin: 0 0 6px 0;">
+    ${fullName ? `<strong style="font-size: 15px; color: #0F172A;">${fullName}</strong><br>` : ''}
+    ${jobTitle ? `<span style="color: #008f7d; font-weight: 600;">${jobTitle}</span>` : ''}${jobTitle && company ? ' | ' : ''}${company ? `<strong>${company}</strong>` : ''}
+  </p>
+  <p style="margin: 0 0 8px 0; font-size: 12px; color: #64748B;">
+    ${[phone, email ? `<a href="mailto:${email}" style="color: #008f7d; text-decoration: none;">${email}</a>` : '', website ? `<a href="${website.startsWith('http') ? website : `https://${website}`}" style="color: #008f7d; text-decoration: none;">${website}</a>` : ''].filter(Boolean).join(' &nbsp;•&nbsp; ')}
+  </p>
+  ${logoUrl ? `<div style="margin-top: 10px; max-width: 600px;"><img src="${logoUrl}" alt="Bannière" width="600" style="max-width: 100%; width: 100%; height: auto; display: block; border-radius: 6px; border: 0;" /></div>` : ''}
+</div>`;
     }
 
     if (theme === 'minimal') {
@@ -178,10 +206,13 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
     }, 50);
   };
 
-  // Compress & convert image file to Base64
-  const processImageFile = (file: File, callback: (dataUrl: string) => void) => {
+  // Compress & convert image file to Base64 (supports HD banners up to 1200px for 2x Retina)
+  const processImageFile = (
+    file: File,
+    callback: (dataUrl: string, info?: { width: number; height: number; isBanner: boolean }) => void
+  ) => {
     if (!file.type.startsWith('image/')) {
-      alert('Veuillez sélectionner un fichier image valide (PNG, JPG, SVG).');
+      alert('Veuillez sélectionner un fichier image valide (PNG, JPG, SVG, WebP).');
       return;
     }
 
@@ -190,22 +221,36 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const maxDim = 320;
+        // Max dimension 1200px for crisp 2x Retina rendering on 600px email banners
+        const maxDim = 1200;
         let width = img.width;
         let height = img.height;
-        if (width > height && width > maxDim) {
-          height = Math.round((height * maxDim) / width);
-          width = maxDim;
-        } else if (height > maxDim) {
-          width = Math.round((width * maxDim) / height);
-          height = maxDim;
+
+        if (width > maxDim || height > maxDim) {
+          if (width >= height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
         }
+
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/png', 0.88);
-        callback(dataUrl);
+        if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+        }
+
+        const isJpeg = file.type === 'image/jpeg' || file.type === 'image/jpg';
+        const mimeType = isJpeg ? 'image/jpeg' : 'image/png';
+        const dataUrl = canvas.toDataURL(mimeType, 0.92);
+        const isBanner = width / height >= 1.8 || width >= 400;
+
+        callback(dataUrl, { width, height, isBanner });
       };
       img.src = e.target?.result as string;
     };
@@ -214,8 +259,15 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
 
   // Code Mode image upload
   const handleCodeImageUpload = (file: File) => {
-    processImageFile(file, (dataUrl) => {
-      const imgHtml = `\n<img src="${dataUrl}" alt="Logo" style="max-width: 160px; height: auto; margin-top: 8px; display: block;" />\n`;
+    processImageFile(file, (dataUrl, info) => {
+      let imgHtml: string;
+      if (info?.isBanner) {
+        // Responsive 600px email banner (crisp on desktop and mobile)
+        imgHtml = `\n<img src="${dataUrl}" alt="Bannière" width="600" style="max-width: 100%; width: 100%; height: auto; margin-top: 12px; display: block; border: 0;" />\n`;
+      } else {
+        const displayWidth = Math.min(info?.width || 180, 200);
+        imgHtml = `\n<img src="${dataUrl}" alt="Logo" width="${displayWidth}" style="max-width: 200px; height: auto; margin-top: 8px; display: block; border: 0;" />\n`;
+      }
       insertSnippetInCode(imgHtml);
     });
   };
@@ -239,7 +291,7 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
 
   const isHtml = (str: string) => /<[a-z][\s\S]*>/i.test(str);
 
-  const handleSelectPreset = (themeName: 'sidebar' | 'classic' | 'minimal') => {
+  const handleSelectPreset = (themeName: 'sidebar' | 'classic' | 'minimal' | 'banner') => {
     setVisualState((prev) => {
       // Keep any user-entered text or uploaded logo
       const hasUserData = Boolean(
@@ -275,6 +327,17 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
             website: 'www.virtualdev.tn',
             logoUrl: prev.logoUrl, // Strictly preserved!
             theme: 'classic',
+          };
+        } else if (themeName === 'banner') {
+          nextState = {
+            fullName: 'Hamdi Triki',
+            jobTitle: 'Directeur Commercial',
+            company: 'VIRTUALDEV',
+            phone: '+216 29 400 566',
+            email: 'hamdi.triki@virtualdev.tn',
+            website: 'www.virtualdev.tn',
+            logoUrl: prev.logoUrl, // Strictly preserved!
+            theme: 'banner',
           };
         } else {
           nextState = {
@@ -413,6 +476,7 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
             { id: 'sidebar' as const, name: 'Professionnel' },
             { id: 'classic' as const, name: 'Corporate' },
             { id: 'minimal' as const, name: 'Minimaliste' },
+            { id: 'banner' as const, name: 'Avec Bannière' },
           ].map((preset) => {
             const isActive = visualState.theme === preset.id;
             return (
@@ -560,9 +624,12 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
               </div>
             </div>
 
-            {/* Logo Upload */}
+            {/* Logo or Banner Upload */}
             <div>
-              <label style={fieldLabelStyle}>Logo ou Avatar (PNG / JPG)</label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                <label style={{ ...fieldLabelStyle, marginBottom: 0 }}>Logo ou Bannière Email (PNG / JPG / WebP)</label>
+                <span style={{ fontSize: '0.7rem', color: '#00E5C8', opacity: 0.85 }}>Recommandé : 600px à 1200px (HD Retina)</span>
+              </div>
               <div
                 onClick={() => visualLogoInputRef.current?.click()}
                 style={{
@@ -580,7 +647,7 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 229, 200, 0.03)')}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: '#94A3B8' }}>
-                  <span>{visualState.logoUrl ? 'Changer le logo PNG...' : 'Cliquer pour importer un logo PNG...'}</span>
+                  <span>{visualState.logoUrl ? 'Changer l\'image (Logo / Bannière)...' : 'Cliquer pour importer une image nette (Logo ou Bannière HD)...'}</span>
                 </div>
 
                 {visualState.logoUrl && (
@@ -706,9 +773,9 @@ export const EmailSignatureEditor: React.FC<EmailSignatureEditorProps> = ({
                 display: 'inline-flex',
                 alignItems: 'center',
               }}
-              title="Insérer un logo ou une image PNG/JPEG"
+              title="Insérer un logo ou une bannière HD (jusqu'à 1200px Retina)"
             >
-              + Insérer Image PNG
+              + Insérer Image / Bannière HD
             </button>
 
             <span style={{ color: 'rgba(255, 255, 255, 0.15)', margin: '0 2px' }}>|</span>
