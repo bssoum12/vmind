@@ -457,7 +457,7 @@ export const SignupRequestsView: React.FC = () => {
                           </>
                         ) : req.status === 'approved' && req.user_status ? (
                           <>
-                            {(req.user_status === 'active' || req.user_status === 'pending_activation') ? (
+                            {req.user_status === 'active' && (
                               <button
                                 onClick={() => toggleUserStatus(req.email, req.user_status)}
                                 disabled={actionLoading}
@@ -466,7 +466,8 @@ export const SignupRequestsView: React.FC = () => {
                               >
                                 Désactiver
                               </button>
-                            ) : (
+                            )}
+                            {req.user_status === 'deactivated' && (
                               <button
                                 onClick={() => toggleUserStatus(req.email, req.user_status)}
                                 disabled={actionLoading}
