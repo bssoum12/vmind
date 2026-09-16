@@ -38,10 +38,10 @@ interface SourcingAgentScheduleModalProps {
 
 export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSchedule, onToast }: SourcingAgentScheduleModalProps) {
   const savedMission = (
-    agent?.config?.agent_mission || 
-    (agent as any)?.agent_mission || 
-    (agent as any)?.parameters?.agent_mission || 
-    (agent as any)?.agentSettings?.agent_mission || 
+    agent?.config?.agent_mission ||
+    (agent as any)?.agent_mission ||
+    (agent as any)?.parameters?.agent_mission ||
+    (agent as any)?.agentSettings?.agent_mission ||
     ''
   ).trim();
 
@@ -195,10 +195,10 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
 
   React.useEffect(() => {
     const mission = (
-      agent?.config?.agent_mission || 
-      (agent as any)?.agent_mission || 
-      (agent as any)?.parameters?.agent_mission || 
-      (agent as any)?.agentSettings?.agent_mission || 
+      agent?.config?.agent_mission ||
+      (agent as any)?.agent_mission ||
+      (agent as any)?.parameters?.agent_mission ||
+      (agent as any)?.agentSettings?.agent_mission ||
       ''
     ).trim();
     if (mission && !sourcingSummary) {
@@ -219,8 +219,8 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
         return prev.filter(id => {
           const sId = String(id).toLowerCase();
           return sId !== String(pa.uuid || '').toLowerCase() &&
-                 sId !== String(pa.agent_id || '').toLowerCase() &&
-                 sId !== String(pa.agent_name || pa.nom || '').toLowerCase();
+            sId !== String(pa.agent_id || '').toLowerCase() &&
+            sId !== String(pa.agent_name || pa.nom || '').toLowerCase();
         });
       } else {
         return [...prev, targetUuid];
@@ -315,7 +315,7 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
     const r = agent.trigger_rules[0];
     const interval = r.interval;
     const minPad = String(r.triggerAtMinute ?? 0).padStart(2, '0');
-    
+
     if (interval === 'Minutes') {
       const step = Number(r.minutesBetween) || 5;
       return step <= 1 ? 'Toutes les minutes' : `Toutes les ${step} min`;
@@ -805,7 +805,7 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
                             color: selectedTargetAgentIds.length > 0 ? '#00E5C8' : '#38BDF8',
                             fontWeight: 600
                           }}>
-                            {selectedTargetAgentIds.length > 0 
+                            {selectedTargetAgentIds.length > 0
                               ? `${selectedTargetAgentIds.length} sélectionné${selectedTargetAgentIds.length > 1 ? 's' : ''}`
                               : 'Mode Autonome'}
                           </span>

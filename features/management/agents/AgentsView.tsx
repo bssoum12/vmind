@@ -560,10 +560,12 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     if (tutorialStep === step && tutorialAgent?.agent_name === agent.agent_name) {
       return {
         position: 'relative' as any,
-        zIndex: 10001,
-        boxShadow: '0 0 0 4px rgba(0,229,200,0.8)',
-        pointerEvents: 'none' as any,
-        background: 'var(--card-bg)'
+        zIndex: 10003,
+        background: '#00E5C8',
+        color: '#04101E',
+        fontWeight: 700,
+        boxShadow: '0 0 0 3px #00E5C8, 0 0 20px rgba(0, 229, 200, 0.75)',
+        pointerEvents: 'none' as any
       };
     }
     return tutorialStep > 0 ? { pointerEvents: 'none' as any } : {};
@@ -932,7 +934,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
       <div className="scroll" style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
 
         {/* ── Table ── */}
-        <div className="agents-table-wrap" style={{ flex: 1, minWidth: 0, width: '100%', overflowX: tutorialStep > 0 ? 'visible' : 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div className="agents-table-wrap" style={{ flex: 1, minWidth: 0, width: '100%', overflow: tutorialStep > 0 ? 'visible' : undefined, overflowX: tutorialStep > 0 ? 'visible' : 'auto', WebkitOverflowScrolling: 'touch' }}>
           {loading && (
             <div style={{ textAlign: 'center', padding: '40px', color: 'var(--muted)' }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
@@ -962,7 +964,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           )}
 
           {!loading && agents.length > 0 && (
-            <table className="agents-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+            <table className="agents-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left', fontSize: '13px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid rgba(0, 229, 200, 0.15)', background: 'rgba(9, 27, 51, 0.75)', color: '#00E5C8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
                   <th style={{ padding: '12px 18px', minWidth: '320px' }}>Agent</th>
@@ -980,6 +982,23 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                   const isSelected = selected?.agent_name === agent.agent_name;
                   const isTutorialActive = tutorialStep > 0 && tutorialAgent?.agent_name === agent.agent_name;
 
+                  const getTutorialRowCellStyle = (colIndex: number) => {
+                    if (!isTutorialActive || tutorialStep !== 1) return {};
+                    const isFirst = colIndex === 0;
+                    const isLast = colIndex === 4;
+
+                    return {
+                      borderTop: '2px solid #00E5C8',
+                      borderBottom: '2px solid #00E5C8',
+                      borderLeft: isFirst ? '2px solid #00E5C8' : 'none',
+                      borderRight: isLast ? '2px solid #00E5C8' : 'none',
+                      borderTopLeftRadius: isFirst ? '10px' : 0,
+                      borderBottomLeftRadius: isFirst ? '10px' : 0,
+                      borderTopRightRadius: isLast ? '10px' : 0,
+                      borderBottomRightRadius: isLast ? '10px' : 0,
+                    };
+                  };
+
                   return (
                     <tr
                       key={agent.agent_name}
@@ -995,15 +1014,15 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         cursor: tutorialStep > 0 ? 'default' : 'pointer',
                         pointerEvents: tutorialStep > 0 ? 'none' : undefined,
                         background: isTutorialActive && tutorialStep === 1 ? 'rgba(0, 229, 200, 0.12)' : isSelected ? 'rgba(0,229,160,0.08)' : 'rgba(5, 16, 30, 0.5)',
-                        borderLeft: isSelected ? '3px solid #00E5C8' : '3px solid transparent',
-                        borderBottom: '1px solid rgba(255,255,255,0.04)',
+                        borderLeft: !isTutorialActive && isSelected ? '3px solid #00E5C8' : 'none',
+                        borderBottom: isTutorialActive && tutorialStep === 1 ? 'none' : '1px solid rgba(255,255,255,0.04)',
                         transition: 'background 0.2s, border-color 0.2s',
                         position: isTutorialActive ? 'relative' : undefined,
                         zIndex: isTutorialActive ? 10001 : undefined,
-                        boxShadow: isTutorialActive && tutorialStep === 1 ? '0 0 0 4px rgba(0, 229, 200, 0.85)' : undefined,
+                        filter: isTutorialActive && tutorialStep === 1 ? 'drop-shadow(0 0 8px rgba(0, 229, 200, 0.35))' : undefined,
                       }}
                     >
-                      <td style={{ padding: '14px 18px' }}>
+                      <td style={{ padding: '14px 18px', ...getTutorialRowCellStyle(0) }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative' }}>
                           {isTutorialActive && tutorialStep === 1 && (
                             <VMindGuideArrow
@@ -1011,8 +1030,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                               color="#00E5C8"
                               style={{
                                 position: 'absolute',
-                                top: '-42px',
-                                left: '16px',
+                                top: '-48px',
+                                left: '20px',
                                 zIndex: 10002
                               }}
                             />
@@ -1044,7 +1063,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         </div>
                       </td>
 
-                      <td style={{ padding: '14px 18px' }}>
+                      <td style={{ padding: '14px 18px', ...getTutorialRowCellStyle(1) }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           {agent.is_executing ? (
                             <span style={{
@@ -1073,17 +1092,17 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         </div>
                       </td>
 
-                      <td style={{ padding: '12px 16px' }}>
+                      <td style={{ padding: '12px 16px', ...getTutorialRowCellStyle(2) }}>
                         <div style={{ fontSize: 12, color: 'var(--muted)' }}>
                           {agent.schedule_id ? triggerRuleSummary(agent.trigger_rules) : 'Aucune règle'}
                         </div>
                       </td>
 
-                      <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--muted)' }}>
+                      <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--muted)', ...getTutorialRowCellStyle(3) }}>
                         {formatDate(agent.lastExecuted)}
                       </td>
 
-                      <td style={{ padding: '14px 18px', textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                      <td style={{ padding: '14px 18px', textAlign: 'right', ...getTutorialRowCellStyle(4) }} onClick={e => e.stopPropagation()}>
                         <div className="row-actions" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 6 }}>
                           {/* Run Now - Tutorial Step 3 */}
                           <button

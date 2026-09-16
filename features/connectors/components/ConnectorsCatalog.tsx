@@ -16,8 +16,8 @@ export const ConnectorsCatalog: React.FC<ConnectorsCatalogProps> = ({ activeConn
     {
       title: 'ERP & Métiers',
       items: [
-        { id: 'tralis', name: 'TraLIS MCP', icon: <Database size={16} />, connected: tralisConnected },
-        { id: 'odoo', name: 'Odoo MCP', icon: <Layout size={16} />, connected: false },
+        { id: 'tralis', name: 'TraLIS MCP', icon: <img src="/logo-tralis-mcp.png" alt="TraLIS" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />, connected: tralisConnected },
+        { id: 'odoo', name: 'Odoo MCP', icon: <img src="/odoo-logo.png" alt="Odoo" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />, connected: false },
       ]
     },
     {
