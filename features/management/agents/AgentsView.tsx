@@ -391,28 +391,51 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const [tutorialStep, setTutorialStep] = useState<number>(0);
   const [tutorialAgent, setTutorialAgent] = useState<LiveAgent | null>(null);
 
-  const startTutorial = (agent: LiveAgent) => {
-    const storageKey = `vmind_tutorial_done_${agent.run_mode}`;
-    if (localStorage.getItem(storageKey)) return;
+  const getTutorialStorageKey = (agent: LiveAgent | null): string => {
+    const mode = agent?.run_mode || 'general';
+    return `vmind_tutorial_done_${mode}`;
+  };
 
-    localStorage.setItem(storageKey, 'true');
+  const dismissTutorial = useCallback(() => {
+    if (tutorialAgent) {
+      try {
+        localStorage.setItem(getTutorialStorageKey(tutorialAgent), 'true');
+      } catch {}
+    }
+    setTutorialStep(0);
+    setTutorialAgent(null);
+  }, [tutorialAgent]);
+
+  const startTutorial = (agent: LiveAgent) => {
+    try {
+      const modeKey = getTutorialStorageKey(agent);
+      // First-visit only per agent type: check if this specific agent type has already been visited
+      if (localStorage.getItem(modeKey) === 'true') {
+        return;
+      }
+
+      // Immediately flag this specific agent type as completed so future visits & logins never re-trigger it
+      localStorage.setItem(modeKey, 'true');
+    } catch {}
+
     setTutorialAgent(agent);
     setTutorialStep(1);
   };
 
   const restartTutorial = () => {
-    // Clear all tutorial keys
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('vmind_tutorial_done_')) {
-        keysToRemove.push(key);
+    try {
+      // Clear all tutorial keys for manual replay across all agent types
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('vmind_tutorial_done_') || key.includes('tutorial'))) {
+          keysToRemove.push(key);
+        }
       }
-    }
-    keysToRemove.forEach(k => localStorage.removeItem(k));
-
-    // Also remove the old generic key just in case
-    localStorage.removeItem('vmind_agent_tutorial_done');
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+      localStorage.removeItem('vmind_agents_view_tutorial_done');
+      localStorage.removeItem('vmind_agent_tutorial_done');
+    } catch {}
 
     showToast('Tutoriels réinitialisés pour tous les types d\'agents. Survolez un agent pour commencer.', 'ok');
   };
@@ -420,12 +443,17 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const nextTutorialStep = useCallback(() => {
     setTutorialStep(s => {
       if (s >= 5) {
+        if (tutorialAgent) {
+          try {
+            localStorage.setItem(getTutorialStorageKey(tutorialAgent), 'true');
+          } catch {}
+        }
         setTutorialAgent(null);
         return 0;
       }
       return s + 1;
     });
-  }, []);
+  }, [tutorialAgent]);
 
   // Keyboard navigation for VMindGuide Tutorial: Space / ArrowRight = Next, Escape = Dismiss
   useEffect(() => {
@@ -449,8 +477,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
       } else if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
-        setTutorialStep(0);
-        setTutorialAgent(null);
+        dismissTutorial();
       }
     };
 
@@ -458,7 +485,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [tutorialStep, nextTutorialStep]);
+  }, [tutorialStep, nextTutorialStep, dismissTutorial]);
 
   const agentHasTargetProspects = (agent: LiveAgent | null): boolean => {
     if (!agent) return false;
@@ -782,10 +809,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           message={getTutorialContent()?.message || null}
           mood={getTutorialContent()?.mood}
           showBackdrop={false}
-          onClose={() => {
-            setTutorialStep(0);
-            setTutorialAgent(null);
-          }}
+          onClose={dismissTutorial}
         >
           <div className="vmind-guide-actions">
             {tutorialStep < 4 && (
@@ -805,8 +829,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                   type="button"
                   className="vmind-guide-btn-primary"
                   onClick={() => {
-                    setTutorialStep(0);
-                    setTutorialAgent(null);
+                    dismissTutorial();
                     if (typeof window !== 'undefined') {
                       sessionStorage.setItem('vmind_guide_target_marketplace', 'sourcing');
                       const linkId = tutorialAgent.uuid || (tutorialAgent as any).agent_id;
@@ -841,8 +864,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                   type="button"
                   className="vmind-guide-btn-primary"
                   onClick={() => {
-                    setTutorialStep(0);
-                    setTutorialAgent(null);
+                    dismissTutorial();
                     if (typeof window !== 'undefined') {
                       sessionStorage.setItem('vmind_guide_target_marketplace', 'prospection');
                       const linkId = tutorialAgent.uuid || (tutorialAgent as any).agent_id;
@@ -889,10 +911,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
               <button
                 type="button"
                 className="vmind-guide-btn-primary"
-                onClick={() => {
-                  setTutorialStep(0);
-                  setTutorialAgent(null);
-                }}
+                onClick={dismissTutorial}
               >
                 <span>Terminer la Visite</span>
                 <CyberIcon name="check" size={14} color="currentColor" />
@@ -902,10 +921,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
             <button
               type="button"
               className="vmind-guide-btn-ghost"
-              onClick={() => {
-                setTutorialStep(0);
-                setTutorialAgent(null);
-              }}
+              onClick={dismissTutorial}
             >
               <span>Fermer</span>
             </button>

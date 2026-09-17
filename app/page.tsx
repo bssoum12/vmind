@@ -228,8 +228,12 @@ function HomeContent() {
         const decoded: any = jwtDecode(token);
         // Expiration check
         if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-          localStorage.clear();
-          sessionStorage.clear();
+          try {
+            localStorage.removeItem('vmind_session');
+            localStorage.removeItem('vmind_mcp_token');
+            localStorage.removeItem('vmind_allowed_agents');
+            sessionStorage.clear();
+          } catch {}
           setIsAuthenticated(false);
           window.location.href = '/login';
           return;
@@ -255,8 +259,12 @@ function HomeContent() {
         setIsAuthorized(true);
       } catch (err) {
         console.error("Auth check failed", err);
-        localStorage.clear();
-        sessionStorage.clear();
+        try {
+          localStorage.removeItem('vmind_session');
+          localStorage.removeItem('vmind_mcp_token');
+          localStorage.removeItem('vmind_allowed_agents');
+          sessionStorage.clear();
+        } catch {}
         setIsAuthenticated(false);
         window.location.href = '/login';
       }

@@ -38,7 +38,9 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
   // Fonction de déconnexion sécurisée
   const handleLogout = () => {
     try {
-      localStorage.clear();
+      localStorage.removeItem('vmind_session');
+      localStorage.removeItem('vmind_mcp_token');
+      localStorage.removeItem('vmind_allowed_agents');
       sessionStorage.clear();
       setShowWarning(false);
       
