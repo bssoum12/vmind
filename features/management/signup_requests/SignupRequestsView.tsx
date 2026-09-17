@@ -15,6 +15,30 @@ interface SignupRequest {
   user_status?: 'pending_activation' | 'active' | 'deactivated';
 }
 
+function getAuthToken(): string | null {
+  try {
+    const sessionRaw = localStorage.getItem('vmind_session');
+    if (sessionRaw) {
+      if (sessionRaw.startsWith('eyJ')) return sessionRaw;
+      const parsed = JSON.parse(sessionRaw);
+      const token = parsed?.token || parsed?.access_token || parsed?.user?.token || parsed?.data?.token;
+      if (token) return token;
+    }
+    const mcpRaw = localStorage.getItem('vmind_mcp_token');
+    if (mcpRaw) return mcpRaw;
+  } catch (e) {}
+  return null;
+}
+
+function getAuthHeaders(extraHeaders: Record<string, string> = {}): HeadersInit {
+  const token = getAuthToken();
+  const headers: Record<string, string> = { ...extraHeaders };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 export const SignupRequestsView: React.FC = () => {
   const [requests, setRequests] = useState<SignupRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,7 +62,9 @@ export const SignupRequestsView: React.FC = () => {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/signup-requests`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/signup-requests`, {
+        headers: getAuthHeaders()
+      });
       const data = await res.json();
       if (data.ok) {
         setRequests(data.requests);
@@ -63,7 +89,7 @@ export const SignupRequestsView: React.FC = () => {
       setActionLoading(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/approve-request`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           requestId: selectedReq.id,
           role,
@@ -91,7 +117,7 @@ export const SignupRequestsView: React.FC = () => {
       setActionLoading(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/reject-request`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ requestId: rejectReq.id })
       });
       const data = await res.json();
@@ -108,13 +134,14 @@ export const SignupRequestsView: React.FC = () => {
       setActionLoading(false);
     }
   };
+
   const toggleUserStatus = async (email: string, currentStatus?: string) => {
     const targetStatus = currentStatus === 'deactivated' ? 'active' : 'deactivated';
     try {
       setActionLoading(true);
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/toggle-user-status`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ email, status: targetStatus })
       });
       const data = await res.json();
@@ -130,6 +157,7 @@ export const SignupRequestsView: React.FC = () => {
       setActionLoading(false);
     }
   };
+
   // ── SORTING HANDLER ──
   const handleSort = (field: 'name' | 'username' | 'email' | 'date' | 'status') => {
     if (sortField === field) {

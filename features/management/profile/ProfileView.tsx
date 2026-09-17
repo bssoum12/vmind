@@ -175,7 +175,8 @@ export const ProfileView: React.FC = () => {
         body: JSON.stringify({
           first_name: firstName.trim(), last_name: lastName.trim(),
           email: email.trim(), phone_number: phone.trim(),
-          password: isUpdatingPassword ? newPassword.trim() : undefined
+          password: isUpdatingPassword ? newPassword.trim() : undefined,
+          current_password: isUpdatingPassword ? currentPassword.trim() : undefined
         })
       });
 

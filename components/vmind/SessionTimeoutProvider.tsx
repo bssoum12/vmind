@@ -59,6 +59,30 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
   const resetTimer = () => {
     lastActivityRef.current = Date.now();
     
+    // Vérification de validité et d'expiration du token JWT
+    const token = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
+    if (token) {
+      try {
+        let cleanToken = token;
+        if (cleanToken.startsWith('{')) {
+          const parsed = JSON.parse(cleanToken);
+          cleanToken = parsed.token || parsed.accessToken || cleanToken;
+        } else if (cleanToken.startsWith('"') && cleanToken.endsWith('"')) {
+          cleanToken = cleanToken.slice(1, -1);
+        }
+        const decoded: any = jwtDecode(cleanToken);
+        if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+          console.warn('[SessionTimeoutProvider] Token expiré détecté lors de l\'activité.');
+          handleLogout();
+          return;
+        }
+      } catch (err) {
+        console.error('[SessionTimeoutProvider] Erreur décodage token:', err);
+        handleLogout();
+        return;
+      }
+    }
+
     // Si la modale est affichée et qu'on détecte une activité, on prolonge automatiquement
     if (showWarningRef.current) {
       setShowWarning(false);
@@ -78,8 +102,8 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
     // Lancer le timer avant alerte
     inactivityTimerRef.current = setTimeout(() => {
       // Avant d'afficher l'alerte, on s'assure qu'un token valide existe toujours
-      const token = localStorage.getItem('vmind_session');
-      if (token) {
+      const currentToken = localStorage.getItem('vmind_session');
+      if (currentToken) {
         setCountdown(WARNING_DURATION);
         setShowWarning(true);
       }
@@ -203,6 +227,59 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+  }, [isPublicPage]);
+
+  // 4. Intercepteur global des réponses HTTP 401 (expiration ou invalidation de token)
+  useEffect(() => {
+    if (typeof window === 'undefined' || isPublicPage) return;
+
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+      if (response.status === 401) {
+        const url = typeof args[0] === 'string' ? args[0] : (args[0] instanceof Request ? args[0].url : '');
+        // Ne pas intercepter la validation d'identifiants incorrects ou la vérification du mot de passe
+        const isAuthCheckEndpoint = url.includes('/api/auth/vmind/login') || url.includes('/api/auth/vmind/verify-current-password');
+        if (!isAuthCheckEndpoint) {
+          console.warn('[SessionTimeoutProvider] Statut 401 reçu : session expirée ou invalide. Déconnexion automatique...');
+          handleLogout();
+        }
+      }
+      return response;
+    };
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, [isPublicPage]);
+
+  // 5. Vérification périodique d'arrière-plan de l'expiration du token (toutes les 30 secondes)
+  useEffect(() => {
+    if (isPublicPage) return;
+
+    const interval = setInterval(() => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
+      if (token) {
+        try {
+          let cleanToken = token;
+          if (cleanToken.startsWith('{')) {
+            const parsed = JSON.parse(cleanToken);
+            cleanToken = parsed.token || parsed.accessToken || cleanToken;
+          } else if (cleanToken.startsWith('"') && cleanToken.endsWith('"')) {
+            cleanToken = cleanToken.slice(1, -1);
+          }
+          const decoded: any = jwtDecode(cleanToken);
+          if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+            console.warn('[SessionTimeoutProvider] Expiration périodique atteinte : déconnexion automatique.');
+            handleLogout();
+          }
+        } catch {
+          handleLogout();
+        }
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
   }, [isPublicPage]);
 
   // Couleurs de la charte VMIND
