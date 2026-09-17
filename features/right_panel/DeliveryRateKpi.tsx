@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
+import { RefreshCw, TrendingUp, TrendingDown, Info, Truck } from 'lucide-react';
 import { DeliveryRateTooltip } from './TableauCroiseKpi/DeliveryRateTooltip';
 import { useKpis } from '../../shared/contexts/KpiCacheContext';
-import { SkeletonLoader } from '../../components/vmind/SkeletonLoader';
+import { AnimatedNumber } from './TableauCroiseKpi/AnimatedNumber';
 
 interface DeliveryKpiData {
   value: number;
@@ -49,9 +50,9 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
   const mouvementsEnRetard = details?.mouvements_en_retard || 0;
   const lateDeliveries = tableRows;
 
-  const loading = loadingByAgent["vdata"] && !toolData.ok;
-  const error = !loading && !toolData.ok && globalError ? globalError : "";
-  const noData = !loading && toolData.ok && kpis.length === 0;
+  const effectiveLoading = (loadingByAgent["vdata"] || loadingByAgent["VDATA"]) && !toolData.ok;
+  const error = !effectiveLoading && !toolData.ok && globalError ? globalError : "";
+  const noData = !effectiveLoading && toolData.ok && kpis.length === 0;
 
   function getAuthToken() {
     if (typeof window === 'undefined') return '';
@@ -122,7 +123,7 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
       const animate = (currentTime: number) => {
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
-        const easeProgress = progress * (2 - progress); // Ease out quad
+        const easeProgress = progress * (2 - progress);
 
         setAnimatedPercent(targetPercent * easeProgress);
 
@@ -179,7 +180,6 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
     }, 250);
   };
 
-  // Follow scroll and resize events when tooltip is visible
   useEffect(() => {
     if (!tooltipVisible) return;
     const handleUpdate = () => {
@@ -217,16 +217,23 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
   const circumference = 2 * Math.PI * radius; // ~163.36
   const strokeDashoffset = circumference - (animatedPercent / 100) * circumference;
 
+  const isPositiveVsPrev = prevTaux !== null && kpi ? kpi.value >= prevTaux : true;
+  const diffVsPrev = prevTaux !== null && kpi ? Math.abs(kpi.value - prevTaux) : null;
+
   return (
     <div
       ref={cardRef}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
       style={{
+        background: 'linear-gradient(145deg, rgba(13, 17, 26, 0.96) 0%, rgba(10, 26, 24, 0.96) 100%)',
+        border: `1px solid ${statusColor}45`,
+        borderRadius: '16px',
+        padding: '16px 18px',
+        color: '#fff',
+        boxShadow: `0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 20px ${statusColor}10`,
+        backdropFilter: 'blur(16px)',
         position: 'relative',
-        marginTop: '16px',
         overflow: 'visible',
-        zIndex: 9,
+        marginBottom: '16px'
       }}
     >
       {/* Detail Tooltip */}
@@ -244,94 +251,117 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
         onMouseLeave={handleTooltipMouseLeave}
       />
 
-      {/* Cyber Card Container */}
-      <div
-        style={{
-          padding: '16px',
-          backgroundColor: cardHovered ? 'rgba(6, 17, 31, 0.85)' : 'rgba(6, 17, 31, 0.7)',
-          backgroundImage: `
-            radial-gradient(${statusColor}08 1px, transparent 0),
-            radial-gradient(${statusColor}03 1px, transparent 0)
-          `,
-          backgroundSize: "12px 12px",
-          backgroundPosition: "0 0, 6px 6px",
-          border: cardHovered ? `1px solid ${statusColor}60` : `1px solid ${statusColor}2b`,
-          boxShadow: cardHovered 
-            ? `0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 16px ${statusColor}15, 0 0 15px ${statusColor}20` 
-            : `0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 16px ${statusColor}08`,
-          transform: cardHovered ? "translateY(-1px) scale(1.005)" : "none",
-          borderRadius: '8px',
-          overflow: 'hidden',
-          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-          cursor: 'pointer',
-        }}
-      >
-        {/* Glowing Corner Brackets */}
-        <div style={{ position: "absolute", top: 0, left: 0, width: "10px", height: "10px", borderTop: `2px solid ${statusColor}`, borderLeft: `2px solid ${statusColor}`, borderRadius: "2px 0 0 0", boxShadow: `0 0 5px ${statusColor}60` }} />
-        <div style={{ position: "absolute", top: 0, right: 0, width: "10px", height: "10px", borderTop: `2px solid ${statusColor}`, borderRight: `2px solid ${statusColor}`, borderRadius: "0 2px 0 0", boxShadow: `0 0 5px ${statusColor}60` }} />
-        <div style={{ position: "absolute", bottom: 0, left: 0, width: "10px", height: "10px", borderBottom: `2px solid ${statusColor}`, borderLeft: `2px solid ${statusColor}`, borderRadius: "0 0 0 2px", boxShadow: `0 0 5px ${statusColor}60` }} />
-        <div style={{ position: "absolute", bottom: 0, right: 0, width: "10px", height: "10px", borderBottom: `2px solid ${statusColor}`, borderRight: `2px solid ${statusColor}`, borderRadius: "0 0 2px 0", boxShadow: `0 0 5px ${statusColor}60` }} />
-
-        {/* Section Title */}
-        <div
-          style={{
+      {/* Top Header Row */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
             fontSize: '9px',
-            color: 'var(--muted)',
             fontFamily: 'var(--font-mono)',
-            letterSpacing: '1.5px',
+            fontWeight: 800,
             textTransform: 'uppercase',
-            marginBottom: '12px',
-          }}
-        >
-          Livraison à temps
+            letterSpacing: '1.5px',
+            color: '#E2E8F0'
+          }}>
+            LIVRAISON À TEMPS
+          </span>
+          <span style={{
+            fontSize: '9px',
+            fontWeight: 800,
+            color: '#00E5C8',
+            background: 'rgba(0, 229, 200, 0.15)',
+            border: '1px solid rgba(0, 229, 200, 0.35)',
+            padding: '1px 6px',
+            borderRadius: '4px',
+            letterSpacing: '0.5px'
+          }}>
+            VDATA
+          </span>
         </div>
 
-        {loading ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <SkeletonLoader height="68px" width="68px" style={{ borderRadius: '50%' }} />
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <SkeletonLoader height="16px" width="90%" />
-              <SkeletonLoader height="12px" width="60%" />
-            </div>
-          </div>
-        ) : error ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <span style={{ color: "var(--red)", fontSize: "9px", fontFamily: "var(--font-mono)" }}>
-              {error}
-            </span>
-            <button
-              onClick={() => fetchKpis('vdata', true, 'get_delivery_rate')}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--cyan)',
-                fontFamily: 'var(--font-mono)',
-                fontSize: '8px',
-                textDecoration: 'underline',
-                cursor: 'pointer',
-                padding: 0,
-                textAlign: 'left',
-              }}
-            >
-              Réessayer
-            </button>
-          </div>
-        ) : noData ? (
-          <div style={{ fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'var(--muted)', fontStyle: 'italic' }}>
-            Aucune donnée pour cette période
-          </div>
-        ) : kpi ? (
+        <button
+          onClick={() => fetchKpis('vdata', true, 'get_delivery_rate')}
+          title="Rafraîchir KPI via n8n"
+          disabled={effectiveLoading}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: '#64748B',
+            cursor: effectiveLoading ? 'not-allowed' : 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'color 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.color = '#00E5C8'}
+          onMouseLeave={(e) => e.currentTarget.style.color = '#64748B'}
+        >
+          <RefreshCw size={12} className={effectiveLoading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+
+      {effectiveLoading ? (
+        <div style={{
+          padding: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          color: '#64748B',
+          fontSize: '11px'
+        }}>
+          <RefreshCw size={14} className="animate-spin" />
+          <span>Chargement du taux de livraison...</span>
+        </div>
+      ) : error ? (
+        <div style={{
+          padding: '14px',
+          fontSize: '11px',
+          color: '#EF4444',
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.2)',
+          borderRadius: '8px'
+        }}>
+          {error}
+        </div>
+      ) : noData ? (
+        <div style={{ fontSize: '10px', color: '#64748B', fontStyle: 'italic', padding: '12px', textAlign: 'center' }}>
+          Aucune donnée pour cette période
+        </div>
+      ) : kpi ? (
+        <div
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          style={{
+            background: cardHovered
+              ? `linear-gradient(135deg, ${statusColor}18 0%, rgba(6, 182, 212, 0.08) 100%)`
+              : 'rgba(255, 255, 255, 0.02)',
+            border: cardHovered
+              ? `1px solid ${statusColor}60`
+              : '1px solid rgba(255, 255, 255, 0.07)',
+            borderRadius: '14px',
+            padding: '14px 16px',
+            transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+            cursor: 'pointer',
+            boxShadow: cardHovered ? `0 6px 24px ${statusColor}25` : 'none',
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             {/* SVG Circular Gauge */}
             <div style={{ position: 'relative', width: '68px', height: '68px', flexShrink: 0 }}>
               <svg width="68" height="68" viewBox="0 0 68 68">
                 <defs>
-                  <linearGradient id="cardDeliveryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <linearGradient id="vdataDeliveryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#ffffff" />
                     <stop offset="100%" stopColor={statusColor} />
                   </linearGradient>
-                  <filter id="card-delivery-glow">
-                    <feGaussianBlur stdDeviation="2.5" result="blur" />
+                  <filter id="vdata-delivery-glow">
+                    <feGaussianBlur stdDeviation="2" result="blur" />
                     <feMerge>
                       <feMergeNode in="blur" />
                       <feMergeNode in="SourceGraphic" />
@@ -344,7 +374,7 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
                   cy="34"
                   r={radius}
                   fill="none"
-                  stroke="rgba(255, 255, 255, 0.04)"
+                  stroke="rgba(255, 255, 255, 0.06)"
                   strokeWidth="4.5"
                 />
                 {/* Ticks ring */}
@@ -353,7 +383,7 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
                   cy="34"
                   r="21"
                   fill="none"
-                  stroke={`${statusColor}1a`}
+                  stroke={`${statusColor}25`}
                   strokeWidth="2.5"
                   strokeDasharray="1.5 3.5"
                 />
@@ -363,13 +393,13 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
                   cy="34"
                   r={radius}
                   fill="none"
-                  stroke="url(#cardDeliveryGrad)"
+                  stroke="url(#vdataDeliveryGrad)"
                   strokeWidth="4.5"
                   strokeDasharray={circumference}
                   strokeDashoffset={strokeDashoffset}
                   strokeLinecap="round"
                   transform="rotate(-90 34 34)"
-                  filter="url(#card-delivery-glow)"
+                  filter="url(#vdata-delivery-glow)"
                 />
               </svg>
               {/* Value label in center */}
@@ -386,33 +416,43 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
                 <span
                   style={{
                     fontSize: '12px',
-                    fontFamily: 'var(--font-mono)',
-                    fontWeight: 800,
+                    fontFamily: 'monospace',
+                    fontWeight: 900,
                     color: '#ffffff',
                     textShadow: `0 0 8px ${statusColor}a0`,
                     lineHeight: 1,
                   }}
                 >
-                  {animatedPercent.toFixed(2).replace('.', ',')}
-                  <span style={{ fontSize: '9px', fontWeight: 600, color: statusColor }}>%</span>
+                  {animatedPercent.toFixed(1)}
+                  <span style={{ fontSize: '9px', fontWeight: 700, color: statusColor }}>%</span>
                 </span>
               </div>
             </div>
 
             {/* Right side text */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: '11px',
-                  fontFamily: 'var(--font-body)',
-                  color: 'var(--white)',
-                  fontWeight: 500,
-                  lineHeight: 1.35,
-                  marginBottom: '6px',
-                }}
-              >
-                Dossiers livrés dans les délais contractuels
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '9px', color: '#64748B', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 700 }}>
+                  CONFORMITÉ DÉLAIS
+                </span>
+                <span style={{
+                  fontSize: '9px',
+                  color: cardHovered ? '#6EE7B7' : '#64748B',
+                  background: cardHovered ? 'rgba(0, 229, 200, 0.18)' : 'rgba(255, 255, 255, 0.04)',
+                  border: cardHovered ? '1px solid rgba(0, 229, 200, 0.35)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  transition: 'all 0.2s',
+                  flexShrink: 0
+                }}>
+                  <Info size={10} style={{ color: cardHovered ? '#00E5C8' : '#94A3B8' }} />
+                  {cardHovered ? 'Détails' : 'Détails'}
+                </span>
               </div>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                 {/* Cyber status badge */}
                 <div
@@ -420,9 +460,9 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
                     display: 'flex',
                     alignItems: 'center',
                     gap: '4px',
-                    background: `${statusColor}14`,
-                    border: `1px solid ${statusColor}33`,
-                    borderRadius: '3px',
+                    background: `${statusColor}18`,
+                    border: `1px solid ${statusColor}40`,
+                    borderRadius: '4px',
                     padding: '2px 6px',
                   }}
                 >
@@ -443,7 +483,7 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
                       color: statusColor,
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px',
-                      fontWeight: 700,
+                      fontWeight: 800,
                     }}
                   >
                     {kpi.status === 'success'
@@ -453,50 +493,41 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
                       : 'En alerte'}
                   </span>
                 </div>
+
                 {/* Ratio count */}
                 <span
                   style={{
-                    fontSize: '8px',
-                    fontFamily: 'var(--font-mono)',
-                    color: 'var(--muted)',
-                    letterSpacing: '0.5px',
+                    fontSize: '9px',
+                    fontFamily: 'monospace',
+                    color: '#E2E8F0',
+                    fontWeight: 700
                   }}
                 >
-                  {mouvementsATemps} / {totalMouvements} DOSSIERS
+                  {mouvementsATemps}/{totalMouvements} dossiers
                 </span>
               </div>
-              {kpi && prevTaux !== null && (
+
+              {prevTaux !== null && (
                 <div
                   style={{
                     fontSize: '9px',
                     fontFamily: 'var(--font-mono)',
-                    color: 'rgba(255, 255, 255, 0.4)',
+                    color: isPositiveVsPrev ? '#10B981' : '#FF4757',
+                    fontWeight: 700,
                     marginTop: '6px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '4px',
+                    gap: '3px',
                   }}
                 >
-                  <span>vs {prevYear} :</span>
-                  <span style={{ color: 'var(--white)', fontWeight: 600 }}>
-                    {prevTaux.toFixed(2)}%
-                  </span>
-                  {(() => {
-                    const diff = kpi.value - prevTaux;
-                    const color = diff >= 0 ? 'var(--green)' : 'var(--red)';
-                    const sign = diff >= 0 ? '▲ +' : '▼ ';
-                    return (
-                      <span style={{ color, fontWeight: 700, marginLeft: '2px' }}>
-                        ({sign}{diff.toFixed(2)}%)
-                      </span>
-                    );
-                  })()}
+                  {isPositiveVsPrev ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                  <span>{isPositiveVsPrev ? '+' : '-'}{diffVsPrev?.toFixed(1)}% vs {prevYear}</span>
                 </div>
               )}
             </div>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
     </div>
   );
 };

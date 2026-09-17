@@ -1,39 +1,21 @@
 "use client";
 
-
-function getAuthToken() {
-  if (typeof window === 'undefined') return '';
-  const mcpToken = localStorage.getItem('vmind_mcp_token');
-  if (mcpToken) return mcpToken;
-  try {
-    const sessionStr = localStorage.getItem('vmind_session');
-    if (!sessionStr) return '';
-    if (sessionStr.startsWith('eyJ')) return sessionStr;
-    const parsed = JSON.parse(sessionStr);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
-  } catch(e) { return ''; }
-}
-import React, { useEffect, useState } from "react";
-import { SkeletonLoader } from "@/components/vmind/SkeletonLoader";
+import React, { useState } from "react";
+import { RefreshCw, FileText, ExternalLink } from "lucide-react";
+import { useKpis } from "@/shared/contexts/KpiCacheContext";
 
 interface LatestReportCardProps {
   activeAgentId?: string;
 }
 
-import { useKpis } from "@/shared/contexts/KpiCacheContext";
-
 export const LatestReportCard: React.FC<LatestReportCardProps> = ({ activeAgentId }) => {
-  const { kpisByAgent, loadingByAgent, fetchKpis } = useKpis();
-  const [hovered, setHovered] = useState(false);
+  const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
+  const [isHovered, setIsHovered] = useState(false);
 
-  const agentData = kpisByAgent["vdata"] || {};
+  const agentData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
   const report = agentData.get_latest_report || null;
-  const loading = loadingByAgent["vdata"] && !report;
-
-  const fetchLatestReport = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    fetchKpis("vdata", true, "get_latest_report");
-  };
+  const effectiveLoading = (loadingByAgent["vdata"] || loadingByAgent["VDATA"]) && !report;
+  const error = !effectiveLoading && !report && globalError ? globalError : "";
 
   if (activeAgentId !== "VDATA") {
     return null;
@@ -56,138 +38,152 @@ export const LatestReportCard: React.FC<LatestReportCardProps> = ({ activeAgentI
 
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
-        position: "relative",
-        marginTop: "12px",
-        overflow: "hidden",
-        padding: "16px",
-        backgroundColor: hovered ? "rgba(6, 17, 31, 0.85)" : "rgba(6, 17, 31, 0.7)",
-        backgroundImage: `
-          radial-gradient(rgba(123, 97, 255, 0.04) 1px, transparent 0),
-          radial-gradient(rgba(123, 97, 255, 0.015) 1px, transparent 0)
-        `,
-        backgroundSize: "12px 12px",
-        backgroundPosition: "0 0, 6px 6px",
-        border: hovered ? "1px solid rgba(123, 97, 255, 0.35)" : "1px solid rgba(123, 97, 255, 0.16)",
-        borderRadius: "8px",
-        boxShadow: hovered 
-          ? "0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 16px rgba(123, 97, 255, 0.08), 0 0 15px rgba(123, 97, 255, 0.1)" 
-          : "0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 16px rgba(123, 97, 255, 0.04)",
-        transform: hovered ? "translateY(-1px) scale(1.005)" : "none",
-        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-        cursor: "pointer",
+        background: 'linear-gradient(145deg, rgba(13, 17, 26, 0.96) 0%, rgba(20, 14, 32, 0.96) 100%)',
+        border: '1px solid rgba(123, 97, 255, 0.3)',
+        borderRadius: '16px',
+        padding: '16px 18px',
+        color: '#fff',
+        boxShadow: '0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 20px rgba(123, 97, 255, 0.05)',
+        backdropFilter: 'blur(16px)',
+        position: 'relative',
+        overflow: 'visible',
+        marginBottom: '16px'
       }}
     >
-      {/* Glowing Corner Brackets (matching purple color) */}
-      <div style={{ position: "absolute", top: 0, left: 0, width: "10px", height: "10px", borderTop: "2px solid rgba(123, 97, 255, 0.7)", borderLeft: "2px solid rgba(123, 97, 255, 0.7)", borderRadius: "2px 0 0 0", boxShadow: "0 0 5px rgba(123, 97, 255, 0.4)" }} />
-      <div style={{ position: "absolute", top: 0, right: 0, width: "10px", height: "10px", borderTop: "2px solid rgba(123, 97, 255, 0.7)", borderRight: "2px solid rgba(123, 97, 255, 0.7)", borderRadius: "0 2px 0 0", boxShadow: "0 0 5px rgba(123, 97, 255, 0.4)" }} />
-      <div style={{ position: "absolute", bottom: 0, left: 0, width: "10px", height: "10px", borderBottom: "2px solid rgba(123, 97, 255, 0.7)", borderLeft: "2px solid rgba(123, 97, 255, 0.7)", borderRadius: "0 0 0 2px", boxShadow: "0 0 5px rgba(123, 97, 255, 0.4)" }} />
-      <div style={{ position: "absolute", bottom: 0, right: 0, width: "10px", height: "10px", borderBottom: "2px solid rgba(123, 97, 255, 0.7)", borderRight: "2px solid rgba(123, 97, 255, 0.7)", borderRadius: "0 0 2px 0", boxShadow: "0 0 5px rgba(123, 97, 255, 0.4)" }} />
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: "1px",
-          background: "linear-gradient(90deg, transparent, var(--purple), transparent)",
-          opacity: 0.6,
-        }}
-      />
+      {/* Top Header Row */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: '12px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{
+            fontSize: '9px',
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 800,
+            textTransform: 'uppercase',
+            letterSpacing: '1.5px',
+            color: '#E2E8F0'
+          }}>
+            DERNIER RAPPORT
+          </span>
+          <span style={{
+            fontSize: '9px',
+            fontWeight: 800,
+            color: '#A78BFA',
+            background: 'rgba(167, 139, 250, 0.15)',
+            border: '1px solid rgba(167, 139, 250, 0.35)',
+            padding: '1px 6px',
+            borderRadius: '4px',
+            letterSpacing: '0.5px'
+          }}>
+            VDATA
+          </span>
+        </div>
 
-      <div
-        style={{
-          fontSize: "9px",
-          color: "var(--muted)",
-          fontFamily: "var(--font-mono)",
-          letterSpacing: "1.5px",
-          textTransform: "uppercase",
-          marginBottom: "8px",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <span>Dernier Rapport</span>
         <button
-          onClick={fetchLatestReport}
-          title="Actualiser"
+          onClick={() => fetchKpis('vdata', true, 'get_latest_report')}
+          title="Rafraîchir KPI via n8n"
+          disabled={effectiveLoading}
           style={{
-            background: "none",
-            border: "none",
-            color: "var(--purple)",
-            cursor: "pointer",
-            fontSize: "10px",
-            padding: "2px",
-            display: "flex",
-            alignItems: "center",
-            opacity: 0.7,
-            transition: "opacity 0.2s",
+            background: 'transparent',
+            border: 'none',
+            color: '#64748B',
+            cursor: effectiveLoading ? 'not-allowed' : 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'color 0.2s'
           }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.7")}
+          onMouseEnter={(e) => e.currentTarget.style.color = '#A78BFA'}
+          onMouseLeave={(e) => e.currentTarget.style.color = '#64748B'}
         >
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-          </svg>
+          <RefreshCw size={12} className={effectiveLoading ? 'animate-spin' : ''} />
         </button>
       </div>
 
-      {loading ? (
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", height: "32px" }}>
-          <SkeletonLoader height="32px" width="32px" style={{ borderRadius: "4px" }} />
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px" }}>
-            <SkeletonLoader height="12px" width="60%" />
-            <SkeletonLoader height="8px" width="40%" />
-          </div>
+      {effectiveLoading ? (
+        <div style={{
+          padding: '20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          color: '#64748B',
+          fontSize: '11px'
+        }}>
+          <RefreshCw size={14} className="animate-spin" />
+          <span>Chargement du dernier rapport...</span>
+        </div>
+      ) : error ? (
+        <div style={{
+          padding: '14px',
+          fontSize: '11px',
+          color: '#EF4444',
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.2)',
+          borderRadius: '8px'
+        }}>
+          {error}
         </div>
       ) : report ? (
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          {/* PDF glowing icon */}
+        <div style={{
+          background: isHovered
+            ? 'linear-gradient(135deg, rgba(123, 97, 255, 0.12) 0%, rgba(139, 92, 246, 0.05) 100%)'
+            : 'rgba(255, 255, 255, 0.02)',
+          border: isHovered
+            ? '1px solid rgba(123, 97, 255, 0.4)'
+            : '1px solid rgba(255, 255, 255, 0.07)',
+          borderRadius: '14px',
+          padding: '12px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          transition: 'all 0.2s',
+        }}>
+          {/* PDF Icon Avatar */}
           <div
             style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "4px",
-              background: "rgba(255, 71, 87, 0.1)",
-              border: "1px solid rgba(255, 71, 87, 0.25)",
+              width: "36px",
+              height: "36px",
+              borderRadius: "10px",
+              background: "rgba(239, 68, 68, 0.12)",
+              border: "1px solid rgba(239, 68, 68, 0.3)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "var(--red)",
-              boxShadow: "0 0 8px rgba(255, 71, 87, 0.1)",
+              color: "#EF4444",
+              flexShrink: 0,
+              boxShadow: "0 0 12px rgba(239, 68, 68, 0.15)",
             }}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>
+            <FileText size={18} />
           </div>
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
-                color: "var(--white)",
-                fontSize: "11px",
-                fontWeight: 600,
+                color: "#F8FAFC",
+                fontSize: "12px",
+                fontWeight: 700,
                 textOverflow: "ellipsis",
                 overflow: "hidden",
                 whiteSpace: "nowrap",
+                marginBottom: "2px",
               }}
             >
-              {report.periodLabel}
+              {report.periodLabel || "Rapport d'analyse périodique"}
             </div>
             <div
               style={{
-                color: "var(--muted)",
-                fontSize: "8px",
+                color: "#94A3B8",
+                fontSize: "9px",
                 fontFamily: "var(--font-mono)",
-                marginTop: "2px",
               }}
             >
               Généré le {formatDate(report.generatedAt)}
@@ -200,13 +196,13 @@ export const LatestReportCard: React.FC<LatestReportCardProps> = ({ activeAgentI
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              padding: "6px 8px",
-              background: "rgba(123, 97, 255, 0.1)",
-              border: "1px solid rgba(123, 97, 255, 0.3)",
-              borderRadius: "4px",
-              color: "var(--purple)",
+              padding: "6px 10px",
+              background: "rgba(123, 97, 255, 0.15)",
+              border: "1px solid rgba(123, 97, 255, 0.35)",
+              borderRadius: "6px",
+              color: "#C4B5FD",
               fontFamily: "var(--font-mono)",
-              fontSize: "8px",
+              fontSize: "9px",
               fontWeight: 700,
               textTransform: "uppercase",
               letterSpacing: "0.5px",
@@ -215,28 +211,23 @@ export const LatestReportCard: React.FC<LatestReportCardProps> = ({ activeAgentI
               alignItems: "center",
               gap: "4px",
               transition: "all 0.2s",
+              flexShrink: 0
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(123, 97, 255, 0.2)";
-              e.currentTarget.style.borderColor = "var(--purple)";
-              e.currentTarget.style.boxShadow = "0 0 8px rgba(123, 97, 255, 0.3)";
+              e.currentTarget.style.background = "rgba(123, 97, 255, 0.28)";
+              e.currentTarget.style.color = "#FFFFFF";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = "rgba(123, 97, 255, 0.1)";
-              e.currentTarget.style.borderColor = "rgba(123, 97, 255, 0.3)";
-              e.currentTarget.style.boxShadow = "none";
+              e.currentTarget.style.background = "rgba(123, 97, 255, 0.15)";
+              e.currentTarget.style.color = "#C4B5FD";
             }}
           >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Ouvrir
+            <ExternalLink size={11} />
+            <span>Ouvrir</span>
           </a>
         </div>
       ) : (
-        <div style={{ color: "var(--muted)", fontSize: "9px", fontFamily: "var(--font-mono)" }}>
+        <div style={{ color: "#64748B", fontSize: "10px", fontStyle: "italic", textAlign: "center", padding: "12px" }}>
           Aucun rapport généré pour le moment
         </div>
       )}
