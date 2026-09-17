@@ -489,34 +489,24 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
 
       {/* Performance par Domaine */}
       {activeAgentId === 'VDATA' && isKpiAuthorized && (
-        <div className="rp-section">
+        <div className="rp-section" style={{ marginTop: '20px' }}>
           <div className="rp-title" style={{ marginBottom: '14px' }}>Performance par Domaine</div>
         
         <div
           style={{
-            padding: '16px 14px',
-            backgroundColor: 'rgba(6, 17, 31, 0.7)',
-            backgroundImage: `
-              radial-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 0)
-            `,
-            backgroundSize: "12px 12px",
-            backgroundPosition: "0 0",
-            border: '1px solid rgba(0, 240, 255, 0.16)',
-            borderRadius: '8px',
+            padding: '16px',
+            background: 'linear-gradient(145deg, rgba(13, 17, 26, 0.96) 0%, rgba(10, 24, 28, 0.96) 100%)',
+            border: '1px solid rgba(0, 240, 255, 0.3)',
+            borderRadius: '16px',
             position: 'relative',
             overflow: 'hidden',
-            boxShadow: '0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 16px rgba(0, 240, 255, 0.04)',
+            boxShadow: '0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 20px rgba(0, 240, 255, 0.05)',
+            backdropFilter: 'blur(16px)',
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',
           }}
         >
-          {/* Glowing Corner Brackets */}
-          <div style={{ position: "absolute", top: 0, left: 0, width: "8px", height: "8px", borderTop: "2px solid #00f0ff", borderLeft: "2px solid #00f0ff", borderRadius: "2px 0 0 0", boxShadow: "0 0 4px rgba(0, 240, 255, 0.3)" }} />
-          <div style={{ position: "absolute", top: 0, right: 0, width: "8px", height: "8px", borderTop: "2px solid #00f0ff", borderRight: "2px solid #00f0ff", borderRadius: "0 2px 0 0", boxShadow: "0 0 4px rgba(0, 240, 255, 0.3)" }} />
-          <div style={{ position: "absolute", bottom: 0, left: 0, width: "8px", height: "8px", borderBottom: "2px solid #00f0ff", borderLeft: "2px solid #00f0ff", borderRadius: "0 0 0 2px", boxShadow: "0 0 4px rgba(0, 240, 255, 0.3)" }} />
-          <div style={{ position: "absolute", bottom: 0, right: 0, width: "8px", height: "8px", borderBottom: "2px solid #00f0ff", borderRight: "2px solid #00f0ff", borderRadius: "0 0 2px 0", boxShadow: "0 0 4px rgba(0, 240, 255, 0.3)" }} />
-
           {Object.values(AGENTS).map((agent) => {
             let metricLabel = "Performance globale";
             let statusText = "Optimal";
