@@ -57,11 +57,30 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
         .catch(() => { });
 
       if (currentUserIsAdmin) {
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/signup-requests`)
+        const raw = localStorage.getItem('vmind_session') || localStorage.getItem('vmind_mcp_token');
+        let tokenStr = '';
+        if (raw) {
+          if (raw.startsWith('eyJ')) {
+            tokenStr = raw;
+          } else {
+            try {
+              const parsed = JSON.parse(raw);
+              tokenStr = parsed?.token || parsed?.access_token || parsed?.user?.token || parsed?.data?.token || '';
+            } catch (e) {}
+          }
+        }
+        const headers: Record<string, string> = {};
+        if (tokenStr) {
+          headers['Authorization'] = `Bearer ${tokenStr}`;
+        }
+
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/signup-requests`, {
+          headers,
+        })
           .then(res => res.json())
           .then(data => {
             if (data.ok) {
-              const pending = data.requests.filter((r: any) => r.status === 'pending');
+              const pending = (data.requests || []).filter((r: any) => r.status === 'pending');
               setPendingRequestsCount(pending.length);
             } else {
               setPendingRequestsCount(0);

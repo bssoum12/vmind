@@ -241,8 +241,34 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
         // Ne pas intercepter la validation d'identifiants incorrects ou la vérification du mot de passe
         const isAuthCheckEndpoint = url.includes('/api/auth/vmind/login') || url.includes('/api/auth/vmind/verify-current-password');
         if (!isAuthCheckEndpoint) {
-          console.warn('[SessionTimeoutProvider] Statut 401 reçu : session expirée ou invalide. Déconnexion automatique...');
-          handleLogout();
+          const token = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
+          let isExpired = false;
+          if (token) {
+            try {
+              let cleanToken = token;
+              if (cleanToken.startsWith('{')) {
+                const parsed = JSON.parse(cleanToken);
+                cleanToken = parsed.token || parsed.accessToken || cleanToken;
+              } else if (cleanToken.startsWith('"') && cleanToken.endsWith('"')) {
+                cleanToken = cleanToken.slice(1, -1);
+              }
+              const decoded: any = jwtDecode(cleanToken);
+              if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+                isExpired = true;
+              }
+            } catch (e) {
+              isExpired = true;
+            }
+          } else {
+            isExpired = true;
+          }
+
+          if (isExpired) {
+            console.warn('[SessionTimeoutProvider] Statut 401 reçu et token expiré : session expirée ou invalide. Déconnexion automatique...');
+            handleLogout();
+          } else {
+            console.warn(`[SessionTimeoutProvider] Statut 401 reçu pour ${url} mais le token local reste valide.`);
+          }
         }
       }
       return response;
