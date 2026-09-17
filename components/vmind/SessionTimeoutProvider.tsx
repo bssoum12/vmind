@@ -43,11 +43,11 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
       localStorage.removeItem('vmind_allowed_agents');
       sessionStorage.clear();
       setShowWarning(false);
-      
+
       // Nettoyage des timers
       if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
       if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-      
+
       // Redirection immédiate
       window.location.href = '/login?expired=true';
     } catch (err) {
@@ -58,7 +58,7 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
   // Réinitialisation du minuteur d'inactivité
   const resetTimer = () => {
     lastActivityRef.current = Date.now();
-    
+
     // Vérification de validité et d'expiration du token JWT
     const token = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
     if (token) {
@@ -212,7 +212,7 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
           // Moins de 14 minutes d'inactivité : on ne fait rien (pas de modale), on planifie le temps restant
           if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
           const remainingInactivityTime = INACTIVITY_TIMEOUT - idleTime;
-          
+
           inactivityTimerRef.current = setTimeout(() => {
             const currentToken = localStorage.getItem('vmind_session');
             if (currentToken) {
@@ -318,7 +318,7 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
             borderRadius: '22px',
             padding: '38px 40px 32px',
             textAlign: 'center',
-            boxShadow: countdown <= 10 
+            boxShadow: countdown <= 10
               ? '0 0 35px rgba(255, 71, 87, 0.28), 0 25px 60px rgba(0, 0, 0, 0.7)'
               : `0 0 35px rgba(0, 229, 200, 0.16), 0 25px 60px rgba(0, 0, 0, 0.7)`,
             transition: 'border-color 0.3s, box-shadow 0.3s',
@@ -377,8 +377,8 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
               fontWeight: 900,
               fontFamily: "'JetBrains Mono', monospace",
               color: countdown <= 10 ? pink : cyan,
-              textShadow: countdown <= 10 
-                ? '0 0 15px rgba(255, 71, 87, 0.6)' 
+              textShadow: countdown <= 10
+                ? '0 0 15px rgba(255, 71, 87, 0.6)'
                 : `0 0 15px rgba(0, 229, 200, 0.5)`,
               marginBottom: '28px',
               transition: 'color 0.2s',
