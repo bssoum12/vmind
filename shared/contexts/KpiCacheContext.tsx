@@ -11,7 +11,7 @@ interface KpiCacheContextType {
   kpisByAgent: Record<string, any>;
   loadingByAgent: Record<string, boolean>;
   cooldowns: Record<string, number>; // Timestamps of last manual refreshes
-  fetchKpis: (agentId: string, force?: boolean, targetTool?: string) => Promise<void>;
+  fetchKpis: (agentId: string, force?: boolean, targetTool?: string, horizon?: string) => Promise<void>;
   error: string | null;
   clearError: () => void;
   notice: string | null;
@@ -89,7 +89,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     return false;
   };
 
-  const fetchKpis = async (agentId: string, force = false, targetTool?: string) => {
+  const fetchKpis = async (agentId: string, force = false, targetTool?: string, horizon?: string) => {
     if (!isAuthenticated()) {
       return;
     }
@@ -141,7 +141,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     try {
       const clientId = "DEMO"; // Default tenant id
 
-      console.log(`[KPI CONTEXT] Fetching KPIs for ${allowedAgentUpper} (force: ${force}, tool: ${targetTool || 'ALL'})`);
+      console.log(`[KPI CONTEXT] Fetching KPIs for ${allowedAgentUpper} (force: ${force}, tool: ${targetTool || 'ALL'}, horizon: ${horizon || '1m'})`);
       const response = await fetchN8nKpis(
         {
           allowed_agents: allowedAgentUpper,
@@ -149,7 +149,8 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
           startDate,
           endDate,
           target_tool: targetTool,
-          forceRefresh: force
+          forceRefresh: force,
+          horizon: horizon || '1m'
         },
         controller.signal
       );
