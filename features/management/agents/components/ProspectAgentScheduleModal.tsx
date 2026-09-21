@@ -6,6 +6,7 @@ import { LiveAgent } from '../AgentsView';
 import { VMindGuide } from '@/shared/management/components/VMindGuide';
 import { getProspectAgentStats, triggerAIQualificationAllPending, qualifyManualProspects } from '@/shared/api/n8n-api';
 import { useProspectSocket } from '../../prospect-workspace/hooks/useProspectSocket';
+import { parseHourString } from '@/shared/utils/timezone';
 
 interface ProspectAgentScheduleModalProps {
   agent: LiveAgent;
@@ -114,17 +115,17 @@ export function ProspectAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
     }
     if (interval === 'Days') {
       const step = Number(r.daysBetween) || 1;
-      const hour = r.triggerAtHour || '08';
+      const hour = parseHourString(r.triggerAtHour);
       return step <= 1 ? `Chaque jour à ${hour}h${minPad}` : `Tous les ${step} jours à ${hour}h${minPad}`;
     }
     if (interval === 'Weeks') {
       const days = (r.triggerOnWeekdays || ['Monday']).join(', ');
-      const hour = r.triggerAtHour || '08';
+      const hour = parseHourString(r.triggerAtHour);
       return `Hebdo (${days}) à ${hour}h${minPad}`;
     }
     if (interval === 'Months') {
       const dom = r.triggerAtDayOfMonth || 1;
-      const hour = r.triggerAtHour || '08';
+      const hour = parseHourString(r.triggerAtHour);
       return `Mensuel (le ${dom}) à ${hour}h${minPad}`;
     }
     return interval;

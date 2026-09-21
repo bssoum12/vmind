@@ -6,6 +6,7 @@ import { OnboardingChat } from '../../wizard/components/OnboardingChat';
 import { VMindGuide } from '@/shared/management/components/VMindGuide';
 import { extractIcpFromAgent, buildSourcingConclusionFromIcp } from '../../wizard/helpers/sourcingIcpHelper';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
+import { parseHourString } from '@/shared/utils/timezone';
 
 export interface TriggerRule {
   interval: string;
@@ -327,17 +328,17 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
     }
     if (interval === 'Days') {
       const step = Number(r.daysBetween) || 1;
-      const hour = r.triggerAtHour || '08';
+      const hour = parseHourString(r.triggerAtHour);
       return step <= 1 ? `Chaque jour à ${hour}h${minPad}` : `Tous les ${step} jours à ${hour}h${minPad}`;
     }
     if (interval === 'Weeks') {
       const days = (r.triggerOnWeekdays || ['Monday']).join(', ');
-      const hour = r.triggerAtHour || '08';
+      const hour = parseHourString(r.triggerAtHour);
       return `Hebdo (${days}) à ${hour}h${minPad}`;
     }
     if (interval === 'Months') {
       const dom = r.triggerAtDayOfMonth || 1;
-      const hour = r.triggerAtHour || '08';
+      const hour = parseHourString(r.triggerAtHour);
       return `Mensuel (le ${dom}) à ${hour}h${minPad}`;
     }
     return interval;

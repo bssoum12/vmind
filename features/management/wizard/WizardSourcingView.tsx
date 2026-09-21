@@ -11,6 +11,7 @@ import { SourcingAgentExecutionModal } from '../agents/components/SourcingAgentE
 import { SourcingAgentScheduleModal } from '../agents/components/SourcingAgentScheduleModal';
 import { LiveAgent } from '../agents/AgentsView';
 import { SourcingPipeline3D } from './components/SourcingPipeline3D';
+import { getBrowserTimezone } from '@/shared/utils/timezone';
 
 import { useToast } from '@/shared/contexts/ToastContext';
 
@@ -135,7 +136,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       return {
         agent_name: agentToEdit.agent_name || `${defaultName} - ${randomSuffix}`,
         run_mode: agentToEdit.run_mode || 'sourcing',
-        workflow_timezone: agentToEdit.workflow_timezone || 'Africa/Tunis',
+        workflow_timezone: agentToEdit.workflow_timezone || getBrowserTimezone(),
         target_agent_ids: initialTargetIds,
         sourcing_config: {
           agent_mission: cfg.agent_mission || ''
@@ -163,7 +164,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
     return {
       agent_name: `${defaultName} - ${randomSuffix}`,
       run_mode: 'sourcing',
-      workflow_timezone: 'Africa/Tunis',
+      workflow_timezone: getBrowserTimezone(),
       target_agent_ids: initialTargetIds,
       sourcing_config: {
         agent_mission: ''
@@ -454,7 +455,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
         agent_name: formData.agent_name,
         run_mode: 'sourcing',
         status: 'running',
-        workflow_timezone: formData.workflow_timezone || 'Africa/Tunis',
+        workflow_timezone: formData.workflow_timezone || getBrowserTimezone(),
         recovery_config: {},
         trigger_rules: [],
         session_id: sessionId,
@@ -544,7 +545,8 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
           ...(token && { 'Authorization': `Bearer ${token}` })
         },
         body: JSON.stringify({
-          target_agent_ids: params.target_agent_ids || agent.target_agent_ids
+          target_agent_ids: params.target_agent_ids || agent.target_agent_ids,
+          workflow_timezone: getBrowserTimezone()
         })
       });
 

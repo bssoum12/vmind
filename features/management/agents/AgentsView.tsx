@@ -14,6 +14,7 @@ import {
 } from '@/shared/api/n8n-api';
 import { useProspectSocket } from '../prospect-workspace/hooks/useProspectSocket';
 import { useRouter } from 'next/navigation';
+import { getBrowserTimezone } from '@/shared/utils/timezone';
 import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -78,6 +79,8 @@ function formatDate(ts?: number | string) {
 function parseHourString(rawHour: any): string {
   if (rawHour === undefined || rawHour === null || rawHour === '') return '08';
   const str = String(rawHour).trim().toLowerCase();
+  if (str === 'noon') return '12';
+  if (str === 'midnight') return '00';
   if (str.endsWith('am')) {
     const val = parseInt(str.replace('am', ''), 10);
     return String(isNaN(val) ? 8 : (val === 12 ? 0 : val)).padStart(2, '0');
@@ -134,6 +137,18 @@ function triggerRuleSummary(rules: any[]): string {
     return step <= 1 ? `Mensuel (le ${dom}) à ${timeStr}` : `Tous les ${step} mois (le ${dom}) à ${timeStr}`;
   }
   return interval || 'Aucune règle';
+}
+
+function getPlanificationSummary(agent: LiveAgent): string {
+  const rules = (agent.trigger_rules && agent.trigger_rules.length > 0)
+    ? agent.trigger_rules
+    : (agent.config?.trigger_rules || []);
+
+  if (!rules || rules.length === 0) {
+    return 'Aucune règle';
+  }
+
+  return triggerRuleSummary(rules);
 }
 
 function TargetAgentsBadge({ targets }: { targets: string[] }) {
@@ -691,7 +706,10 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const handleResume = async (agent: LiveAgent, params?: any) => {
     setActionLoading(agent.agent_name);
     try {
-      await resumeAgent(agent.agent_name, params);
+      await resumeAgent(agent.agent_name, {
+        ...(params || {}),
+        workflow_timezone: getBrowserTimezone()
+      });
       showToast(`Agent "${agent.agent_name}" relancé.`);
       await refresh();
     } catch (e: any) {
@@ -1110,7 +1128,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
 
                       <td style={{ padding: '12px 16px', ...getTutorialRowCellStyle(2) }}>
                         <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                          {agent.schedule_id ? triggerRuleSummary(agent.trigger_rules) : 'Aucune règle'}
+                          {getPlanificationSummary(agent)}
                         </div>
                       </td>
 
@@ -1265,7 +1283,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
             {[
               { label: '📋 Mode', value: selected.run_mode },
               { label: '🌍 Timezone', value: selected.workflow_timezone },
-              { label: '⏰ Planification', value: selected.schedule_id ? triggerRuleSummary(selected.trigger_rules) : 'Aucune règle' },
+              { label: '⏰ Planification', value: getPlanificationSummary(selected) },
               selected.run_mode === 'sourcing' && getTargetAgentNames(selected).length > 0 ? {
                 label: '🎯 Prospects Cibles',
                 value: getTargetAgentNames(selected).join(', ')
@@ -1435,6 +1453,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                 const publicId = scheduleModalAgent.uuid || scheduleModalAgent.agent_id;
                 const updateBody: any = {
                   agent_name: scheduleModalAgent.agent_name,
+                  workflow_timezone: getBrowserTimezone(),
                   trigger_rules: params.trigger_rules,
                   agent_mission: params.sourcingSummary,
                   sourcing_config: {
@@ -1467,7 +1486,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                   },
                   body: JSON.stringify({
                     target_agent_ids: params.target_agent_ids || scheduleModalAgent.target_agent_ids,
-                    update_defaults: params.update_defaults
+                    update_defaults: params.update_defaults,
+                    workflow_timezone: getBrowserTimezone()
                   })
                 });
 

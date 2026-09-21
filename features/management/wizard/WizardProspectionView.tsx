@@ -14,6 +14,7 @@ import { CountryMultiSelect } from './components/CountryMultiSelect';
 import { EmailSignatureEditor } from './components/EmailSignatureEditor';
 import { ProspectPipeline3D } from './components/ProspectPipeline3D';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
+import { getBrowserTimezone } from '@/shared/utils/timezone';
 
 interface WizardViewProps {
   templateId: string;
@@ -348,7 +349,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       return {
         agent_name: agentToEdit.agent_name || 'Agent de Prospection',
         run_mode: agentToEdit.run_mode || 'prospection',
-        workflow_timezone: agentToEdit.workflow_timezone || 'Africa/Tunis',
+        workflow_timezone: agentToEdit.workflow_timezone || getBrowserTimezone(),
         prospection_config: {
           agent_mission: cfg.agent_mission || '',
           signature_logo: logoData || null,
@@ -397,7 +398,7 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     return {
       agent_name: `${defaultName} - ${randomSuffix}`,
       run_mode: 'prospection',
-      workflow_timezone: 'Africa/Tunis',
+      workflow_timezone: getBrowserTimezone(),
       prospection_config: {
         agent_mission: '',
         icp: {

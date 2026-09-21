@@ -1,4 +1,5 @@
 import { VmindN8nResponse } from '../types/vmind';
+import { getBrowserTimezone } from '@/shared/utils/timezone';
 
 function getVmindSessionId() {
   let sessionId = typeof window !== 'undefined' ? sessionStorage.getItem("vmind_session_id") : null;
@@ -274,10 +275,14 @@ export async function pauseAgent(agentName: string): Promise<any> {
  * Resumes a paused agent — recreates its QStash schedule from stored trigger_rules
  */
 export async function resumeAgent(agentName: string, params?: any): Promise<any> {
+  const finalParams = {
+    ...(params || {}),
+    workflow_timezone: params?.workflow_timezone || getBrowserTimezone()
+  };
   const res = await fetch(`${getBaseUrl()}/api/resume-agent/${encodeURIComponent(agentName)}`, {
     method: "POST",
-    headers: getAuthHeaders(params ? { "Content-Type": "application/json" } : {}),
-    body: params ? JSON.stringify(params) : undefined
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(finalParams)
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -320,7 +325,10 @@ export async function updateAgentConfig(agentName: string, recoveryConfig: objec
       "Content-Type": "application/json",
       ...getAuthHeaders()
     },
-    body: JSON.stringify({ recovery_config: recoveryConfig }),
+    body: JSON.stringify({
+      recovery_config: recoveryConfig,
+      workflow_timezone: getBrowserTimezone()
+    }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

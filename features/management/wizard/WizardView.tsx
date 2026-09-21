@@ -5,6 +5,7 @@ import { Button } from '@/shared/management/components/Button';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
 import { deployAgent } from '@/shared/api/n8n-api';
 import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
+import { getBrowserTimezone } from '@/shared/utils/timezone';
 
 interface WizardViewProps {
   templateId: string;
@@ -246,7 +247,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel, ag
       return {
         agent_name: agentToEdit.agent_name || agentToEdit.nom || `${template?.name || 'Assistant'} - ${randomSuffix}`,
         run_mode: agentToEdit.run_mode || 'daily_recovery_check',
-        workflow_timezone: agentToEdit.workflow_timezone || 'Africa/Tunis',
+        workflow_timezone: agentToEdit.workflow_timezone || getBrowserTimezone(),
         recovery_config: {
           tone: recConfig.tone || 'courteous',
           min_urgency: recConfig.min_urgency || 'CRITIQUE_ONLY',
@@ -306,7 +307,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel, ag
     return {
       agent_name: `${template?.name || 'Assistant'} - ${randomSuffix}`,
       run_mode: 'daily_recovery_check',
-      workflow_timezone: 'Africa/Tunis',
+      workflow_timezone: getBrowserTimezone(),
       recovery_config: {
         tone: 'courteous',
         min_urgency: 'CRITIQUE_ONLY',
