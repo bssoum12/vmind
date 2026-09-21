@@ -29,10 +29,10 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
 
     // Read current active data from Context
     const agentData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
-    const toolData = agentData.get_tableau_croise || agentData || {};
+    const toolData = agentData.get_tableau_croise || agentData.data || agentData || {};
     
-    const kpis = toolData.ok && toolData.kpis ? (toolData.kpis as Kpi[]) : [];
-    const exportData = toolData.data?.exportData || null;
+    const kpis = toolData.ok && toolData.kpis ? (toolData.kpis as Kpi[]) : (toolData.data?.kpis || []);
+    const exportData = toolData.data?.exportData || toolData.exportData || null;
 
     const effectiveLoading = (loadingByAgent["vdata"] || loadingByAgent["VDATA"]) && !toolData.ok;
     const error = !effectiveLoading && !toolData.ok && globalError ? globalError : "";
@@ -208,6 +208,7 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
             ) : (
                 <div
                     onMouseEnter={handleMouseEnter}
+                    onMouseMove={handleMouseEnter}
                     onMouseLeave={handleMouseLeave}
                     style={{
                         background: isCardHovered

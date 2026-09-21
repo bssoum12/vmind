@@ -22,11 +22,12 @@ export const AlertsCard: React.FC<AlertsCardProps> = ({ activeAgentId }) => {
 
   // Read current active data from Context
   const agentData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
-  const toolData = agentData.get_alerts_kpi_vdata || agentData || {};
+  const toolData = agentData.get_alerts_kpi_vdata || agentData.data || agentData || {};
   
-  const bugs = toolData.ok && toolData.kpis ? (toolData.kpis.find((k: any) => k.label === "Bugs ERP")?.value ?? 0) : 0;
-  const nonConform = toolData.ok && toolData.kpis ? (toolData.kpis.find((k: any) => k.label === "Dossiers non conformes")?.value ?? 0) : 0;
-  const totalAlerts = toolData.ok && toolData.kpis ? (toolData.kpis.find((k: any) => k.label === "Total alertes")?.value ?? 0) : 0;
+  const kpisList = toolData.ok && toolData.kpis ? toolData.kpis : (toolData.data?.kpis || []);
+  const bugs = kpisList.find((k: any) => k.label === "Bugs ERP")?.value ?? 0;
+  const nonConform = kpisList.find((k: any) => k.label === "Dossiers non conformes")?.value ?? 0;
+  const totalAlerts = kpisList.find((k: any) => k.label === "Total alertes")?.value ?? 0;
 
   const effectiveLoading = (loadingByAgent["vdata"] || loadingByAgent["VDATA"]) && !toolData.ok;
   const error = !effectiveLoading && !toolData.ok && globalError ? globalError : "";
@@ -254,6 +255,7 @@ export const AlertsCard: React.FC<AlertsCardProps> = ({ activeAgentId }) => {
       ) : (
         <div
           onMouseEnter={handleMouseEnter}
+          onMouseMove={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           style={{
             background: isCardHovered
