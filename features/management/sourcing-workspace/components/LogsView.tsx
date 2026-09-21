@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
 
 interface Log {
   id?: number;
@@ -13,17 +14,25 @@ interface Log {
 
 interface LogsViewProps {
   logs: Log[];
+  onRefresh?: () => void;
 }
 
-export default function LogsView({ logs }: LogsViewProps) {
+export default function LogsView({ logs, onRefresh }: LogsViewProps) {
   const [levelFilter, setLevelFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const limit = 50;
   const [displayCount, setDisplayCount] = useState(limit);
 
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalEndRef = useRef<HTMLDivElement>(null);
+
+  const handleRefreshClick = () => {
+    setIsRefreshing(true);
+    onRefresh?.();
+    setTimeout(() => setIsRefreshing(false), 600);
+  };
 
   useEffect(() => {
     // Scroll to bottom whenever new logs arrive
@@ -59,15 +68,22 @@ export default function LogsView({ logs }: LogsViewProps) {
           <h1>Journaux d&apos;Exécution</h1>
           <p>Suivi en temps réel des actions menées par les agents VMIND (Collecte, Sourcing)</p>
         </div>
-        <button className="btn btn-secondary" onClick={() => { }}>
-          🔄 Actualiser les Logs
+        <button 
+          className="btn btn-secondary" 
+          onClick={handleRefreshClick}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+        >
+          <CyberIcon name="refresh" size={14} className={isRefreshing ? 'spin-anim' : ''} />
+          <span>Actualiser les Logs</span>
         </button>
       </div>
 
       {/* Filters */}
       <div className="filters-bar">
         <div className="search-input-wrapper" style={{ flex: 2 }}>
-          <span className="search-icon">🔍</span>
+          <span className="search-icon" style={{ display: 'flex', alignItems: 'center' }}>
+            <CyberIcon name="search" size={14} color="var(--text-muted)" />
+          </span>
           <input
             type="text"
             placeholder="Rechercher par message, étape, ID de workflow..."

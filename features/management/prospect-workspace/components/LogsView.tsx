@@ -17,6 +17,58 @@ interface LogsViewProps {
   logs: Log[];
 }
 
+// Zero Technical Jargon Policy: strictly sanitize internal middleware, technical tools, and implementation details
+function sanitizeLogEtape(raw?: string): string {
+  if (!raw) return 'Système IA';
+  const lower = raw.toLowerCase().trim();
+  if (lower.includes('webhook') || lower.includes('n8n')) return 'Génération IA';
+  if (lower.includes('auto mode') || lower.includes('cron') || lower.includes('autopilot')) return 'Mode Autonome';
+  if (lower.includes('qstash') || lower.includes('redis')) return 'Planification IA';
+  return raw;
+}
+
+function sanitizeLogMessage(raw?: string): string {
+  if (!raw) return '';
+  let msg = raw;
+
+  // 1. Common exact patterns
+  if (/webhook\s+n8n\s+générer\s+email\s+déclenché/i.test(msg)) {
+    return "Génération de l'email personnalisé par l'IA";
+  }
+  if (/qualification de (\d+) prospect\(s\) lancée via n8n/i.test(msg)) {
+    return msg.replace(/qualification de (\d+) prospect\(s\) lancée via n8n\.?/gi, "Qualification et analyse de $1 prospect(s) par l'IA.");
+  }
+
+  // 2. Lead item formatting (e.g. "Lead #triki (virtualdev) — Score ICP : 100/100 — Statut : élevé")
+  msg = msg.replace(/\bLead #([a-zA-Z0-9_\-\.\+]+)/gi, 'Prospect #$1');
+
+  // 3. Technical stack sanitation
+  msg = msg
+    .replace(/\s*via\s+n8n\.?/gi, " par l'IA.")
+    .replace(/\s*\(n8n\)/gi, '')
+    .replace(/\bn8n\b/gi, "l'IA")
+    .replace(/\bwebhook\b/gi, 'processus')
+    .replace(/\bqstash\b/gi, 'planificateur')
+    .replace(/\bredis\b/gi, 'mémoire')
+    .replace(/\bpostgres(ql)?\b/gi, 'base de données')
+    .replace(/\(cron créé\)/gi, '(Planification activée)')
+    .replace(/\bcron\b/gi, 'planification')
+    .replace(/\bworkflow\b/gi, 'processus')
+    .replace(/\bpayload\b/gi, 'données')
+    .trim();
+
+  return msg;
+}
+
+function sanitizeWorkflowId(wf?: string): string {
+  if (!wf) return '';
+  return wf
+    .replace(/n8n-/gi, '')
+    .replace(/-n8n/gi, '')
+    .replace(/webhook-/gi, '')
+    .replace(/qstash-/gi, '');
+}
+
 export default function LogsView({ logs }: LogsViewProps) {
   const [levelFilter, setLevelFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -42,8 +94,14 @@ export default function LogsView({ logs }: LogsViewProps) {
     }
   };
 
-  // Filter and prepare logs
+  // Filter and prepare logs with Zero Technical Jargon policy
   const terminalLogs = logs
+    .map(log => ({
+      ...log,
+      etape: sanitizeLogEtape(log.etape),
+      message: sanitizeLogMessage(log.message),
+      workflow_id: sanitizeWorkflowId(log.workflow_id)
+    }))
     .filter(log => levelFilter === 'All' || log.statut === levelFilter)
     .filter(log =>
       searchQuery === '' ||
@@ -56,7 +114,7 @@ export default function LogsView({ logs }: LogsViewProps) {
 
   return (
     <div className="fade-in">
-      <div className="view-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="view-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <div style={{
             width: 44,

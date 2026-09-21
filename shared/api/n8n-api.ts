@@ -406,6 +406,7 @@ export async function fetchN8nKpis(
     endDate: string;
     target_tool?: string;
     forceRefresh?: boolean;
+    horizon?: string;
   },
   signal?: AbortSignal
 ): Promise<any> {
@@ -424,7 +425,8 @@ export async function fetchN8nKpis(
       startDate: params.startDate,
       endDate: params.endDate,
       target_tool: params.target_tool,
-      forceRefresh: params.forceRefresh
+      forceRefresh: params.forceRefresh,
+      horizon: params.horizon || '1m'
     }),
     signal
   });

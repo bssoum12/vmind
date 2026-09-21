@@ -196,7 +196,12 @@ export const ProfileView: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.clear(); sessionStorage.clear();
+    try {
+      localStorage.removeItem('vmind_session');
+      localStorage.removeItem('vmind_mcp_token');
+      localStorage.removeItem('vmind_allowed_agents');
+      sessionStorage.clear();
+    } catch {}
     window.location.href = '/login';
   };
 

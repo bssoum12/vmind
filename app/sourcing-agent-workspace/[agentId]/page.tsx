@@ -15,7 +15,7 @@ import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { VMindGuide } from '@/shared/management/components/VMindGuide';
 import { useToast } from '@/shared/contexts/ToastContext';
 
-import '../../../features/management/prospect-workspace/workspace.scss'; // Reuse styling
+import '../../../features/management/sourcing-workspace/sourcing-workspace.scss';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -203,19 +203,13 @@ export default function SourcingAgentWorkspacePage() {
   }, [agentData, allAgents]);
 
   return (
-    <div className="workspace-container app-container" style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden' }}>
+    <div className="sourcing-workspace-container">
 
       {/* HEADER (Native VMIND Style) */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '18px 32px', borderBottom: '1px solid var(--border)',
-        background: 'rgba(8, 20, 38, 0.5)',
-        backdropFilter: 'blur(16px)',
-        flexShrink: 0,
-        gap: 16
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div className="sourcing-top-bar">
+        <div className="sourcing-top-bar-left">
           <button
+            className="sourcing-back-btn"
             onClick={() => {
               if (typeof window !== 'undefined') {
                 sessionStorage.setItem('vmind_current_view', 'agents');
@@ -224,31 +218,18 @@ export default function SourcingAgentWorkspacePage() {
               }
               router.push('/?view=agents');
             }}
-            style={{
-              background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border)',
-              borderRadius: '8px', padding: '8px', color: 'var(--text)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.borderColor = 'var(--cyan)'}
-            onMouseOut={(e) => e.currentTarget.style.borderColor = 'var(--border)'}
           >
             <ArrowLeft size={18} />
           </button>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <h1 style={{ fontSize: '18px', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
-                Espace de Travail : {agentName}
-              </h1>
+          <div className="sourcing-top-bar-avatar">
+            <Users size={22} />
+          </div>
+          <div className="sourcing-top-bar-agent-info">
+            <div className="sourcing-top-bar-title">
+              <span>Espace de Travail : {agentName}</span>
               {agentData?.is_executing && (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 11, padding: '2px 8px', borderRadius: 4,
-                  background: 'rgba(0, 229, 200, 0.1)', color: '#00E5C8',
-                  border: '1px solid rgba(0, 229, 200, 0.3)',
-                  fontWeight: 600, animation: 'pulse 1.5s infinite'
-                }}>
-                  ⚡ En cours d'exécution...
+                <span className="sourcing-live-pill">
+                  <CyberIcon name="zap" size={11} color="#00E5C8" /> En cours d'exécution...
                 </span>
               )}
             </div>
@@ -288,7 +269,7 @@ export default function SourcingAgentWorkspacePage() {
         </div>
 
         {/* TABS */}
-        <div style={{ display: 'flex', background: 'var(--navy2)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)' }}>
+        <div className="sourcing-top-bar-tabs">
           {[
             { id: 'dashboard', label: 'Vue d\'ensemble', icon: LayoutDashboard },
             { id: 'leads', label: 'Candidats / Leads', icon: Users },
@@ -297,19 +278,12 @@ export default function SourcingAgentWorkspacePage() {
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '8px 16px', borderRadius: '8px',
-                background: activeTab === tab.id ? 'var(--cyan)' : 'transparent',
-                color: activeTab === tab.id ? '#000' : 'var(--text-muted)',
-                fontWeight: activeTab === tab.id ? 600 : 500,
-                border: 'none', cursor: 'pointer', transition: 'all 0.2s'
-              }}
+              className={`sourcing-tab-btn ${activeTab === tab.id ? 'active' : ''}`}
             >
               <tab.icon size={16} />
-              {tab.label}
+              <span>{tab.label}</span>
               {tab.id === 'leads' && leads.length > 0 && (
-                <span className="badge" style={{ marginLeft: '6px' }}>{leads.length}</span>
+                <span className="tab-count-badge">{leads.length}</span>
               )}
             </button>
           ))}
@@ -317,64 +291,27 @@ export default function SourcingAgentWorkspacePage() {
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="main-content" style={{ flex: 1, padding: '0', overflowY: 'auto', background: 'var(--navy)' }}>
+      <div className="sourcing-main-content">
         {isLoading && leads.length === 0 ? (
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: 'var(--cyan)' }}>
             Chargement de l'espace...
           </div>
         ) : (
-          <div style={{ padding: '2.5rem', maxWidth: '1600px', margin: '0 auto' }}>
+          <div className="sourcing-content-container">
             {targetAgentNames.length === 0 && (
-              <div style={{
-                marginBottom: '24px',
-                padding: '14px 22px',
-                borderRadius: '12px',
-                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.08) 0%, rgba(6, 17, 31, 0.6) 100%)',
-                border: '1px solid rgba(56, 189, 248, 0.25)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '16px',
-                flexWrap: 'wrap'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: 8,
-                    background: 'rgba(56, 189, 248, 0.15)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}>
+              <div className="sourcing-connect-banner">
+                <div className="banner-left">
+                  <div className="banner-icon">
                     <CyberIcon name="zap" size={14} color="#38BDF8" />
                   </div>
-                  <span style={{ fontSize: '13px', color: '#E2E8F0', lineHeight: 1.4 }}>
+                  <span className="banner-text">
                     Connectez un Agent de Prospection pour automatiser l&apos;envoi de vos campagnes d&apos;emails.
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={handleConnectProspectClick}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: '8px',
-                    background: 'rgba(56, 189, 248, 0.15)',
-                    border: '1px solid rgba(56, 189, 248, 0.35)',
-                    color: '#38BDF8',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    transition: 'all 0.2s ease',
-                    whiteSpace: 'nowrap'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.background = 'rgba(56, 189, 248, 0.25)';
-                    e.currentTarget.style.borderColor = '#38BDF8';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)';
-                    e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.35)';
-                  }}
+                  className="banner-btn"
                 >
                   <span>Connecter un Agent de Prospection</span>
                   <ArrowUpRight size={14} />
@@ -392,7 +329,7 @@ export default function SourcingAgentWorkspacePage() {
               />
             )}
             {activeTab === 'leads' && <LeadsView leads={leads} onOpenLead={handleOpenLead} onRefresh={fetchData} />}
-            {activeTab === 'logs' && <LogsView logs={logs} />}
+            {activeTab === 'logs' && <LogsView logs={logs} onRefresh={fetchData} />}
           </div>
         )}
       </div>

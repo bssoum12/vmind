@@ -120,7 +120,6 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
             <span className="metric-value">{totalQualified}</span>
             <span className="metric-change up">({percentQualified}%)</span>
           </div>
-          <span className="metric-subtext" style={{ marginTop: '0.25rem', display: 'block' }}>Basé sur la décision de l'IA</span>
         </div>
 
         <div className="card metric-card warning">
@@ -131,7 +130,6 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
               ({totalLeads > 0 ? Math.round((totalDiscarded / totalLeads) * 100) : 0}%)
             </span>
           </div>
-          <span className="metric-subtext" style={{ marginTop: '0.25rem', display: 'block' }}>Basé sur la décision de l'IA</span>
         </div>
 
         <div className="card metric-card secondary">
@@ -253,7 +251,7 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
         </div>
       </div>
 
-       {/* Full Width ICP Configuration Card */}
+      {/* Full Width ICP Configuration Card */}
       <div className="icp-config-container">
         {(() => {
           const agentConfig = agent?.config || {};
@@ -267,7 +265,7 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
               try {
                 const parsed = JSON.parse(val);
                 if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
-              } catch (_) {}
+              } catch (_) { }
               return val.split(',').map((s: string) => s.trim()).filter(Boolean);
             }
             return [];
@@ -287,12 +285,12 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
           return (
             <div className="icp-card">
               {/* Header */}
-              <div className="icp-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                <div className="icp-header-title">
+              <div className="icp-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
+                <div className="icp-header-title" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                   <div className="icp-icon" style={{ background: 'transparent', padding: 0 }}>
                     <div style={{
-                      width: 38,
-                      height: 38,
+                      width: 42,
+                      height: 42,
                       borderRadius: 10,
                       background: 'rgba(255, 71, 87, 0.12)',
                       border: '1px solid rgba(255, 71, 87, 0.3)',
@@ -302,20 +300,16 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
                       color: '#FF4757',
                       flexShrink: 0
                     }}>
-                      <Target size={20} />
+                      <Target size={22} />
                     </div>
                   </div>
                   <div>
-                    <h3>Configuration & Algorithme de Ciblage (ICP)</h3>
-                    <p>Règles et pondérations utilisées par l'intelligence artificielle pour évaluer les prospects</p>
+                    <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#F0F4F8' }}>Configuration & Algorithme de Ciblage (ICP)</h3>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.85rem', color: '#94A3B8' }}>Règles et pondérations utilisées par l'intelligence artificielle pour évaluer les prospects</p>
                   </div>
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div className="icp-badge">
-                    <span className="dot"></span>
-                    Algorithme Actif
-                  </div>
                   <button
                     onClick={handleModifyConfig}
                     className="btn"

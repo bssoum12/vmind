@@ -323,100 +323,76 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
       </div>
 
       {/* KPI Cards Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+      <div className="sourcing-kpi-grid">
 
         {/* KPI 1 */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(8, 20, 38, 0.7) 0%, rgba(15, 30, 55, 0.5) 100%)',
-          border: '1px solid rgba(0, 229, 200, 0.2)',
-          borderRadius: '16px',
-          padding: '20px 24px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className="sourcing-kpi-card">
+          <div className="kpi-header">
+            <span className="kpi-title">
               Candidats Sourcés
             </span>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(0, 229, 200, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00E5C8' }}>
+            <div className="kpi-icon-wrapper cyan">
               <Users size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: '#F0F4F8', lineHeight: 1.2 }}>
+          <div className="kpi-value">
             {totalLeads}
           </div>
-          <div style={{ fontSize: '12px', color: '#00E5C8', marginTop: '6px', fontWeight: 500 }}>
+          <div className="kpi-subtext highlight">
             Total des leads trouvés
           </div>
         </div>
 
         {/* KPI 2 */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(8, 20, 38, 0.7) 0%, rgba(15, 30, 55, 0.5) 100%)',
-          border: '1px solid rgba(0, 229, 200, 0.15)',
-          borderRadius: '16px',
-          padding: '20px 24px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className="sourcing-kpi-card">
+          <div className="kpi-header">
+            <span className="kpi-title">
               Leads ce Mois
             </span>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(0, 184, 217, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00B8D9' }}>
+            <div className="kpi-icon-wrapper blue">
               <TrendingUp size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: '#F0F4F8', lineHeight: 1.2 }}>
+          <div className="kpi-value">
             {leadsThisMonth}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '6px' }}>
-            Extaits au cours des 30 derniers jours
+          <div className="kpi-subtext">
+            Extraits au cours des 30 derniers jours
           </div>
         </div>
 
         {/* KPI 3 */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(8, 20, 38, 0.7) 0%, rgba(15, 30, 55, 0.5) 100%)',
-          border: '1px solid rgba(0, 229, 200, 0.15)',
-          borderRadius: '16px',
-          padding: '20px 24px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className="sourcing-kpi-card">
+          <div className="kpi-header">
+            <span className="kpi-title">
               Leads Aujourd'hui
             </span>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(54, 179, 126, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#36B37E' }}>
+            <div className="kpi-icon-wrapper green">
               <Calendar size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: '#F0F4F8', lineHeight: 1.2 }}>
+          <div className="kpi-value">
             {leadsToday}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '6px' }}>
+          <div className="kpi-subtext">
             Dernières extractions du jour
           </div>
         </div>
 
         {/* KPI 4 */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(8, 20, 38, 0.7) 0%, rgba(15, 30, 55, 0.5) 100%)',
-          border: '1px solid rgba(0, 229, 200, 0.15)',
-          borderRadius: '16px',
-          padding: '20px 24px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className="sourcing-kpi-card">
+          <div className="kpi-header">
+            <span className="kpi-title">
               Entreprises Ciblées
             </span>
-            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(101, 84, 192, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6554C0' }}>
+            <div className="kpi-icon-wrapper purple">
               <Building2 size={18} />
             </div>
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: '#F0F4F8', lineHeight: 1.2 }}>
+          <div className="kpi-value">
             {uniqueCompaniesCount}
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--muted)', marginTop: '6px' }}>
+          <div className="kpi-subtext">
             Entreprises uniques prospectées
           </div>
         </div>
@@ -424,30 +400,24 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
       </div>
 
       {/* Agent Performance Section: 30-Day Line/Area Chart */}
-      <div style={{
-        background: 'rgba(8, 20, 38, 0.6)',
-        border: '1px solid var(--border)',
-        borderRadius: '18px',
-        padding: '24px',
-        boxShadow: '0 12px 32px rgba(0,0,0,0.2)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <div>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#F0F4F8', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div className="sourcing-chart-card">
+        <div className="chart-card-header">
+          <div className="chart-title-group">
+            <h3>
               <TrendingUp size={20} color="#00E5C8" />
               <span>Performance de l'Agent — Leads Trouvés par Jour (30 Derniers Jours)</span>
             </h3>
-            <p style={{ fontSize: '12px', color: 'var(--muted)', margin: '4px 0 0 0' }}>
+            <p>
               Évolution quotidienne des profils sourcés et extraits par l'IA
             </p>
           </div>
-          <div style={{ padding: '6px 14px', borderRadius: '20px', background: 'rgba(0, 229, 200, 0.1)', border: '1px solid rgba(0, 229, 200, 0.3)', color: '#00E5C8', fontSize: '12px', fontWeight: 600 }}>
+          <div className="chart-badge">
             {leadsThisMonth} leads ce mois
           </div>
         </div>
 
         {/* Chart Container */}
-        <div style={{ height: '260px', width: '100%', position: 'relative' }}>
+        <div className="chart-canvas-container">
           <svg width="100%" height="100%" viewBox="0 0 1000 240" preserveAspectRatio="none">
             <defs>
               <linearGradient id="sourcingAreaGrad" x1="0" y1="0" x2="0" y2="1">
@@ -458,9 +428,9 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
 
             {/* Grid lines */}
             <line x1="30" y1="30" x2="970" y2="30" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" />
-            <line x1="30" y1="80" x2="970" y2="80" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" />
-            <line x1="30" y1="130" x2="970" y2="130" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" />
-            <line x1="30" y1="180" x2="970" y2="180" stroke="rgba(255, 255, 255, 0.1)" strokeWidth="1.5" />
+            <line x1="30" y1="85" x2="970" y2="85" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" />
+            <line x1="30" y1="140" x2="970" y2="140" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" />
+            <line x1="30" y1="195" x2="970" y2="195" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="1" />
 
             {/* Compute SVG Path */}
             {(() => {
@@ -516,66 +486,28 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
       </div>
 
       {/* Target Agents (Lead Pipeline Flow) Section */}
-      <div style={{
-        background: 'linear-gradient(145deg, rgba(6, 17, 31, 0.85) 0%, rgba(10, 25, 46, 0.65) 100%)',
-        border: '1px solid rgba(0, 229, 200, 0.22)',
-        borderRadius: '20px',
-        padding: '24px 28px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '20px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)',
-        position: 'relative',
-        overflow: 'hidden'
-      }}>
+      <div className="target-agents-section">
         {/* Subtle Ambient Top Border Beam */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: '10%',
-          right: '10%',
-          height: '1px',
-          background: 'linear-gradient(90deg, transparent, #00E5C8, transparent)',
-          opacity: 0.6
-        }} />
+        <div className="top-ambient-beam" />
 
         {/* Section Header & Flow Indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{
-              width: 38,
-              height: 38,
-              borderRadius: 10,
-              background: 'rgba(0, 229, 200, 0.12)',
-              border: '1px solid rgba(0, 229, 200, 0.35)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#00E5C8',
-              boxShadow: '0 0 16px rgba(0, 229, 200, 0.15)'
-            }}>
+        <div className="section-header-flow">
+          <div className="header-title-flex">
+            <div className="header-icon-box">
               <Target size={20} />
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#F0F4F8', margin: 0, letterSpacing: '-0.2px' }}>
+            <div className="title-meta-group">
+              <div className="title-row">
+                <h3>
                   Target Agents (Destinataires des Leads)
                 </h3>
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  padding: '2px 10px',
-                  borderRadius: '12px',
-                  background: targetAgentList.length > 0 ? 'rgba(0, 229, 200, 0.12)' : 'rgba(56, 189, 248, 0.12)',
-                  color: targetAgentList.length > 0 ? '#00E5C8' : '#38BDF8',
-                  border: targetAgentList.length > 0 ? '1px solid rgba(0, 229, 200, 0.3)' : '1px solid rgba(56, 189, 248, 0.3)'
-                }}>
+                <span className={`mode-badge ${targetAgentList.length > 0 ? 'assigned' : 'autonomous'}`}>
                   {targetAgentList.length > 0 
                     ? `${targetAgentList.length} ${targetAgentList.length > 1 ? 'Agents Assignés' : 'Agent Assigné'}`
                     : 'Mode Autonome (0 Agent)'}
                 </span>
               </div>
-              <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '3px 0 0 0', lineHeight: 1.4 }}>
+              <p>
                 Pipeline de synchronisation automatique : les leads extraits sont instantanément injectés dans ces agents pour qualification IA et prospection.
               </p>
             </div>
@@ -584,34 +516,15 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
 
         {/* Empty State vs. Interactive Cards Grid */}
         {targetAgentList.length === 0 ? (
-          <div style={{
-            padding: '24px 28px',
-            borderRadius: '14px',
-            background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.05) 0%, rgba(0, 229, 200, 0.03) 100%)',
-            border: '1px dashed rgba(56, 189, 248, 0.3)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 18
-          }}>
-            <div style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              background: 'rgba(56, 189, 248, 0.1)',
-              border: '1px solid rgba(56, 189, 248, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#38BDF8',
-              flexShrink: 0
-            }}>
+          <div className="standalone-empty-box">
+            <div className="empty-icon">
               <CyberIcon name="zap" size={20} color="#38BDF8" />
             </div>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: 600, color: '#38BDF8' }}>
+            <div className="empty-content">
+              <div className="empty-title">
                 Mode Autonome Actif
               </div>
-              <div style={{ fontSize: '13px', color: 'var(--muted)', marginTop: 4, lineHeight: 1.4, maxWidth: 640 }}>
+              <div className="empty-desc">
                 Pour automatiser l&apos;envoi de vos campagnes d&apos;emails, vous pouvez associer un <strong>Agent de Prospection</strong> lors du prochain lancement ou dans la planification Autopilot.
               </div>
             </div>
@@ -625,42 +538,14 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
                 }
                 window.location.href = '/?view=market';
               })}
-              style={{
-                marginLeft: 'auto',
-                padding: '9px 16px',
-                borderRadius: 10,
-                background: 'rgba(56, 189, 248, 0.12)',
-                border: '1px solid rgba(56, 189, 248, 0.35)',
-                color: '#38BDF8',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s ease',
-                flexShrink: 0
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.background = 'rgba(56, 189, 248, 0.22)';
-                e.currentTarget.style.borderColor = '#38BDF8';
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.background = 'rgba(56, 189, 248, 0.12)';
-                e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.35)';
-              }}
+              className="connect-prospect-cta"
             >
               <span>Connecter un Agent de Prospection</span>
               <ExternalLink size={13} />
             </button>
           </div>
         ) : (
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '16px'
-          }}>
+          <div className="target-agents-grid">
             {targetAgentList.map((target, idx) => {
               if (!target) return null;
               const isExec = target.is_executing;
@@ -670,111 +555,43 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
               return (
                 <div
                   key={idx}
-                  style={{
-                    flex: '1 1 360px',
-                    minWidth: '320px',
-                    background: 'linear-gradient(135deg, rgba(8, 20, 38, 0.6) 0%, rgba(13, 27, 48, 0.45) 100%)',
-                    border: isExec 
-                      ? '1px solid rgba(0, 229, 200, 0.5)' 
-                      : '1px solid rgba(255, 255, 255, 0.08)',
-                    borderRadius: '14px',
-                    padding: '16px 20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '16px',
-                    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
-                    position: 'relative',
-                    backdropFilter: 'blur(12px)',
-                    boxShadow: isExec ? '0 0 20px rgba(0, 229, 200, 0.12)' : 'none'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.45)';
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 229, 200, 0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = isExec ? 'rgba(0, 229, 200, 0.5)' : 'rgba(255, 255, 255, 0.08)';
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = isExec ? '0 0 20px rgba(0, 229, 200, 0.12)' : 'none';
-                  }}
+                  className={`target-card ${isExec ? 'executing' : ''}`}
                 >
                   {/* Left Side: Cyber Avatar + Name + Telemetry */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: '11px',
-                      background: 'linear-gradient(135deg, rgba(0, 229, 200, 0.15) 0%, rgba(0, 120, 220, 0.15) 100%)',
-                      border: '1px solid rgba(0, 229, 200, 0.35)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#00E5C8',
-                      fontSize: '20px',
-                      flexShrink: 0,
-                      boxShadow: 'inset 0 0 12px rgba(0, 229, 200, 0.1)'
-                    }}>
+                  <div className="target-card-left">
+                    <div className="target-robot-avatar">
                       🤖
                     </div>
 
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontSize: '14px',
-                        fontWeight: 700,
-                        color: '#F0F4F8',
-                        lineHeight: 1.3
-                      }}>
+                    <div className="target-meta">
+                      <div className="target-agent-name">
                         {target.name}
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                        <span style={{
-                          fontSize: '10px',
-                          padding: '2px 7px',
-                          borderRadius: 4,
-                          background: 'rgba(0, 229, 200, 0.08)',
-                          color: '#00E5C8',
-                          fontWeight: 600,
-                          letterSpacing: '0.4px',
-                          textTransform: 'uppercase',
-                          border: '1px solid rgba(0, 229, 200, 0.2)'
-                        }}>
+                      <div className="target-tag-row">
+                        <span className="prospection-tag">
                           Prospection
                         </span>
 
                         {/* Status Indicator Pill */}
                         {isExec ? (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 5,
-                            fontSize: '11px', color: '#00E5C8', fontWeight: 600,
-                            animation: 'pulse 1.5s infinite'
-                          }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00E5C8', boxShadow: '0 0 6px #00E5C8' }} />
+                          <span className="status-indicator-pill executing">
+                            <span className="dot" />
                             En cours
                           </span>
                         ) : isPaused ? (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 5,
-                            fontSize: '11px', color: '#FFB800', fontWeight: 500
-                          }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#FFB800' }} />
+                          <span className="status-indicator-pill paused">
+                            <span className="dot" />
                             En pause
                           </span>
                         ) : isScheduled ? (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 5,
-                            fontSize: '11px', color: '#00E5A0', fontWeight: 500
-                          }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00E5A0', boxShadow: '0 0 6px #00E5A0' }} />
+                          <span className="status-indicator-pill scheduled">
+                            <span className="dot" />
                             Programmé
                           </span>
                         ) : (
-                          <span style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 5,
-                            fontSize: '11px', color: '#FF4757', fontWeight: 500
-                          }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#FF4757' }} />
+                          <span className="status-indicator-pill stopped">
+                            <span className="dot" />
                             Arrêté
                           </span>
                         )}
@@ -786,33 +603,7 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
                   {target.uuid && (
                     <a
                       href={`/prospect-agent-workspace/${target.uuid}`}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        fontSize: '12px',
-                        padding: '8px 14px',
-                        borderRadius: '8px',
-                        background: 'rgba(255, 255, 255, 0.04)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        color: '#F0F4F8',
-                        textDecoration: 'none',
-                        fontWeight: 500,
-                        transition: 'all 0.2s ease',
-                        flexShrink: 0
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'var(--cyan)';
-                        e.currentTarget.style.color = '#000';
-                        e.currentTarget.style.borderColor = 'var(--cyan)';
-                        e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 229, 200, 0.3)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
-                        e.currentTarget.style.color = '#F0F4F8';
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }}
+                      className="target-link-btn"
                     >
                       <span>Espace</span>
                       <ExternalLink size={13} />
@@ -826,44 +617,24 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
       </div>
 
       {/* Bottom Grid: Activity Feed & AI Mission Card */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '24px' }}>
+      <div className="sourcing-bottom-grid">
 
         {/* Activity Feed */}
-        <div style={{
-          background: 'rgba(8, 20, 38, 0.6)',
-          border: '1px solid var(--border)',
-          borderRadius: '18px',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#F0F4F8', margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="activity-feed-card">
+          <div className="activity-card-header">
+            <h3>
               <Activity size={20} color="#00E5C8" />
               <span>Activity Feed</span>
             </h3>
-            <span style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <span className="activity-realtime-badge">
               Temps Réel
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="activity-items-list">
             {activityItems.length === 0 ? (
-              <div style={{
-                padding: '32px 16px',
-                textAlign: 'center',
-                borderRadius: '14px',
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid var(--border)',
-                color: 'var(--muted)',
-                fontSize: '13px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px'
-              }}>
-                <Activity size={28} style={{ opacity: 0.4, color: 'var(--cyan)' }} />
+              <div className="activity-empty-box">
+                <Activity size={28} className="empty-icon" />
                 <span>Aucune activité récente enregistrée pour cet agent.</span>
               </div>
             ) : (
@@ -872,44 +643,29 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
                 return (
                   <div
                     key={item.id}
-                    style={{
-                      padding: '16px',
-                      borderRadius: '14px',
-                      background: 'rgba(255, 255, 255, 0.02)',
-                      border: `1px solid ${item.borderColor}`,
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '14px',
-                      transition: 'all 0.2s ease'
-                    }}
+                    className="activity-item-row"
+                    style={{ borderColor: item.borderColor }}
                   >
-                    <div style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '10px',
-                      background: item.bgColor,
-                      color: item.color,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
+                    <div
+                      className="activity-item-icon"
+                      style={{ background: item.bgColor, color: item.color }}
+                    >
                       <IconComp size={20} color={item.color} />
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: item.color }}>
+                    <div className="activity-item-content">
+                      <div className="activity-item-title-row">
+                        <div className="activity-item-title" style={{ color: item.color }}>
                           {item.title}
                         </div>
                         <div
                           title={item.fullTime || item.time}
-                          style={{ fontSize: '12px', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 5, cursor: 'default' }}
+                          className="activity-time-badge"
                         >
-                          <Clock size={12} style={{ opacity: 0.8 }} />
+                          <Clock size={12} />
                           <span>{item.time}</span>
                         </div>
                       </div>
-                      <div style={{ fontSize: '13px', color: '#F0F4F8', lineHeight: 1.4 }}>
+                      <div className="activity-item-msg">
                         {item.message}
                       </div>
                     </div>
@@ -921,81 +677,72 @@ const DashboardView: React.FC<DashboardViewProps> = React.memo(({
         </div>
 
         {/* AI Mission & Schedule Card */}
-        <div style={{
-          background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.8) 0%, rgba(15, 30, 55, 0.6) 100%)',
-          border: '1px solid rgba(0, 229, 200, 0.15)',
-          borderRadius: '18px',
-          padding: '24px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          gap: '20px'
-        }}>
+        <div className="ai-mission-card">
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '16px', marginBottom: '16px' }}>
-              <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(0, 229, 200, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(0, 229, 200, 0.25)', color: '#00E5C8' }}>
+            <div className="ai-mission-header">
+              <div className="ai-bot-avatar">
                 <Bot size={24} color="#00E5C8" />
               </div>
               <div>
-                <h3 style={{ fontSize: '16px', color: '#F0F4F8', margin: 0, fontWeight: 700 }}>Cerveau Sourcing IA</h3>
-                <span style={{ fontSize: '12px', color: 'var(--muted)' }}>Agent de Sourcing Autonome</span>
+                <h3>Cerveau Sourcing IA</h3>
+                <span>Agent de Sourcing Autonome</span>
               </div>
             </div>
 
             <div>
-              <span style={{ fontSize: '11px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
+              <span className="mission-config-title">
                 Mission Configurée
               </span>
-              <p style={{ fontSize: '13px', color: '#F0F4F8', lineHeight: 1.5, marginTop: '8px', fontStyle: 'italic', background: 'rgba(0, 0, 0, 0.25)', padding: '14px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <p className="mission-quote-box">
                 "{agent?.config?.agent_mission || 'Recherche de candidats pertinents et extraction autonome selon les règles définies.'}"
               </p>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Planification</span>
-              <div style={{ fontSize: '13px', color: '#F0F4F8', fontWeight: 600, marginTop: '4px' }}>
+          <div className="mission-metrics-row">
+            <div className="mission-metric-box">
+              <span className="metric-label">Planification</span>
+              <div className="metric-val">
                 {agent?.schedule_id ? (
                   triggerRuleSummary(agent.trigger_rules || agent.config?.trigger_rules || agent.parameters?.trigger_rules)
                 ) : (
-                  <span style={{ color: 'var(--muted)', fontWeight: 500 }}>
+                  <span className="muted-text">
                     Aucune règle
                   </span>
                 )}
               </div>
             </div>
 
-            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Statut Autopilote</span>
-              <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div className="mission-metric-box">
+              <span className="metric-label">Statut Autopilote</span>
+              <div className="metric-val">
                 {agent?.is_executing ? (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#00E5C8', animation: 'pulse 1.5s infinite' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00E5C8', boxShadow: '0 0 8px #00E5C8' }}></span>
+                  <span className="status-pill executing">
+                    <span className="dot" />
                     ⚡ En cours...
                   </span>
                 ) : agent?.status === 'paused' ? (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#FFB800' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FFB800' }}></span>
+                  <span className="status-pill paused">
+                    <span className="dot" />
                     En pause
                   </span>
                 ) : agent?.schedule_id ? (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#00E5A0' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00E5A0', boxShadow: '0 0 8px #00E5A0' }}></span>
+                  <span className="status-pill scheduled">
+                    <span className="dot" />
                     Programmé
                   </span>
                 ) : (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#FF4757' }}>
-                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#FF4757' }}></span>
+                  <span className="status-pill stopped">
+                    <span className="dot" />
                     Arrêté
                   </span>
                 )}
               </div>
             </div>
 
-            <div style={{ background: 'rgba(0,0,0,0.2)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border)' }}>
-              <span style={{ fontSize: '10px', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Dernière exéc.</span>
-              <div style={{ fontSize: '13px', color: '#F0F4F8', fontWeight: 600, marginTop: '4px' }}>
+            <div className="mission-metric-box">
+              <span className="metric-label">Dernière exéc.</span>
+              <div className="metric-val">
                 {formatDate(agent?.lastExecuted)}
               </div>
             </div>

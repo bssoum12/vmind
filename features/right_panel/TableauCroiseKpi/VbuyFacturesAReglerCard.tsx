@@ -23,7 +23,7 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
   const agentData = kpisByAgent["vbuy"] || kpisByAgent["VBUY"] || {};
   const n8nToolData = agentData.get_vbuy_kpi_factures_a_regler;
 
-  const [horizon, setHorizon] = useState<'1d' | '1w' | '1m' | '3m' | '6m'>('1d');
+  const [horizon, setHorizon] = useState<'1d' | '1w' | '1m' | '3m' | '6m'>('1m');
   const [isCardHovered, setIsCardHovered] = useState<boolean>(false);
   const [cardCoords, setCardCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const [mounted, setMounted] = useState<boolean>(false);
@@ -31,6 +31,12 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
   const [pageProches, setPageProches] = useState<number>(1);
   const [pageEchues, setPageEchues] = useState<number>(1);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleHorizonSelect = (newHorizon: '1d' | '1w' | '1m' | '3m' | '6m') => {
+    if (newHorizon === horizon) return;
+    setHorizon(newHorizon);
+    fetchKpis('vbuy', true, 'get_vbuy_kpi_factures_a_regler', newHorizon);
+  };
 
   const handleMouseEnterCard = (e: React.MouseEvent<HTMLDivElement>) => {
     if (hoverTimeoutRef.current) {
@@ -161,7 +167,7 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ color: "#FF4757", fontSize: "9px", fontWeight: 800, letterSpacing: '0.5px' }}>VBUY</span>
           <button
-            onClick={() => fetchKpis('vbuy', true, 'get_vbuy_kpi_factures_a_regler')}
+            onClick={() => fetchKpis('vbuy', true, 'get_vbuy_kpi_factures_a_regler', horizon)}
             disabled={effectiveLoading}
             style={{
               background: 'rgba(255, 255, 255, 0.04)',
@@ -206,7 +212,7 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
           return (
             <button
               key={item.label}
-              onClick={() => setHorizon(item.value as any)}
+              onClick={() => handleHorizonSelect(item.value as any)}
               style={{
                 flex: '1 1 0px',
                 minWidth: 0,

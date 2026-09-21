@@ -29,7 +29,7 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
           try {
             const parsed = JSON.parse(raw);
             tokenStr = parsed?.token || parsed?.access_token || parsed?.user?.token || raw;
-          } catch (e) {}
+          } catch (e) { }
         }
         if (tokenStr.startsWith('eyJ')) {
           const payload = JSON.parse(atob(tokenStr.split('.')[1]));
@@ -38,7 +38,7 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
           currentUserIsAdmin = (roleStr === 'Administrator' || roleStr === 'admin' || roleStr === 'Admin');
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     setIsAdmin(currentUserIsAdmin);
 
     const refreshData = () => {
@@ -54,14 +54,33 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
             setSuccessRate(res.sidebarStats.successRate);
           }
         })
-        .catch(() => {});
+        .catch(() => { });
 
       if (currentUserIsAdmin) {
-        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/signup-requests`)
+        const raw = localStorage.getItem('vmind_session') || localStorage.getItem('vmind_mcp_token');
+        let tokenStr = '';
+        if (raw) {
+          if (raw.startsWith('eyJ')) {
+            tokenStr = raw;
+          } else {
+            try {
+              const parsed = JSON.parse(raw);
+              tokenStr = parsed?.token || parsed?.access_token || parsed?.user?.token || parsed?.data?.token || '';
+            } catch (e) {}
+          }
+        }
+        const headers: Record<string, string> = {};
+        if (tokenStr) {
+          headers['Authorization'] = `Bearer ${tokenStr}`;
+        }
+
+        fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/signup-requests`, {
+          headers,
+        })
           .then(res => res.json())
           .then(data => {
             if (data.ok) {
-              const pending = data.requests.filter((r: any) => r.status === 'pending');
+              const pending = (data.requests || []).filter((r: any) => r.status === 'pending');
               setPendingRequestsCount(pending.length);
             } else {
               setPendingRequestsCount(0);
@@ -128,15 +147,15 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
   return (
     <div className="sidebar">
       <div className="nav-section">Navigation</div>
-      <div 
-        className={`nav-item ${currentView === 'market' && activeCategory === 'all' ? 'active' : ''}`} 
+      <div
+        className={`nav-item ${currentView === 'market' && activeCategory === 'all' ? 'active' : ''}`}
         onClick={() => { onSelectCategory('all'); onNavigate('market'); }}
       >
         <div className="nav-icon">🏪</div>
         <span>Marketplace</span>
       </div>
-      <div 
-        className={`nav-item ${currentView === 'agents' ? 'active' : ''}`} 
+      <div
+        className={`nav-item ${currentView === 'agents' ? 'active' : ''}`}
         onClick={() => onNavigate('agents')}
       >
         <div className="nav-icon">🤖</div>
@@ -148,11 +167,11 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
           <span className="nav-badge" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted)' }}>0</span>
         )}
       </div>
-      
+
       {isAdmin && (
         <>
-          <div 
-            className={`nav-item ${currentView === 'signup-requests' ? 'active' : ''}`} 
+          <div
+            className={`nav-item ${currentView === 'signup-requests' ? 'active' : ''}`}
             onClick={() => onNavigate('signup-requests')}
           >
             <div className="nav-icon">📩</div>
@@ -163,7 +182,7 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
               </span>
             )}
           </div>
-          <div 
+          <div
             className={`nav-item ${currentView === 'journal' ? 'active' : ''}`}
             onClick={() => onNavigate('journal')}
           >
