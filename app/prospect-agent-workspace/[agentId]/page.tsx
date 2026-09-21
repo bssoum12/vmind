@@ -294,16 +294,14 @@ export default function AgentWorkspacePage() {
       )}
 
       {/* HEADER (Native VMIND Style) */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '20px 32px', borderBottom: '1px solid var(--border)',
-        background: 'rgba(8, 20, 38, 0.4)',
-        backdropFilter: navTutorialStep > 0 ? 'none' : 'blur(10px)',
-        flexShrink: 0,
-        position: 'relative',
-        zIndex: navTutorialStep > 0 ? 10001 : 1
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div
+        className="workspace-top-bar"
+        style={{
+          backdropFilter: navTutorialStep > 0 ? 'none' : 'blur(10px)',
+          zIndex: navTutorialStep > 0 ? 10001 : 1
+        }}
+      >
+        <div className="workspace-top-bar-left">
           <button
             onClick={() => {
               if (typeof window !== 'undefined') {
@@ -314,51 +312,40 @@ export default function AgentWorkspacePage() {
               router.push('/?view=agents');
             }}
             style={{
-              background: 'transparent', border: '1px solid var(--border)',
-              borderRadius: '8px', padding: '8px', color: 'var(--text)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              padding: '8px',
+              color: 'var(--text)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
             }}
           >
             <ArrowLeft size={18} />
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{
-              width: 42,
-              height: 42,
-              borderRadius: 12,
-              background: 'rgba(0, 229, 200, 0.1)',
-              border: '1px solid rgba(0, 229, 200, 0.25)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#00E5C8',
-              flexShrink: 0
-            }}>
+          <div className="workspace-top-bar-agent-info">
+            <div className="workspace-top-bar-avatar">
               <Target size={22} />
             </div>
             <div>
-              <h1 style={{ fontSize: '20px', fontWeight: 700, margin: 0, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 12 }}>
-                Espace de Travail : {agentName}
+              <h1 className="workspace-top-bar-title">
+                <span>Espace de Travail : {agentName}</span>
                 {agentData?.is_executing && (
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    fontSize: 12, padding: '2px 10px', borderRadius: 4,
-                    background: 'rgba(0, 229, 200, 0.1)', color: '#00E5C8',
-                    border: '1px solid rgba(0, 229, 200, 0.3)',
-                    fontWeight: 600, animation: 'pulse 1.5s infinite',
-                    verticalAlign: 'middle'
-                  }}>
+                  <span className="workspace-live-pill">
                     <CyberIcon name="zap" size={11} color="#00E5C8" /> En cours d'exécution...
                   </span>
                 )}
               </h1>
-              <p style={{ fontSize: '13px', color: 'var(--muted)', margin: '4px 0 0 0' }}>Supervisez l'agent de prospection en temps réel.</p>
+              <p className="workspace-top-bar-subtitle">Supervisez l'agent de prospection en temps réel.</p>
             </div>
           </div>
         </div>
 
         {/* TABS */}
-        <div style={{ display: 'flex', background: 'var(--navy2)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border)', position: 'relative', zIndex: 10002 }}>
+        <div className="workspace-top-bar-tabs" style={{ zIndex: 10002 }}>
           {[
             { id: 'dashboard', label: 'Vue d\'ensemble', icon: LayoutDashboard, step: 1 },
             { id: 'leads', label: 'Prospects', icon: Users, step: 2 },
@@ -373,12 +360,17 @@ export default function AgentWorkspacePage() {
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '8px',
-                  padding: '6px 14px', borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '6px 14px',
+                  borderRadius: '8px',
                   background: isStepActive ? '#00E5C8' : isActive ? 'var(--cyan)' : 'transparent',
                   color: (isStepActive || isActive) ? '#04101E' : 'var(--text-muted)',
                   fontWeight: (isStepActive || isActive) ? 700 : 500,
-                  border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
                   ...getTabBtnStyle(tab.step)
                 }}
               >
@@ -398,7 +390,7 @@ export default function AgentWorkspacePage() {
             Chargement de l'espace...
           </div>
         ) : (
-          <div style={{ padding: '2.5rem', maxWidth: '1600px', margin: '0 auto' }}>
+          <div className="workspace-main-content-inner">
             {activeTab === 'dashboard' && <DashboardView leads={leads} campaigns={campaigns} threshold={60} agent={agentData} />}
             {activeTab === 'leads' && <LeadsView leads={leads} threshold={60} onOpenLead={handleOpenLead} onRefresh={fetchData} isNavTutorialActive={navTutorialStep > 0} agent={agentData} />}
             {activeTab === 'outbox' && <CampaignsView campaigns={campaigns} onRefresh={fetchData} defaultCc="" onOpenLeadById={handleOpenLeadById} />}

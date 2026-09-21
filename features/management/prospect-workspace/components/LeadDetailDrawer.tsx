@@ -437,9 +437,10 @@ export default function LeadDetailDrawer({
 
   const drawerContent = (
     <>
-      {/* Backdrop - Starts right below the 52px TopBar */}
+      {/* Backdrop - Starts right below TopBar */}
       <div 
         onClick={onClose}
+        className="prospect-lead-drawer-backdrop"
         style={{
           position: 'fixed',
           top: '52px',
@@ -449,13 +450,14 @@ export default function LeadDetailDrawer({
           backgroundColor: 'rgba(3, 8, 16, 0.75)',
           backdropFilter: 'blur(8px)',
           WebkitBackdropFilter: 'blur(8px)',
-          zIndex: 9998,
+          zIndex: 10015,
           transition: 'opacity 0.25s ease'
         }}
       />
 
-      {/* Drawer Panel - Docked directly beneath the 52px TopBar */}
+      {/* Drawer Panel - Docked directly beneath TopBar */}
       <div 
+        className="prospect-lead-drawer-panel"
         style={{
           position: 'fixed',
           top: '52px',
@@ -469,7 +471,7 @@ export default function LeadDetailDrawer({
           borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
           borderTop: '1px solid rgba(255, 255, 255, 0.08)',
           boxShadow: '-16px 0 48px rgba(0, 0, 0, 0.75)',
-          zIndex: 9999,
+          zIndex: 10020,
           display: 'flex',
           flexDirection: 'column',
           transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
@@ -489,15 +491,18 @@ export default function LeadDetailDrawer({
         }} />
 
         {/* 1. HEADER */}
-        <div style={{
-          padding: '22px 26px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: '14px',
-          background: 'rgba(8, 20, 38, 0.6)'
-        }}>
+        <div 
+          className="drawer-header-main"
+          style={{
+            padding: '22px 26px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '14px',
+            background: 'rgba(8, 20, 38, 0.6)'
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div style={{
               width: '52px',
@@ -578,18 +583,20 @@ export default function LeadDetailDrawer({
             <button 
               onClick={onClose}
               title="Fermer (Échap)"
+              aria-label="Fermer la vue détails"
               style={{
                 background: 'rgba(255, 255, 255, 0.05)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: '8px',
-                width: '32px',
-                height: '32px',
+                width: '36px',
+                height: '36px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: '#94A3B8',
                 cursor: 'pointer',
-                transition: 'all 0.2s'
+                transition: 'all 0.2s',
+                flexShrink: 0
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.background = 'rgba(255, 71, 87, 0.15)';
@@ -776,40 +783,10 @@ export default function LeadDetailDrawer({
                   }}
                 >
                   {qualifyProgress.isDone ? (
-                    <div
-                      style={{
-                        height: '100%',
-                        width: '100%',
-                        borderRadius: '3px',
-                        background: 'linear-gradient(90deg, #00E5A0 0%, #00E5C8 100%)',
-                        boxShadow: '0 0 14px rgba(0, 229, 160, 0.7)',
-                        transition: 'all 0.5s ease'
-                      }}
-                    />
+                    <div className="void-complete-bar" />
                   ) : (
-                    <div
-                      style={{
-                        height: '100%',
-                        width: '100%',
-                        borderRadius: '3px',
-                        background: 'linear-gradient(90deg, #06111F 0%, #00E5C8 25%, #3B82F6 50%, #00E5C8 75%, #06111F 100%)',
-                        backgroundSize: '200% 100%',
-                        animation: 'infinite-void-stream 3.2s linear infinite',
-                        boxShadow: '0 0 14px rgba(0, 229, 200, 0.5), inset 0 0 6px rgba(255, 255, 255, 0.2)',
-                        position: 'relative',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          bottom: 0,
-                          width: '35%',
-                          background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%)',
-                          animation: 'void-laser-gleam 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite'
-                        }}
-                      />
+                    <div className="void-stream-bar">
+                      <div className="void-laser-gleam-effect" />
                     </div>
                   )}
                 </div>
@@ -839,17 +816,6 @@ export default function LeadDetailDrawer({
                     {formatUserFacingMessage(qualifyProgress.message)}
                   </span>
                 </div>
-
-                <style>{`
-                  @keyframes infinite-void-stream {
-                    0% { background-position: 200% 0; }
-                    100% { background-position: -200% 0; }
-                  }
-                  @keyframes void-laser-gleam {
-                    0% { left: -35%; }
-                    100% { left: 115%; }
-                  }
-                `}</style>
               </div>
             )}
 
@@ -1341,8 +1307,7 @@ export default function LeadDetailDrawer({
 
                 <div>
                   <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '5px' }}>
-                    Copie Conforme (CC)
-                  </label>
+                     CC                  </label>
                   <input
                     type="text"
                     value={cc}

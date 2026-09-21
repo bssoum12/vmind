@@ -151,14 +151,17 @@ export default function GlobalLeadsModal({ isOpen, agentId, onClose, onSuccess }
             backgroundColor: 'rgba(11, 15, 25, 0.75)', backdropFilter: 'blur(12px)',
             zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center'
         }}>
-            <div style={{
-                background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95))',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '24px',
-                padding: '2.5rem', width: '95vw', maxWidth: '1400px',
-                height: '92vh', display: 'flex', flexDirection: 'column', gap: '1.5rem',
-                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.05)'
-            }}>
+            <div 
+                className="global-leads-modal-card"
+                style={{
+                    background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95))',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '24px',
+                    padding: '2.5rem', width: '95vw', maxWidth: '1400px',
+                    height: '92vh', display: 'flex', flexDirection: 'column', gap: '1.5rem',
+                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.6), inset 0 1px 1px rgba(255, 255, 255, 0.05)'
+                }}
+            >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '1rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <div style={{
@@ -189,7 +192,7 @@ export default function GlobalLeadsModal({ isOpen, agentId, onClose, onSuccess }
                     </button>
                 </div>
 
-                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div className="global-leads-filter-bar" style={{ display: 'flex', gap: '1rem', alignItems: 'center', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
                     <div style={{ flex: 2, position: 'relative' }}>
                         <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center' }}>
                             <CyberIcon name="search" size={15} color="var(--text-muted)" />
@@ -233,7 +236,7 @@ export default function GlobalLeadsModal({ isOpen, agentId, onClose, onSuccess }
                     </div>
                 </div>
 
-                <div style={{ flex: 1, minHeight: '300px', overflowY: 'auto', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)' }}>
+                <div className="global-leads-table-wrapper" style={{ flex: 1, minHeight: '300px', overflowY: 'auto', overflowX: 'auto', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                         <thead style={{ position: 'sticky', top: 0, background: 'rgba(30, 41, 59, 0.95)', backdropFilter: 'blur(10px)', zIndex: 10 }}>
                             <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
@@ -329,7 +332,7 @@ export default function GlobalLeadsModal({ isOpen, agentId, onClose, onSuccess }
                     </table>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
+                <div className="global-leads-pagination-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '1.5rem' }}>
                     <button
                         className="btn btn-secondary"
                         disabled={page === 1}

@@ -161,7 +161,7 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
       </div>
 
       {/* Campaign Stats */}
-      <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="campaigns-metrics-grid">
         <div className="card metric-card secondary">
           <span className="metric-title">Emails Total</span>
           <div className="metric-value-container">
@@ -254,7 +254,7 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
       </div>
 
       {/* Emailed Leads Table & Detail */}
-      <div style={{ display: 'grid', gridTemplateColumns: selectedEmail ? '3fr 2fr' : '1fr', gap: '1.5rem', alignItems: 'start' }}>
+      <div className={`campaigns-content-grid ${selectedEmail ? 'has-selection' : ''}`}>
         {/* Table List */}
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-color)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

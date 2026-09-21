@@ -9,13 +9,86 @@ import { SourcingAgentExecutionModal } from '../../agents/components/SourcingAge
 import { SourcingLauncherModal } from './SourcingLauncherModal';
 import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
-import { Database, FileSpreadsheet, ScanLine, UserPlus, Zap, Globe, Sparkles, UploadCloud, Target, CheckCircle2, X } from 'lucide-react';
+import { Database, FileSpreadsheet, ScanLine, UserPlus, Zap, Globe, Sparkles, UploadCloud, Target, CheckCircle2, X, Plus, Trash2, AlertCircle, RotateCcw, Copy, User, Building2, Briefcase, MapPin, Users, Compass, Mail } from 'lucide-react';
 import { useProspectSocket } from '../hooks/useProspectSocket';
 import { getAgents } from '@/shared/api/n8n-api';
 import { useToast } from '@/shared/contexts/ToastContext';
 import { LiveAgent } from '../../agents/AgentsView';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+
+interface ManualLeadItem {
+  id: string;
+  prenom: string;
+  nom: string;
+  email: string;
+  poste: string;
+  secteur: string;
+  pays: string;
+  entreprise: string;
+  taille_ent: string;
+}
+
+interface LeadFieldError {
+  prenom?: string;
+  nom?: string;
+  email?: string;
+  poste?: string;
+  entreprise?: string;
+  secteur?: string;
+  pays?: string;
+}
+
+export interface LeadImportPayload {
+  prenom: string;
+  nom: string;
+  email: string;
+  poste: string;
+  secteur: string;
+  pays: string;
+  entreprise: string;
+  taille_ent: number | null;
+  source: string;
+  date_collecte: string;
+}
+
+const generateLeadRowId = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `lead-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 11)}`;
+};
+
+const focusLeadField = (leadId: string, field: string) => {
+  const el = document.getElementById(`manual-lead-${leadId}-${field}`) as HTMLInputElement | null;
+  if (el) {
+    el.focus();
+    el.select?.();
+  }
+};
+
+const createEmptyManualLead = (): ManualLeadItem => ({
+  id: generateLeadRowId(),
+  prenom: '',
+  nom: '',
+  email: '',
+  poste: '',
+  secteur: '',
+  pays: '',
+  entreprise: '',
+  taille_ent: ''
+});
+
+const SECTEUR_PRESETS = ['Tech & SaaS', 'Conseil & Services', 'Santé', 'Industrie', 'Banque & Finance', 'E-commerce', 'Logistique'];
+const PAYS_PRESETS = ['France', 'Belgique', 'Suisse', 'Canada', 'Royaume-Uni'];
+const POSTE_PRESETS = ['Directeur Commercial', 'CEO / Fondateur', 'VP Sales', 'DRH', 'Directeur Marketing'];
+const TAILLE_PRESETS = [
+  { label: '1-10', value: '10' },
+  { label: '11-50', value: '50' },
+  { label: '51-200', value: '200' },
+  { label: '201-500', value: '500' },
+  { label: '500+', value: '1000' }
+];
 
 interface QualifyProgressState {
   active: boolean;
@@ -622,6 +695,9 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
   const [importTab, setImportTab] = useState<'file' | 'url' | 'paste'>('file');
   const [importUrl, setImportUrl] = useState('');
   const [importPasteText, setImportPasteText] = useState('');
+  const [manualLeads, setManualLeads] = useState<ManualLeadItem[]>([createEmptyManualLead()]);
+  const [manualErrors, setManualErrors] = useState<Record<string, LeadFieldError>>({});
+  const [detectedDomainCompany, setDetectedDomainCompany] = useState<Record<string, string>>({});
   const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const [newlyImportedLeads, setNewlyImportedLeads] = useState<Lead[]>([]);
   const [showQualifyPrompt, setShowQualifyPrompt] = useState(false);
@@ -680,7 +756,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
     }
 
     setUploadMessage({
-      text: `Importation terminée : ${successCount} prospects importés avec succès, ${failCount} ignorés (doublons ou erreurs).`,
+      text: `Importation terminée : ${successCount} prospects importés , ${failCount} ignorés (doublons ou erreurs).`,
       type: 'success'
     });
 
@@ -688,6 +764,8 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
     setCsvUploading(false);
     setImportUrl('');
     setImportPasteText('');
+    setManualLeads([createEmptyManualLead()]);
+    setManualErrors({});
 
     if (imported.length > 0) {
       setNewlyImportedLeads(imported);
@@ -779,69 +857,238 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
     }
   };
 
-  // Text Paste Ingest
-  const handlePasteImport = async () => {
-    if (!importPasteText.trim()) return;
-    setCsvUploading(true);
-    setUploadMessage(null);
+  // Manual Lead Entry Handlers
+  const handleUpdateManualLead = (id: string, field: keyof ManualLeadItem, value: string) => {
+    // Strictly text-only for names (prevent numeric digits)
+    const sanitizedValue = (field === 'prenom' || field === 'nom')
+      ? value.replace(/[0-9]/g, '')
+      : value;
 
-    try {
-      const trimmed = importPasteText.trim();
-      let leadsData: Record<string, unknown>[] = [];
+    setManualLeads(prev => prev.map(lead => (lead.id === id ? { ...lead, [field]: sanitizedValue } : lead)));
 
-      if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-        // Parse JSON
-        const parsed = JSON.parse(trimmed);
-        const rawList = Array.isArray(parsed) ? parsed : [parsed];
-        leadsData = rawList.map((item: Record<string, unknown>) => ({
-          nom: (item.nom || item.lastName || '') as string,
-          prenom: (item.prenom || item.firstName || '') as string,
-          email: (item.email || '') as string,
-          poste: (item.poste || item.jobTitle || '') as string,
-          entreprise: (item.entreprise || item.company || '') as string,
-          secteur: (item.secteur || item.industry || '') as string,
-          taille_ent: (item.taille_ent || item.companySize || item.employees || null) as number | null,
-          pays: (item.pays || item.country || '') as string,
-          source: 'API'
-        })).filter(l => l.email && l.nom && l.prenom);
-      } else {
-        // Parse CSV
-        const lines = trimmed.split('\n').map(l => l.trim()).filter(Boolean);
-        if (lines.length > 0) {
-          const delimiter = lines[0].includes(';') ? ';' : ',';
-          const headers = lines[0].toLowerCase().split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+    // Real-time clearance of validation errors as user types
+    if (manualErrors[id] && manualErrors[id][field as keyof LeadFieldError]) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const isNowValid = field === 'email'
+        ? emailRegex.test(sanitizedValue.trim())
+        : sanitizedValue.trim().length > 0;
 
-          for (let i = 1; i < lines.length; i++) {
-            const cols = lines[i].split(delimiter).map(c => c.trim().replace(/^"|"$/g, ''));
-            if (cols.length < 3) continue;
+      if (isNowValid) {
+        setManualErrors(prev => ({
+          ...prev,
+          [id]: {
+            ...prev[id],
+            [field]: undefined
+          }
+        }));
+      }
+    }
+  };
 
-            const leadObj: Record<string, unknown> = { source: 'CSV' };
-            headers.forEach((header, index) => {
-              if (cols[index] !== undefined && cols[index] !== '') {
-                const cleanHeader = header.trim();
-                if (cleanHeader === 'taille_ent') {
-                  leadObj[cleanHeader] = parseInt(cols[index]) || null;
-                } else {
-                  leadObj[cleanHeader] = cols[index];
-                }
-              }
-            });
+  // Smart Email Change with Company Auto-Extraction
+  const handleEmailChange = (leadId: string, email: string) => {
+    handleUpdateManualLead(leadId, 'email', email);
 
-            if (leadObj.email && leadObj.nom && leadObj.prenom) {
-              leadsData.push(leadObj);
+    // Smart domain detection: auto-suggest company name if currently empty
+    const lead = manualLeads.find(l => l.id === leadId);
+    if (lead && email.includes('@')) {
+      const parts = email.split('@');
+      if (parts.length > 1 && parts[1].includes('.')) {
+        const domain = parts[1].split('.')[0].toLowerCase();
+        const genericDomains = ['gmail', 'yahoo', 'hotmail', 'outlook', 'icloud', 'live', 'msn', 'free', 'orange', 'wanadoo', 'laposte', 'sfr', 'bbox', 'proton', 'protonmail'];
+        if (domain && domain.length >= 2 && !genericDomains.includes(domain)) {
+          const companyName = domain.charAt(0).toUpperCase() + domain.slice(1);
+          setDetectedDomainCompany(prev => ({ ...prev, [leadId]: companyName }));
+          if (!lead.entreprise.trim()) {
+            handleUpdateManualLead(leadId, 'entreprise', companyName);
+          }
+        }
+      }
+    }
+  };
+
+  const handleAddManualLead = () => {
+    const lastLead = manualLeads[manualLeads.length - 1];
+    const newLead = createEmptyManualLead();
+    // Inherit company details from previous contact to save repeated typing!
+    if (lastLead && lastLead.entreprise) {
+      newLead.entreprise = lastLead.entreprise;
+      newLead.secteur = lastLead.secteur;
+      newLead.pays = lastLead.pays;
+      newLead.taille_ent = lastLead.taille_ent;
+    }
+    setManualLeads(prev => [...prev, newLead]);
+    setTimeout(() => {
+      focusLeadField(newLead.id, 'prenom');
+    }, 50);
+  };
+
+  const handleRemoveManualLead = (id: string) => {
+    if (manualLeads.length <= 1) return;
+    setManualLeads(prev => prev.filter(l => l.id !== id));
+    setManualErrors(prev => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+    setDetectedDomainCompany(prev => {
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+  };
+
+  const handleDuplicateManualLead = (lead?: ManualLeadItem) => {
+    const sourceLead = lead || manualLeads[manualLeads.length - 1];
+    const duplicated: ManualLeadItem = {
+      id: generateLeadRowId(),
+      prenom: '',
+      nom: '',
+      email: '',
+      poste: '',
+      secteur: sourceLead?.secteur || '',
+      pays: sourceLead?.pays || '',
+      entreprise: sourceLead?.entreprise || '',
+      taille_ent: sourceLead?.taille_ent || ''
+    };
+    setManualLeads(prev => [...prev, duplicated]);
+    setTimeout(() => {
+      focusLeadField(duplicated.id, 'prenom');
+    }, 50);
+    showToast('Nouvelle ligne ajoutée avec entreprise pré-remplie', 'info');
+  };
+
+  const handleResetManualForm = () => {
+    const hasData = manualLeads.some(l => l.prenom || l.nom || l.email || l.poste || l.entreprise);
+    setManualLeads([createEmptyManualLead()]);
+    setManualErrors({});
+    setDetectedDomainCompany({});
+    if (hasData) {
+      showToast('Formulaire de saisie réinitialisé', 'info');
+    }
+  };
+
+  const handleManualFormSubmit = async () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const newErrors: Record<string, LeadFieldError> = {};
+    let hasError = false;
+
+    manualLeads.forEach((lead) => {
+      const leadErr: LeadFieldError = {};
+      if (!lead.prenom.trim()) {
+        leadErr.prenom = 'Le prénom est requis';
+        hasError = true;
+      }
+      if (!lead.nom.trim()) {
+        leadErr.nom = 'Le nom est requis';
+        hasError = true;
+      }
+      if (!lead.email.trim()) {
+        leadErr.email = "L'email est requis";
+        hasError = true;
+      } else if (!emailRegex.test(lead.email.trim())) {
+        leadErr.email = "Format d'email invalide (ex: nom@domaine.com)";
+        hasError = true;
+      }
+      if (!lead.poste.trim()) {
+        leadErr.poste = 'Le poste est requis';
+        hasError = true;
+      }
+      if (!lead.entreprise.trim()) {
+        leadErr.entreprise = "L'entreprise est requise";
+        hasError = true;
+      }
+      if (!lead.secteur.trim()) {
+        leadErr.secteur = 'Le secteur est requis';
+        hasError = true;
+      }
+      if (!lead.pays.trim()) {
+        leadErr.pays = 'Le pays est requis';
+        hasError = true;
+      }
+
+      if (Object.keys(leadErr).length > 0) {
+        newErrors[lead.id] = leadErr;
+      }
+    });
+
+    if (hasError) {
+      setManualErrors(newErrors);
+      // Focus the first invalid field across all rows
+      for (const l of manualLeads) {
+        if (newErrors[l.id]) {
+          const firstField = Object.keys(newErrors[l.id])[0];
+          focusLeadField(l.id, firstField);
+          break;
+        }
+      }
+      showToast('Veuillez remplir tous les champs obligatoires (*)', 'error');
+      return;
+    }
+
+    setManualErrors({});
+
+    const leadsData: LeadImportPayload[] = manualLeads.map(l => ({
+      prenom: l.prenom.trim(),
+      nom: l.nom.trim(),
+      email: l.email.trim().toLowerCase(),
+      poste: l.poste.trim(),
+      secteur: l.secteur.trim(),
+      pays: l.pays.trim(),
+      entreprise: l.entreprise.trim(),
+      taille_ent: l.taille_ent.trim() ? parseInt(l.taille_ent.trim(), 10) || null : null,
+      source: 'saisie manuelle',
+      date_collecte: new Date().toISOString()
+    }));
+
+    await importLeads(leadsData);
+  };
+
+  // Advance focus to next field on Enter key (flows naturally across fields and rows without premature submit)
+  const handleFieldKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, leadId: string, currentField: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const fieldOrder = ['prenom', 'nom', 'email', 'poste', 'entreprise', 'secteur', 'pays', 'taille_ent'];
+      const currentIndex = fieldOrder.indexOf(currentField);
+      const leadIdx = manualLeads.findIndex(l => l.id === leadId);
+
+      if (currentIndex !== -1 && currentIndex < fieldOrder.length - 1) {
+        const nextField = fieldOrder[currentIndex + 1];
+        focusLeadField(leadId, nextField);
+      } else if (currentIndex === fieldOrder.length - 1) {
+        // Last field of row: advance to next row's prenom if available
+        if (leadIdx !== -1 && leadIdx + 1 < manualLeads.length) {
+          const nextLead = manualLeads[leadIdx + 1];
+          focusLeadField(nextLead.id, 'prenom');
+          return;
+        }
+
+        // Last field of the last row: check completeness across all rows
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const allComplete = manualLeads.every(l =>
+          l.prenom.trim() && l.nom.trim() && emailRegex.test(l.email.trim()) && l.poste.trim() && l.entreprise.trim() && l.secteur.trim() && l.pays.trim()
+        );
+        if (allComplete) {
+          handleManualFormSubmit();
+        } else {
+          for (const l of manualLeads) {
+            const checks = [
+              { field: 'prenom', ok: !!l.prenom.trim() },
+              { field: 'nom', ok: !!l.nom.trim() },
+              { field: 'email', ok: !!(l.email.trim() && emailRegex.test(l.email.trim())) },
+              { field: 'poste', ok: !!l.poste.trim() },
+              { field: 'entreprise', ok: !!l.entreprise.trim() },
+              { field: 'secteur', ok: !!l.secteur.trim() },
+              { field: 'pays', ok: !!l.pays.trim() },
+            ];
+            const firstMissing = checks.find(c => !c.ok);
+            if (firstMissing) {
+              focusLeadField(l.id, firstMissing.field);
+              break;
             }
           }
         }
       }
-
-      if (leadsData.length === 0) {
-        throw new Error("Aucun prospect valide trouvé. Veuillez vérifier le format de saisie.");
-      }
-
-      await importLeads(leadsData);
-    } catch (err: unknown) {
-      setUploadMessage({ text: err instanceof Error ? err.message : "Erreur de traitement des données collées.", type: 'error' });
-      setCsvUploading(false);
     }
   };
 
@@ -1005,7 +1252,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
             <p style={{ margin: '0.25rem 0 0 0' }}>Visualiser, filtrer et gérer vos leads qualifiés par l&apos;intelligence artificielle</p>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', flexShrink: 0 }}>
+        <div className="view-header-actions">
           <button
             className="btn btn-secondary"
             onClick={exportToCSV}
@@ -1248,42 +1495,12 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
           >
             {qualifyProgress.isDone ? (
               /* Solid Emerald Full Bar when Complete */
-              <div
-                style={{
-                  height: '100%',
-                  width: '100%',
-                  borderRadius: '4px',
-                  background: 'linear-gradient(90deg, #00E5A0 0%, #00E5C8 100%)',
-                  boxShadow: '0 0 16px rgba(0, 229, 160, 0.7)',
-                  transition: 'all 0.5s ease'
-                }}
-              />
+              <div className="void-complete-bar" />
             ) : (
               /* Infinite Full Bar Looping in the Void */
-              <div
-                style={{
-                  height: '100%',
-                  width: '100%',
-                  borderRadius: '4px',
-                  background: 'linear-gradient(90deg, #06111F 0%, #00E5C8 25%, #3B82F6 50%, #00E5C8 75%, #06111F 100%)',
-                  backgroundSize: '200% 100%',
-                  animation: 'infinite-void-stream 3.2s linear infinite',
-                  boxShadow: '0 0 16px rgba(0, 229, 200, 0.5), inset 0 0 6px rgba(255, 255, 255, 0.2)',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}
-              >
+              <div className="void-stream-bar">
                 {/* Secondary Laser Gleam sweeping through the void */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    bottom: 0,
-                    width: '35%',
-                    background: 'linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.75) 50%, transparent 100%)',
-                    animation: 'void-laser-gleam 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite'
-                  }}
-                />
+                <div className="void-laser-gleam-effect" />
               </div>
             )}
           </div>
@@ -1313,22 +1530,6 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
               {formatUserFacingMessage(qualifyProgress.latestMessage)}
             </span>
           </div>
-
-          <style>{`
-            @keyframes infinite-void-stream {
-              0% { background-position: 200% 0; }
-              100% { background-position: -200% 0; }
-            }
-            @keyframes void-laser-gleam {
-              0% { left: -35%; }
-              100% { left: 115%; }
-            }
-            @keyframes cyber-ping {
-              0% { transform: scale(0.9); opacity: 0.7; }
-              50% { transform: scale(1.3); opacity: 1; }
-              100% { transform: scale(0.9); opacity: 0.7; }
-            }
-          `}</style>
         </div>
       )}
 
@@ -1388,7 +1589,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
               onClick={() => setImportTab('file')}
             >
               <FileSpreadsheet size={16} style={{ flexShrink: 0 }} />
-              <span>Fichier (CSV / JSON)</span>
+              <span>Fichier     </span>
             </button>
             <button
               type="button"
@@ -1485,8 +1686,8 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
 
             {importTab === 'url' && (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Saisissez l&apos;URL d&apos;un fichier JSON ou CSV distant à importer :
+                <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  Saisissez l&apos;URL d&apos;un fichie distant à importer :
                 </div>
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                   <input
@@ -1510,30 +1711,373 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
 
             {importTab === 'paste' && (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Collez vos données brutes ci-dessous au format JSON (tableau d&apos;objets) ou CSV (première ligne pour les en-têtes) :
-                </div>
-                <textarea
-                  placeholder={`EXEMPLE JSON :
-[
-  {"nom": "Dupont", "prenom": "Jean", "email": "jean.dupont@translog.be", "entreprise": "TransLogistics"}
-]
+                {/* Native Autocomplete Datalists (zero visual clutter) */}
+                <datalist id="vmind-secteur-presets">
+                  {SECTEUR_PRESETS.map(s => <option key={s} value={s} />)}
+                </datalist>
+                <datalist id="vmind-pays-presets">
+                  {PAYS_PRESETS.map(p => <option key={p} value={p} />)}
+                </datalist>
+                <datalist id="vmind-poste-presets">
+                  {POSTE_PRESETS.map(r => <option key={r} value={r} />)}
+                </datalist>
 
-EXEMPLE CSV :
-nom,prenom,email,entreprise
-Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
-                  value={importPasteText}
-                  onChange={(e) => setImportPasteText(e.target.value)}
-                  className="email-textarea"
-                  style={{ height: '140px', fontSize: '0.8rem', fontFamily: 'monospace' }}
-                />
-                <button
-                  className="btn btn-primary"
-                  onClick={handlePasteImport}
-                  disabled={csvUploading || !importPasteText.trim()}
-                >
-                  {csvUploading ? 'Importation...' : 'Analyser & Importer'}
-                </button>
+                {/* Compact Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', paddingBottom: '0.2rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '4px', background: 'rgba(0, 229, 200, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00E5C8' }}>
+                      <Sparkles size={12} />
+                    </div>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: '#F0F4F8' }}>
+                      {manualLeads.length > 1 ? `Saisie Rapide (${manualLeads.length} contacts)` : 'Saisie Rapide de Prospect'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '0.68rem', color: '#00E5C8', background: 'rgba(0, 229, 200, 0.08)', padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(0, 229, 200, 0.2)' }}>
+                      * Requis
+                    </span>
+                  </div>
+                </div>
+
+                {/* Multi-Row Leads Entry Grid (Styles defined in workspace.scss) */}
+                <div className="manual-leads-grid-container">
+                  {/* Single Column Header Row (Desktop Only) */}
+                  <div className="manual-leads-header-row">
+                    <div className="manual-header-col" style={{ flex: '0 0 100px' }}>
+                      Prénom <span className="req">*</span>
+                    </div>
+                    <div className="manual-header-col" style={{ flex: '0 0 100px' }}>
+                      Nom <span className="req">*</span>
+                    </div>
+                    <div className="manual-header-col" style={{ flex: '1 1 200px', minWidth: '170px', maxWidth: '250px' }}>
+                      Email <span className="req">*</span>
+                    </div>
+                    <div className="manual-header-col" style={{ flex: '1 1 140px', minWidth: '120px', maxWidth: '180px' }}>
+                      Poste <span className="req">*</span>
+                    </div>
+                    <div className="manual-header-col" style={{ flex: '1 1 120px', minWidth: '100px', maxWidth: '150px' }}>
+                      Entreprise <span className="req">*</span>
+                    </div>
+                    <div className="manual-header-col" style={{ flex: '1 1 130px', minWidth: '110px', maxWidth: '160px' }}>
+                      Secteur <span className="req">*</span>
+                    </div>
+                    <div className="manual-header-col" style={{ flex: '0 0 95px' }}>
+                      Pays <span className="req">*</span>
+                    </div>
+                    <div className="manual-header-col" style={{ flex: '0 0 55px' }}>
+                      Effectif
+                    </div>
+                    {manualLeads.length > 1 && (
+                      <div style={{ flex: '0 0 24px' }} />
+                    )}
+                  </div>
+
+                  {/* Rows: Spreadsheet row on desktop, Cyber card on mobile */}
+                  {manualLeads.map((lead, leadIdx) => {
+                    const errors = manualErrors[lead.id] || {};
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    const isEmailValid = emailRegex.test(lead.email.trim());
+                    const detectedCompany = detectedDomainCompany[lead.id];
+
+                    return (
+                      <div key={lead.id} className="manual-lead-row">
+                        {/* Mobile-Only Card Header */}
+                        <div className="manual-lead-card-header">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <User size={12} color="#00E5C8" />
+                            <span style={{ fontSize: '0.74rem', fontWeight: 600, color: '#F0F4F8' }}>
+                              Prospect #{leadIdx + 1}
+                            </span>
+                            {lead.prenom || lead.nom ? (
+                              <span style={{ fontSize: '0.7rem', color: '#94A3B8' }}>
+                                ({lead.prenom} {lead.nom})
+                              </span>
+                            ) : null}
+                          </div>
+                          {manualLeads.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveManualLead(lead.id)}
+                              title="Supprimer ce prospect"
+                              className="manual-delete-card-btn"
+                            >
+                              <Trash2 size={11} />
+                              <span>Supprimer</span>
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Group 1: Prénom & Nom */}
+                        <div className="manual-mobile-field-group">
+                          {/* Prénom */}
+                          <div style={{ flex: '0 0 100px' }}>
+                            <label className="manual-field-mobile-label" htmlFor={`manual-lead-${lead.id}-prenom`}>
+                              Prénom <span style={{ color: '#00E5C8' }}>*</span>
+                            </label>
+                            <input
+                              id={`manual-lead-${lead.id}-prenom`}
+                              type="text"
+                              autoCapitalize="words"
+                              placeholder="Jean"
+                              value={lead.prenom}
+                              onChange={(e) => handleUpdateManualLead(lead.id, 'prenom', e.target.value)}
+                              onKeyDown={(e) => handleFieldKeyDown(e, lead.id, 'prenom')}
+                              className={`manual-input-field ${errors.prenom ? 'has-error' : lead.prenom.trim() ? 'is-valid' : ''}`}
+                            />
+                          </div>
+
+                          {/* Nom */}
+                          <div style={{ flex: '0 0 100px' }}>
+                            <label className="manual-field-mobile-label" htmlFor={`manual-lead-${lead.id}-nom`}>
+                              Nom <span style={{ color: '#00E5C8' }}>*</span>
+                            </label>
+                            <input
+                              id={`manual-lead-${lead.id}-nom`}
+                              type="text"
+                              autoCapitalize="words"
+                              placeholder="Dupont"
+                              value={lead.nom}
+                              onChange={(e) => handleUpdateManualLead(lead.id, 'nom', e.target.value)}
+                              onKeyDown={(e) => handleFieldKeyDown(e, lead.id, 'nom')}
+                              className={`manual-input-field ${errors.nom ? 'has-error' : lead.nom.trim() ? 'is-valid' : ''}`}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Group 2: Email */}
+                        <div className="manual-mobile-field-group">
+                          <div style={{ flex: '1 1 200px', minWidth: '170px', maxWidth: '250px' }}>
+                            <label className="manual-field-mobile-label" htmlFor={`manual-lead-${lead.id}-email`}>
+                              Email <span style={{ color: '#00E5C8' }}>*</span>
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                id={`manual-lead-${lead.id}-email`}
+                                type="email"
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                placeholder="jean@entreprise.com"
+                                value={lead.email}
+                                onChange={(e) => handleEmailChange(lead.id, e.target.value)}
+                                onKeyDown={(e) => handleFieldKeyDown(e, lead.id, 'email')}
+                                className={`manual-input-field ${errors.email ? 'has-error' : isEmailValid ? 'is-valid' : ''}`}
+                                style={{ paddingRight: '26px' }}
+                              />
+                              {isEmailValid && (
+                                <div style={{ position: 'absolute', right: '7px', top: '50%', transform: 'translateY(-50%)', color: '#00E5A0', pointerEvents: 'none' }}>
+                                  <CheckCircle2 size={13} />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Group 3: Role & Entreprise */}
+                        <div className="manual-mobile-field-group">
+                          {/* Poste */}
+                          <div style={{ flex: '1 1 140px', minWidth: '120px', maxWidth: '180px' }}>
+                            <label className="manual-field-mobile-label" htmlFor={`manual-lead-${lead.id}-poste`}>
+                              Poste <span style={{ color: '#00E5C8' }}>*</span>
+                            </label>
+                            <input
+                              id={`manual-lead-${lead.id}-poste`}
+                              type="text"
+                              list="vmind-poste-presets"
+                              placeholder="Dir. Commercial"
+                              value={lead.poste}
+                              onChange={(e) => handleUpdateManualLead(lead.id, 'poste', e.target.value)}
+                              onKeyDown={(e) => handleFieldKeyDown(e, lead.id, 'poste')}
+                              className={`manual-input-field ${errors.poste ? 'has-error' : lead.poste.trim() ? 'is-valid' : ''}`}
+                            />
+                          </div>
+
+                          {/* Entreprise */}
+                          <div style={{ flex: '1 1 120px', minWidth: '100px', maxWidth: '150px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <label className="manual-field-mobile-label" htmlFor={`manual-lead-${lead.id}-entreprise`}>
+                                Entreprise <span style={{ color: '#00E5C8' }}>*</span>
+                              </label>
+                              {detectedCompany && (
+                                <span className="manual-field-mobile-label" style={{ fontSize: '0.58rem', color: '#00E5C8' }}>
+                                  (auto)
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                              <input
+                                id={`manual-lead-${lead.id}-entreprise`}
+                                type="text"
+                                placeholder="Stripe"
+                                value={lead.entreprise}
+                                onChange={(e) => handleUpdateManualLead(lead.id, 'entreprise', e.target.value)}
+                                onKeyDown={(e) => handleFieldKeyDown(e, lead.id, 'entreprise')}
+                                className={`manual-input-field ${errors.entreprise ? 'has-error' : lead.entreprise.trim() ? 'is-valid' : ''}`}
+                                style={detectedCompany ? { paddingRight: '38px' } : undefined}
+                              />
+                              {detectedCompany && (
+                                <span style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', fontSize: '0.58rem', color: '#00E5C8', pointerEvents: 'none' }}>
+                                  auto
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Group 4: Secteur & Pays */}
+                        <div className="manual-mobile-field-group">
+                          {/* Secteur */}
+                          <div style={{ flex: '1 1 130px', minWidth: '110px', maxWidth: '160px' }}>
+                            <label className="manual-field-mobile-label" htmlFor={`manual-lead-${lead.id}-secteur`}>
+                              Secteur <span style={{ color: '#00E5C8' }}>*</span>
+                            </label>
+                            <input
+                              id={`manual-lead-${lead.id}-secteur`}
+                              type="text"
+                              list="vmind-secteur-presets"
+                              placeholder="Tech & SaaS"
+                              value={lead.secteur}
+                              onChange={(e) => handleUpdateManualLead(lead.id, 'secteur', e.target.value)}
+                              onKeyDown={(e) => handleFieldKeyDown(e, lead.id, 'secteur')}
+                              className={`manual-input-field ${errors.secteur ? 'has-error' : lead.secteur.trim() ? 'is-valid' : ''}`}
+                            />
+                          </div>
+
+                          {/* Pays */}
+                          <div style={{ flex: '0 0 95px' }}>
+                            <label className="manual-field-mobile-label" htmlFor={`manual-lead-${lead.id}-pays`}>
+                              Pays <span style={{ color: '#00E5C8' }}>*</span>
+                            </label>
+                            <input
+                              id={`manual-lead-${lead.id}-pays`}
+                              type="text"
+                              list="vmind-pays-presets"
+                              placeholder="France"
+                              value={lead.pays}
+                              onChange={(e) => handleUpdateManualLead(lead.id, 'pays', e.target.value)}
+                              onKeyDown={(e) => handleFieldKeyDown(e, lead.id, 'pays')}
+                              className={`manual-input-field ${errors.pays ? 'has-error' : lead.pays.trim() ? 'is-valid' : ''}`}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Group 5: Effectif */}
+                        <div className="manual-mobile-field-group">
+                          {/* Effectif */}
+                          <div style={{ flex: '0 0 55px' }}>
+                            <label className="manual-field-mobile-label" htmlFor={`manual-lead-${lead.id}-taille_ent`}>
+                              Effectif
+                            </label>
+                            <input
+                              id={`manual-lead-${lead.id}-taille_ent`}
+                              type="number"
+                              inputMode="numeric"
+                              placeholder="50"
+                              min="1"
+                              value={lead.taille_ent}
+                              onChange={(e) => handleUpdateManualLead(lead.id, 'taille_ent', e.target.value)}
+                              onKeyDown={(e) => handleFieldKeyDown(e, lead.id, 'taille_ent')}
+                              className="manual-input-field"
+                              style={{ padding: '4px 6px' }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Delete Row Button (Desktop only, when > 1 lead) */}
+                        {manualLeads.length > 1 && (
+                          <div className="manual-lead-row-delete-desktop" style={{ flex: '0 0 24px', justifyContent: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveManualLead(lead.id)}
+                              title="Supprimer cette ligne"
+                              className="manual-delete-row-btn"
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Squeezed Action Bar */}
+                <div className="manual-action-bar">
+                  <div className="manual-action-buttons">
+                    <button
+                      type="button"
+                      onClick={handleAddManualLead}
+                      disabled={csvUploading}
+                      className="manual-btn-add"
+                    >
+                      <Plus size={13} />
+                      <span>Ajouter un autre prospect</span>
+                    </button>
+
+                    {manualLeads[manualLeads.length - 1]?.entreprise && (
+                      <button
+                        type="button"
+                        onClick={() => handleDuplicateManualLead(manualLeads[manualLeads.length - 1])}
+                        className="manual-btn-duplicate"
+                      >
+                        <Copy size={12} />
+                        <span>Dupliquer</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleResetManualForm}
+                      disabled={csvUploading}
+                      className="manual-btn-reset"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Réinitialiser</span>
+                    </button>
+                  </div>
+
+                  <div className="manual-action-submit-zone">
+                    {(() => {
+                      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                      const validCount = manualLeads.filter(l =>
+                        l.prenom.trim() && l.nom.trim() && emailRegex.test(l.email.trim()) && l.poste.trim() && l.entreprise.trim() && l.secteur.trim() && l.pays.trim()
+                      ).length;
+                      const allReady = validCount === manualLeads.length;
+
+                      return (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: allReady ? '#00E5A0' : '#FFB020', display: 'inline-block' }} />
+                          <span>
+                            <strong style={{ color: allReady ? '#00E5A0' : '#F0F4F8' }}>{validCount}/{manualLeads.length}</strong> {manualLeads.length > 1 ? 'prêts' : 'prêt'}
+                          </span>
+                        </div>
+                      );
+                    })()}
+
+                    <button
+                      className="btn btn-primary manual-submit-btn"
+                      onClick={handleManualFormSubmit}
+                      disabled={csvUploading}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '0.45rem 1rem',
+                        fontSize: '0.82rem',
+                        fontWeight: 600
+                      }}
+                    >
+                      <Zap size={14} />
+                      <span>
+                        {csvUploading
+                          ? 'Importation...'
+                          : manualLeads.length > 1
+                            ? `Importer (${manualLeads.length})`
+                            : 'Importer'}
+                      </span>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1635,11 +2179,11 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
           </div>
 
           {/* Table */}
-          <div className="table-container" style={{ overflowX: leadsTutorialStep === 6 ? 'visible' : 'auto' }}>
+          <div className="table-container" style={{ overflowX: leadsTutorialStep === 6 ? 'visible' : undefined }}>
             <table className="leads-table">
               <thead>
                 <tr>
-                  <th style={{ width: '40px', textAlign: 'center', verticalAlign: 'middle' }}>
+                  <th className="col-checkbox" style={{ width: '40px', textAlign: 'center', verticalAlign: 'middle' }}>
                     <StyledCheckbox
                       checked={paginatedLeads.length > 0 && selectedLeadIds.length === sortedLeads.length}
                       isIndeterminate={selectedLeadIds.length > 0 && selectedLeadIds.length < sortedLeads.length}
@@ -1652,24 +2196,24 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                       }}
                     />
                   </th>
-                  <th style={{ cursor: 'pointer', width: '20%' }} onClick={() => toggleSort('nom')}>
+                  <th className="col-contact" style={{ cursor: 'pointer', width: '20%' }} onClick={() => toggleSort('nom')}>
                     Contact {sortBy === 'nom' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th style={{ width: '16%' }}>Entreprise</th>
-                  <th style={{ cursor: 'pointer', width: '12%' }} onClick={() => toggleSort('score')}>
+                  <th className="col-company" style={{ width: '16%' }}>Entreprise</th>
+                  <th className="col-score" style={{ cursor: 'pointer', width: '12%' }} onClick={() => toggleSort('score')}>
                     Score ICP {sortBy === 'score' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th style={{ cursor: 'pointer', width: '10%', whiteSpace: 'nowrap', textAlign: 'center' }} onClick={() => toggleSort('statut')}>
+                  <th className="col-status" style={{ cursor: 'pointer', width: '10%', whiteSpace: 'nowrap', textAlign: 'center' }} onClick={() => toggleSort('statut')}>
                     Statut {sortBy === 'statut' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th style={{ cursor: 'pointer', width: '10%', textAlign: 'center' }} onClick={() => toggleSort('emails_count')}>
+                  <th className="col-emails" style={{ cursor: 'pointer', width: '10%', textAlign: 'center' }} onClick={() => toggleSort('emails_count')}>
                     Emails {sortBy === 'emails_count' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th style={{ width: '10%' }}>Source</th>
-                  <th style={{ cursor: 'pointer', width: '12%' }} onClick={() => toggleSort('date_collecte')}>
+                  <th className="col-source" style={{ width: '10%' }}>Source</th>
+                  <th className="col-date" style={{ cursor: 'pointer', width: '12%' }} onClick={() => toggleSort('date_collecte')}>
                     Collecté {sortBy === 'date_collecte' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th style={{ width: '10%', textAlign: 'center' }}>Actions</th>
+                  <th className="col-action" style={{ width: '10%', textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1685,8 +2229,20 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                           : 'low';
 
                     return (
-                      <tr key={lead.id} className={`lead-row ${selectedLeadIds.includes(lead.id) ? 'selected-row' : ''}`} style={{ cursor: 'pointer', ...(selectedLeadIds.includes(lead.id) ? { backgroundColor: 'rgba(99, 102, 241, 0.05)' } : {}) }} onDoubleClick={() => onOpenLead(lead)}>
-                        <td style={{ textAlign: 'center', width: '40px', verticalAlign: 'middle' }}>
+                      <tr
+                        key={lead.id}
+                        className={`lead-row ${selectedLeadIds.includes(lead.id) ? 'selected-row' : ''}`}
+                        style={{ cursor: 'pointer', ...(selectedLeadIds.includes(lead.id) ? { backgroundColor: 'rgba(99, 102, 241, 0.05)' } : {}) }}
+                        onClick={(e) => {
+                          const target = e.target as HTMLElement;
+                          if (target.closest('input[type="checkbox"]') || target.closest('label') || target.closest('button')) {
+                            return;
+                          }
+                          onOpenLead(lead);
+                        }}
+                        onDoubleClick={() => onOpenLead(lead)}
+                      >
+                        <td className="col-checkbox" style={{ textAlign: 'center', width: '40px', verticalAlign: 'middle' }}>
                           <StyledCheckbox
                             checked={selectedLeadIds.includes(lead.id)}
                             onChange={(e) => {
@@ -1698,17 +2254,23 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                             }}
                           />
                         </td>
-                        <td>
+                        <td className="col-contact">
                           <div className="lead-name">{lead.prenom} {lead.nom}</div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{lead.email}</div>
+                          {lead.poste && (
+                            <div className="lead-job-mobile">
+                              <Briefcase size={11} />
+                              <span>{lead.poste}</span>
+                            </div>
+                          )}
+                          <div className="lead-email" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{lead.email}</div>
                         </td>
-                        <td>
-                          <div>{lead.entreprise}</div>
-                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        <td className="col-company">
+                          <div className="company-name">{lead.entreprise}</div>
+                          <div className="company-sub-meta" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                             {lead.poste} • {lead.secteur} • {lead.pays}
                           </div>
                         </td>
-                        <td>
+                        <td className="col-score">
                           {lead.score !== null ? (
                             <div className="score-progress-container">
                               <div className="score-progress-bar">
@@ -1717,18 +2279,18 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                                   style={{ width: `${lead.score}%` }}
                                 ></div>
                               </div>
-                              <span className="score-text">{lead.score}</span>
+                              <span className={`score-text ${scoreColorClass}`}>{lead.score}</span>
                             </div>
                           ) : (
-                            <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Non qualifié</span>
+                            <span className="unqualified-text" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Non qualifié</span>
                           )}
                         </td>
-                        <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                        <td className="col-status" style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
                           <span className={`badge badge-${lead.est_qualifie === true ? 'qualified' : lead.est_qualifie === false ? 'discarded' : lead.statut === 'Erreur' ? 'error' : 'new'}`}>
                             {lead.est_qualifie === true ? 'Qualifié' : lead.est_qualifie === false ? 'Écarté' : lead.statut || 'Nouveau'}
                           </span>
                         </td>
-                        <td style={{ textAlign: 'center' }}>
+                        <td className="col-emails" style={{ textAlign: 'center' }}>
                           <span className={`badge ${(lead.agent_emails_count ?? lead.emails_count ?? 0) > 0 ? 'badge-sent' : 'badge-new'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                             {(lead.agent_emails_count ?? lead.emails_count ?? 0) > 0 ? (
                               <>
@@ -1738,7 +2300,7 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                             ) : '0'}
                           </span>
                         </td>
-                        <td>
+                        <td className="col-source">
                           <span style={{ fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                             {lead.source.includes('CSV') ? (
                               <>
@@ -1755,7 +2317,7 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                             )}
                           </span>
                         </td>
-                        <td>
+                        <td className="col-date">
                           <div style={{ fontSize: '0.85rem' }}>
                             {new Date(lead.date_collecte).toLocaleDateString('fr-FR', {
                               day: 'numeric',
@@ -1770,7 +2332,7 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                             })}
                           </div>
                         </td>
-                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <td className="col-action" style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <button
                             className="btn btn-secondary"
                             style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: 5, ...(paginatedLeads.indexOf(lead) === 0 ? getTabBtnStyle(6) : {}) }}
@@ -1786,7 +2348,7 @@ Dupont,Jean,jean.dupont@translog.be,TransLogistics`}
                   })
                 ) : (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                    <td colSpan={9} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                       Aucun prospect ne correspond aux filtres de recherche.
                     </td>
                   </tr>

@@ -610,7 +610,7 @@ export const ProspectPipeline3D: React.FC<ProspectPipeline3DProps> = ({ onStageC
       >
         {activeStage === 'card' && (
           <>
-            <span style={{ fontSize: '0.95rem' }}>📥</span>
+            <span style={{ fontSize: '0.95rem' }}></span>
             <span>
               <strong style={{ color: '#00E5A0' }}>Fiche Contact :</strong> Vos prospects (fichiers CSV, Excel, XML..., URL web ou Sourcing IA) entrent dans le pipeline
             </span>
@@ -618,7 +618,7 @@ export const ProspectPipeline3D: React.FC<ProspectPipeline3DProps> = ({ onStageC
         )}
         {activeStage === 'scanner' && (
           <>
-            <span style={{ fontSize: '0.95rem' }}>⚡</span>
+            <span style={{ fontSize: '0.95rem' }}></span>
             <span>
               <strong style={{ color: '#00E5C8' }}>Scanner IA :</strong> Analyse du profil et calcul de la correspondance avec votre client idéal
             </span>
@@ -626,7 +626,7 @@ export const ProspectPipeline3D: React.FC<ProspectPipeline3DProps> = ({ onStageC
         )}
         {activeStage === 'mail' && (
           <>
-            <span style={{ fontSize: '0.95rem' }}>✉️</span>
+            <span style={{ fontSize: '0.95rem' }}></span>
             <span>
               <strong style={{ color: '#38BDF8' }}>Email Personnalisé :</strong> Rédaction sur-mesure et expédition automatisée
             </span>
