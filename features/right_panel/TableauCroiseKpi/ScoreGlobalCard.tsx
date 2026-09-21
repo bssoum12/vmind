@@ -38,11 +38,13 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
 
   // Read current active year data from Context
   const agentData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
-  const toolData = agentData.get_score_global_vdata_kpi || agentData || {};
+  const toolData = agentData.get_score_global_vdata_kpi || agentData.data || agentData || {};
   
-  const scoreQualite = toolData.ok && toolData.kpis ? (toolData.kpis.find((k: any) => k.label === "Score qualité global")?.value ?? null) : null;
-  const statut = toolData.details?.statut ?? (toolData.ok ? "Optimal" : "En attente");
-  const details = toolData.details || null;
+  const scoreQualite = toolData.ok && toolData.kpis 
+    ? (toolData.kpis.find((k: any) => k.label === "Score qualité global")?.value ?? null) 
+    : (toolData.data?.kpis ? (toolData.data.kpis.find((k: any) => k.label === "Score qualité global")?.value ?? null) : null);
+  const statut = toolData.details?.statut ?? toolData.data?.details?.statut ?? (toolData.ok ? "Optimal" : "En attente");
+  const details = toolData.details || toolData.data?.details || null;
   
   const effectiveLoading = (loadingByAgent["vdata"] || loadingByAgent["VDATA"]) && !toolData.ok;
   const error = !effectiveLoading && !toolData.ok && globalError ? globalError : "";
@@ -288,6 +290,7 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
         /* Main Card Container */
         <div
           onMouseEnter={handleMouseEnter}
+          onMouseMove={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           style={{
             background: isCardHovered

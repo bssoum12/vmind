@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { MultiKpiItem } from "@/shared/types/kpi";
 
 interface KpiTooltipProps {
@@ -112,6 +113,12 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
   onMouseEnter,
   onMouseLeave,
 }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Extract key KPI fields by label safely
   const kpiActive = kpis?.find(k => k.label === "Dossiers actifs");
   const kpiClosed = kpis?.find(k => k.label === "Dossiers clôturés");
@@ -195,12 +202,20 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
     remorqueVal,
   ]);
 
-  if (!visible || !kpis || kpis.length === 0) {
+  if (!visible || !mounted || !kpis || kpis.length === 0) {
     return null;
   }
 
   const tooltipWidth = 440;
-  const leftPosition = coords.left - tooltipWidth - 12;
+  const leftPosition = Math.max(10, coords.left - tooltipWidth - 12);
+  const tooltipHeight = 480;
+  let topPosition = coords.top - 20;
+  if (typeof window !== "undefined") {
+    if (topPosition + tooltipHeight > window.innerHeight) {
+      topPosition = window.innerHeight - tooltipHeight - 20;
+    }
+    topPosition = Math.max(20, topPosition);
+  }
 
   const handleExportExcel = () => {
     if (!exportData) {
@@ -405,14 +420,14 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  return (
+  return createPortal(
     <div
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       style={{
         position: "fixed",
         left: `${leftPosition}px`,
-        top: `${coords.top}px`,
+        top: `${topPosition}px`,
         width: `${tooltipWidth}px`,
 
         background: "rgba(6, 17, 31, 0.98)",
@@ -430,7 +445,7 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
         transition: "opacity .2s ease, transform .2s ease",
 
         pointerEvents: "auto",
-        zIndex: 99999,
+        zIndex: 999999,
         maxHeight: "calc(100vh - 40px)",
         overflowY: "auto",
       }}
@@ -637,6 +652,7 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
         </svg>
         Exporter vers Excel
       </button>
-    </div>
+    </div>,
+    document.body
   );
 };
