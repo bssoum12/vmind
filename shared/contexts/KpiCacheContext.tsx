@@ -67,8 +67,8 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   // Helper to check if user has ERP connected and agent is allowed
   const isAgentKpiAllowed = (agentId: string) => {
     if (typeof window === "undefined") return false;
-    const mcpToken = localStorage.getItem("vmind_mcp_token");
-    if (!mcpToken) return false;
+    const isConnected = localStorage.getItem("vmind_connector_status") === "connected" || Boolean(localStorage.getItem("vmind_mcp_token"));
+    if (!isConnected) return false;
     
     const stored = localStorage.getItem("vmind_allowed_agents");
     if (stored) {
@@ -79,10 +79,18 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     }
     
     try {
-      const decoded: any = jwtDecode(mcpToken);
-      if (decoded.roles && decoded.roles.includes("Administrators")) return true;
-      if (decoded.allowedAgents) {
-        return decoded.allowedAgents.includes(agentId.toUpperCase());
+      let sessionToken = localStorage.getItem("vmind_session");
+      if (sessionToken) {
+        if (sessionToken.startsWith('{')) {
+          try { sessionToken = JSON.parse(sessionToken).token || sessionToken; } catch {}
+        }
+        if (sessionToken) {
+          const decoded: any = jwtDecode(sessionToken);
+          if (decoded.roles && (Array.isArray(decoded.roles) ? decoded.roles.includes("Administrators") : decoded.roles === "Administrators")) return true;
+          if (decoded.allowedAgents && Array.isArray(decoded.allowedAgents)) {
+            return decoded.allowedAgents.includes(agentId.toUpperCase());
+          }
+        }
       }
     } catch (e) {}
     
@@ -272,8 +280,8 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   // Instantly clear or refetch KPI cache when MCP session connects/disconnects
   useEffect(() => {
     const handleMcpUpdate = () => {
-      const mcpToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_mcp_token') : null;
-      if (!mcpToken) {
+      const isConnected = typeof window !== 'undefined' && (localStorage.getItem('vmind_connector_status') === 'connected' || Boolean(localStorage.getItem('vmind_mcp_token')));
+      if (!isConnected) {
         // Disconnected from ERP: immediately wipe cached KPIs & errors
         setKpisByAgent({});
         setError(null);

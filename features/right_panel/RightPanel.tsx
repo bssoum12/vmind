@@ -63,7 +63,8 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
   const checkPermissions = () => {
     if (typeof window === 'undefined') return;
     const mcpToken = localStorage.getItem('vmind_mcp_token');
-    const connected = Boolean(mcpToken);
+    const connectorStatus = localStorage.getItem('vmind_connector_status');
+    const connected = connectorStatus === 'connected' || Boolean(mcpToken);
     setIsErpConnected(connected);
 
     const storedAllowed = localStorage.getItem('vmind_allowed_agents');

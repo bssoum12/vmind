@@ -337,12 +337,18 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
 
     try {
       const vmindToken = getVmindSessionToken();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (vmindToken) {
-        headers['Authorization'] = `Bearer ${vmindToken}`;
+      if (!vmindToken) {
+        setLoginError('Session VMIND requise. Veuillez vous connecter.');
+        setLoginLoading(false);
+        return;
       }
 
-      const res = await fetch(`${baseUrl}/api/mcp/auth/login`, {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${vmindToken}`
+      };
+
+      const res = await fetch(`${baseUrl}/api/connectors/tralis/connect`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ 
@@ -356,10 +362,10 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
       const data = await res.json();
 
       if (res.ok && data.ok) {
-        console.log('[Connectors] Connexion manuelle réussie — user:', data.user?.username);
+        console.log('[Connectors] Connexion connecteur TraLIS réussie — user:', data.user?.username);
         setShowModal(false);
         setLoginError('');
-        onConnected(data.token, data);
+        onConnected(data.status || 'connected', data);
       } else {
         setLoginError(data?.error || 'Identifiants invalides.');
       }

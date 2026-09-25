@@ -50,28 +50,10 @@ export async function sendVmindMessage(message: string, conversationId: string, 
   const agentCode = (agentId || "VFIN").toUpperCase();
   console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode });
 
-  let mcp_token = "";
-  let session_token = "";
-  if (typeof window !== "undefined") {
-    try {
-      mcp_token = localStorage.getItem("vmind_mcp_token") || "";
-      const sessionStr = localStorage.getItem("vmind_session");
-      if (sessionStr) {
-        try {
-          session_token = JSON.parse(sessionStr).token || sessionStr;
-        } catch(e2) {
-          session_token = sessionStr;
-        }
-      }
-    } catch (e) {
-      console.warn("Could not retrieve token:", e);
-    }
-  }
-
-  const effectiveAuthToken = mcp_token || session_token;
+  const authHeaders = getAuthHeaders({ "Content-Type": "application/json" });
 
   try {
-    if (!effectiveAuthToken) {
+    if (!authHeaders["Authorization"]) {
       console.warn("⚠️ [n8n-api] Aucun token d'authentification trouvé. Blocage de l'appel vers n8n.");
       return {
         ok: false,
@@ -90,18 +72,14 @@ export async function sendVmindMessage(message: string, conversationId: string, 
 
     const response = await fetch(proxyUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(effectiveAuthToken ? { "Authorization": `Bearer ${effectiveAuthToken}` } : {})
-      },
+      headers: authHeaders,
       body: JSON.stringify({
         message,
         client_id: clientId,
         vmind_session_id: sessionId,
         conversation_id: conversationId,
         agent_id: agentId,
-        agent: agentCode,
-        mcp_token: mcp_token || ""
+        agent: agentCode
       }),
       signal
     });

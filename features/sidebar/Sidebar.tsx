@@ -26,7 +26,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
   const updatePermissions = () => {
     try {
       const mcpToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_mcp_token') : null;
-      setIsErpConnected(Boolean(mcpToken));
+      const connectorStatus = typeof window !== 'undefined' ? localStorage.getItem('vmind_connector_status') : null;
+      setIsErpConnected(connectorStatus === 'connected' || Boolean(mcpToken));
 
       const storedAllowedAgents = typeof window !== 'undefined' ? localStorage.getItem('vmind_allowed_agents') : null;
       if (storedAllowedAgents) {
