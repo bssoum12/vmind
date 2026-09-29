@@ -260,38 +260,37 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     }
   };
 
-  const checkPermissions = () => {
+  const checkPermissions = (event?: any) => {
     if (typeof window === 'undefined') return;
-    const mcpToken = localStorage.getItem('vmind_mcp_token');
-    const connectorStatus = localStorage.getItem('vmind_connector_status');
-    const connected = connectorStatus === 'connected' || Boolean(mcpToken);
-    setIsErpConnected(connected);
-
-    const storedAllowed = localStorage.getItem('vmind_allowed_agents');
-    if (storedAllowed) {
-      try {
-        setAllowedAgents(JSON.parse(storedAllowed));
-      } catch (e) {
-        setAllowedAgents([]);
-      }
-    } else {
+    const sessionToken = localStorage.getItem('vmind_session');
+    if (!sessionToken) {
+      setIsErpConnected(false);
       setAllowedAgents([]);
+      setIsAdmin(false);
+      return;
     }
 
-    const token = mcpToken || localStorage.getItem('vmind_session');
-    if (token) {
-      try {
-        let raw = token;
-        if (token.startsWith('{')) raw = JSON.parse(token).token;
-        const decoded: any = jwtDecode(raw);
-        setIsAdmin(Boolean(decoded.roles && decoded.roles.includes('Administrators')));
-        if (!storedAllowed && decoded.allowedAgents) {
-          setAllowedAgents(decoded.allowedAgents);
-        }
-      } catch (e) {
-        setIsAdmin(false);
+    const sessionDetail = event?.detail;
+    if (sessionDetail && (sessionDetail.connected || sessionDetail.user)) {
+      setIsErpConnected(true);
+      const agents = sessionDetail.allowedAgents || sessionDetail.user?.allowedAgents;
+      if (Array.isArray(agents)) {
+        setAllowedAgents(agents);
       }
-    } else {
+    }
+
+    try {
+      let raw = sessionToken;
+      if (raw.startsWith('{')) raw = JSON.parse(sessionToken).token || sessionToken;
+      if (raw.split('.').length === 3) {
+        const decoded: any = jwtDecode(raw);
+        setIsAdmin(Boolean(decoded.roles && (decoded.roles.includes('Administrator') || decoded.roles.includes('Administrators'))));
+        if (!sessionDetail && decoded.allowedAgents && Array.isArray(decoded.allowedAgents)) {
+          setAllowedAgents(decoded.allowedAgents);
+          setIsErpConnected(decoded.allowedAgents.length > 0);
+        }
+      }
+    } catch (e) {
       setIsAdmin(false);
     }
   };

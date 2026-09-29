@@ -63,29 +63,18 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   // Helper to check if user has ERP connected and agent is allowed
   const isAgentKpiAllowed = (agentId: string) => {
     if (typeof window === "undefined") return false;
-    const isConnected = localStorage.getItem("vmind_connector_status") === "connected" || Boolean(localStorage.getItem("vmind_mcp_token"));
-    if (!isConnected) return false;
-    
-    const stored = localStorage.getItem("vmind_allowed_agents");
-    if (stored) {
-      try {
-        const allowed: string[] = JSON.parse(stored);
-        return allowed.includes(agentId.toUpperCase());
-      } catch (e) {}
-    }
+    let sessionToken = localStorage.getItem("vmind_session");
+    if (!sessionToken) return false;
     
     try {
-      let sessionToken = localStorage.getItem("vmind_session");
-      if (sessionToken) {
-        if (sessionToken.startsWith('{')) {
-          try { sessionToken = JSON.parse(sessionToken).token || sessionToken; } catch {}
-        }
-        if (sessionToken) {
-          const decoded: any = jwtDecode(sessionToken);
-          if (decoded.roles && (Array.isArray(decoded.roles) ? decoded.roles.includes("Administrators") : decoded.roles === "Administrators")) return true;
-          if (decoded.allowedAgents && Array.isArray(decoded.allowedAgents)) {
-            return decoded.allowedAgents.includes(agentId.toUpperCase());
-          }
+      if (sessionToken.startsWith('{')) {
+        try { sessionToken = JSON.parse(sessionToken).token || sessionToken; } catch {}
+      }
+      if (sessionToken && sessionToken.split('.').length === 3) {
+        const decoded: any = jwtDecode(sessionToken);
+        if (decoded.roles && (Array.isArray(decoded.roles) ? (decoded.roles.includes("Administrator") || decoded.roles.includes("Administrators")) : (decoded.roles === "Administrator" || decoded.roles === "Administrators"))) return true;
+        if (decoded.allowedAgents && Array.isArray(decoded.allowedAgents)) {
+          return decoded.allowedAgents.includes(agentId.toUpperCase());
         }
       }
     } catch (e) {}
@@ -126,13 +115,19 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     // Set loading state for this agent independently (never aborts other specialists)
     setLoadingByAgent(prev => ({ ...prev, [agentKey]: true }));
     try {
-      let clientId = typeof window !== 'undefined' ? localStorage.getItem('vmind_client_id') || 'DEMO' : 'DEMO';
-      const mcpToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_mcp_token') : null;
-      if (mcpToken && mcpToken !== 'connected' && mcpToken.split('.').length === 3) {
-        try {
-          const decoded: any = jwtDecode(mcpToken);
-          if (decoded?.client_id) clientId = decoded.client_id;
-        } catch {}
+      let clientId = 'LOCAL';
+      const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
+      if (sessionToken) {
+        let clean = sessionToken;
+        if (clean.startsWith('{')) {
+          try { clean = JSON.parse(clean).token || clean; } catch {}
+        }
+        if (clean && clean.split('.').length === 3) {
+          try {
+            const decoded: any = jwtDecode(clean);
+            if (decoded?.client_id) clientId = decoded.client_id;
+          } catch {}
+        }
       }
 
       console.log(`[KPI CONTEXT] Fetching KPIs for ${allowedAgentUpper} (tenant: ${clientId}, force: ${force}, tool: ${targetTool || 'ALL'}, horizon: ${horizon || '1m'})`);
@@ -231,10 +226,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   const isAuthenticated = () => {
     if (typeof window === "undefined") return false;
     const sessionToken = localStorage.getItem("vmind_session");
-    const mcpToken = localStorage.getItem("vmind_mcp_token");
-    const isMcpValid = Boolean(mcpToken && mcpToken !== "null" && mcpToken !== "connected");
-    const isSessionValid = Boolean(sessionToken && sessionToken !== "null");
-    return isMcpValid || isSessionValid;
+    return Boolean(sessionToken && sessionToken !== "null");
   };
 
   // Chargement passif depuis PostgreSQL lors du changement d'onglet spécialiste ou de date (NE LANCE JAMAIS n8n)
@@ -273,9 +265,10 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
   // Nettoyage lors de la déconnexion de session MCP
   useEffect(() => {
-    const handleMcpUpdate = () => {
-      const isConnected = typeof window !== 'undefined' && (localStorage.getItem('vmind_connector_status') === 'connected' || Boolean(localStorage.getItem('vmind_mcp_token')));
-      if (!isConnected) {
+    const handleMcpUpdate = (event?: any) => {
+      const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
+      const sessionDetail = event?.detail;
+      if (!sessionToken || sessionDetail === null) {
         setKpisByAgent({});
         setError(null);
         setLoadingByAgent({});

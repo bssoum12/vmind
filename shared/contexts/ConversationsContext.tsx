@@ -26,10 +26,6 @@ interface ConversationsContextType {
 
 function getValidAuthToken(): string | null {
   if (typeof window === 'undefined') return null;
-  const mcpToken = localStorage.getItem('vmind_mcp_token');
-  if (mcpToken && mcpToken !== 'connected' && mcpToken.split('.').length === 3) {
-    return mcpToken;
-  }
   let session = localStorage.getItem('vmind_session');
   if (session) {
     if (session.startsWith('{')) {

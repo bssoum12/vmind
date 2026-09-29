@@ -8,8 +8,6 @@ import { AnimatedNumber } from "./AnimatedNumber";
 
 function getAuthToken() {
   if (typeof window === 'undefined') return '';
-  const mcpToken = localStorage.getItem('vmind_mcp_token');
-  if (mcpToken) return mcpToken;
   try {
     const sessionStr = localStorage.getItem('vmind_session');
     if (!sessionStr) return '';
@@ -17,6 +15,19 @@ function getAuthToken() {
     const parsed = JSON.parse(sessionStr);
     return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
   } catch(e) { return ''; }
+}
+
+function getClientIdFromSession() {
+  if (typeof window === 'undefined') return 'LOCAL';
+  try {
+    const token = getAuthToken();
+    if (token && token.split('.').length === 3) {
+      const parts = token.split('.');
+      const payload = JSON.parse(atob(parts[1]));
+      return payload?.client_id || 'LOCAL';
+    }
+  } catch {}
+  return 'LOCAL';
 }
 
 interface Props {
@@ -114,7 +125,7 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
   const fetchPrevYearData = async () => {
     if (typeof window === "undefined") return;
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-    const clientId = "DEMO";
+    const clientId = getClientIdFromSession();
 
     try {
       const currentYear = new Date().getFullYear();
