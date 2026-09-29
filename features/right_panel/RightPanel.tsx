@@ -1,0 +1,780 @@
+"use client";
+
+import React from 'react';
+import { jwtDecode } from 'jwt-decode';
+import { MiniKpi } from '../../components/ui/MiniKpi';
+import { AGENTS } from '../../shared/constants/data';
+import { LogEntry } from '../../shared/types';
+import { VolumeLineChart } from './VolumeLineChart';
+import { DeliveryRateKpi } from './DeliveryRateKpi';
+import { MultiIndicatorsCard } from './TableauCroiseKpi/MultiIndicatorsCard';
+import { ScoreGlobalCard } from './TableauCroiseKpi/ScoreGlobalCard';
+import { LatestReportCard } from './TableauCroiseKpi/LatestReportCard';
+import { AlertsCard } from './TableauCroiseKpi/AlertsCard';
+import { VfinMonthlyRevenueCard } from './TableauCroiseKpi/VfinMonthlyRevenueCard';
+import { VfinOverdueCard } from './TableauCroiseKpi/VfinOverdueCard';
+import { VfinSixMonthChartCard } from './TableauCroiseKpi/VfinSixMonthChartCard';
+import { VfinMarginCard } from './TableauCroiseKpi/VfinMarginCard';
+import { VfinTopClientsCard } from './TableauCroiseKpi/VfinTopClientsCard';
+import { VsellTopClientsCard } from './TableauCroiseKpi/VsellTopClientsCard';
+import { VsellNewClientsCard } from './TableauCroiseKpi/VsellNewClientsCard';
+import { VsellInactiveClientsCard } from './TableauCroiseKpi/VsellInactiveClientsCard';
+import { VsellRevenuClientBarChart } from './TableauCroiseKpi/VsellRevenuClientBarChart';
+import { VsellFidelisationChartCard } from './TableauCroiseKpi/VsellFidelisationChartCard';
+import { VsellPipelineFunnelCard } from './TableauCroiseKpi/VsellPipelineFunnelCard';
+import { VfinTresorerieCard } from './TableauCroiseKpi/VfinTresorerieCard';
+import { VbuyFacturesAReglerCard } from './TableauCroiseKpi/VbuyFacturesAReglerCard';
+import { VbuyAchatsDuMoisCard } from './TableauCroiseKpi/VbuyAchatsDuMoisCard';
+import { VbuyFournisseursEnRetardCard } from './TableauCroiseKpi/VbuyFournisseursEnRetardCard';
+import { VbuyCommandesEnAttenteCard } from './TableauCroiseKpi/VbuyCommandesEnAttenteCard';
+import { VbuyRepartitionCategoriePieCard } from './TableauCroiseKpi/VbuyRepartitionCategoriePieCard';
+import { VmoveDossiersOuvertsCard } from './TableauCroiseKpi/VmoveDossiersOuvertsCard';
+import { VmoveDossiersEnRetardCard } from './TableauCroiseKpi/VmoveDossiersEnRetardCard';
+import { VmoveVolumeTransporteurCard } from './TableauCroiseKpi/VmoveVolumeTransporteurCard';
+import { VmoveBlNonFacturesCard } from './TableauCroiseKpi/VmoveBlNonFacturesCard';
+import { VmoveActiveFlowsMapCard } from './TableauCroiseKpi/VmoveActiveFlowsMapCard';
+import { KpiCacheProvider, useKpis } from '../../shared/contexts/KpiCacheContext';
+import { KpiEmptyState } from './KpiEmptyState';
+
+function getAuthToken() {
+  if (typeof window === 'undefined') return '';
+  const mcpToken = localStorage.getItem('vmind_mcp_token');
+  if (mcpToken) return mcpToken;
+  try {
+    const sessionStr = localStorage.getItem('vmind_session');
+    if (!sessionStr) return '';
+    if (sessionStr.startsWith('eyJ')) return sessionStr;
+    const parsed = JSON.parse(sessionStr);
+    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
+  } catch(e) { return ''; }
+}
+
+interface RightPanelProps {
+  logs: LogEntry[];
+  onInsertPrompt: (text: string) => void;
+  activeAgentId?: string;
+}
+
+const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, activeAgentId }) => {
+  const { startDate, endDate, updateGlobalDates, error, clearError, notice, clearNotice, fetchKpis, kpisByAgent, loadingByAgent, lastUpdatedByAgent } = useKpis();
+  const [isErpConnected, setIsErpConnected] = React.useState<boolean>(false);
+  const [allowedAgents, setAllowedAgents] = React.useState<string[]>([]);
+  const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
+
+  const agentKey = (activeAgentId || 'vdata').toLowerCase();
+  const agentData = kpisByAgent[agentKey];
+  const isLoading = Boolean(loadingByAgent[agentKey]);
+  const isInProgress = Boolean(agentData?._inProgress);
+
+  const lastUpdatedIso = lastUpdatedByAgent[agentKey] || agentData?._updatedAt;
+  const formattedLastUpdate = React.useMemo(() => {
+    if (!lastUpdatedIso) return null;
+    try {
+      const d = new Date(lastUpdatedIso);
+      if (isNaN(d.getTime())) return null;
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      return `${day}/${month} à ${hours}:${mins}`;
+    } catch {
+      return null;
+    }
+  }, [lastUpdatedIso]);
+
+  const hasKpiData = React.useMemo(() => {
+    if (!agentData) return false;
+    if (agentData._stored === false && !agentData.data && !agentData.kpis && !agentData.get_score_global_vdata_kpi) {
+      return false;
+    }
+    const meaningfulKeys = Object.keys(agentData).filter(k => !k.startsWith('_'));
+    return meaningfulKeys.length > 0;
+  }, [agentData]);
+
+  const showEmptyState = !hasKpiData;
+
+  const checkPermissions = () => {
+    if (typeof window === 'undefined') return;
+    const mcpToken = localStorage.getItem('vmind_mcp_token');
+    const connectorStatus = localStorage.getItem('vmind_connector_status');
+    const connected = connectorStatus === 'connected' || Boolean(mcpToken);
+    setIsErpConnected(connected);
+
+    const storedAllowed = localStorage.getItem('vmind_allowed_agents');
+    if (storedAllowed) {
+      try {
+        setAllowedAgents(JSON.parse(storedAllowed));
+      } catch (e) {
+        setAllowedAgents([]);
+      }
+    } else {
+      setAllowedAgents([]);
+    }
+
+    const token = mcpToken || localStorage.getItem('vmind_session');
+    if (token) {
+      try {
+        let raw = token;
+        if (token.startsWith('{')) raw = JSON.parse(token).token;
+        const decoded: any = jwtDecode(raw);
+        setIsAdmin(Boolean(decoded.roles && decoded.roles.includes('Administrators')));
+        if (!storedAllowed && decoded.allowedAgents) {
+          setAllowedAgents(decoded.allowedAgents);
+        }
+      } catch (e) {
+        setIsAdmin(false);
+      }
+    } else {
+      setIsAdmin(false);
+    }
+  };
+
+  React.useEffect(() => {
+    checkPermissions();
+    window.addEventListener('mcp-session-updated', checkPermissions);
+    return () => window.removeEventListener('mcp-session-updated', checkPermissions);
+  }, []);
+
+  const isKpiAuthorized = isErpConnected && (isAdmin || allowedAgents.includes(activeAgentId || 'VDATA'));
+
+  const [performances, setPerformances] = React.useState<Record<string, number>>({
+    VDATA: 0,
+    VFIN: 0,
+    VSELL: 0,
+    VSTOCK: 0,
+    VBUY: 0,
+    VMOVE: 0,
+  });
+
+  const [animatedPct, setAnimatedPct] = React.useState<Record<string, number>>({
+    VDATA: 0,
+    VFIN: 0,
+    VSELL: 0,
+    VSTOCK: 0,
+    VBUY: 0,
+    VMOVE: 0,
+  });
+
+  // Extract domain performances dynamically from n8n IA execution cache
+  React.useEffect(() => {
+    const vdataData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
+    const toolData = vdataData.get_score_global_vdata_kpi || vdataData;
+    const kpis = toolData?.kpis || toolData?.data?.kpis;
+
+    if (kpis && Array.isArray(kpis)) {
+      const scoreGlobal = kpis.find((k: any) => k.label === 'Score qualité global')?.value ?? 0;
+      const scoreLivraison = kpis.find((k: any) => k.label === 'Taux livraison')?.value ?? 0;
+      const scoreFinance = kpis.find((k: any) => k.label === 'Score impayés')?.value ?? 0;
+
+      setPerformances(prev => ({
+        ...prev,
+        VDATA: scoreGlobal,
+        VMOVE: scoreLivraison,
+        VFIN: scoreFinance,
+      }));
+    }
+  }, [kpisByAgent]);
+
+  React.useEffect(() => {
+    const duration = 1200;
+    const startTime = performance.now();
+    const startValues = { ...animatedPct };
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeProgress = progress * (2 - progress); // Ease out quad
+
+      setAnimatedPct({
+        VDATA: startValues.VDATA + (performances.VDATA - startValues.VDATA) * easeProgress,
+        VFIN: startValues.VFIN + (performances.VFIN - startValues.VFIN) * easeProgress,
+        VSELL: startValues.VSELL + (performances.VSELL - startValues.VSELL) * easeProgress,
+        VSTOCK: startValues.VSTOCK + (performances.VSTOCK - startValues.VSTOCK) * easeProgress,
+        VBUY: startValues.VBUY + (performances.VBUY - startValues.VBUY) * easeProgress,
+        VMOVE: startValues.VMOVE + (performances.VMOVE - startValues.VMOVE) * easeProgress,
+      });
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }, [performances]);
+
+  // Convert YYYYMMDD string to YYYY-MM-DD input date value format
+  const toInputValue = (dateStr: string) => {
+    if (dateStr.length !== 8) return '';
+    return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
+  };
+
+  return (
+    <div className="right-panel">
+      {/* KPIs Live */}
+      <div className="rp-section">
+        {/* Header with Section Title & Prominent Refresh Action */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', gap: '8px' }}>
+          <div className="rp-title" style={{ margin: 0, flex: 1, minWidth: 0, overflow: 'hidden' }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {activeAgentId === 'VDATA' 
+                ? 'DONNÉES & ANALYTICS' 
+                : activeAgentId === 'VFIN' 
+                  ? 'FINANCE & COMPTABILITÉ' 
+                  : activeAgentId === 'VSELL'
+                    ? 'COMMERCIAL'
+                    : activeAgentId === 'VBUY'
+                      ? 'ACHATS & FOURNISSEURS'
+                      : activeAgentId === 'VMOVE'
+                        ? 'LOGISTIQUE & LIVRAISONS'
+                        : 'INDICATEURS CLÉS'}
+            </span>
+          </div>
+          {isKpiAuthorized && (
+            <button
+              onClick={() => {
+                const agentKey = (activeAgentId || 'vdata').toLowerCase();
+                fetchKpis(agentKey, true);
+              }}
+              disabled={loadingByAgent[(activeAgentId || 'vdata').toLowerCase()]}
+              title="Actualiser les indicateurs en direct depuis l'ERP (n8n)"
+              style={{
+                background: loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] ? 'rgba(0, 240, 255, 0.04)' : 'rgba(0, 240, 255, 0.1)',
+                border: '1px solid rgba(0, 240, 255, 0.35)',
+                borderRadius: '6px',
+                color: '#00f0ff',
+                cursor: loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] ? 'not-allowed' : 'pointer',
+                padding: '5px 10px',
+                fontSize: '11px',
+                fontWeight: 600,
+                fontFamily: 'var(--font-mono)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.2s ease',
+                flexShrink: 0,
+                boxShadow: '0 2px 8px rgba(0, 240, 255, 0.12)'
+              }}
+              onMouseOver={(e) => !loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] && (e.currentTarget.style.background = 'rgba(0, 240, 255, 0.22)')}
+              onMouseOut={(e) => !loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] && (e.currentTarget.style.background = 'rgba(0, 240, 255, 0.1)')}
+            >
+              <span style={{ 
+                display: 'inline-block', 
+                fontSize: '12px',
+                animation: loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] ? 'spin 1s linear infinite' : 'none' 
+              }}>
+                🔄
+              </span>
+              <span>{loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] ? 'Actualisation...' : 'Actualiser'}</span>
+            </button>
+          )}
+        </div>
+
+        {/* Timestamp de dernière mise à jour stockée en base */}
+        {isKpiAuthorized && formattedLastUpdate && (
+          <div style={{
+            fontSize: '10.5px',
+            color: 'var(--muted)',
+            fontFamily: 'var(--font-mono)',
+            marginBottom: '14px',
+            marginTop: '-6px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <span style={{ color: '#00e5c8', fontSize: '10px' }}>●</span>
+            <span>Dernière actualisation : {formattedLastUpdate}</span>
+          </div>
+        )}
+
+        {!isKpiAuthorized ? (
+          !isErpConnected ? (
+            <div style={{
+              padding: '24px 16px',
+              backgroundColor: 'rgba(6, 17, 31, 0.7)',
+              backgroundImage: 'radial-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 0)',
+              backgroundSize: '12px 12px',
+              border: '1px solid rgba(0, 240, 255, 0.16)',
+              borderRadius: '10px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '12px',
+              boxShadow: '0 10px 30px rgba(0, 0, 0, 0.4)',
+              margin: '8px 0 16px 0'
+            }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '10px',
+                background: 'rgba(0, 240, 255, 0.08)',
+                border: '1px solid rgba(0, 240, 255, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '20px'
+              }}>
+                🔌
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--white)' }}>
+                Connecteur ERP Requis
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5', maxWidth: '280px' }}>
+                Connexion au connecteur ERP requise pour afficher les indicateurs de performance en temps réel et débloquer les outils avancés de cet agent.
+              </div>
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'connectors' }));
+                }}
+                style={{
+                  marginTop: '4px',
+                  padding: '7px 14px',
+                  borderRadius: '6px',
+                  background: 'rgba(0, 240, 255, 0.12)',
+                  border: '1px solid rgba(0, 240, 255, 0.3)',
+                  color: '#00f0ff',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(0, 240, 255, 0.2)'}
+                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(0, 240, 255, 0.12)'}
+              >
+                Accéder aux Connecteurs →
+              </button>
+            </div>
+          ) : (
+            <div style={{
+              padding: '20px 16px',
+              backgroundColor: 'rgba(255, 170, 0, 0.04)',
+              border: '1px solid rgba(255, 170, 0, 0.2)',
+              borderRadius: '10px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '10px',
+              margin: '8px 0 16px 0'
+            }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '8px',
+                background: 'rgba(255, 170, 0, 0.1)',
+                border: '1px solid rgba(255, 170, 0, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '18px'
+              }}>
+                🔒
+              </div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffaa00' }}>
+                Accès aux données restreint
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' }}>
+                Accès aux données et indicateurs TraLIS non autorisé pour cet agent. Il est possible d'échanger avec l'agent pour des questions métier ou de contacter un administrateur.
+              </div>
+            </div>
+          )
+        ) : (
+          <>
+            {/* Global Date Picker for VDATA only */}
+            {activeAgentId === 'VDATA' && (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  <label style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: '4px' }}>Début</label>
+                  <input 
+                    type="date" 
+                    value={toInputValue(startDate)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/-/g, '');
+                      if (val.length === 8) updateGlobalDates(val, endDate);
+                    }}
+                    style={{
+                      background: 'var(--navy3)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '4px',
+                      color: 'var(--white)',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                      padding: '4px 8px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+                  <label style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: '4px' }}>Fin</label>
+                  <input 
+                    type="date" 
+                    value={toInputValue(endDate)}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/-/g, '');
+                      if (val.length === 8) updateGlobalDates(startDate, val);
+                    }}
+                    style={{
+                      background: 'var(--navy3)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '4px',
+                      color: 'var(--white)',
+                      fontSize: '11px',
+                      fontFamily: 'var(--font-mono)',
+                      padding: '4px 8px',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Global Notice Banner (e.g. Cooldown) */}
+            {notice && (
+              <div style={{
+                background: 'rgba(0, 240, 255, 0.08)',
+                border: '1px solid rgba(0, 240, 255, 0.25)',
+                color: '#00f0ff',
+                fontSize: '11px',
+                padding: '8px 12px',
+                borderRadius: '6px',
+                marginBottom: '14px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>⏳</span>
+                  <span>{notice}</span>
+                </div>
+                <button 
+                  onClick={clearNotice} 
+                  style={{ background: 'none', border: 'none', color: '#00f0ff', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', padding: '0 4px' }}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Global Error Banner */}
+            {error && (
+              <div style={{ 
+                background: 'rgba(255, 71, 87, 0.12)', 
+                border: '1px solid rgba(255, 71, 87, 0.3)', 
+                color: 'var(--red)', 
+                fontSize: '10px', 
+                padding: '6px 12px', 
+                borderRadius: '4px', 
+                marginBottom: '16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span>{error}</span>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button 
+                    onClick={() => {
+                      const lowerAgent = (activeAgentId || 'VDATA').toLowerCase();
+                      fetchKpis(lowerAgent, true);
+                    }} 
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      color: 'var(--red)', 
+                      cursor: 'pointer', 
+                      fontWeight: 'bold', 
+                      fontSize: '14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 0,
+                      transform: 'translateY(-0.5px)'
+                    }}
+                    title="Réessayer"
+                  >
+                    ↻
+                  </button>
+                  <button onClick={clearError} style={{ background: 'none', border: 'none', color: 'var(--red)', cursor: 'pointer', fontWeight: 'bold', fontSize: '12px', padding: 0 }}>✕</button>
+                </div>
+              </div>
+            )}
+
+            {/* Affichage de l'état En attente si aucune donnée n'est stockée en base */}
+            {showEmptyState ? (
+              <KpiEmptyState 
+                agentId={activeAgentId || 'VDATA'} 
+                onLaunch={() => fetchKpis(agentKey, true)} 
+                isLoading={isLoading || isInProgress} 
+              />
+            ) : (
+              <>
+                {/* Indicateur discret si un recalcul tourne en tâche de fond alors que des données sont déjà affichées */}
+                {(isLoading || isInProgress) && (
+                  <div style={{
+                    padding: '10px 14px',
+                    background: 'rgba(0, 240, 255, 0.06)',
+                    border: '1px solid rgba(0, 240, 255, 0.22)',
+                    borderRadius: '8px',
+                    marginBottom: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <div style={{
+                      width: '14px',
+                      height: '14px',
+                      border: '2px solid rgba(0, 240, 255, 0.2)',
+                      borderTop: '2px solid #00f0ff',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                      flexShrink: 0
+                    }} />
+                    <span style={{ fontSize: '11px', color: '#00f0ff', lineHeight: 1.4 }}>
+                      Actualisation en cours en arrière-plan. La navigation vers d'autres spécialistes reste possible sans interrompre le traitement.
+                    </span>
+                  </div>
+                )}
+
+                <ScoreGlobalCard activeAgentId={activeAgentId} />
+                <VsellTopClientsCard activeAgentId={activeAgentId} />
+                <VsellNewClientsCard activeAgentId={activeAgentId} />
+                <VsellInactiveClientsCard activeAgentId={activeAgentId} />
+                <VsellRevenuClientBarChart activeAgentId={activeAgentId} />
+                <VsellFidelisationChartCard activeAgentId={activeAgentId} />
+                <VsellPipelineFunnelCard activeAgentId={activeAgentId} />
+                <VfinMonthlyRevenueCard activeAgentId={activeAgentId} />
+                <VfinOverdueCard activeAgentId={activeAgentId} />
+                <VfinSixMonthChartCard activeAgentId={activeAgentId} />
+                <VfinMarginCard activeAgentId={activeAgentId} />
+                <VfinTopClientsCard activeAgentId={activeAgentId} />
+                <VfinTresorerieCard activeAgentId={activeAgentId} />
+                <VbuyFacturesAReglerCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VbuyAchatsDuMoisCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VbuyFournisseursEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VbuyCommandesEnAttenteCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VbuyRepartitionCategoriePieCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VmoveBlNonFacturesCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VmoveActiveFlowsMapCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VmoveDossiersOuvertsCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VmoveDossiersEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VmoveVolumeTransporteurCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VolumeLineChart activeAgentId={activeAgentId} />
+                <DeliveryRateKpi activeAgentId={activeAgentId} /> 
+                <MultiIndicatorsCard activeAgentId={activeAgentId} />
+                <LatestReportCard activeAgentId={activeAgentId} />
+                <AlertsCard activeAgentId={activeAgentId} />
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Performance par Domaine */}
+      {activeAgentId === 'VDATA' && isKpiAuthorized && (
+        <div className="rp-section" style={{ marginTop: '20px' }}>
+          <div className="rp-title" style={{ marginBottom: '14px' }}>Performance par Domaine</div>
+        
+        <div
+          style={{
+            padding: '16px',
+            background: 'linear-gradient(145deg, rgba(13, 17, 26, 0.96) 0%, rgba(10, 24, 28, 0.96) 100%)',
+            border: '1px solid rgba(0, 240, 255, 0.3)',
+            borderRadius: '16px',
+            position: 'relative',
+            overflow: 'hidden',
+            boxShadow: '0 10px 35px rgba(0, 0, 0, 0.55), inset 0 0 20px rgba(0, 240, 255, 0.05)',
+            backdropFilter: 'blur(16px)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+          }}
+        >
+          {Object.values(AGENTS).map((agent) => {
+            let metricLabel = "Performance globale";
+            let statusText = "Optimal";
+            let statusColor = "#00e5c8";
+            const score = animatedPct[agent.id] || 0;
+
+            if (agent.id === 'VDATA') {
+              metricLabel = "Score qualité global";
+            } else if (agent.id === 'VFIN') {
+              metricLabel = "Recouvrement factures clients";
+            } else if (agent.id === 'VSELL') {
+              metricLabel = "Conversion opportunités CRM";
+            } else if (agent.id === 'VSTOCK') {
+              metricLabel = "Taux de rotation & dispo stock";
+            } else if (agent.id === 'VBUY') {
+              metricLabel = "Délai & conformité fournisseurs";
+            } else if (agent.id === 'VMOVE') {
+              metricLabel = "Taux de livraison à temps";
+            }
+
+            if (score >= 85) {
+              statusText = "Optimal";
+              statusColor = "#00e5c8";
+            } else if (score >= 70) {
+              statusText = "Moyen";
+              statusColor = "#ffb800";
+            } else {
+              statusText = "Alerte";
+              statusColor = "#ff3b30";
+            }
+
+            if (agent.id === 'VMOVE' && score < 70) {
+              statusText = "Critique";
+            }
+
+            return (
+              <div
+                key={agent.id}
+                onClick={() => onInsertPrompt(`Analyse situation ${agent.name}`)}
+                style={{
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '5px',
+                  padding: '6px 8px',
+                  borderRadius: '6px',
+                  transition: 'all 0.2s ease-in-out',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                  e.currentTarget.style.boxShadow = 'inset 0 0 8px rgba(0, 240, 255, 0.02)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                {/* Header row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  {/* Left: icon/tag + description */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div
+                      style={{
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '3px',
+                        background: agent.bgColor,
+                        color: agent.color,
+                        border: `1px solid ${agent.borderColor}`,
+                        fontSize: '8px',
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 700,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: `0 0 4px ${agent.color}20`,
+                      }}
+                    >
+                      {agent.icon}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          color: 'var(--white)',
+                          fontFamily: 'var(--font-body)',
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {agent.desc}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '7px',
+                          fontFamily: 'var(--font-mono)',
+                          color: 'var(--muted)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.2px',
+                        }}
+                      >
+                        {metricLabel}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right: score + status badge */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span
+                      style={{
+                        fontSize: '10px',
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 700,
+                        color: '#ffffff',
+                        textShadow: `0 0 4px ${agent.color}40`,
+                      }}
+                    >
+                      {score.toFixed(2).replace('.', ',')}%
+                    </span>
+                    <span
+                      style={{
+                        fontSize: '7px',
+                        fontFamily: 'var(--font-mono)',
+                        fontWeight: 700,
+                        color: statusColor,
+                        background: `${statusColor}14`,
+                        border: `1px solid ${statusColor}33`,
+                        borderRadius: '3px',
+                        padding: '1px 4px',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.2px',
+                      }}
+                    >
+                      {statusText}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div
+                  style={{
+                    height: '4px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.02)',
+                    borderRadius: '2px',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${score}%`,
+                      background: `linear-gradient(90deg, ${agent.color}, ${statusColor})`,
+                      boxShadow: `0 0 6px ${statusColor}30`,
+                      borderRadius: '2px',
+                      transition: 'width 0.1s linear',
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+
+      {/* Activity Log */}
+      {logs && logs.length > 0 && (
+        <div className="rp-section">
+          <div className="rp-title">Journal d'Activité</div>
+          <div id="activity-log">
+            {logs.map((log) => (
+              <div key={log.id} className="log-item">
+                <div className="log-time">{log.time}</div>
+                <div className="log-text"><span>{log.agent}</span> — {log.action}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const RightPanel: React.FC<RightPanelProps> = (props) => (
+  <RightPanelContent {...props} />
+);

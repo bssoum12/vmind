@@ -1,0 +1,230 @@
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || isLoading) return;
+
+    setInput('');
+    setIsLoading(true);
+
+    const userMessage: VmindMessage = {
+      id: `user-${Date.now()}`,
+      sender: 'user',
+      text,
+      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+    };
+
+    const thinkingMessage: VmindMessage = {
+      id: `thinking-${Date.now()}`,
+      sender: 'vm',
+      text: '',
+      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+      isThinking: true,
+    };
+
+    setMessages((prev) => [...prev, userMessage, thinkingMessage]);
+
+    try {
+      let targetConvId = activeConversationId;
+      if (!targetConvId) {
+         targetConvId = await createNewConversation(activeAgentId, text);
+      }
+      let response = await sendVmindMessage(text, targetConvId, activeAgentId, clientId);
+
+      // Call bump
+      bumpConversation(targetConvId);
+
+      // Call smart-title async if this is a new conversation (or just always call it, backend handles it, but let's only do it if the title is generic)
+      const currentConv = conversations.find(c => c.conversation_id === targetConvId);
+      if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
+        // Fire and forget
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
+        if (token && token.startsWith("{")) token = JSON.parse(token).token;
+        
+        fetch(`${baseUrl}/api/conversations/${targetConvId}/smart-title`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ message: text || text })
+        })
+        .then(res => res.json())
+        .then(data => {
+           if (data.ok && data.conversation) {
+             updateConversationTitle(targetConvId, data.conversation.title);
+           }
+        })
+        .catch(err => console.error("Smart title error", err));
+      }
+
+
+      console.log("✅ [VmindChat] Réponse reçue de l'API:", {
+        tool: response.tool_used,
+        type: response.response_type,
+        fullObject: response
+      });
+
+      setMessages((prev) => prev.filter(m => !m.isThinking));
+
+      // On utilise maintenant le format standardisé
+      const isOk = response && (response.ok === true || (response.ok as any) === "true");
+
+      if (!isOk) {
+        setMessages((prev) => [...prev, {
+          id: `err-${Date.now()}`,
+          sender: 'vm',
+          text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
+          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          error: response?.error || 'NO_RESPONSE',
+          response_type: 'error',
+          title: response?.title || 'Erreur n8n'
+        }]);
+      } else {
+        const toolUsed = response.tool_used as string;
+        const agentId = TOOL_TO_AGENT[toolUsed] || 'VMIND';
+
+        if (onAgentActive) onAgentActive(agentId);
+
+        setMessages((prev) => [...prev, {
+          id: `vm-${Date.now()}`,
+          sender: 'vm',
+          text: response.message || 'Voici les informations demandées.',
+          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          tool_used: response.tool_used,
+          response_type: response.response_type || 'full',
+          title: response.title,
+          kpis: response.kpis,
+          table: response.table,
+          chart: response.chart,
+          details: response.details,
+          raw: response.raw,
+          alerts: response.alerts,
+          report_url: response.report_url,
+          report_filename: response.report_filename,
+          error: response.error
+        }]);
+      }
+
+    } catch (error: any) {
+      setMessages((prev) => prev.filter(m => !m.isThinking));
+      setMessages((prev) => [...prev, {
+        id: `err-${Date.now()}`,
+        sender: 'vm',
+        text: `Erreur de communication avec n8n : ${error.message}`,
+        time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+        error: error.message,
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFastTrackClick = async (shortLabel: string) => {
+    if (isLoading) return;
+    
+    const professionalMessage = FAST_TRACK_REGISTRY[shortLabel];
+    if (!professionalMessage) return;
+
+    setInput('');
+    setIsLoading(true);
+
+    const userMessage: VmindMessage = {
+      id: `user-${Date.now()}`,
+      sender: 'user',
+      text: professionalMessage,
+      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+    };
+
+    const thinkingMessage: VmindMessage = {
+      id: `thinking-${Date.now()}`,
+      sender: 'vm',
+      text: '',
+      time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+      isThinking: true,
+    };
+
+    setMessages((prev) => [...prev, userMessage, thinkingMessage]);
+
+    try {
+      // Déclenche le Webhook n8n comme pour un message normal (via l'IA)
+      let targetConvId = activeConversationId;
+      if (!targetConvId) {
+         targetConvId = await createNewConversation(activeAgentId, professionalMessage);
+      }
+      let response = await sendVmindMessage(professionalMessage, targetConvId, activeAgentId, clientId);
+
+      // Call bump
+      bumpConversation(targetConvId);
+
+      // Call smart-title async if this is a new conversation (or just always call it, backend handles it, but let's only do it if the title is generic)
+      const currentConv = conversations.find(c => c.conversation_id === targetConvId);
+      if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
+        // Fire and forget
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
+        if (token && token.startsWith("{")) token = JSON.parse(token).token;
+        
+        fetch(`${baseUrl}/api/conversations/${targetConvId}/smart-title`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ message: professionalMessage })
+        })
+        .then(res => res.json())
+        .then(data => {
+           if (data.ok && data.conversation) {
+             updateConversationTitle(targetConvId, data.conversation.title);
+           }
+        })
+        .catch(err => console.error("Smart title error", err));
+      }
+
+
+      setMessages((prev) => prev.filter(m => !m.isThinking));
+
+      const isOk = response && (response.ok === true || (response.ok as any) === "true");
+
+      if (!isOk) {
+        setMessages((prev) => [...prev, {
+          id: `err-${Date.now()}`,
+          sender: 'vm',
+          text: response?.message || 'Le service n8n n\'a pas renvoyé de réponse valide (ok=false).',
+          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          error: response?.error || 'NO_RESPONSE',
+          response_type: 'error',
+          title: response?.title || 'Erreur n8n'
+        }]);
+      } else {
+        const toolUsed = response.tool_used as string;
+        const agentId = TOOL_TO_AGENT[toolUsed] || 'VMIND';
+
+        if (onAgentActive) onAgentActive(agentId);
+
+        setMessages((prev) => [...prev, {
+          id: `vm-${Date.now()}`,
+          sender: 'vm',
+          text: response.message || 'Voici les informations demandées.',
+          time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+          tool_used: response.tool_used,
+          response_type: response.response_type || 'full',
+          title: response.title,
+          kpis: response.kpis,
+          table: response.table,
+          chart: response.chart,
+          details: response.details,
+          raw: response.raw,
+          alerts: response.alerts,
+          report_url: response.report_url,
+          report_filename: response.report_filename,
+          error: response.error
+        }]);
+      }
+    } catch (error: any) {
+      setMessages((prev) => prev.filter(m => !m.isThinking));
+      setMessages((prev) => [...prev, {
+        id: `err-${Date.now()}`,
+        sender: 'vm',
+        text: `Erreur de communication avec n8n : ${error.message}`,
+        time: new Date().toLocaleTimeString('fr-FR', { hour12: false }),
+        error: error.message,
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
