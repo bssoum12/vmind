@@ -630,7 +630,7 @@ export default function LoginPage() {
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || "Une erreur s'est produite.");
       
-      setSignupSuccess("Votre demande d'inscription a bien été enregistrée et est en attente de validation par un administrateur.");
+      setSignupSuccess("Votre compte a été créé avec succès ! Un e-mail d'activation vous a été envoyé. Veuillez consulter votre boîte de réception et cliquer sur le lien reçu pour définir votre mot de passe et activer votre compte.");
       // Reset form fields
       setSignupFirstName('');
       setSignupLastName('');
@@ -1287,7 +1287,7 @@ export default function LoginPage() {
                   <div style={{ textAlign: 'center', marginTop: '14px', fontSize: '12.5px', color: muted }}>
                     Pas de compte ?{' '}
                     <span onClick={() => { setShowSignup(true); setSignupError(''); setSignupSuccess(''); }} style={{ color: cyan, cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}>
-                      Créer une demande d&apos;inscription
+                      Créer un compte
                     </span>
                   </div>
                 </form>
@@ -1308,8 +1308,8 @@ export default function LoginPage() {
                     <ShieldCheck size={17} color={cyan} />
                     <div style={{ height: '1px', width: '40px', background: `linear-gradient(90deg, rgba(0,229,200,0.4), transparent)` }} />
                   </div>
-                  <h2 style={{ fontSize: '13.5px', fontWeight: 700, color: white, letterSpacing: '0.1em', marginBottom: '8px' }}>DEMANDE D&apos;INSCRIPTION</h2>
-                  <p style={{ fontSize: '12.5px', color: muted, lineHeight: 1.5 }}>Veuillez soumettre vos informations.</p>
+                  <h2 style={{ fontSize: '13.5px', fontWeight: 700, color: white, letterSpacing: '0.1em', marginBottom: '8px' }}>CRÉER UN COMPTE</h2>
+                  <p style={{ fontSize: '12.5px', color: muted, lineHeight: 1.5 }}>Renseignez vos informations pour créer votre compte VMIND.</p>
                 </div>
 
                 {signupSuccess ? (
@@ -1434,7 +1434,7 @@ export default function LoginPage() {
                           boxShadow: (signupLoading || isUsernameAvailable === false || isEmailAvailable === false || (signupPhone.trim().length > 0 && !phoneValidation.isValid) || !signupPhone.trim() || (isTurnstileConfigured && !turnstileToken)) ? 'none' : `0 0 20px rgba(0,229,200,0.3)` 
                         }}
                       >
-                        {signupLoading ? 'ENVOI...' : 'SOUMETTRE LA DEMANDE'}
+                        {signupLoading ? 'INSCRIPTION EN COURS...' : "S'INSCRIRE"}
                       </button>
                       <div style={{ textAlign: 'center', fontSize: '12.5px', color: muted, marginTop: '4px' }}>
                         Déjà inscrit ?{' '}

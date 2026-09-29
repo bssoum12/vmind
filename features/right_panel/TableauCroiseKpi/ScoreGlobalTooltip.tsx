@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 
 interface ScoreGlobalTooltipProps {
@@ -24,6 +25,12 @@ export const ScoreGlobalTooltip: React.FC<ScoreGlobalTooltipProps> = ({
   onMouseEnter,
   onMouseLeave,
 }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [animatedScore, setAnimatedScore] = useState(0);
   const [animatedDelivery, setAnimatedDelivery] = useState(0);
   const [animatedImpayes, setAnimatedImpayes] = useState(0);
@@ -116,7 +123,7 @@ export const ScoreGlobalTooltip: React.FC<ScoreGlobalTooltipProps> = ({
     tauxImpayes
   ]);
 
-  if (!visible) return null;
+  if (!visible || !mounted) return null;
 
   // Determine status color and styling
   let statusColor = "var(--red)";
@@ -192,7 +199,7 @@ export const ScoreGlobalTooltip: React.FC<ScoreGlobalTooltipProps> = ({
     }) + " TND";
   };
 
-  return (
+  return createPortal(
     <motion.div
       initial={{ opacity: 0, scale: 0.95, x: 15 }}
       animate={{ opacity: 1, scale: 1, x: 0 }}
@@ -216,7 +223,7 @@ export const ScoreGlobalTooltip: React.FC<ScoreGlobalTooltipProps> = ({
         boxShadow: `0 20px 50px rgba(0,0,0,0.6), 0 0 30px ${statusColor}0D`,
 
         pointerEvents: "auto",
-        zIndex: 99999,
+        zIndex: 999999,
       }}
     >
       {/* Cyber HUD Header */}
@@ -858,6 +865,7 @@ export const ScoreGlobalTooltip: React.FC<ScoreGlobalTooltipProps> = ({
           </div>
         </div>
       </div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 };

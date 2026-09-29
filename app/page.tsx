@@ -26,7 +26,6 @@ const JournalView = dynamic(() => import('@/features/management/journal/JournalV
 const ReportsView = dynamic(() => import('@/features/management/reports/ReportsView').then(m => m.ReportsView), { ssr: false });
 const IntegrationsView = dynamic(() => import('@/features/management/integrations/IntegrationsView').then(m => m.IntegrationsView), { ssr: false });
 const ProfileView = dynamic(() => import('@/features/management/profile/ProfileView').then(m => m.ProfileView), { ssr: false });
-const SignupRequestsView = dynamic(() => import('@/features/management/signup_requests/SignupRequestsView').then(m => m.SignupRequestsView), { ssr: false });
 const PromptsConfigView = dynamic(() => import('@/features/management/prompts/PromptsConfigView').then(m => m.PromptsConfigView), { ssr: false });
 
 const ConnectorsHub = dynamic(() => import('@/features/connectors/ConnectorsHub').then(m => m.ConnectorsHub), { ssr: false });
@@ -582,14 +581,9 @@ function HomeContent() {
             <JournalView />
           )}
 
-          {currentView === 'signup-requests' && (
-            <SignupRequestsView />
-          )}
-
           {currentView === 'prompts' && (
             <PromptsConfigView />
           )}
-
           {currentView === 'reports' && (
             <ReportsView />
           )}

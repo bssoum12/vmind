@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 
 interface AlertsTooltipProps {
@@ -22,6 +23,12 @@ export const AlertsTooltip: React.FC<AlertsTooltipProps> = ({
   onMouseEnter,
   onMouseLeave,
 }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Animated states for numbers
   const [animatedBugs, setAnimatedBugs] = useState(0);
   const [animatedNonConform, setAnimatedNonConform] = useState(0);
@@ -74,7 +81,7 @@ export const AlertsTooltip: React.FC<AlertsTooltipProps> = ({
     }
   }, [visible, bugs, nonConform]);
 
-  if (!visible) return null;
+  if (!visible || !mounted) return null;
 
   const tooltipWidth = 530;
   const leftPosition = Math.max(10, coords.left - tooltipWidth - 16);
@@ -95,7 +102,7 @@ export const AlertsTooltip: React.FC<AlertsTooltipProps> = ({
   // Formatting helper for big totals
   const formatNum = (val: number) => Math.round(val).toLocaleString("fr-FR");
 
-  return (
+  return createPortal(
     <motion.div
       ref={tooltipRef}
       initial={{ opacity: 0, scale: 0.95, y: isBottomHalf ? 15 : -15, x: 8 }}
@@ -116,7 +123,7 @@ export const AlertsTooltip: React.FC<AlertsTooltipProps> = ({
         backdropFilter: "blur(18px)",
         boxShadow: "0 25px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(255, 59, 48, 0.04), inset 0 0 20px rgba(0, 240, 255, 0.02)",
         pointerEvents: "auto",
-        zIndex: 99999,
+        zIndex: 999999,
         fontFamily: "var(--font-mono), monospace",
         transformOrigin: isBottomHalf ? "bottom right" : "top right",
       }}
@@ -504,6 +511,7 @@ export const AlertsTooltip: React.FC<AlertsTooltipProps> = ({
           </div>
         </div>
       </div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 };

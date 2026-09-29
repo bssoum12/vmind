@@ -251,7 +251,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel, ag
         recovery_config: {
           tone: recConfig.tone || 'courteous',
           min_urgency: recConfig.min_urgency || 'CRITIQUE_ONLY',
-          instructions: recConfig.instructions || 'Send emails to all overdue invoices except Barton Group. Add CC a.jebri@virtualdev.tn. Group by client.',
+          instructions: recConfig.instructions || 'Envoyez des e-mails pour toutes les factures en retard, sauf celles du Barton Group . Mettez a.jebri@virtualdev.tn en copie (CC). Regroupez les envois par client.',
           thresholds: {
             minimum_amount: thresholds.minimum_amount ?? 500,
             currency: thresholds.currency || 'TND',
@@ -311,7 +311,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel, ag
       recovery_config: {
         tone: 'courteous',
         min_urgency: 'CRITIQUE_ONLY',
-        instructions: 'Send emails to all overdue invoices except Barton Group. Add CC a.jebri@virtualdev.tn. Group by client.',
+        instructions: 'Envoyez des e-mails pour toutes les factures en retard, sauf celles du Barton Group . Mettez a.jebri@virtualdev.tn en copie (CC). Regroupez les envois par client.',
         thresholds: {
           minimum_amount: 500,
           currency: 'TND',
@@ -340,8 +340,8 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel, ag
           create_log: true
         },
         escalation_contact: {
-          email: 'a.jebri@virtualdev.tn',
-          phone: '+21623523939'
+          email: '',
+          phone: ''
         }
       },
       trigger_rules: [
@@ -672,7 +672,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel, ag
                       onChange={(e) => setFormData({ ...formData, agent_name: e.target.value })}
                       placeholder="Ex: Yasmine, Mohamed, Amira..."
                     />
-                    <div className="form-hint">Ce nom sera affiché dans les communications envoyées aux clients</div>
+                    
                   </div>
                   <div className="form-group">
                     <label className="form-label">Ton de communication</label>
@@ -832,7 +832,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel, ag
                     })}
                     placeholder="Saisissez des instructions précises pour guider l'IA lors des relances..."
                   />
-                  <div className="form-hint">Exemple : "N'envoie pas de relance à Barton Group. Ajoute en CC a.jebri@virtualdev.tn."</div>
+                  <div className="form-hint">Exemple : "N'envoie pas de relance au client xxx . Ajoute en CC l'email xxx."</div>
                 </div>
 
                 <div style={{ marginTop: '40px' }}>

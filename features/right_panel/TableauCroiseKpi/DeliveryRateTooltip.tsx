@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 
 interface DeliveryRateTooltipProps {
@@ -30,6 +31,12 @@ export const DeliveryRateTooltip: React.FC<DeliveryRateTooltipProps> = ({
   onMouseEnter,
   onMouseLeave,
 }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [animatedTotal, setAnimatedTotal] = useState(0);
   const [animatedATemps, setAnimatedATemps] = useState(0);
   const [animatedEnRetard, setAnimatedEnRetard] = useState(0);
@@ -89,7 +96,7 @@ export const DeliveryRateTooltip: React.FC<DeliveryRateTooltipProps> = ({
     }
   }, [visible, totalMouvements, mouvementsATemps, mouvementsEnRetard, finalPct]);
 
-  if (!visible) return null;
+  if (!visible || !mounted) return null;
 
   const tooltipWidth = 530;
   const leftPosition = Math.max(10, coords.left - tooltipWidth - 16);
@@ -112,7 +119,7 @@ export const DeliveryRateTooltip: React.FC<DeliveryRateTooltipProps> = ({
   const arcLength = 282.74; // 270 deg arc limit
   const strokeDashoffset = arcLength - animatedPct * arcLength;
 
-  return (
+  return createPortal(
     <motion.div
       ref={tooltipRef}
       initial={{ opacity: 0, scale: 0.95, y: isBottomHalf ? 15 : -15, x: 8 }}
@@ -133,7 +140,7 @@ export const DeliveryRateTooltip: React.FC<DeliveryRateTooltipProps> = ({
         backdropFilter: "blur(18px)",
         boxShadow: `0 25px 60px rgba(0, 0, 0, 0.75), 0 0 35px ${statusColor}10, inset 0 0 20px ${statusColor}05`,
         pointerEvents: "auto",
-        zIndex: 99999,
+        zIndex: 999999,
         fontFamily: "var(--font-mono), monospace",
         transformOrigin: isBottomHalf ? "bottom right" : "top right",
       }}
@@ -347,6 +354,7 @@ export const DeliveryRateTooltip: React.FC<DeliveryRateTooltipProps> = ({
           </div>
         </div>
       </div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 };

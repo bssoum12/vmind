@@ -56,41 +56,47 @@ export const ConnectorsHub: React.FC = () => {
       return;
     }
 
-    console.log('[ConnectorsHub] Récupération des sessions de connecteurs actives depuis PostgreSQL');
+    console.log('[ConnectorsHub] Récupération du statut du connecteur TraLIS depuis le backend');
     try {
-      const res = await fetch(`${baseUrl}/api/connectors/active-sessions`, {
+      const res = await fetch(`${baseUrl}/api/connectors/tralis/status`, {
         headers: { Authorization: `Bearer ${vmindToken}` },
       });
 
       if (res.ok) {
         const data = await res.json();
-        if (data.ok && Array.isArray(data.sessions)) {
-          const tralisSessionData = data.sessions.find((s: any) => s.connector_type === 'tralis');
-          if (tralisSessionData && tralisSessionData.connector_token) {
-            const token = tralisSessionData.connector_token;
-            // Valider le token MCP
-            const meRes = await fetch(`${baseUrl}/api/mcp/auth/me`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (meRes.ok) {
-              const meData = await meRes.json();
-              console.log('[ConnectorsHub] ✅ Session MCP restaurée via la base de données');
-              localStorage.setItem('vmind_mcp_token', token);
-              if (meData.user && Array.isArray(meData.user.allowedAgents)) {
-                localStorage.setItem('vmind_allowed_agents', JSON.stringify(meData.user.allowedAgents));
-              }
-              setTralisSession(meData);
-              setTralisStatus('connected');
-              window.dispatchEvent(new Event('mcp-session-updated'));
-              return;
-            }
+        if (data.ok && data.connected) {
+          console.log('[ConnectorsHub] ✅ Session TraLIS active restaurée via le backend');
+          localStorage.setItem('vmind_connector_status', 'connected');
+          const realToken = data.token || data.accessToken || data.connector_token;
+          if (realToken && realToken !== 'connected') {
+            localStorage.setItem('vmind_mcp_token', realToken);
           }
+          if (data.client_id) {
+            localStorage.setItem('vmind_client_id', data.client_id);
+          }
+          if (Array.isArray(data.allowedAgents)) {
+            localStorage.setItem('vmind_allowed_agents', JSON.stringify(data.allowedAgents));
+          }
+          setTralisSession({
+            user: {
+              username: data.erp_username || '',
+              client_id: data.client_id || 'DEMO',
+              roles: [],
+              allowedAgents: data.allowedAgents || []
+            },
+            tools: [],
+            allTools: []
+          });
+          setTralisStatus('connected');
+          window.dispatchEvent(new Event('mcp-session-updated'));
+          return;
         }
       }
 
       // Si aucune session active n'est trouvée ou si la validation a échoué
       localStorage.removeItem('vmind_mcp_token');
-      localStorage.removeItem('vmind_allowed_agents');
+      localStorage.removeItem('vmind_connector_status');
+      localStorage.removeItem('vmind_client_id');
       setTralisSession(null);
       setTralisStatus('idle');
       window.dispatchEvent(new Event('mcp-session-updated'));
@@ -105,9 +111,18 @@ export const ConnectorsHub: React.FC = () => {
 
   /** Called by TralisConnectorPanel after a successful login */
   const handleTralisMcpConnected = (token: string, data: McpSession) => {
-    localStorage.setItem('vmind_mcp_token', token);
-    if (data.user && Array.isArray(data.user.allowedAgents)) {
-      localStorage.setItem('vmind_allowed_agents', JSON.stringify(data.user.allowedAgents));
+    localStorage.setItem('vmind_connector_status', 'connected');
+    const realToken = (token && token !== 'connected') ? token : ((data as any)?.token || (data as any)?.accessToken || (data as any)?.connector_token);
+    if (realToken && realToken !== 'connected') {
+      localStorage.setItem('vmind_mcp_token', realToken);
+    }
+    const resolvedClientId = (data as any)?.client_id || data.user?.client_id;
+    if (resolvedClientId) {
+      localStorage.setItem('vmind_client_id', resolvedClientId);
+    }
+    const agents = (data as any)?.allowedAgents || data.user?.allowedAgents;
+    if (Array.isArray(agents)) {
+      localStorage.setItem('vmind_allowed_agents', JSON.stringify(agents));
     }
     console.log('[ConnectorsHub] 🔗 connecté — user:', data.user?.username);
     setTralisSession(data);
@@ -121,13 +136,12 @@ export const ConnectorsHub: React.FC = () => {
     let remainingAgents: string[] = [];
     if (vmindToken) {
       try {
-        const res = await fetch(`${baseUrl}/api/connectors/disconnect`, {
+        const res = await fetch(`${baseUrl}/api/connectors/tralis/disconnect`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${vmindToken}`
-          },
-          body: JSON.stringify({ connector_type: 'tralis' })
+          }
         });
         if (res.ok) {
           const data = await res.json();
@@ -140,8 +154,10 @@ export const ConnectorsHub: React.FC = () => {
       }
     }
     localStorage.removeItem('vmind_mcp_token');
+    localStorage.removeItem('vmind_connector_status');
+    localStorage.removeItem('vmind_client_id');
     localStorage.setItem('vmind_allowed_agents', JSON.stringify(remainingAgents));
-    console.log('[ConnectorsHub] 🔌 déconnecté MCP — agents restants après union:', remainingAgents);
+    console.log('[ConnectorsHub] 🔌 Déconnecté TraLIS — agents restants:', remainingAgents);
     setTralisSession(null);
     setTralisStatus('idle');
     window.dispatchEvent(new Event('mcp-session-updated'));

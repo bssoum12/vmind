@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 
 interface VfinMarginTooltipProps {
@@ -34,6 +35,11 @@ export const VfinMarginTooltip: React.FC<VfinMarginTooltipProps> = ({
   onMouseEnter,
   onMouseLeave,
 }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [animatedTauxCourant, setAnimatedTauxCourant] = useState(0);
   const [animatedTauxPrecedent, setAnimatedTauxPrecedent] = useState(0);
   const [animatedEcart, setAnimatedEcart] = useState(0);
@@ -100,7 +106,7 @@ export const VfinMarginTooltip: React.FC<VfinMarginTooltipProps> = ({
     }
   }, [visible, tauxCourant, tauxPrecedent, ecartTaux, caCourant, margeCourant, caPrecedent, margePrecedent]);
 
-  if (!visible) return null;
+  if (!visible || !mounted) return null;
 
   const themeColor = "#1D9E75"; // Green highlight matching active VFIN agent
   const tooltipWidth = 520;
@@ -133,7 +139,7 @@ export const VfinMarginTooltip: React.FC<VfinMarginTooltipProps> = ({
     }) + " TND";
   };
 
-  return (
+  return createPortal(
     <motion.div
       ref={tooltipRef}
       initial={{ opacity: 0, scale: 0.95, y: isBottomHalf ? 15 : -15, x: 8 }}
@@ -152,7 +158,7 @@ export const VfinMarginTooltip: React.FC<VfinMarginTooltipProps> = ({
         border: `1px solid ${statusColor}40`,
         borderRadius: "12px",
         boxShadow: `0 20px 50px rgba(0,0,0,0.6), 0 0 30px ${statusColor}0D`,
-        zIndex: 99999,
+        zIndex: 999999,
         padding: "20px",
         fontFamily: "var(--font-mono)",
         color: "var(--white)",
@@ -543,6 +549,7 @@ export const VfinMarginTooltip: React.FC<VfinMarginTooltipProps> = ({
           <span>FILTRE: STATUT IN ('Validee', 'ClotureeGagnee')</span>
         </div>
       </div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 };

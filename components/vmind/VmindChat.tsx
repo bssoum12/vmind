@@ -263,7 +263,8 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   const checkPermissions = () => {
     if (typeof window === 'undefined') return;
     const mcpToken = localStorage.getItem('vmind_mcp_token');
-    const connected = Boolean(mcpToken);
+    const connectorStatus = localStorage.getItem('vmind_connector_status');
+    const connected = connectorStatus === 'connected' || Boolean(mcpToken);
     setIsErpConnected(connected);
 
     const storedAllowed = localStorage.getItem('vmind_allowed_agents');
@@ -341,8 +342,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       try {
         setIsLoading(true);
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
-        if (token && token.startsWith("{")) token = JSON.parse(token).token;
+        let rawMcp = localStorage.getItem("vmind_mcp_token");
+        let token = (rawMcp && rawMcp !== "connected") ? rawMcp : localStorage.getItem("vmind_session");
+        if (token && token.startsWith("{")) {
+          try { token = JSON.parse(token).token || token; } catch {}
+        }
 
         const res = await fetch(`${baseUrl}/api/conversations/${activeConversationId}/messages`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -472,8 +476,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
         // Fire and forget
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
-        if (token && token.startsWith("{")) token = JSON.parse(token).token;
+        let rawMcp = localStorage.getItem("vmind_mcp_token");
+        let token = (rawMcp && rawMcp !== "connected") ? rawMcp : localStorage.getItem("vmind_session");
+        if (token && token.startsWith("{")) {
+          try { token = JSON.parse(token).token || token; } catch {}
+        }
         
         fetch(`${baseUrl}/api/conversations/${targetConvId}/smart-title`, {
           method: 'PATCH',
@@ -635,8 +642,11 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
         // Fire and forget
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
-        if (token && token.startsWith("{")) token = JSON.parse(token).token;
+        let rawMcp = localStorage.getItem("vmind_mcp_token");
+        let token = (rawMcp && rawMcp !== "connected") ? rawMcp : localStorage.getItem("vmind_session");
+        if (token && token.startsWith("{")) {
+          try { token = JSON.parse(token).token || token; } catch {}
+        }
         
         fetch(`${baseUrl}/api/conversations/${targetConvId}/smart-title`, {
           method: 'PATCH',

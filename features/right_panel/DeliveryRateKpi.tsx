@@ -33,11 +33,11 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
 
   // Read current active data from Context
   const agentData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
-  const toolData = agentData.get_delivery_rate || agentData || {};
+  const toolData = agentData.get_delivery_rate || agentData.data || agentData || {};
 
-  const kpis = toolData.ok && toolData.kpis ? toolData.kpis : [];
-  const details = toolData.details || null;
-  const tableRows = toolData.table?.rows || [];
+  const kpis = toolData.ok && toolData.kpis ? toolData.kpis : (toolData.data?.kpis || []);
+  const details = toolData.details || toolData.data?.details || null;
+  const tableRows = toolData.table?.rows || toolData.data?.table?.rows || [];
 
   const kpi: DeliveryKpiData | null = kpis.length > 0 ? {
     value: kpis[0].value,
@@ -336,6 +336,7 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
       ) : kpi ? (
         <div
           onMouseEnter={handleMouseEnter}
+          onMouseMove={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           style={{
             background: cardHovered

@@ -37,7 +37,7 @@ Following a deep architectural audit, extensive technical discussion, and tracki
 - **Cloudflare Turnstile Shared & Enforced**:
   - Anti-bot validation enforced across login, signup, and password reset flows.
 
----
+-------------------------------------------------
 
 ### ⚠️ Critical Security Gaps Remaining:
 
