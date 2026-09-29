@@ -10,6 +10,7 @@ interface KpiCacheContextType {
   updateGlobalDates: (start: string, end: string) => void;
   kpisByAgent: Record<string, any>;
   loadingByAgent: Record<string, boolean>;
+  lastUpdatedByAgent: Record<string, string | null>;
   cooldowns: Record<string, number>; // Timestamps of last manual refreshes
   fetchKpis: (agentId: string, force?: boolean, targetTool?: string, horizon?: string) => Promise<void>;
   error: string | null;
@@ -46,15 +47,10 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   
   const [kpisByAgent, setKpisByAgent] = useState<Record<string, any>>({});
   const [loadingByAgent, setLoadingByAgent] = useState<Record<string, boolean>>({});
+  const [lastUpdatedByAgent, setLastUpdatedByAgent] = useState<Record<string, string | null>>({});
   const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const activeAgentRef = useRef<string>('VDATA');
-
-  // Debouncing selection ref
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const updateGlobalDates = (start: string, end: string) => {
     setStartDate(start);
@@ -67,8 +63,8 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   // Helper to check if user has ERP connected and agent is allowed
   const isAgentKpiAllowed = (agentId: string) => {
     if (typeof window === "undefined") return false;
-    const mcpToken = localStorage.getItem("vmind_mcp_token");
-    if (!mcpToken) return false;
+    const isConnected = localStorage.getItem("vmind_connector_status") === "connected" || Boolean(localStorage.getItem("vmind_mcp_token"));
+    if (!isConnected) return false;
     
     const stored = localStorage.getItem("vmind_allowed_agents");
     if (stored) {
@@ -79,10 +75,18 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     }
     
     try {
-      const decoded: any = jwtDecode(mcpToken);
-      if (decoded.roles && decoded.roles.includes("Administrators")) return true;
-      if (decoded.allowedAgents) {
-        return decoded.allowedAgents.includes(agentId.toUpperCase());
+      let sessionToken = localStorage.getItem("vmind_session");
+      if (sessionToken) {
+        if (sessionToken.startsWith('{')) {
+          try { sessionToken = JSON.parse(sessionToken).token || sessionToken; } catch {}
+        }
+        if (sessionToken) {
+          const decoded: any = jwtDecode(sessionToken);
+          if (decoded.roles && (Array.isArray(decoded.roles) ? decoded.roles.includes("Administrators") : decoded.roles === "Administrators")) return true;
+          if (decoded.allowedAgents && Array.isArray(decoded.allowedAgents)) {
+            return decoded.allowedAgents.includes(agentId.toUpperCase());
+          }
+        }
       }
     } catch (e) {}
     
@@ -96,17 +100,11 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
     const agentKey = (agentId || 'vdata').toLowerCase();
     const allowedAgentUpper = agentKey.toUpperCase();
-    activeAgentRef.current = allowedAgentUpper;
 
     if (!isAgentKpiAllowed(allowedAgentUpper)) {
       console.log(`[KPI CONTEXT] KPIs not allowed for agent ${allowedAgentUpper} (ERP not connected or agent not authorized)`);
       setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
       return;
-    }
-
-    // Clear any previous debounce timeout
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
     }
 
     const cooldownKey = targetTool ? `${allowedAgentUpper}_${targetTool}` : `${allowedAgentUpper}_ALL`;
@@ -125,23 +123,19 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       }
     }
 
-    // Set loading state for this agent (canonical lowercase key)
+    // Set loading state for this agent independently (never aborts other specialists)
     setLoadingByAgent(prev => ({ ...prev, [agentKey]: true }));
-    setError(null);
-
-    // Cancel in-flight HTTP request if any
-    if (abortControllerRef.current) {
-      console.log(`[KPI CONTEXT] Aborting in-flight request for agent switch`);
-      abortControllerRef.current.abort();
-    }
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
     try {
-      const clientId = "DEMO"; // Default tenant id
+      let clientId = typeof window !== 'undefined' ? localStorage.getItem('vmind_client_id') || 'DEMO' : 'DEMO';
+      const mcpToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_mcp_token') : null;
+      if (mcpToken && mcpToken !== 'connected' && mcpToken.split('.').length === 3) {
+        try {
+          const decoded: any = jwtDecode(mcpToken);
+          if (decoded?.client_id) clientId = decoded.client_id;
+        } catch {}
+      }
 
-      console.log(`[KPI CONTEXT] Fetching KPIs for ${allowedAgentUpper} (force: ${force}, tool: ${targetTool || 'ALL'}, horizon: ${horizon || '1m'})`);
+      console.log(`[KPI CONTEXT] Fetching KPIs for ${allowedAgentUpper} (tenant: ${clientId}, force: ${force}, tool: ${targetTool || 'ALL'}, horizon: ${horizon || '1m'})`);
       const response = await fetchN8nKpis(
         {
           allowed_agents: allowedAgentUpper,
@@ -151,14 +145,25 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
           target_tool: targetTool,
           forceRefresh: force,
           horizon: horizon || '1m'
-        },
-        controller.signal
+        }
       );
 
-      // Active Selection Guard: Check if the user hasn't switched away
-      if (activeAgentRef.current !== allowedAgentUpper) {
-        console.warn(`[KPI CONTEXT] Resolved data for ${allowedAgentUpper} discarded: Active agent is now ${activeAgentRef.current}`);
+      // Si le backend indique qu'aucune donnée n'est encore stockée en base (État 'En attente')
+      if (response && response.stored === false) {
+        setKpisByAgent(prev => ({
+          ...prev,
+          [agentKey]: { _stored: false, _inProgress: Boolean(response.inProgress) }
+        }));
+        setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
         return;
+      }
+
+      // Si une date de snapshot est renvoyée depuis PostgreSQL
+      if (response && response._updatedAt) {
+        setLastUpdatedByAgent(prev => ({
+          ...prev,
+          [agentKey]: response._updatedAt
+        }));
       }
 
       // Merge new data into cache (canonical lowercase key)
@@ -180,17 +185,19 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
           }
           updatedAgentData = {
             ...existingAgentData,
-            [targetTool]: unwrapped
+            [targetTool]: unwrapped,
+            _stored: true
           };
         } else {
-          // Full agent load or fallback: overwrite cache (extract nested agent key if present)
+          // Full agent load: extract nested agent key if present
           const extractedData = response && typeof response === 'object' 
             ? (response[agentKey] || response[allowedAgentUpper] || response) 
             : response;
 
           updatedAgentData = {
             ...existingAgentData,
-            ...(typeof extractedData === 'object' ? extractedData : { data: extractedData })
+            ...(typeof extractedData === 'object' ? extractedData : { data: extractedData }),
+            _stored: true
           };
         }
 
@@ -209,32 +216,28 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       }
 
     } catch (err: any) {
-      if (err.name === 'AbortError') {
-        console.log(`[KPI CONTEXT] Request for ${allowedAgentUpper} was aborted`);
-        return; // Don't trigger error or clear loading for aborted requests
-      }
-      console.error(`[KPI CONTEXT] Error fetching KPIs:`, err);
+      console.error(`[KPI CONTEXT] Error fetching KPIs for ${allowedAgentUpper}:`, err);
       let msg = err?.message || "Impossible de charger les indicateurs.";
       if (msg.toLowerCase().includes("fetch failed") || msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("econnrefused")) {
         msg = "Erreur de connexion. Le service d'analyse est temporairement inaccessible.";
       }
       setError(msg);
     } finally {
-      // Only reset loading if this remains the active agent
-      if (activeAgentRef.current === allowedAgentUpper) {
-        setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
-      }
+      setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
     }
   };
 
   // Helper to check if user is authenticated before fetching KPIs
   const isAuthenticated = () => {
     if (typeof window === "undefined") return false;
-    const token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
-    return Boolean(token && token !== "null");
+    const sessionToken = localStorage.getItem("vmind_session");
+    const mcpToken = localStorage.getItem("vmind_mcp_token");
+    const isMcpValid = Boolean(mcpToken && mcpToken !== "null" && mcpToken !== "connected");
+    const isSessionValid = Boolean(sessionToken && sessionToken !== "null");
+    return isMcpValid || isSessionValid;
   };
 
-  // Auto-refetch when date changes or when the active agent changes (with 2s debounce)
+  // Chargement passif depuis PostgreSQL lors du changement d'onglet spécialiste ou de date (NE LANCE JAMAIS n8n)
   useEffect(() => {
     if (!isAuthenticated()) {
       return;
@@ -249,39 +252,36 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       return;
     }
 
-    // Clear previous debounce timeout
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-
-    // Set loading state immediately so the skeletons show up during the 2s wait
-    setLoadingByAgent(prev => ({ ...prev, [lowerAgent]: true }));
-
-    // Set new debounce timeout (2 seconds)
-    debounceTimeoutRef.current = setTimeout(() => {
-      fetchKpis(lowerAgent);
-    }, 2000);
-
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
+    // Interrogation de la base PostgreSQL en mode passif (force = false)
+    fetchKpis(lowerAgent, false);
   }, [startDate, endDate, activeAgentId]);
 
-  // Instantly clear or refetch KPI cache when MCP session connects/disconnects
+  // Polling automatique si un calcul est en cours en tâche de fond pour l'agent actif
+  useEffect(() => {
+    const currentAgent = (activeAgentId || 'VDATA').toLowerCase();
+    const agentState = kpisByAgent[currentAgent];
+
+    if (agentState && agentState._inProgress && !agentState._stored) {
+      const pollTimer = setInterval(() => {
+        console.log(`[KPI CONTEXT] Polling backend for background completion of ${currentAgent}...`);
+        fetchKpis(currentAgent, false);
+      }, 4000);
+
+      return () => clearInterval(pollTimer);
+    }
+  }, [activeAgentId, kpisByAgent]);
+
+  // Nettoyage lors de la déconnexion de session MCP
   useEffect(() => {
     const handleMcpUpdate = () => {
-      const mcpToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_mcp_token') : null;
-      if (!mcpToken) {
-        // Disconnected from ERP: immediately wipe cached KPIs & errors
+      const isConnected = typeof window !== 'undefined' && (localStorage.getItem('vmind_connector_status') === 'connected' || Boolean(localStorage.getItem('vmind_mcp_token')));
+      if (!isConnected) {
         setKpisByAgent({});
         setError(null);
         setLoadingByAgent({});
       } else {
-        // Connected: trigger refetch for active agent
         const currentAgent = (activeAgentId || 'VDATA').toLowerCase();
-        fetchKpis(currentAgent);
+        fetchKpis(currentAgent, false);
       }
     };
     window.addEventListener('mcp-session-updated', handleMcpUpdate);
@@ -296,6 +296,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
         updateGlobalDates,
         kpisByAgent,
         loadingByAgent,
+        lastUpdatedByAgent,
         cooldowns,
         fetchKpis,
         error,

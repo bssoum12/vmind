@@ -24,6 +24,27 @@ interface ConversationsContextType {
   isLoading: boolean;
 }
 
+function getValidAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  const mcpToken = localStorage.getItem('vmind_mcp_token');
+  if (mcpToken && mcpToken !== 'connected' && mcpToken.split('.').length === 3) {
+    return mcpToken;
+  }
+  let session = localStorage.getItem('vmind_session');
+  if (session) {
+    if (session.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(session);
+        session = parsed.token || parsed.accessToken || parsed.user?.token || session;
+      } catch (e) {}
+    }
+    if (session && session !== 'connected' && session.split('.').length === 3) {
+      return session;
+    }
+  }
+  return null;
+}
+
 const ConversationsContext = createContext<ConversationsContextType | undefined>(undefined);
 
 export function ConversationsProvider({ children }: { children: React.ReactNode }) {
@@ -35,8 +56,7 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     try {
       setIsLoading(true);
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
-      if (token && token.startsWith("{")) token = JSON.parse(token).token;
+      const token = getValidAuthToken();
 
       if (!token) return;
 
@@ -61,8 +81,8 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const createNewConversation = async (agentId: string, firstMessageText: string): Promise<string> => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
-      if (token && token.startsWith("{")) token = JSON.parse(token).token;
+      const token = getValidAuthToken();
+      if (!token) return '';
       
       const newId = `conv-${Date.now()}`;
       const title = firstMessageText.substring(0, 30) + "...";
@@ -106,8 +126,8 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const renameConversation = async (conversationId: string, newTitle: string) => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
-      if (token && token.startsWith("{")) token = JSON.parse(token).token;
+      const token = getValidAuthToken();
+      if (!token) return;
 
       const res = await fetch(`${baseUrl}/api/conversations/${conversationId}`, {
         method: 'PUT',
@@ -126,8 +146,8 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const deleteConversation = async (conversationId: string) => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      let token = localStorage.getItem("vmind_mcp_token") || localStorage.getItem("vmind_session");
-      if (token && token.startsWith("{")) token = JSON.parse(token).token;
+      const token = getValidAuthToken();
+      if (!token) return;
 
       const res = await fetch(`${baseUrl}/api/conversations/${conversationId}`, {
         method: 'DELETE',

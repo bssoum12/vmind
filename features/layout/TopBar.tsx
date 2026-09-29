@@ -25,8 +25,9 @@ export const TopBar: React.FC = () => {
       try {
         let token = localStorage.getItem('vmind_session');
         const mcpToken = localStorage.getItem('vmind_mcp_token');
+        const connectorStatus = localStorage.getItem('vmind_connector_status');
         
-        if (mcpToken) {
+        if (connectorStatus === 'connected' || Boolean(mcpToken)) {
           setIsErpConnected(true);
         } else {
           setIsErpConnected(false);
