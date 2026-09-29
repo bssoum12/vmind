@@ -167,8 +167,86 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint, onModif
       });
 
       if (!res.ok) throw new Error('Erreur de communication avec le service d\'assistance');
-      const data = await res.json();
-      const assistantMessage = data.choices[0].message.content;
+
+      const contentType = res.headers.get('content-type') || '';
+      let assistantMessage = '';
+
+      if (contentType.includes('text/event-stream') && res.body) {
+        // Stream mode (SSE): live progressive token rendering with typewriter effect
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let done = false;
+        let accumulated = '';
+        let displayAccumulated = '';
+
+        // Add initial placeholder message bubble for the assistant
+        setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+        // Token queue to guarantee smooth human-paced typewriter effect even if upstream proxies buffer chunks
+        const tokenQueue: string[] = [];
+        let isDraining = true;
+
+        const drainPromise = (async () => {
+          while (isDraining || tokenQueue.length > 0) {
+            if (tokenQueue.length > 0) {
+              const token = tokenQueue.shift()!;
+              displayAccumulated += token;
+              setMessages(prev => {
+                const updated = [...prev];
+                if (updated.length > 0) {
+                  updated[updated.length - 1] = {
+                    role: 'assistant',
+                    content: displayAccumulated
+                  };
+                }
+                return updated;
+              });
+              // 18ms delay creates the fluid ChatGPT-style typewriter cadence
+              await new Promise(r => setTimeout(r, 18));
+            } else {
+              await new Promise(r => setTimeout(r, 10));
+            }
+          }
+        })();
+
+        let buffer = '';
+        while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          done = readerDone;
+          if (value) {
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ''; // Keep partial line in buffer
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith('data: ')) {
+                const dataStr = trimmed.slice(6).trim();
+                if (dataStr === '[DONE]') continue;
+                try {
+                  const parsed = JSON.parse(dataStr);
+                  if (parsed.content) {
+                    accumulated += parsed.content;
+                    tokenQueue.push(parsed.content);
+                  }
+                } catch {
+                  // Ignore partial chunks
+                }
+              }
+            }
+          }
+        }
+
+        // Wait for token queue to finish typing smoothly
+        isDraining = false;
+        await drainPromise;
+        assistantMessage = accumulated;
+      } else {
+        // Standard JSON mode
+        const data = await res.json();
+        assistantMessage = data.choices?.[0]?.message?.content || data.reply || '';
+        setMessages(prev => [...prev, { role: 'assistant', content: assistantMessage }]);
+      }
 
       // Check if it's the final summary
       if (assistantMessage.includes('[SUMMARY_COMPLETE]')) {
@@ -177,10 +255,15 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint, onModif
           cleanSummary = cleanSummary.substring(cleanSummary.indexOf('COMPANY_TARGET:')).trim();
         }
         setSummary(cleanSummary);
-        setMessages(prev => [...prev, { role: 'assistant', content: cleanSummary }]);
-      } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: assistantMessage }]);
+        setMessages(prev => {
+          const updated = [...prev];
+          if (updated.length > 0) {
+            updated[updated.length - 1] = { role: 'assistant', content: cleanSummary };
+          }
+          return updated;
+        });
       }
+
     } catch (err) {
       console.error(err);
       setMessages(prev => [...prev, { role: 'assistant', content: "Une erreur s'est produite lors de la connexion à l'IA. Veuillez réessayer." }]);
