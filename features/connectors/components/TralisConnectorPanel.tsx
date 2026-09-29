@@ -532,7 +532,8 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
         console.log('[Connectors] Connexion connecteur TraLIS réussie — user:', data.user?.username);
         setShowModal(false);
         setLoginError('');
-        onConnected(data.status || 'connected', data);
+        const realToken = data.token || data.accessToken || data.connector_token;
+        onConnected(realToken || data.status || 'connected', data);
       } else {
         setLoginError(data?.error || 'Identifiants invalides.');
       }

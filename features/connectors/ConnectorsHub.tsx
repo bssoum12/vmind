@@ -67,7 +67,13 @@ export const ConnectorsHub: React.FC = () => {
         if (data.ok && data.connected) {
           console.log('[ConnectorsHub] ✅ Session TraLIS active restaurée via le backend');
           localStorage.setItem('vmind_connector_status', 'connected');
-          localStorage.setItem('vmind_mcp_token', 'connected');
+          const realToken = data.token || data.accessToken || data.connector_token;
+          if (realToken && realToken !== 'connected') {
+            localStorage.setItem('vmind_mcp_token', realToken);
+          }
+          if (data.client_id) {
+            localStorage.setItem('vmind_client_id', data.client_id);
+          }
           if (Array.isArray(data.allowedAgents)) {
             localStorage.setItem('vmind_allowed_agents', JSON.stringify(data.allowedAgents));
           }
@@ -90,6 +96,7 @@ export const ConnectorsHub: React.FC = () => {
       // Si aucune session active n'est trouvée ou si la validation a échoué
       localStorage.removeItem('vmind_mcp_token');
       localStorage.removeItem('vmind_connector_status');
+      localStorage.removeItem('vmind_client_id');
       setTralisSession(null);
       setTralisStatus('idle');
       window.dispatchEvent(new Event('mcp-session-updated'));
@@ -105,7 +112,14 @@ export const ConnectorsHub: React.FC = () => {
   /** Called by TralisConnectorPanel after a successful login */
   const handleTralisMcpConnected = (token: string, data: McpSession) => {
     localStorage.setItem('vmind_connector_status', 'connected');
-    localStorage.setItem('vmind_mcp_token', 'connected');
+    const realToken = (token && token !== 'connected') ? token : ((data as any)?.token || (data as any)?.accessToken || (data as any)?.connector_token);
+    if (realToken && realToken !== 'connected') {
+      localStorage.setItem('vmind_mcp_token', realToken);
+    }
+    const resolvedClientId = (data as any)?.client_id || data.user?.client_id;
+    if (resolvedClientId) {
+      localStorage.setItem('vmind_client_id', resolvedClientId);
+    }
     const agents = (data as any)?.allowedAgents || data.user?.allowedAgents;
     if (Array.isArray(agents)) {
       localStorage.setItem('vmind_allowed_agents', JSON.stringify(agents));
@@ -141,6 +155,7 @@ export const ConnectorsHub: React.FC = () => {
     }
     localStorage.removeItem('vmind_mcp_token');
     localStorage.removeItem('vmind_connector_status');
+    localStorage.removeItem('vmind_client_id');
     localStorage.setItem('vmind_allowed_agents', JSON.stringify(remainingAgents));
     console.log('[ConnectorsHub] 🔌 Déconnecté TraLIS — agents restants:', remainingAgents);
     setTralisSession(null);

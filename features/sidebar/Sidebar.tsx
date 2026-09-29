@@ -25,9 +25,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
 
   const updatePermissions = () => {
     try {
-      const mcpToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_mcp_token') : null;
+      const rawMcpToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_mcp_token') : null;
+      const mcpToken = (rawMcpToken && rawMcpToken !== 'connected') ? rawMcpToken : null;
       const connectorStatus = typeof window !== 'undefined' ? localStorage.getItem('vmind_connector_status') : null;
-      setIsErpConnected(connectorStatus === 'connected' || Boolean(mcpToken));
+      setIsErpConnected(connectorStatus === 'connected' || Boolean(rawMcpToken));
 
       const storedAllowedAgents = typeof window !== 'undefined' ? localStorage.getItem('vmind_allowed_agents') : null;
       if (storedAllowedAgents) {
@@ -49,7 +50,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
         } catch (e) {}
       }
 
-      if (tokenToUse) {
+      const isJwt = (t: any): t is string => typeof t === 'string' && t.split('.').length === 3;
+
+      if (tokenToUse && isJwt(tokenToUse)) {
         const decoded: any = jwtDecode(tokenToUse);
         if (decoded.username) {
           setUsername(decoded.username);
@@ -58,6 +61,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
 
         if (!storedAllowedAgents && decoded.allowedAgents) {
           setAllowedAgents(decoded.allowedAgents);
+        }
+      } else if (sessionToken) {
+        let cleanSession = sessionToken;
+        if (cleanSession.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(cleanSession);
+            cleanSession = parsed.token || parsed.access_token || parsed.user?.token;
+          } catch (e) {}
+        }
+        if (isJwt(cleanSession)) {
+          const decoded: any = jwtDecode(cleanSession);
+          if (decoded.username) {
+            setUsername(decoded.username);
+          }
+          setIsAdmin(Boolean(decoded.roles && decoded.roles.includes('Administrators')));
         }
       }
     } catch (e) {

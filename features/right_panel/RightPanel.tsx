@@ -1,28 +1,16 @@
 "use client";
 
-
-function getAuthToken() {
-  if (typeof window === 'undefined') return '';
-  const mcpToken = localStorage.getItem('vmind_mcp_token');
-  if (mcpToken) return mcpToken;
-  try {
-    const sessionStr = localStorage.getItem('vmind_session');
-    if (!sessionStr) return '';
-    if (sessionStr.startsWith('eyJ')) return sessionStr;
-    const parsed = JSON.parse(sessionStr);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
-  } catch(e) { return ''; }
-}
 import React from 'react';
+import { jwtDecode } from 'jwt-decode';
 import { MiniKpi } from '../../components/ui/MiniKpi';
 import { AGENTS } from '../../shared/constants/data';
 import { LogEntry } from '../../shared/types';
 import { VolumeLineChart } from './VolumeLineChart';
 import { DeliveryRateKpi } from './DeliveryRateKpi';
-import {MultiIndicatorsCard} from './TableauCroiseKpi/MultiIndicatorsCard' ;
-import {ScoreGlobalCard} from './TableauCroiseKpi/ScoreGlobalCard' ;
-import {LatestReportCard} from './TableauCroiseKpi/LatestReportCard';
-import {AlertsCard} from './TableauCroiseKpi/AlertsCard';
+import { MultiIndicatorsCard } from './TableauCroiseKpi/MultiIndicatorsCard';
+import { ScoreGlobalCard } from './TableauCroiseKpi/ScoreGlobalCard';
+import { LatestReportCard } from './TableauCroiseKpi/LatestReportCard';
+import { AlertsCard } from './TableauCroiseKpi/AlertsCard';
 import { VfinMonthlyRevenueCard } from './TableauCroiseKpi/VfinMonthlyRevenueCard';
 import { VfinOverdueCard } from './TableauCroiseKpi/VfinOverdueCard';
 import { VfinSixMonthChartCard } from './TableauCroiseKpi/VfinSixMonthChartCard';
@@ -45,20 +33,65 @@ import { VmoveDossiersEnRetardCard } from './TableauCroiseKpi/VmoveDossiersEnRet
 import { VmoveVolumeTransporteurCard } from './TableauCroiseKpi/VmoveVolumeTransporteurCard';
 import { VmoveBlNonFacturesCard } from './TableauCroiseKpi/VmoveBlNonFacturesCard';
 import { VmoveActiveFlowsMapCard } from './TableauCroiseKpi/VmoveActiveFlowsMapCard';
+import { KpiCacheProvider, useKpis } from '../../shared/contexts/KpiCacheContext';
+import { KpiEmptyState } from './KpiEmptyState';
+
+function getAuthToken() {
+  if (typeof window === 'undefined') return '';
+  const mcpToken = localStorage.getItem('vmind_mcp_token');
+  if (mcpToken) return mcpToken;
+  try {
+    const sessionStr = localStorage.getItem('vmind_session');
+    if (!sessionStr) return '';
+    if (sessionStr.startsWith('eyJ')) return sessionStr;
+    const parsed = JSON.parse(sessionStr);
+    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
+  } catch(e) { return ''; }
+}
+
 interface RightPanelProps {
   logs: LogEntry[];
   onInsertPrompt: (text: string) => void;
   activeAgentId?: string;
 }
 
-import { KpiCacheProvider, useKpis } from '../../shared/contexts/KpiCacheContext';
-import { jwtDecode } from 'jwt-decode';
-
 const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, activeAgentId }) => {
-  const { startDate, endDate, updateGlobalDates, error, clearError, notice, clearNotice, fetchKpis, kpisByAgent, loadingByAgent } = useKpis();
+  const { startDate, endDate, updateGlobalDates, error, clearError, notice, clearNotice, fetchKpis, kpisByAgent, loadingByAgent, lastUpdatedByAgent } = useKpis();
   const [isErpConnected, setIsErpConnected] = React.useState<boolean>(false);
   const [allowedAgents, setAllowedAgents] = React.useState<string[]>([]);
   const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
+
+  const agentKey = (activeAgentId || 'vdata').toLowerCase();
+  const agentData = kpisByAgent[agentKey];
+  const isLoading = Boolean(loadingByAgent[agentKey]);
+  const isInProgress = Boolean(agentData?._inProgress);
+
+  const lastUpdatedIso = lastUpdatedByAgent[agentKey] || agentData?._updatedAt;
+  const formattedLastUpdate = React.useMemo(() => {
+    if (!lastUpdatedIso) return null;
+    try {
+      const d = new Date(lastUpdatedIso);
+      if (isNaN(d.getTime())) return null;
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
+      return `${day}/${month} à ${hours}:${mins}`;
+    } catch {
+      return null;
+    }
+  }, [lastUpdatedIso]);
+
+  const hasKpiData = React.useMemo(() => {
+    if (!agentData) return false;
+    if (agentData._stored === false && !agentData.data && !agentData.kpis && !agentData.get_score_global_vdata_kpi) {
+      return false;
+    }
+    const meaningfulKeys = Object.keys(agentData).filter(k => !k.startsWith('_'));
+    return meaningfulKeys.length > 0;
+  }, [agentData]);
+
+  const showEmptyState = !hasKpiData;
 
   const checkPermissions = () => {
     if (typeof window === 'undefined') return;
@@ -141,12 +174,6 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
       }));
     }
   }, [kpisByAgent]);
-
-  React.useEffect(() => {
-    if (activeAgentId === 'VDATA' && isKpiAuthorized) {
-      fetchKpis('VDATA', false, 'get_score_global_vdata_kpi');
-    }
-  }, [activeAgentId, startDate, endDate, isKpiAuthorized]);
 
   React.useEffect(() => {
     const duration = 1200;
@@ -242,6 +269,23 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
           )}
         </div>
 
+        {/* Timestamp de dernière mise à jour stockée en base */}
+        {isKpiAuthorized && formattedLastUpdate && (
+          <div style={{
+            fontSize: '10.5px',
+            color: 'var(--muted)',
+            fontFamily: 'var(--font-mono)',
+            marginBottom: '14px',
+            marginTop: '-6px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px'
+          }}>
+            <span style={{ color: '#00e5c8', fontSize: '10px' }}>●</span>
+            <span>Dernière actualisation : {formattedLastUpdate}</span>
+          </div>
+        )}
+
         {!isKpiAuthorized ? (
           !isErpConnected ? (
             <div style={{
@@ -276,7 +320,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                 Connecteur ERP Requis
               </div>
               <div style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5', maxWidth: '280px' }}>
-                Connectez votre connecteur ERP pour débloquer les indicateurs de performance en temps réel et les outils avancés de cet agent.
+                Connexion au connecteur ERP requise pour afficher les indicateurs de performance en temps réel et débloquer les outils avancés de cet agent.
               </div>
               <button
                 onClick={() => {
@@ -333,7 +377,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                 Accès aux données restreint
               </div>
               <div style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' }}>
-                Accès aux données et indicateurs TraLIS non autorisé pour cet agent. Vous pouvez échanger avec l'agent pour des questions métier ou contacter un administrateur.
+                Accès aux données et indicateurs TraLIS non autorisé pour cet agent. Il est possible d'échanger avec l'agent pour des questions métier ou de contacter un administrateur.
               </div>
             </div>
           )
@@ -456,34 +500,73 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                 </div>
               </div>
             )}
-            <ScoreGlobalCard activeAgentId={activeAgentId} />
-            <VsellTopClientsCard activeAgentId={activeAgentId} />
-            <VsellNewClientsCard activeAgentId={activeAgentId} />
-            <VsellInactiveClientsCard activeAgentId={activeAgentId} />
-            <VsellRevenuClientBarChart activeAgentId={activeAgentId} />
-            <VsellFidelisationChartCard activeAgentId={activeAgentId} />
-            <VsellPipelineFunnelCard activeAgentId={activeAgentId} />
-            <VfinMonthlyRevenueCard activeAgentId={activeAgentId} />
-            <VfinOverdueCard activeAgentId={activeAgentId} />
-            <VfinSixMonthChartCard activeAgentId={activeAgentId} />
-            <VfinMarginCard activeAgentId={activeAgentId} />
-            <VfinTopClientsCard activeAgentId={activeAgentId} />
-            <VfinTresorerieCard activeAgentId={activeAgentId} />
-            <VbuyFacturesAReglerCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-            <VbuyAchatsDuMoisCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-            <VbuyFournisseursEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-            <VbuyCommandesEnAttenteCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-            <VbuyRepartitionCategoriePieCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-            <VmoveBlNonFacturesCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-            <VmoveActiveFlowsMapCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-            <VmoveDossiersOuvertsCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-            <VmoveDossiersEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-            <VmoveVolumeTransporteurCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-            <VolumeLineChart activeAgentId={activeAgentId} />
-            <DeliveryRateKpi activeAgentId={activeAgentId} /> 
-            <MultiIndicatorsCard activeAgentId={activeAgentId} />
-            <LatestReportCard activeAgentId={activeAgentId} />
-            <AlertsCard activeAgentId={activeAgentId} />
+
+            {/* Affichage de l'état En attente si aucune donnée n'est stockée en base */}
+            {showEmptyState ? (
+              <KpiEmptyState 
+                agentId={activeAgentId || 'VDATA'} 
+                onLaunch={() => fetchKpis(agentKey, true)} 
+                isLoading={isLoading || isInProgress} 
+              />
+            ) : (
+              <>
+                {/* Indicateur discret si un recalcul tourne en tâche de fond alors que des données sont déjà affichées */}
+                {(isLoading || isInProgress) && (
+                  <div style={{
+                    padding: '10px 14px',
+                    background: 'rgba(0, 240, 255, 0.06)',
+                    border: '1px solid rgba(0, 240, 255, 0.22)',
+                    borderRadius: '8px',
+                    marginBottom: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}>
+                    <div style={{
+                      width: '14px',
+                      height: '14px',
+                      border: '2px solid rgba(0, 240, 255, 0.2)',
+                      borderTop: '2px solid #00f0ff',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                      flexShrink: 0
+                    }} />
+                    <span style={{ fontSize: '11px', color: '#00f0ff', lineHeight: 1.4 }}>
+                      Actualisation en cours en arrière-plan. La navigation vers d'autres spécialistes reste possible sans interrompre le traitement.
+                    </span>
+                  </div>
+                )}
+
+                <ScoreGlobalCard activeAgentId={activeAgentId} />
+                <VsellTopClientsCard activeAgentId={activeAgentId} />
+                <VsellNewClientsCard activeAgentId={activeAgentId} />
+                <VsellInactiveClientsCard activeAgentId={activeAgentId} />
+                <VsellRevenuClientBarChart activeAgentId={activeAgentId} />
+                <VsellFidelisationChartCard activeAgentId={activeAgentId} />
+                <VsellPipelineFunnelCard activeAgentId={activeAgentId} />
+                <VfinMonthlyRevenueCard activeAgentId={activeAgentId} />
+                <VfinOverdueCard activeAgentId={activeAgentId} />
+                <VfinSixMonthChartCard activeAgentId={activeAgentId} />
+                <VfinMarginCard activeAgentId={activeAgentId} />
+                <VfinTopClientsCard activeAgentId={activeAgentId} />
+                <VfinTresorerieCard activeAgentId={activeAgentId} />
+                <VbuyFacturesAReglerCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VbuyAchatsDuMoisCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VbuyFournisseursEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VbuyCommandesEnAttenteCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VbuyRepartitionCategoriePieCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VmoveBlNonFacturesCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VmoveActiveFlowsMapCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VmoveDossiersOuvertsCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VmoveDossiersEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VmoveVolumeTransporteurCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
+                <VolumeLineChart activeAgentId={activeAgentId} />
+                <DeliveryRateKpi activeAgentId={activeAgentId} /> 
+                <MultiIndicatorsCard activeAgentId={activeAgentId} />
+                <LatestReportCard activeAgentId={activeAgentId} />
+                <AlertsCard activeAgentId={activeAgentId} />
+              </>
+            )}
           </>
         )}
       </div>
