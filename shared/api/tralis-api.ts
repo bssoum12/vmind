@@ -5,6 +5,8 @@
  * Utilise la variable d'environnement NEXT_PUBLIC_API_URL ou une valeur par défaut.
  */
 
+import { frontLog } from '../utils/frontLog';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
 // ─── TYPES ───
@@ -65,6 +67,9 @@ export interface SearchCotationsPayload extends CommonPayload {
  * Exécute un appel POST vers un outil spécifique du backend.
  */
 async function postTool<T>(endpoint: string, payload: any): Promise<ToolResponse<T>> {
+  const start = Date.now();
+  frontLog.info('API_TRALIS', `➔ POST /api/tools${endpoint} [Client: ${payload?.client_id || 'N/A'}]`);
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/tools${endpoint}`, {
       method: 'POST',
@@ -74,22 +79,29 @@ async function postTool<T>(endpoint: string, payload: any): Promise<ToolResponse
       body: JSON.stringify(payload),
     });
 
+    const duration = Date.now() - start;
+
     if (!response.ok) {
       const errBody = await response.json().catch(() => ({}));
+      const errorMsg = errBody.error?.message || errBody.error || `Erreur HTTP ${response.status}`;
+      frontLog.error('API_TRALIS', `Échec ${endpoint} (${duration}ms) [Status: ${response.status}]: ${errorMsg}`);
       return {
         ok: false,
         data: null,
         error: {
-          message: errBody.error?.message || `Erreur HTTP ${response.status}`,
+          message: errorMsg,
           tool: endpoint,
           client_id: payload.client_id || null,
         },
       };
     }
 
-    return await response.json();
+    const data = await response.json();
+    frontLog.success('API_TRALIS', `${endpoint} complété (${duration}ms)`);
+    return data;
   } catch (error: any) {
-    console.error(`[API] Erreur réseau sur ${endpoint}:`, error);
+    const duration = Date.now() - start;
+    frontLog.error('API_TRALIS', `Erreur réseau sur ${endpoint} (${duration}ms): ${error?.message || error}`);
     return {
       ok: false,
       data: null,

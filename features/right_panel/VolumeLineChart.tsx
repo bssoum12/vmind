@@ -7,8 +7,6 @@ import { AnimatedNumber } from './TableauCroiseKpi/AnimatedNumber';
 
 function getAuthToken() {
   if (typeof window === 'undefined') return '';
-  const mcpToken = localStorage.getItem('vmind_mcp_token');
-  if (mcpToken) return mcpToken;
   try {
     const sessionStr = localStorage.getItem('vmind_session');
     if (!sessionStr) return '';
@@ -16,6 +14,19 @@ function getAuthToken() {
     const parsed = JSON.parse(sessionStr);
     return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
   } catch(e) { return ''; }
+}
+
+function getClientIdFromSession() {
+  if (typeof window === 'undefined') return 'LOCAL';
+  try {
+    const token = getAuthToken();
+    if (token && token.split('.').length === 3) {
+      const parts = token.split('.');
+      const payload = JSON.parse(atob(parts[1]));
+      return payload?.client_id || 'LOCAL';
+    }
+  } catch {}
+  return 'LOCAL';
 }
 
 interface ChartDataPoint {
@@ -49,7 +60,7 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
   const fetchPrevYearVolume = async () => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || "DEMO";
+      const clientId = getClientIdFromSession();
       const pYear = parseInt(startDate.substring(0, 4)) - 1;
       setPrevYear(pYear);
       const prevStart = `${pYear}${startDate.substring(4)}`;

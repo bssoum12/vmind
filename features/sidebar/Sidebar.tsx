@@ -23,60 +23,44 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
   const [isErpConnected, setIsErpConnected] = useState<boolean>(false);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
-  const updatePermissions = () => {
+  const updatePermissions = (event?: any) => {
     try {
-      const rawMcpToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_mcp_token') : null;
-      const mcpToken = (rawMcpToken && rawMcpToken !== 'connected') ? rawMcpToken : null;
-      const connectorStatus = typeof window !== 'undefined' ? localStorage.getItem('vmind_connector_status') : null;
-      setIsErpConnected(connectorStatus === 'connected' || Boolean(rawMcpToken));
-
-      const storedAllowedAgents = typeof window !== 'undefined' ? localStorage.getItem('vmind_allowed_agents') : null;
-      if (storedAllowedAgents) {
-        try {
-          setAllowedAgents(JSON.parse(storedAllowedAgents));
-        } catch (e) {
-          setAllowedAgents([]);
-        }
-      } else {
-        setAllowedAgents([]);
-      }
-
       const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
-      let tokenToUse = mcpToken || sessionToken;
-      if (tokenToUse && tokenToUse.startsWith('{')) {
+      let cleanSession = sessionToken;
+      if (cleanSession && cleanSession.startsWith('{')) {
         try {
-          const parsed = JSON.parse(tokenToUse);
-          tokenToUse = parsed.token || parsed.access_token || parsed.user?.token;
+          const parsed = JSON.parse(cleanSession);
+          cleanSession = parsed.token || parsed.access_token || parsed.user?.token;
         } catch (e) {}
       }
 
       const isJwt = (t: any): t is string => typeof t === 'string' && t.split('.').length === 3;
 
-      if (tokenToUse && isJwt(tokenToUse)) {
-        const decoded: any = jwtDecode(tokenToUse);
-        if (decoded.username) {
+      let decoded: any = null;
+      if (cleanSession && isJwt(cleanSession)) {
+        decoded = jwtDecode(cleanSession);
+        if (decoded?.username) {
           setUsername(decoded.username);
         }
-        setIsAdmin(Boolean(decoded.roles && decoded.roles.includes('Administrators')));
+        setIsAdmin(Boolean(decoded?.roles && (decoded.roles.includes('Administrator') || decoded.roles.includes('Administrators'))));
+      }
 
-        if (!storedAllowedAgents && decoded.allowedAgents) {
-          setAllowedAgents(decoded.allowedAgents);
+      const sessionDetail = event?.detail;
+      if (sessionDetail && (sessionDetail.connected || sessionDetail.user)) {
+        setIsErpConnected(true);
+        const agents = sessionDetail.allowedAgents || sessionDetail.user?.allowedAgents;
+        if (Array.isArray(agents)) {
+          setAllowedAgents(agents);
+          return;
         }
-      } else if (sessionToken) {
-        let cleanSession = sessionToken;
-        if (cleanSession.startsWith('{')) {
-          try {
-            const parsed = JSON.parse(cleanSession);
-            cleanSession = parsed.token || parsed.access_token || parsed.user?.token;
-          } catch (e) {}
-        }
-        if (isJwt(cleanSession)) {
-          const decoded: any = jwtDecode(cleanSession);
-          if (decoded.username) {
-            setUsername(decoded.username);
-          }
-          setIsAdmin(Boolean(decoded.roles && decoded.roles.includes('Administrators')));
-        }
+      }
+
+      if (decoded?.allowedAgents && Array.isArray(decoded.allowedAgents) && decoded.allowedAgents.length > 0) {
+        setAllowedAgents(decoded.allowedAgents);
+        setIsErpConnected(true);
+      } else {
+        setAllowedAgents([]);
+        setIsErpConnected(false);
       }
     } catch (e) {
       console.error("Erreur de décodage du token dans la sidebar", e);
