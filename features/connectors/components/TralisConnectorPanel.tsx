@@ -1,8 +1,58 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, AlertTriangle, Link2, Shield, ShieldCheck, X, Database, ChevronDown, ChevronUp, Eye, EyeOff, FileEdit, Zap } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Link2, Shield, ShieldCheck, X, Database, ChevronDown, ChevronUp, Eye, EyeOff, FileEdit, Zap, Server } from 'lucide-react';
 import { Turnstile } from '@marsidev/react-turnstile';
+import { TralisInstancesModal } from './TralisInstancesModal';
+import { jwtDecode } from 'jwt-decode';
+
+function checkIsVmindAdmin(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem('vmind_session');
+    if (!raw) return false;
+
+    let token = raw;
+    let userObj: any = null;
+
+    if (raw.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(raw);
+        token = parsed?.token || parsed?.access_token || parsed?.user?.token || parsed?.data?.token || '';
+        userObj = parsed?.user || parsed?.data?.user;
+      } catch {}
+    }
+
+    const adminRoles = ['administrator', 'administrators', 'admin', 'superusers'];
+
+    const hasAdminRole = (val: any): boolean => {
+      if (!val) return false;
+      if (Array.isArray(val)) {
+        return val.some(r => typeof r === 'string' && adminRoles.includes(r.trim().toLowerCase()));
+      }
+      if (typeof val === 'string') {
+        const trimmed = val.trim().toLowerCase();
+        return adminRoles.includes(trimmed);
+      }
+      return false;
+    };
+
+    if (userObj && (hasAdminRole(userObj.roles) || hasAdminRole(userObj.role))) {
+      return true;
+    }
+
+    if (token && typeof token === 'string' && token.split('.').length === 3) {
+      const decoded: any = jwtDecode(token);
+      if (hasAdminRole(decoded?.roles) || hasAdminRole(decoded?.role)) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -245,6 +295,8 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
 }) => {
   // Local UI state only (modal, form fields)
   const [showModal, setShowModal]                 = useState(false);
+  const [showInstancesModal, setShowInstancesModal] = useState(false);
+  const [isVmindAdmin, setIsVmindAdmin]           = useState(false);
   const [loginErpUrl, setLoginErpUrl]             = useState('');
   const [loginUsername, setLoginUsername]         = useState('');
   const [loginPassword, setLoginPassword]         = useState('');
@@ -275,6 +327,19 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   const erpInputRef   = React.useRef<HTMLInputElement | null>(null);
   const probeAbortRef = React.useRef<AbortController | null>(null);
   const probeSeqRef   = React.useRef<number>(0);
+
+  useEffect(() => {
+    const updateAdmin = () => {
+      setIsVmindAdmin(checkIsVmindAdmin());
+    };
+    updateAdmin();
+    window.addEventListener('mcp-session-updated', updateAdmin);
+    window.addEventListener('storage', updateAdmin);
+    return () => {
+      window.removeEventListener('mcp-session-updated', updateAdmin);
+      window.removeEventListener('storage', updateAdmin);
+    };
+  }, []);
 
   useEffect(() => {
     if (session?.allTools && session.allTools.length > 0) {
@@ -616,31 +681,67 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
           </div>
         </div>
 
-        {status === 'connected' ? (
-          <button onClick={handleDisconnect} style={{
-            background: 'transparent', color: '#8FA3B8',
-            border: '1px solid rgba(255,255,255,0.1)',
-            padding: '8px 16px', borderRadius: '8px',
-            fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-            transition: 'color 0.2s',
-          }}
-            onMouseOver={e => e.currentTarget.style.color = '#fff'}
-            onMouseOut={e => e.currentTarget.style.color = '#8FA3B8'}
-          >
-            Déconnecter
-          </button>
-        ) : status !== 'loading' && (
-          <button onClick={() => setShowModal(true)} style={{
-            background: 'linear-gradient(90deg, #00E5C8 0%, #21F3D6 100%)',
-            color: '#021010', border: 'none',
-            padding: '8px 16px', borderRadius: '8px',
-            fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', gap: '6px',
-            boxShadow: '0 0 10px rgba(0, 229, 200, 0.2)',
-          }}>
-            <Link2 size={14} /> Connecter
-          </button>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {isVmindAdmin && (
+            <button
+              onClick={() => setShowInstancesModal(true)}
+              style={{
+                background: 'rgba(130, 80, 255, 0.12)',
+                color: '#B088FF',
+                border: '1px solid rgba(130, 80, 255, 0.35)',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s',
+                boxShadow: '0 0 10px rgba(130, 80, 255, 0.15)'
+              }}
+              onMouseOver={e => {
+                e.currentTarget.style.background = 'rgba(130, 80, 255, 0.25)';
+                e.currentTarget.style.borderColor = '#8250FF';
+                e.currentTarget.style.color = '#FFFFFF';
+              }}
+              onMouseOut={e => {
+                e.currentTarget.style.background = 'rgba(130, 80, 255, 0.12)';
+                e.currentTarget.style.borderColor = 'rgba(130, 80, 255, 0.35)';
+                e.currentTarget.style.color = '#B088FF';
+              }}
+            >
+              <Server size={14} />
+              Instances TraLIS
+            </button>
+          )}
+
+          {status === 'connected' ? (
+            <button onClick={handleDisconnect} style={{
+              background: 'transparent', color: '#8FA3B8',
+              border: '1px solid rgba(255,255,255,0.1)',
+              padding: '8px 16px', borderRadius: '8px',
+              fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+              transition: 'color 0.2s',
+            }}
+              onMouseOver={e => e.currentTarget.style.color = '#fff'}
+              onMouseOut={e => e.currentTarget.style.color = '#8FA3B8'}
+            >
+              Déconnecter
+            </button>
+          ) : status !== 'loading' && (
+            <button onClick={() => setShowModal(true)} style={{
+              background: 'linear-gradient(90deg, #00E5C8 0%, #21F3D6 100%)',
+              color: '#021010', border: 'none',
+              padding: '8px 16px', borderRadius: '8px',
+              fontSize: '13px', fontWeight: 700, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              boxShadow: '0 0 10px rgba(0, 229, 200, 0.2)',
+            }}>
+              <Link2 size={14} /> Connecter
+            </button>
+          )}
+        </div>
       </div>
 
       <p style={{ color: '#8FA3B8', fontSize: '13px', lineHeight: 1.65, marginBottom: '36px', maxWidth: '680px' }}>
@@ -1190,6 +1291,15 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
           </div>
         </div>
       )}
+
+      {/* ── MODAL DE GESTION MULTI-TENANT (INSTANCES TRALIS) ──────────────── */}
+      <TralisInstancesModal
+        isOpen={showInstancesModal && isVmindAdmin}
+        onClose={() => setShowInstancesModal(false)}
+        onTenantChanged={() => {
+          console.log('[Connectors] Référentiel des instances mis à jour');
+        }}
+      />
     </div>
   );
 };
