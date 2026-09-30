@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useMode } from '@/shared/contexts/ModeContext';
 import { jwtDecode } from 'jwt-decode';
 import { ShieldAlert, LogOut, ArrowLeft } from 'lucide-react';
@@ -156,6 +156,7 @@ function UnauthorizedView({ onBackToLogin, onBackToDashboard }: { onBackToLogin:
 }
 
 function HomeContent() {
+  const router = useRouter();
   const { mode, setMode } = useMode();
   const [isMounted, setIsMounted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(() => {
@@ -321,6 +322,69 @@ function HomeContent() {
     return null;
   });
 
+  const currentViewRef = useRef(currentView);
+  useEffect(() => {
+    currentViewRef.current = currentView;
+  }, [currentView]);
+
+  // Synchronize browser history (Chrome native back / forward buttons)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Ensure the root history state is initialized with the current view
+    if (!window.history.state || !window.history.state.view) {
+      const initialView = currentViewRef.current || 'market';
+      const initialUrl = initialView === 'market' ? '/' : `/?view=${initialView}`;
+      window.history.replaceState({ view: initialView }, '', window.location.href || initialUrl);
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state;
+      const urlParams = new URLSearchParams(window.location.search);
+      const viewParam = urlParams.get('view');
+      const templateParam = urlParams.get('template');
+
+      // Resolve the target view from state, or fallback to URL query param / 'market'
+      let targetView = state?.view || (viewParam ? (viewParam === 'marketplace' ? 'market' : viewParam) : 'market');
+
+      // If user was inside the wizard and clicked Chrome Back to return
+      if (currentViewRef.current === 'wizard' && targetView !== 'wizard') {
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('vmind_editing_agent');
+          sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
+          sessionStorage.removeItem('vmind_wizard_template');
+          sessionStorage.removeItem('vmind_wizard_step');
+          sessionStorage.removeItem('vmind_wizard_prev_view');
+          sessionStorage.removeItem('vmind_sourcing_target_agent');
+          sessionStorage.removeItem('vmind_wizard_return_url');
+        }
+        setSelectedTemplate(null);
+        setEditingAgent(null);
+        setInitialWizardStep(undefined);
+      } else if (targetView === 'wizard') {
+        // If user clicked Chrome Forward into wizard or restored it
+        const targetTemplate = state?.template || templateParam || (typeof window !== 'undefined' ? sessionStorage.getItem('vmind_wizard_template') : null);
+        if (targetTemplate) {
+          setSelectedTemplate(targetTemplate);
+        }
+        if (state?.editingAgent) {
+          setEditingAgent(state.editingAgent);
+        }
+        if (state?.initialStep) {
+          setInitialWizardStep(state.initialStep);
+        }
+      }
+
+      setCurrentView(targetView);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('vmind_current_view', targetView);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   useEffect(() => {
     if (!searchParams) return;
     const viewParam = searchParams.get('view');
@@ -358,7 +422,13 @@ function HomeContent() {
       const customEvent = e as CustomEvent<string>;
       if (customEvent.detail) {
         setMode('MANAGEMENT');
-        setCurrentView(customEvent.detail);
+        const view = customEvent.detail;
+        setCurrentView(view);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('vmind_current_view', view);
+          const newUrl = view === 'market' ? '/' : `/?view=${view}`;
+          window.history.replaceState({ view }, '', newUrl);
+        }
       }
     };
     window.addEventListener('switch-management-view', handleSwitchManagementView);
@@ -380,10 +450,13 @@ function HomeContent() {
   }, []);
 
   const handleNavigate = (view: string) => {
+    if (view === currentViewRef.current) return;
     setCurrentView(view);
     setMobileSidebarOpen(false);
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('vmind_current_view', view);
+      const newUrl = view === 'market' ? '/' : `/?view=${view}`;
+      window.history.pushState({ view }, '', newUrl);
     }
   };
 
@@ -399,13 +472,22 @@ function HomeContent() {
           const savedStepStr = sessionStorage.getItem('vmind_wizard_step');
           const savedStep = savedStepStr ? parseInt(savedStepStr, 10) : undefined;
           setEditingAgent(agentObj);
-          setSelectedTemplate(agentObj.run_mode || 'prospection');
+          const template = agentObj.run_mode || 'prospection';
+          setSelectedTemplate(template);
           if (savedStep) {
             setInitialWizardStep(savedStep);
           }
           setCurrentView('wizard');
           sessionStorage.removeItem('vmind_editing_agent');
           sessionStorage.removeItem('vmind_wizard_step');
+
+          // Initialize history state for editing agent arrival so Chrome back navigates gracefully
+          const newUrl = `/?view=wizard&template=${encodeURIComponent(template)}`;
+          window.history.replaceState(
+            { view: 'wizard', template, previousView: 'agents', editingAgent: agentObj, initialStep: savedStep },
+            '',
+            newUrl
+          );
         } catch (e) {
           console.error("Failed to parse saved editing agent:", e);
         }
@@ -414,6 +496,7 @@ function HomeContent() {
   }, []);
 
   const handleDeploy = (templateId: string, agent?: any, initialStep: number = 1) => {
+    const prevView = currentViewRef.current !== 'wizard' ? currentViewRef.current : 'market';
     setSelectedTemplate(templateId);
     setEditingAgent(agent || null);
     setInitialWizardStep(initialStep);
@@ -421,22 +504,53 @@ function HomeContent() {
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('vmind_current_view', 'wizard');
       sessionStorage.setItem('vmind_wizard_template', templateId);
+      sessionStorage.setItem('vmind_wizard_prev_view', prevView);
+      const newUrl = `/?view=wizard&template=${encodeURIComponent(templateId)}`;
+      window.history.pushState(
+        {
+          view: 'wizard',
+          template: templateId,
+          previousView: prevView,
+          editingAgent: agent || null,
+          initialStep
+        },
+        '',
+        newUrl
+      );
     }
   };
 
   const handleCancelWizard = () => {
     const hasPostDeploy = typeof window !== 'undefined' && sessionStorage.getItem('vmind_post_deploy_tutorial_agent');
+    const returnUrl = typeof window !== 'undefined' ? sessionStorage.getItem('vmind_wizard_return_url') : null;
+    const savedPrevView = typeof window !== 'undefined' ? sessionStorage.getItem('vmind_wizard_prev_view') : null;
+
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('vmind_editing_agent');
       sessionStorage.removeItem('vmind_guide_link_prospect_uuid');
       sessionStorage.removeItem('vmind_wizard_template');
       sessionStorage.removeItem('vmind_wizard_step');
+      sessionStorage.removeItem('vmind_wizard_prev_view');
       sessionStorage.removeItem('vmind_sourcing_target_agent');
+      sessionStorage.removeItem('vmind_wizard_return_url');
     }
-    setCurrentView(hasPostDeploy ? 'agents' : 'market');
+
+    if (returnUrl) {
+      router.push(returnUrl);
+      return;
+    }
+
+    const targetView = hasPostDeploy ? 'agents' : (savedPrevView || 'market');
+    setCurrentView(targetView);
     setSelectedTemplate(null);
     setEditingAgent(null);
     setInitialWizardStep(undefined);
+
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('vmind_current_view', targetView);
+      const targetUrl = targetView === 'market' ? '/' : `/?view=${targetView}`;
+      window.history.replaceState({ view: targetView }, '', targetUrl);
+    }
   };
 
   const handleSelectCategory = (category: string) => {

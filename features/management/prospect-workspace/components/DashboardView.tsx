@@ -48,8 +48,13 @@ const DashboardView = React.memo(function DashboardView({ leads, campaigns, thre
     if (agent) {
       sessionStorage.setItem('vmind_editing_agent', JSON.stringify(agent));
     }
-    sessionStorage.setItem('vmind_current_view', 'wizard');
-    router.push('/');
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('vmind_wizard_return_url', window.location.pathname + window.location.search);
+      sessionStorage.setItem('vmind_current_view', 'wizard');
+      sessionStorage.setItem('vmind_wizard_template', agent?.run_mode || 'prospection');
+    }
+    const template = agent?.run_mode || 'prospection';
+    router.push(`/?view=wizard&template=${encodeURIComponent(template)}`);
   };
   // Calculations
   const totalLeads = leads.length;

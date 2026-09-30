@@ -178,7 +178,7 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                 <div className="nav-badge">{parentCount}</div>
                 {subs.length > 0 && (
-                  <span style={{ fontSize: '9px', color: 'var(--muted)', transition: 'transform 0.2s', display: 'inline-block', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                  <span style={{ fontSize: '8.5px', color: 'var(--muted)', transition: 'transform 0.2s', display: 'inline-block', transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
                 )}
               </div>
             </div>
@@ -195,11 +195,11 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
                 <div
                   key={fullCat}
                   className={`nav-item ${isSubActive ? 'active' : ''}`}
-                  style={{ paddingLeft: '32px', opacity: 0.9 }}
+                  style={{ paddingLeft: '32px' }}
                   onClick={() => handleCategoryClick(fullCat)}
                 >
-                  <div className="nav-icon" style={{ fontSize: '13px' }}>{subIcon}</div>
-                  <span style={{ fontSize: '12px' }}>{sub}</span>
+                  <div className="nav-icon" style={{ fontSize: '14px' }}>{subIcon}</div>
+                  <span style={{ fontSize: '13px' }}>{sub}</span>
                   <div className="nav-badge" style={{ marginLeft: 'auto' }}>{subCount}</div>
                 </div>
               );
