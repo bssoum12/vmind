@@ -1648,10 +1648,41 @@ a,
 
 .atcard-badges {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: flex-end;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
+}
+
+.admin-config-btn,
+.atcard-admin-cog {
+  width: 35px;
+  height: 35px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 32, 53, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #7E8B9B;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.admin-config-btn:hover,
+.atcard-admin-cog:hover {
+  background: rgba(0, 229, 200, 0.12);
+  border-color: rgba(0, 229, 200, 0.6);
+  color: #00E5C8;
+  transform: rotate(60deg) scale(1.08);
+  box-shadow: 0 0 10px rgba(0, 229, 200, 0.25);
+}
+
+.admin-config-btn:active,
+.atcard-admin-cog:active {
+  transform: rotate(90deg) scale(0.95);
 }
 
 .atcard-tag {

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Button } from '@/shared/management/components/Button';
+import { AdminConfigButton } from '@/shared/management/components/AdminConfigButton';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
 import { VMindGuide, VMindGuideArrow } from '@/shared/management/components/VMindGuide';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
@@ -11,9 +12,17 @@ interface MarketplaceViewProps {
   onDeploy: (templateId: string, agent?: any, initialStep?: number) => void;
   activeCategory: string;
   onSelectCategory: (category: string) => void;
+  onOpenPrompts?: (promptKey?: string) => void;
+  isAdmin?: boolean;
 }
 
-export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, activeCategory, onSelectCategory }) => {
+const AGENT_PROMPT_KEYS: Record<string, string> = {
+  prospection: 'prospect_onboarding_chat',
+  sourcing: 'sourcing_execution_chat',
+};
+
+export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, activeCategory, onSelectCategory, onOpenPrompts, isAdmin: isAdminProp }) => {
+  const [isAdmin, setIsAdmin] = React.useState<boolean>(Boolean(isAdminProp));
   const [activeTab, setActiveTab] = React.useState('all');
   const [searchQuery, setSearchQuery] = React.useState('');
   const [highlightedTemplateId, setHighlightedTemplateId] = React.useState<string | null>(null);
@@ -21,6 +30,12 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
   const [templateDeployments, setTemplateDeployments] = React.useState<Record<string, number>>({});
   const parentCategories = Array.from(new Set(AGENT_TEMPLATES.map(a => a.category.split(' · ')[0]))).sort();
   const allCategories = ['all', ...parentCategories];
+
+  React.useEffect(() => {
+    if (isAdminProp !== undefined) {
+      setIsAdmin(isAdminProp);
+    }
+  }, [isAdminProp]);
 
   React.useEffect(() => {
     getMarketplaceStats()
@@ -265,6 +280,12 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
                         )}
                         {agent.tag === 'new' && !isHighlighted && <span className="atcard-tag new">NOUVEAU</span>}
                         {agent.tag === 'beta' && <span className="atcard-tag beta">BÊTA</span>}
+                        {isAdmin && AGENT_PROMPT_KEYS[agent.id] && (
+                          <AdminConfigButton
+                            title="Configuration des Prompts Système & IA (Admin)"
+                            onClick={() => onOpenPrompts?.(AGENT_PROMPT_KEYS[agent.id])}
+                          />
+                        )}
                       </div>
                     </div>
                     <div className="atcard-desc">{agent.description}</div>
@@ -276,7 +297,12 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
                       </span>
                     </div>
                     <button
+                      type="button"
                       className="atcard-deploy"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeployTarget(agent.id);
+                      }}
                       style={isHighlighted ? {
                         background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
                         color: '#04101E',
@@ -363,6 +389,12 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
                         )}
                         {agent.tag === 'new' && !isHighlighted && <span className="atcard-tag new">NOUVEAU</span>}
                         {agent.tag === 'beta' && <span className="atcard-tag beta">BÊTA</span>}
+                        {isAdmin && AGENT_PROMPT_KEYS[agent.id] && (
+                          <AdminConfigButton
+                            title="Configuration des Prompts Système & IA (Admin)"
+                            onClick={() => onOpenPrompts?.(AGENT_PROMPT_KEYS[agent.id])}
+                          />
+                        )}
                       </div>
                     </div>
                     <div className="atcard-desc">{agent.description}</div>
@@ -374,7 +406,12 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
                       </span>
                     </div>
                     <button
+                      type="button"
                       className="atcard-deploy"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeployTarget(agent.id);
+                      }}
                       style={isHighlighted ? {
                         background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
                         color: '#04101E',

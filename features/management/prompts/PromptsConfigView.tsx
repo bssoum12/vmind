@@ -23,7 +23,8 @@ import {
   ArrowRightLeft,
   Server,
   ShieldCheck,
-  Check
+  Check,
+  ArrowLeft
 } from 'lucide-react';
 import { useToast } from '@/shared/contexts/ToastContext';
 
@@ -47,6 +48,11 @@ interface ProviderStatus {
   hasClaudeCredentials: boolean;
   claudeBaseUrl: string;
   omniRouteBaseUrl: string;
+}
+
+export interface PromptsConfigViewProps {
+  initialKey?: string;
+  onBack?: () => void;
 }
 
 function getAuthToken(): string | null {
@@ -92,14 +98,15 @@ const OMNIROUTE_PRESETS = [
   'deepseek-chat'
 ];
 
-export const PromptsConfigView: React.FC = () => {
+export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey, onBack }) => {
   const { showToast } = useToast();
   const [prompts, setPrompts] = useState<PromptConfig[]>([]);
-  const [activeKey, setActiveKey] = useState<string>('prospect_onboarding_chat');
+  const [activeKey, setActiveKey] = useState<string>(initialKey || 'prospect_onboarding_chat');
   const [providerStatus, setProviderStatus] = useState<ProviderStatus | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [resetting, setResetting] = useState<boolean>(false);
+  const [isUnauthorized, setIsUnauthorized] = useState<boolean>(false);
 
   // Form edit state for currently active prompt
   const [formName, setFormName] = useState<string>('');
@@ -123,16 +130,21 @@ export const PromptsConfigView: React.FC = () => {
     modelUsed?: string;
     providerUsed?: 'claude' | 'omniroute';
     fallbackTriggered?: boolean;
+    temperature?: number;
   } | null>(null);
 
   const fetchPrompts = async () => {
     setLoading(true);
+    setIsUnauthorized(false);
     try {
       const res = await fetch(`${API_BASE}/api/admin/prompts`, {
         headers: getAuthHeaders()
       });
 
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          setIsUnauthorized(true);
+        }
         throw new Error(`HTTP ${res.status}: Échec de récupération des prompts`);
       }
 
@@ -143,7 +155,8 @@ export const PromptsConfigView: React.FC = () => {
           setProviderStatus(data.provider_status);
         }
 
-        const active = data.prompts.find((p: PromptConfig) => p.key === activeKey) || data.prompts[0];
+        const targetKey = initialKey || activeKey;
+        const active = data.prompts.find((p: PromptConfig) => p.key === targetKey) || data.prompts[0];
         if (active) {
           loadPromptIntoForm(active);
           setActiveKey(active.key);
@@ -172,6 +185,16 @@ export const PromptsConfigView: React.FC = () => {
   useEffect(() => {
     fetchPrompts();
   }, []);
+
+  useEffect(() => {
+    if (initialKey && initialKey !== activeKey) {
+      setActiveKey(initialKey);
+      const target = prompts.find(p => p.key === initialKey);
+      if (target) {
+        loadPromptIntoForm(target);
+      }
+    }
+  }, [initialKey, prompts]);
 
   const handleSelectTab = (key: string) => {
     setActiveKey(key);
@@ -346,7 +369,8 @@ export const PromptsConfigView: React.FC = () => {
           durationMs: streamMeta?.durationMs || (Date.now() - startTime),
           modelUsed: streamMeta?.modelUsed || (formProviderMode === 'omniroute' ? formFallbackModel : formModel),
           providerUsed: streamMeta?.providerUsed || (formProviderMode === 'omniroute' ? 'omniroute' : 'claude'),
-          fallbackTriggered: Boolean(streamMeta?.fallbackTriggered)
+          fallbackTriggered: Boolean(streamMeta?.fallbackTriggered),
+          temperature: streamMeta?.temperature !== undefined ? streamMeta.temperature : formTemperature
         });
       } else {
         // Standard JSON mode
@@ -356,7 +380,8 @@ export const PromptsConfigView: React.FC = () => {
           durationMs: data.duration_ms,
           modelUsed: data.model_used,
           providerUsed: data.provider_used,
-          fallbackTriggered: data.fallback_triggered
+          fallbackTriggered: data.fallback_triggered,
+          temperature: data.temperature !== undefined ? data.temperature : formTemperature
         });
       }
     } catch (err: any) {
@@ -365,6 +390,44 @@ export const PromptsConfigView: React.FC = () => {
       setTestLoading(false);
     }
   };
+
+  if (isUnauthorized) {
+    return (
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        height: '100%', minHeight: 450, padding: 32, textAlign: 'center', color: '#8FA3B8'
+      }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'rgba(255, 71, 87, 0.1)', border: '1px solid rgba(255, 71, 87, 0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16
+        }}>
+          <ShieldCheck size={28} color="#FF4757" />
+        </div>
+        <h2 style={{ color: '#FFFFFF', fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
+          Accès Strictement Réservé aux Administrateurs
+        </h2>
+        <p style={{ maxWidth: 440, fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
+          Vous ne disposez pas des privilèges administrateur requis pour consulter ou modifier les instructions système et configurations de modèles LLM.
+        </p>
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '10px 20px', borderRadius: 8,
+              background: 'rgba(0, 229, 200, 0.1)', border: '1px solid #00E5C8',
+              color: '#00E5C8', fontSize: 13, fontWeight: 600, cursor: 'pointer'
+            }}
+          >
+            <ArrowLeft size={14} />
+            <span>Retour au Marketplace</span>
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -394,6 +457,40 @@ export const PromptsConfigView: React.FC = () => {
         flexShrink: 0
       }}>
         <div>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '4px 10px',
+                marginBottom: 10,
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: 6,
+                color: '#8FA3B8',
+                fontSize: 11.5,
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#00E5C8';
+                e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.3)';
+                e.currentTarget.style.background = 'rgba(0, 229, 200, 0.06)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#8FA3B8';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+              }}
+            >
+              <ArrowLeft size={13} />
+              <span>Retour au Marketplace</span>
+            </button>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
             <div style={{
               width: 32, height: 32, borderRadius: 8,
@@ -1123,9 +1220,41 @@ export const PromptsConfigView: React.FC = () => {
 
             {/* Test Input */}
             <div>
-              <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8FA3B8', fontWeight: 600, display: 'block', marginBottom: 4 }}>
-                Message utilisateur simulé
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8FA3B8', fontWeight: 600 }}>
+                  Message utilisateur simulé
+                </label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => setTestUserMessage(
+                      activeKey === 'prospect_onboarding_chat'
+                        ? "Bonjour ! Je m'appelle Thomas, directeur commercial chez CloudSecure. Nous vendons une solution de cybersécurité pour les PME."
+                        : "Directeurs logistique en France dans le secteur du transport"
+                    )}
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: 4, padding: '2px 8px', fontSize: 10,
+                      color: '#94A3B8', cursor: 'pointer'
+                    }}
+                  >
+                    💼 Dialogue Onboarding
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTestUserMessage("Donne-moi 3 idées d'accroches d'approche originales et percutantes pour contacter un prospect B2B.")}
+                    style={{
+                      background: 'rgba(0, 229, 200, 0.08)',
+                      border: '1px solid rgba(0, 229, 200, 0.25)',
+                      borderRadius: 4, padding: '2px 8px', fontSize: 10,
+                      color: '#00E5C8', cursor: 'pointer', fontWeight: 600
+                    }}
+                  >
+                    ✨ Test de Température (Créatif)
+                  </button>
+                </div>
+              </div>
               <textarea
                 value={testUserMessage}
                 onChange={(e) => setTestUserMessage(e.target.value)}
@@ -1143,7 +1272,11 @@ export const PromptsConfigView: React.FC = () => {
             </div>
 
             {/* Test Action */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#8FA3B8' }}>
+                <Thermometer size={13} color="#00E5C8" />
+                <span>Température active : <b style={{ color: '#00E5C8', fontFamily: 'monospace' }}>{formTemperature.toFixed(2)}</b></span>
+              </div>
               <button
                 type="button"
                 onClick={handleRunTest}
@@ -1175,9 +1308,10 @@ export const PromptsConfigView: React.FC = () => {
               <div style={{
                 background: 'rgba(4, 9, 16, 0.95)',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: 8, padding: 14
+                borderRadius: 8, padding: 14,
+                display: 'flex', flexDirection: 'column', gap: 10
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, fontSize: 11, color: '#8FA3B8', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: '#8FA3B8', flexWrap: 'wrap', gap: 6 }}>
                   <span style={{ color: '#00E5C8', fontWeight: 700 }}>Réponse IA :</span>
                   {testMetrics && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -1201,15 +1335,25 @@ export const PromptsConfigView: React.FC = () => {
                         </span>
                       )}
                       <span>Modèle : <b style={{ color: '#F0F4F8' }}>{testMetrics.modelUsed}</b></span>
+                      <span>Température : <b style={{ color: '#00E5C8', fontFamily: 'monospace' }}>{(testMetrics.temperature !== undefined ? testMetrics.temperature : formTemperature).toFixed(2)}</b></span>
                       <span>Latence : <b style={{ color: '#00E5C8' }}>{testMetrics.durationMs}ms</b></span>
                     </div>
                   )}
                 </div>
                 <div style={{
                   whiteSpace: 'pre-wrap', color: '#CBD5E1',
-                  fontSize: 12.5, lineHeight: '1.6', fontFamily: 'monospace'
+                  fontSize: 12.5, lineHeight: '1.6', fontFamily: 'monospace',
+                  maxHeight: 280, overflowY: 'auto'
                 }}>
                   {testResponse}
+                </div>
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: 6, padding: '8px 10px',
+                  fontSize: 11, color: '#64748B', lineHeight: 1.5
+                }}>
+                  💡 <strong style={{ color: '#8FA3B8' }}>Comportement de la Température :</strong> Les prompts avec des règles de cadrage strictes (ex: extraction en 4 étapes ou JSON strict) restent volontairement disciplinés même à T=1.0. Pour constater une forte diversité lexicale, testez une consigne ouverte comme <span style={{ color: '#00E5C8' }}>✨ Test de Température (Créatif)</span>.
                 </div>
               </div>
             )}

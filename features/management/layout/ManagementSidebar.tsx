@@ -135,22 +135,13 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
       </div>
 
       {isAdmin && (
-        <>
-          <div
-            className={`nav-item ${currentView === 'journal' ? 'active' : ''}`}
-            onClick={() => onNavigate('journal')}
-          >
-            <div className="nav-icon">📋</div>
-            <span>Journal</span>
-          </div>
-          <div
-            className={`nav-item ${currentView === 'prompts' ? 'active' : ''}`}
-            onClick={() => onNavigate('prompts')}
-          >
-            <div className="nav-icon">🧠</div>
-            <span>Prompts & IA</span>
-          </div>
-        </>
+        <div
+          className={`nav-item ${currentView === 'journal' ? 'active' : ''}`}
+          onClick={() => onNavigate('journal')}
+        >
+          <div className="nav-icon">📋</div>
+          <span>Journal</span>
+        </div>
       )}
 
       <div className="nav-section">Catégories</div>

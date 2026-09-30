@@ -183,6 +183,7 @@ function HomeContent() {
     }
   });
   const [isAuthorized, setIsAuthorized] = useState<boolean>(true);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [clientId, setClientId] = useState<string>(() => {
     if (typeof window === 'undefined') return "DEMO";
     try {
@@ -246,12 +247,18 @@ function HomeContent() {
         }
 
         // Authorization check for Management mode (Administrators only)
+        const rawRoles = decoded.roles || decoded.role;
+        const roles = Array.isArray(rawRoles)
+          ? rawRoles
+          : typeof rawRoles === 'string'
+            ? [rawRoles]
+            : [];
+        const userIsAdmin = roles.some((r: string) =>
+          ['Administrator', 'Administrators', 'admin', 'Admin', 'Superusers'].includes(r)
+        );
+        setIsAdmin(userIsAdmin);
+
         if (mode === 'MANAGEMENT') {
-          const roles = Array.isArray(decoded.roles)
-            ? decoded.roles
-            : typeof decoded.roles === 'string'
-              ? [decoded.roles]
-              : [];
           if (!roles.includes('Administrators') && !roles.includes('Utilisateur') && !roles.includes('Administrator') && !roles.includes('Superusers')) {
             setIsAuthorized(false);
             return;
@@ -346,6 +353,9 @@ function HomeContent() {
 
       // Resolve the target view from state, or fallback to URL query param / 'market'
       let targetView = state?.view || (viewParam ? (viewParam === 'marketplace' ? 'market' : viewParam) : 'market');
+      if (targetView === 'prompts' && !isAdmin) {
+        targetView = 'market';
+      }
 
       // If user was inside the wizard and clicked Chrome Back to return
       if (currentViewRef.current === 'wizard' && targetView !== 'wizard') {
@@ -403,9 +413,16 @@ function HomeContent() {
 
     if (viewParam) {
       const normalizedView = viewParam === 'marketplace' ? 'market' : viewParam;
-      setCurrentView(normalizedView);
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('vmind_current_view', normalizedView);
+      if (normalizedView === 'prompts' && !isAdmin) {
+        setCurrentView('market');
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('vmind_current_view', 'market');
+        }
+      } else {
+        setCurrentView(normalizedView);
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('vmind_current_view', normalizedView);
+        }
       }
     }
 
@@ -436,6 +453,7 @@ function HomeContent() {
   }, [setMode]);
 
   const [activeCategory, setActiveCategory] = useState('all');
+  const [activePromptKey, setActivePromptKey] = useState<string | undefined>(undefined);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -450,6 +468,7 @@ function HomeContent() {
   }, []);
 
   const handleNavigate = (view: string) => {
+    if (view === 'prompts' && !isAdmin) return;
     if (view === currentViewRef.current) return;
     setCurrentView(view);
     setMobileSidebarOpen(false);
@@ -674,9 +693,14 @@ function HomeContent() {
             <MarketplaceView
               onDeploy={handleDeploy}
               activeCategory={activeCategory}
+              isAdmin={isAdmin}
               onSelectCategory={(cat) => {
                 handleSelectCategory(cat);
                 setMobileSidebarOpen(false);
+              }}
+              onOpenPrompts={(promptKey) => {
+                setActivePromptKey(promptKey);
+                handleNavigate('prompts');
               }}
             />
           )}
@@ -696,7 +720,32 @@ function HomeContent() {
           )}
 
           {currentView === 'prompts' && (
-            <PromptsConfigView />
+            isAdmin ? (
+              <PromptsConfigView 
+                initialKey={activePromptKey}
+                onBack={() => handleNavigate('market')}
+              />
+            ) : (
+              <div style={{ textAlign: 'center', padding: '80px 20px', color: '#8FA3B8' }}>
+                <h2 style={{ color: '#FF4757', marginBottom: 12 }}>Accès Restreint</h2>
+                <p>Cette section est strictement réservée aux administrateurs de VMIND.</p>
+                <button
+                  type="button"
+                  onClick={() => handleNavigate('market')}
+                  style={{
+                    marginTop: 16,
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    background: 'rgba(0, 229, 200, 0.1)',
+                    border: '1px solid #00E5C8',
+                    color: '#00E5C8',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Retour au Marketplace
+                </button>
+              </div>
+            )
           )}
           {currentView === 'reports' && (
             <ReportsView />
