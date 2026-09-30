@@ -174,9 +174,11 @@ export default function SourcingAgentWorkspacePage() {
       sessionStorage.setItem('vmind_editing_agent', JSON.stringify(agentData));
       sessionStorage.setItem('vmind_wizard_step', '2');
       sessionStorage.setItem('vmind_current_view', 'wizard');
+      sessionStorage.setItem('vmind_wizard_template', 'sourcing');
       sessionStorage.setItem('vmind_mode', 'MANAGEMENT');
+      sessionStorage.setItem('vmind_wizard_return_url', window.location.pathname + window.location.search);
     }
-    router.push('/?view=wizard');
+    router.push('/?view=wizard&template=sourcing');
   };
 
   const handleConnectProspectClick = () => {

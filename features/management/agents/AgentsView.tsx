@@ -160,7 +160,8 @@ function TargetAgentsBadge({ targets }: { targets: string[] }) {
     return (
       <span
         style={{
-          fontSize: '10px',
+          fontSize: '11px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           letterSpacing: '0.02em',
           padding: '2px 8px',
           borderRadius: '4px',
@@ -239,7 +240,8 @@ function TargetAgentsBadge({ targets }: { targets: string[] }) {
     >
       <span
         style={{
-          fontSize: '10px',
+          fontSize: '11px',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
           padding: '2px 8px',
           borderRadius: '4px',
           background: 'rgba(0, 229, 200, 0.08)',
@@ -1000,12 +1002,22 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           {!loading && agents.length > 0 && (
             <table className="agents-table" style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, textAlign: 'left', fontSize: '13px' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid rgba(0, 229, 200, 0.15)', background: 'rgba(9, 27, 51, 0.75)', color: '#00E5C8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
-                  <th style={{ padding: '12px 18px', minWidth: '320px' }}>Agent</th>
-                  <th style={{ padding: '12px 18px', width: '140px' }}>Statut</th>
-                  <th style={{ padding: '12px 18px', width: '200px' }}>Planification</th>
-                  <th style={{ padding: '12px 18px', width: '160px' }}>Dernière exéc.</th>
-                  <th style={{ padding: '12px 18px', textAlign: 'right' }}>Actions</th>
+                <tr style={{
+                  borderBottom: '1px solid rgba(0, 229, 200, 0.2)',
+                  background: 'rgba(9, 27, 51, 0.85)',
+                  color: '#00E5C8',
+                  fontWeight: 700,
+                  fontSize: '11px',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.07em',
+                  whiteSpace: 'nowrap'
+                }}>
+                  <th style={{ padding: '12px 18px', minWidth: '320px', color: '#00E5C8', fontWeight: 700, fontSize: '11px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif' }}>Agent</th>
+                  <th style={{ padding: '12px 18px', width: '140px', color: '#00E5C8', fontWeight: 700, fontSize: '11px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif' }}>Statut</th>
+                  <th style={{ padding: '12px 18px', width: '200px', color: '#00E5C8', fontWeight: 700, fontSize: '11px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif' }}>Planification</th>
+                  <th style={{ padding: '12px 18px', width: '160px', color: '#00E5C8', fontWeight: 700, fontSize: '11px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif' }}>Dernière exéc.</th>
+                  <th style={{ padding: '12px 18px', textAlign: 'right', color: '#00E5C8', fontWeight: 700, fontSize: '11px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1079,13 +1091,22 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                             {AGENT_TEMPLATES.find(t => t.id === agent.run_mode)?.icon || '🤖'}
                           </div>
                           <div>
-                            <div className="agent-row-name">{agent.agent_name}</div>
-                            <div style={{ fontSize: '11px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
+                            <div className="agent-row-name" style={{
+                              fontWeight: 600,
+                              color: '#F0F4F8',
+                              fontSize: '13.5px',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif',
+                              letterSpacing: '-0.01em'
+                            }}>
+                              {agent.agent_name}
+                            </div>
+                            <div style={{ fontSize: '11px', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap' }}>
                               <span style={{
                                 textTransform: 'capitalize',
-                                color: 'var(--muted)',
+                                color: '#7E8B9B',
                                 fontWeight: 500,
-                                fontSize: '11px'
+                                fontSize: '11px',
+                                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                               }}>
                                 {agent.run_mode || resolveAgentType(agent)}
                               </span>
@@ -1097,7 +1118,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         </div>
                       </td>
 
-                      <td style={{ padding: '14px 18px', ...getTutorialRowCellStyle(1) }}>
+                      <td style={{ padding: '13px 18px', ...getTutorialRowCellStyle(1) }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           {agent.is_executing ? (
                             <span style={{
@@ -1107,13 +1128,22 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                               border: '1px solid rgba(0, 229, 200, 0.4)',
                               fontWeight: 600, animation: 'pulse 1.5s infinite',
                               boxShadow: '0 0 10px rgba(0, 229, 200, 0.2)',
-                              width: 'fit-content', whiteSpace: 'nowrap'
+                              width: 'fit-content', whiteSpace: 'nowrap',
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif'
                             }}>
                               <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00E5C8', boxShadow: '0 0 6px #00E5C8' }} />
                               ⚡ En cours...
                             </span>
                           ) : (
-                            <span className={`status-pill ${meta.pill}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, width: 'fit-content' }}>
+                            <span className={`status-pill ${meta.pill}`} style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              width: 'fit-content',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif'
+                            }}>
                               <span style={{
                                 width: 7, height: 7, borderRadius: '50%',
                                 background: meta.dot,
@@ -1126,13 +1156,25 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         </div>
                       </td>
 
-                      <td style={{ padding: '12px 16px', ...getTutorialRowCellStyle(2) }}>
-                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                      <td style={{ padding: '13px 18px', ...getTutorialRowCellStyle(2) }}>
+                        <div style={{
+                          fontSize: '12px',
+                          color: '#8FA3B8',
+                          fontWeight: 500,
+                          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                        }}>
                           {getPlanificationSummary(agent)}
                         </div>
                       </td>
 
-                      <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--muted)', ...getTutorialRowCellStyle(3) }}>
+                      <td style={{
+                        padding: '13px 18px',
+                        fontSize: '12px',
+                        color: '#6F8195',
+                        fontWeight: 500,
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                        ...getTutorialRowCellStyle(3)
+                      }}>
                         {formatDate(agent.lastExecuted)}
                       </td>
 
