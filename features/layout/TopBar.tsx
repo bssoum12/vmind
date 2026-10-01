@@ -7,6 +7,7 @@ import { useClock } from '../../shared/hooks/useClock';
 import { useMode } from '@/shared/contexts/ModeContext';
 import { jwtDecode } from 'jwt-decode';
 import { LogOut, User, Menu } from 'lucide-react';
+import { AdminCriticalAlertBadge } from '@/components/admin/AdminCriticalAlertBadge';
 
 export const TopBar: React.FC = () => {
   const pathname = usePathname();
@@ -177,6 +178,7 @@ export const TopBar: React.FC = () => {
         </div>
       </div>
       <div className="topbar-right">
+        <AdminCriticalAlertBadge />
         <div className="tb-btn" title="Paramètres du profil" onClick={handleGoToProfile} style={{ cursor: 'pointer' }}>⚙</div>
         <div style={{ position: 'relative' }}>
           <div 
