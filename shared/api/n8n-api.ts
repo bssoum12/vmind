@@ -14,26 +14,14 @@ function getVmindSessionId() {
   return sessionId;
 }
 
+export const secureFetch = (url: string | URL, init: RequestInit = {}) => {
+  return fetch(url, {
+    ...init,
+    credentials: 'include'
+  });
+};
+
 const getAuthHeaders = (baseHeaders: Record<string, string> = {}): Record<string, string> => {
-  if (typeof window !== "undefined") {
-    try {
-      const sessionStr = localStorage.getItem("vmind_session");
-      if (sessionStr) {
-        let token = sessionStr;
-        if (sessionStr.trim().startsWith("{")) {
-          try {
-            const parsed = JSON.parse(sessionStr);
-            token = parsed?.token || parsed?.access_token || parsed?.user?.token || sessionStr;
-          } catch (e) {}
-        }
-        if (token) {
-          return { ...baseHeaders, "Authorization": `Bearer ${token}` };
-        }
-      }
-    } catch (e) {
-      console.warn("Could not retrieve session token:", e);
-    }
-  }
   return baseHeaders;
 };
 
@@ -50,29 +38,11 @@ export async function sendVmindMessage(message: string, conversationId: string, 
   const agentCode = (agentId || "VFIN").toUpperCase();
   console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode });
 
-  const authHeaders = getAuthHeaders({ "Content-Type": "application/json" });
-
   try {
-    if (!authHeaders["Authorization"]) {
-      console.warn("⚠️ [n8n-api] Aucun token d'authentification trouvé. Blocage de l'appel vers n8n.");
-      return {
-        ok: false,
-        response_type: "error",
-        message: "Veuillez vous connecter avant de poser une question.",
-        tool_used: null,
-        title: "Connexion requise",
-        kpis: [],
-        table: { columns: [], rows: [] },
-        chart: { type: null, title: "", description: "", xKey: "", yKey: "", data: [] },
-        details: null,
-        raw: null,
-        error: "AUTH_REQUIRED"
-      } as VmindN8nResponse;
-    }
-
     const response = await fetch(proxyUrl, {
       method: "POST",
-      headers: authHeaders,
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({
         message,
         client_id: clientId,
@@ -144,7 +114,7 @@ export async function deployAgent(config: any, clientId = "DEMO"): Promise<any> 
     }
   ];
 
-  const response = await fetch(webhookUrl, {
+  const response = await secureFetch(webhookUrl, {
     method: "POST",
     headers: getAuthHeaders({
       "Content-Type": "application/json"
@@ -173,7 +143,7 @@ export async function resetReminders(invoiceRefs: string[]): Promise<any> {
   
   console.log("🔄 [n8n-api] RESETTING REMINDERS FOR:", invoiceRefs);
 
-  const response = await fetch(url, {
+  const response = await secureFetch(url, {
     method: "POST",
     headers: getAuthHeaders({
       "Content-Type": "application/json"
@@ -200,7 +170,7 @@ const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "https://localhost:3
  * Fetches all deployed agents from Redis (via backend)
  */
 export async function getAgents(): Promise<any[]> {
-  const res = await fetch(`${getBaseUrl()}/api/list-agents`, {
+  const res = await secureFetch(`${getBaseUrl()}/api/list-agents`, {
     headers: getAuthHeaders()
   });
   if (!res.ok) throw new Error(`Impossible de récupérer la liste des agents (${res.status})`);
@@ -220,7 +190,7 @@ export interface MarketplaceStatsResponse {
 
 export async function getMarketplaceStats(): Promise<MarketplaceStatsResponse> {
   try {
-    const res = await fetch(`${getBaseUrl()}/api/analytics/marketplace-stats`, {
+    const res = await secureFetch(`${getBaseUrl()}/api/analytics/marketplace-stats`, {
       headers: getAuthHeaders()
     });
     if (!res.ok) return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
@@ -234,7 +204,7 @@ export async function getMarketplaceStats(): Promise<MarketplaceStatsResponse> {
  * Pauses an agent — removes its QStash schedule but keeps config in Redis
  */
 export async function pauseAgent(agentName: string): Promise<any> {
-  const res = await fetch(`${getBaseUrl()}/api/pause-agent/${encodeURIComponent(agentName)}`, {
+  const res = await secureFetch(`${getBaseUrl()}/api/pause-agent/${encodeURIComponent(agentName)}`, {
     method: "POST",
     headers: getAuthHeaders()
   });
@@ -257,7 +227,7 @@ export async function resumeAgent(agentName: string, params?: any): Promise<any>
     ...(params || {}),
     workflow_timezone: params?.workflow_timezone || getBrowserTimezone()
   };
-  const res = await fetch(`${getBaseUrl()}/api/resume-agent/${encodeURIComponent(agentName)}`, {
+  const res = await secureFetch(`${getBaseUrl()}/api/resume-agent/${encodeURIComponent(agentName)}`, {
     method: "POST",
     headers: getAuthHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(finalParams)
@@ -277,7 +247,7 @@ export async function resumeAgent(agentName: string, params?: any): Promise<any>
  * Deletes an agent completely (removes from Redis + cancels QStash schedule)
  */
 export async function deleteAgent(agentName: string): Promise<any> {
-  const res = await fetch(`${getBaseUrl()}/api/delete-agent/${encodeURIComponent(agentName)}`, {
+  const res = await secureFetch(`${getBaseUrl()}/api/delete-agent/${encodeURIComponent(agentName)}`, {
     method: "DELETE",
     headers: getAuthHeaders()
   });
@@ -297,7 +267,7 @@ export async function deleteAgent(agentName: string): Promise<any> {
  * If the agent has a running schedule, it is recreated with the new config.
  */
 export async function updateAgentConfig(agentName: string, recoveryConfig: object): Promise<any> {
-  const res = await fetch(`${getBaseUrl()}/api/update-agent-config/${encodeURIComponent(agentName)}`, {
+  const res = await secureFetch(`${getBaseUrl()}/api/update-agent-config/${encodeURIComponent(agentName)}`, {
     method: "PATCH",
     headers: { 
       "Content-Type": "application/json",
@@ -319,7 +289,7 @@ export async function updateAgentConfig(agentName: string, recoveryConfig: objec
  * Triggers an immediate (one-shot) run of an agent, outside of its schedule
  */
 export async function runAgentNow(agentName: string): Promise<any> {
-  const res = await fetch(`${getBaseUrl()}/api/run-now/${encodeURIComponent(agentName)}`, {
+  const res = await secureFetch(`${getBaseUrl()}/api/run-now/${encodeURIComponent(agentName)}`, {
     method: "POST",
     headers: getAuthHeaders()
   });
@@ -334,7 +304,7 @@ export async function runAgentNow(agentName: string): Promise<any> {
  * Get lead stats for a specific prospect agent
  */
 export async function getProspectAgentStats(agentId: string): Promise<any> {
-  const res = await fetch(`${getBaseUrl()}/api/stats/${encodeURIComponent(agentId)}`, {
+  const res = await secureFetch(`${getBaseUrl()}/api/stats/${encodeURIComponent(agentId)}`, {
     method: "GET",
     headers: getAuthHeaders()
   });
@@ -349,7 +319,7 @@ export async function getProspectAgentStats(agentId: string): Promise<any> {
  * Instantly qualify prospects for this agent (manually)
  */
 export async function qualifyManualProspects(agentId: string, mode: 'pending_only' | 'all'): Promise<any> {
-  const res = await fetch(`${getBaseUrl()}/api/prospect-agent/qualify-manual/${encodeURIComponent(agentId)}`, {
+  const res = await secureFetch(`${getBaseUrl()}/api/prospect-agent/qualify-manual/${encodeURIComponent(agentId)}`, {
     method: "POST",
     headers: getAuthHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ mode })
@@ -365,7 +335,7 @@ export async function qualifyManualProspects(agentId: string, mode: 'pending_onl
  * Trigger AI Qualification (N8N_WEBHOOK_QUALIFY) for all pending leads
  */
 export async function triggerAIQualificationAllPending(agentId: string): Promise<any> {
-  const res = await fetch(`${getBaseUrl()}/api/prospect-agent/qualify-all-pending-ai/${encodeURIComponent(agentId)}`, {
+  const res = await secureFetch(`${getBaseUrl()}/api/prospect-agent/qualify-all-pending-ai/${encodeURIComponent(agentId)}`, {
     method: "POST",
     headers: {
       ...getAuthHeaders(),
@@ -399,7 +369,7 @@ export async function fetchN8nKpis(
   const proxyUrl = `${getBaseUrl()}/api/n8n-proxy/kpis-agent`;
   const erp_name = "TraLis"; // Default ERP name
 
-  const response = await fetch(proxyUrl, {
+  const response = await secureFetch(proxyUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -446,7 +416,7 @@ export async function triggerSourcingRun(
     [key: string]: any;
   }
 ): Promise<any> {
-  const res = await fetch(`${getBaseUrl()}/api/sourcing-agent/run/${encodeURIComponent(agentId)}`, {
+  const res = await secureFetch(`${getBaseUrl()}/api/sourcing-agent/run/${encodeURIComponent(agentId)}`, {
     method: "POST",
     headers: getAuthHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify(params)
@@ -462,7 +432,7 @@ export async function triggerSourcingRun(
  * Trigger immediate execution for Prospect Agent (Auto Mode)
  */
 export async function triggerProspectAutoMode(agentId: string): Promise<any> {
-  const res = await fetch(`${getBaseUrl()}/api/run/${encodeURIComponent(agentId)}`, {
+  const res = await secureFetch(`${getBaseUrl()}/api/run/${encodeURIComponent(agentId)}`, {
     method: "POST",
     headers: getAuthHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ mode: "auto" })
@@ -485,7 +455,7 @@ export async function getVbuyKpiFacturesARegler(
   endDate?: string
 ): Promise<any> {
   const baseUrl = getBaseUrl();
-  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-factures-a-regler`, {
+  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-factures-a-regler`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -517,7 +487,7 @@ export async function getVbuyKpiAchatsDuMois(
   endDate?: string
 ): Promise<any> {
   const baseUrl = getBaseUrl();
-  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-achats-du-mois`, {
+  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-achats-du-mois`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -548,7 +518,7 @@ export async function getVbuyKpiFournisseursEnRetardLivraison(
   endDate?: string
 ): Promise<any> {
   const baseUrl = getBaseUrl();
-  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-fournisseurs-en-retard-livraison`, {
+  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-fournisseurs-en-retard-livraison`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -579,7 +549,7 @@ export async function getVbuyKpiCommandesEnAttente(
   endDate?: string
 ): Promise<any> {
   const baseUrl = getBaseUrl();
-  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-commandes-en-attente`, {
+  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-commandes-en-attente`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -610,7 +580,7 @@ export async function getVbuyKpiRepartitionParCategorie(
   endDate?: string
 ): Promise<any> {
   const baseUrl = getBaseUrl();
-  const response = await fetch(`${baseUrl}/api/tools/get-vbuy-kpi-repartition-par-categorie`, {
+  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-repartition-par-categorie`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

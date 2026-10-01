@@ -71,29 +71,20 @@ export default function ToolsHub() {
 
   React.useEffect(() => {
     setIsMounted(true);
-    try {
-      const token = localStorage.getItem('vmind_session');
-      if (!token) {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+    fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' })
+      .then(res => {
+        if (res.ok) {
+          setIsAuthenticated(true);
+        } else {
+          setIsAuthenticated(false);
+          window.location.href = '/login';
+        }
+      })
+      .catch(() => {
         setIsAuthenticated(false);
         window.location.href = '/login';
-        return;
-      }
-
-      const decoded: any = jwtDecode(token);
-      if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-        localStorage.removeItem('vmind_session');
-        setIsAuthenticated(false);
-        window.location.href = '/login';
-        return;
-      }
-
-      setIsAuthenticated(true);
-    } catch (err) {
-      console.error("Auth check failed in tools", err);
-      localStorage.removeItem('vmind_session');
-      setIsAuthenticated(false);
-      window.location.href = '/login';
-    }
+      });
   }, []);
 
   if (!isMounted || isAuthenticated === null || isAuthenticated === false) {

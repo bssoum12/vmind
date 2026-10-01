@@ -575,9 +575,8 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
         const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name.trim())}` + (editUuid ? `?excludeUuid=${encodeURIComponent(String(editUuid))}` : '');
 
-        const token = localStorage.getItem('vmind_session');
         const res = await fetch(endpoint, {
-          headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+          credentials: 'include'
         });
 
         if (!res.ok) {
@@ -673,9 +672,8 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
       if (!editUuid || !currentOriginalName || currentOriginalName.trim().toLowerCase() !== formData.agent_name.trim().toLowerCase()) {
         const endpoint = `${baseUrl}/api/prospect-agent/check-name/${encodeURIComponent(formData.agent_name.trim())}` + (editUuid ? `?excludeUuid=${encodeURIComponent(String(editUuid))}` : '');
 
-        const token = localStorage.getItem('vmind_session');
         const res = await fetch(endpoint, {
-          headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+          credentials: 'include'
         });
 
         if (!res.ok) {
@@ -752,19 +750,16 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
     };
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const token = localStorage.getItem('vmind_session');
-
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       const endpoint = isEditMode
         ? `${baseUrl}/api/prospect-agent/update/${editUuid}`
         : `${baseUrl}/api/prospect-agent/deploy`;
-
       const response = await fetch(endpoint, {
         method: isEditMode ? "PUT" : "POST",
         headers: {
-          "Content-Type": "application/json",
-          ...(token && { 'Authorization': `Bearer ${token}` })
+          "Content-Type": "application/json"
         },
+        credentials: "include",
         body: JSON.stringify(completePayload)
       });
 
@@ -784,9 +779,9 @@ export const WizardProspectionView: React.FC<WizardViewProps> = ({ templateId, o
           const linkRes = await fetch(`${baseUrl}/api/sourcing-agent/link-target/${originUuid}`, {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json',
-              ...(token && { 'Authorization': `Bearer ${token}` })
+              'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify({ target_agent_uuid: createdUuid })
           });
 

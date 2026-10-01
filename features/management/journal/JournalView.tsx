@@ -32,20 +32,6 @@ export const JournalView: React.FC = () => {
     setIsLoading(true);
     setIsForbidden(false);
     try {
-      let headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (typeof window !== 'undefined') {
-        const sessionStr = localStorage.getItem('vmind_session');
-        if (sessionStr) {
-          let token = sessionStr;
-          if (sessionStr.trim().startsWith('{')) {
-            try {
-              token = JSON.parse(sessionStr).token || sessionStr;
-            } catch (e) { }
-          }
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-      }
-
       const queryParams = new URLSearchParams({
         page: targetPage.toString(),
         limit: targetLimit.toString(),
@@ -53,7 +39,11 @@ export const JournalView: React.FC = () => {
         ...(search ? { search } : {})
       });
 
-      const res = await fetch(`${API_BASE_URL}/api/journal-logs?${queryParams.toString()}`, { headers, cache: 'no-store' });
+      const res = await fetch(`${API_BASE_URL}/api/journal-logs?${queryParams.toString()}`, {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        cache: 'no-store'
+      });
       if (res.status === 403) {
         const data = await res.json().catch(() => ({}));
         setIsForbidden(true);

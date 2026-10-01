@@ -67,9 +67,7 @@ export default function GlobalLeadsModal({ isOpen, agentId, onClose, onSuccess }
                 search: search
             });
             const res = await fetch(`${API_BASE_URL}/api/agent-leads/global/${agentId}?${queryParams.toString()}`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`
-                }
+                credentials: 'include'
             });
             const data = await res.json();
             setLeads(data.leads || []);
@@ -100,7 +98,8 @@ export default function GlobalLeadsModal({ isOpen, agentId, onClose, onSuccess }
         try {
             const res = await fetch(`${API_BASE_URL}/api/agent-leads/assign`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vmind_session')}` },
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
                 body: JSON.stringify({
                     agentId: agentId,
                     leadIds: Array.from(selectedIds)

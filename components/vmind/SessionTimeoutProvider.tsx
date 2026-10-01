@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { ShieldAlert, Clock, LogOut, RefreshCw } from 'lucide-react';
-import { jwtDecode } from 'jwt-decode';
+
 
 // Définition des délais en millisecondes / secondes
 const INACTIVITY_TIMEOUT = 14 * 60 * 1000; // 14 minutes d'inactivité avant l'alerte
@@ -36,11 +36,20 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
   }, [showWarning]);
 
   // Fonction de déconnexion sécurisée
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+      await fetch(`${baseUrl}/api/auth/vmind/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      }).catch(() => {});
+
       localStorage.removeItem('vmind_session');
       localStorage.removeItem('vmind_mcp_token');
       localStorage.removeItem('vmind_allowed_agents');
+      localStorage.removeItem('vmind_client_id');
+      localStorage.removeItem('vmind_connector_status');
+      localStorage.removeItem('vmind_mode');
       sessionStorage.clear();
       setShowWarning(false);
 
@@ -58,30 +67,6 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
   // Réinitialisation du minuteur d'inactivité
   const resetTimer = () => {
     lastActivityRef.current = Date.now();
-
-    // Vérification de validité et d'expiration du token JWT
-    const token = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
-    if (token) {
-      try {
-        let cleanToken = token;
-        if (cleanToken.startsWith('{')) {
-          const parsed = JSON.parse(cleanToken);
-          cleanToken = parsed.token || parsed.accessToken || cleanToken;
-        } else if (cleanToken.startsWith('"') && cleanToken.endsWith('"')) {
-          cleanToken = cleanToken.slice(1, -1);
-        }
-        const decoded: any = jwtDecode(cleanToken);
-        if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-          console.warn('[SessionTimeoutProvider] Token expiré détecté lors de l\'activité.');
-          handleLogout();
-          return;
-        }
-      } catch (err) {
-        console.error('[SessionTimeoutProvider] Erreur décodage token:', err);
-        handleLogout();
-        return;
-      }
-    }
 
     // Si la modale est affichée et qu'on détecte une activité, on prolonge automatiquement
     if (showWarningRef.current) {
@@ -101,12 +86,8 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
 
     // Lancer le timer avant alerte
     inactivityTimerRef.current = setTimeout(() => {
-      // Avant d'afficher l'alerte, on s'assure qu'un token valide existe toujours
-      const currentToken = localStorage.getItem('vmind_session');
-      if (currentToken) {
-        setCountdown(WARNING_DURATION);
-        setShowWarning(true);
-      }
+      setCountdown(WARNING_DURATION);
+      setShowWarning(true);
     }, INACTIVITY_TIMEOUT);
   };
 
@@ -188,36 +169,18 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
       } else {
         setIsTabVisible(true);
         // L'utilisateur revient sur l'onglet : on réinitialise simplement le minuteur d'inactivité à partir de cet instant
-        const token = localStorage.getItem('vmind_session');
-        if (!token) return;
-
-        try {
-          const decoded: any = jwtDecode(token);
-          if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-            handleLogout();
-            return;
-          }
-        } catch (e) {
-          handleLogout();
-          return;
-        }
-
-        // Calcul du temps d'inactivité cumulé réel (pendant que l'onglet était masqué)
         const idleTime = Date.now() - lastActivityRef.current;
         if (idleTime >= INACTIVITY_TIMEOUT) {
           // L'inactivité a dépassé le délai initial de 14 minutes : affichage direct de la modale avec 20 secondes
           setCountdown(20);
           setShowWarning(true);
         } else {
-          // Moins de 14 minutes d'inactivité : on ne fait rien (pas de modale), on planifie le temps restant
+          // Moins de 14 minutes d'inactivité : on planifie le temps restant
           if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
           const remainingInactivityTime = INACTIVITY_TIMEOUT - idleTime;
 
           inactivityTimerRef.current = setTimeout(() => {
-            const currentToken = localStorage.getItem('vmind_session');
-            if (currentToken) {
-              setShowWarning(true);
-            }
+            setShowWarning(true);
           }, remainingInactivityTime);
         }
       }
@@ -229,7 +192,7 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
     };
   }, [isPublicPage]);
 
-  // 4. Intercepteur global des réponses HTTP 401 (expiration ou invalidation de token)
+  // 4. Intercepteur global des réponses HTTP 401 (expiration ou invalidation de session)
   useEffect(() => {
     if (typeof window === 'undefined' || isPublicPage) return;
 
@@ -239,36 +202,16 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
       if (response.status === 401) {
         const url = typeof args[0] === 'string' ? args[0] : (args[0] instanceof Request ? args[0].url : '');
         // Ne pas intercepter la validation d'identifiants incorrects ou la vérification du mot de passe
-        const isAuthCheckEndpoint = url.includes('/api/auth/vmind/login') || url.includes('/api/auth/vmind/verify-current-password');
+        const isAuthCheckEndpoint = url.includes('/api/auth/vmind/login') || url.includes('/api/auth/vmind/verify-current-password') || url.includes('/api/auth/vmind/me');
         if (!isAuthCheckEndpoint) {
-          const token = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
-          let isExpired = false;
-          if (token) {
-            try {
-              let cleanToken = token;
-              if (cleanToken.startsWith('{')) {
-                const parsed = JSON.parse(cleanToken);
-                cleanToken = parsed.token || parsed.accessToken || cleanToken;
-              } else if (cleanToken.startsWith('"') && cleanToken.endsWith('"')) {
-                cleanToken = cleanToken.slice(1, -1);
-              }
-              const decoded: any = jwtDecode(cleanToken);
-              if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-                isExpired = true;
-              }
-            } catch (e) {
-              isExpired = true;
+          const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+          try {
+            const checkMe = await originalFetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' });
+            if (checkMe.status === 401) {
+              console.warn('[SessionTimeoutProvider] Statut 401 confirmé par /api/auth/vmind/me : session révoquée en base. Déconnexion automatique...');
+              handleLogout();
             }
-          } else {
-            isExpired = true;
-          }
-
-          if (isExpired) {
-            console.warn('[SessionTimeoutProvider] Statut 401 reçu et token expiré : session expirée ou invalide. Déconnexion automatique...');
-            handleLogout();
-          } else {
-            console.warn(`[SessionTimeoutProvider] Statut 401 reçu pour ${url} mais le token local reste valide.`);
-          }
+          } catch {}
         }
       }
       return response;
@@ -279,31 +222,20 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
     };
   }, [isPublicPage]);
 
-  // 5. Vérification périodique d'arrière-plan de l'expiration du token (toutes les 30 secondes)
+  // 5. Vérification périodique d'arrière-plan de validité de la session (toutes les 60 secondes)
   useEffect(() => {
     if (isPublicPage) return;
 
-    const interval = setInterval(() => {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
-      if (token) {
-        try {
-          let cleanToken = token;
-          if (cleanToken.startsWith('{')) {
-            const parsed = JSON.parse(cleanToken);
-            cleanToken = parsed.token || parsed.accessToken || cleanToken;
-          } else if (cleanToken.startsWith('"') && cleanToken.endsWith('"')) {
-            cleanToken = cleanToken.slice(1, -1);
-          }
-          const decoded: any = jwtDecode(cleanToken);
-          if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-            console.warn('[SessionTimeoutProvider] Expiration périodique atteinte : déconnexion automatique.');
-            handleLogout();
-          }
-        } catch {
+    const interval = setInterval(async () => {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+        const res = await fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' });
+        if (res.status === 401) {
+          console.warn('[SessionTimeoutProvider] Session expirée en base : déconnexion automatique.');
           handleLogout();
         }
-      }
-    }, 30000);
+      } catch (e) {}
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [isPublicPage]);

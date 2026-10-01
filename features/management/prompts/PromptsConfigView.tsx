@@ -49,31 +49,11 @@ interface ProviderStatus {
   omniRouteBaseUrl: string;
 }
 
-function getAuthToken(): string | null {
-  try {
-    const sessionRaw = localStorage.getItem('vmind_session');
-    if (sessionRaw) {
-      if (sessionRaw.startsWith('eyJ')) return sessionRaw;
-      const parsed = JSON.parse(sessionRaw);
-      const token = parsed?.token || parsed?.access_token || parsed?.user?.token || parsed?.data?.token;
-      if (token) return token;
-    }
-    const mcpRaw = localStorage.getItem('vmind_mcp_token');
-    if (mcpRaw) return mcpRaw;
-  } catch (e) {}
-  return null;
-}
-
 function getAuthHeaders(extraHeaders: Record<string, string> = {}): HeadersInit {
-  const token = getAuthToken();
-  const headers: Record<string, string> = {
+  return {
     'Content-Type': 'application/json',
     ...extraHeaders
   };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';

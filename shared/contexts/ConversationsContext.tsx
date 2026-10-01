@@ -24,23 +24,6 @@ interface ConversationsContextType {
   isLoading: boolean;
 }
 
-function getValidAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  let session = localStorage.getItem('vmind_session');
-  if (session) {
-    if (session.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(session);
-        session = parsed.token || parsed.accessToken || parsed.user?.token || session;
-      } catch (e) {}
-    }
-    if (session && session !== 'connected' && session.split('.').length === 3) {
-      return session;
-    }
-  }
-  return null;
-}
-
 const ConversationsContext = createContext<ConversationsContextType | undefined>(undefined);
 
 export function ConversationsProvider({ children }: { children: React.ReactNode }) {
@@ -52,12 +35,9 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
     try {
       setIsLoading(true);
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      const token = getValidAuthToken();
-
-      if (!token) return;
 
       const res = await fetch(`${baseUrl}/api/conversations`, {
-        headers: { Authorization: `Bearer ${token}` }
+        credentials: 'include'
       });
       const data = await res.json();
       if (data.ok) {
@@ -72,19 +52,28 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     fetchConversations();
+    const handleAuthUpdated = () => {
+      fetchConversations();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mcp-session-updated', handleAuthUpdated);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('mcp-session-updated', handleAuthUpdated);
+      }
+    };
   }, []);
 
   const createNewConversation = async (agentId: string, firstMessageText: string): Promise<string> => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      const token = getValidAuthToken();
-      if (!token) return '';
-      
       const newId = `conv-${Date.now()}`;
       const title = firstMessageText.substring(0, 30) + "...";
       const res = await fetch(`${baseUrl}/api/conversations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ conversation_id: newId, agent_id: agentId, title })
       });
       const data = await res.json();
@@ -122,12 +111,11 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const renameConversation = async (conversationId: string, newTitle: string) => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      const token = getValidAuthToken();
-      if (!token) return;
 
       const res = await fetch(`${baseUrl}/api/conversations/${conversationId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ title: newTitle })
       });
       const data = await res.json();
@@ -142,12 +130,10 @@ export function ConversationsProvider({ children }: { children: React.ReactNode 
   const deleteConversation = async (conversationId: string) => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      const token = getValidAuthToken();
-      if (!token) return;
 
       const res = await fetch(`${baseUrl}/api/conversations/${conversationId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        credentials: 'include'
       });
       const data = await res.json();
       if (data.ok) {

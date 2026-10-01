@@ -5,30 +5,6 @@ import { RefreshCw, TrendingUp, TrendingDown, BarChart2 } from 'lucide-react';
 import { useKpis } from '../../shared/contexts/KpiCacheContext';
 import { AnimatedNumber } from './TableauCroiseKpi/AnimatedNumber';
 
-function getAuthToken() {
-  if (typeof window === 'undefined') return '';
-  try {
-    const sessionStr = localStorage.getItem('vmind_session');
-    if (!sessionStr) return '';
-    if (sessionStr.startsWith('eyJ')) return sessionStr;
-    const parsed = JSON.parse(sessionStr);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
-  } catch(e) { return ''; }
-}
-
-function getClientIdFromSession() {
-  if (typeof window === 'undefined') return 'LOCAL';
-  try {
-    const token = getAuthToken();
-    if (token && token.split('.').length === 3) {
-      const parts = token.split('.');
-      const payload = JSON.parse(atob(parts[1]));
-      return payload?.client_id || 'LOCAL';
-    }
-  } catch {}
-  return 'LOCAL';
-}
-
 interface ChartDataPoint {
   label: string;
   value: number;
@@ -39,7 +15,7 @@ interface VolumeLineChartProps {
 }
 
 export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId }) => {
-  const { kpisByAgent, loadingByAgent, fetchKpis, startDate, endDate, error: globalError } = useKpis();
+  const { kpisByAgent, loadingByAgent, fetchKpis, startDate, endDate, error: globalError, clientId } = useKpis();
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [cardHovered, setCardHovered] = useState(false);
@@ -60,7 +36,7 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
   const fetchPrevYearVolume = async () => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-      const clientId = getClientIdFromSession();
+      const targetClientId = clientId || "DEMO";
       const pYear = parseInt(startDate.substring(0, 4)) - 1;
       setPrevYear(pYear);
       const prevStart = `${pYear}${startDate.substring(4)}`;
@@ -68,12 +44,12 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
 
       const response = await fetch(`${baseUrl}/api/tools/get-dossier-volume-evolution`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          client_id: clientId,
+          client_id: targetClientId,
           startDate: prevStart,
           endDate: prevEnd
         }),

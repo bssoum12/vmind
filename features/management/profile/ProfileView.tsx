@@ -14,18 +14,7 @@ interface ConnectorInfo {
   is_active?: boolean;
 }
 
-function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  const raw = localStorage.getItem('vmind_session') || localStorage.getItem('vmind_mcp_token');
-  if (!raw) return null;
-  if (raw.startsWith('eyJ')) return raw;
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || raw;
-  } catch (e) {
-    return raw;
-  }
-}
+
 
 export const ProfileView: React.FC = () => {
   const [firstName, setFirstName] = useState('');
@@ -60,32 +49,8 @@ export const ProfileView: React.FC = () => {
       try {
         setIsLoading(true);
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-        const token = getAuthToken();
-        if (!token) return;
-
-        try {
-          const decoded: any = jwtDecode(token);
-          if (decoded.username) setUsername(decoded.username);
-          if (decoded.first_name) setFirstName(decoded.first_name);
-          if (decoded.last_name) setLastName(decoded.last_name);
-          if (decoded.email) setEmail(decoded.email);
-          if (decoded.phone_number) setPhone(decoded.phone_number);
-          if (decoded.roles) setRoleLabel(Array.isArray(decoded.roles) ? decoded.roles[0] : decoded.roles);
-          if (Array.isArray(decoded.allowedAgents)) {
-            setAllowedAgents(decoded.allowedAgents.map((a: string) => a.toUpperCase()));
-          }
-          if (decoded.connector_type && decoded.client_id) {
-            setConnectors([{
-              connector_type: decoded.connector_type,
-              client_id: decoded.client_id,
-              is_active: true,
-              is_default: true
-            }]);
-          }
-        } catch (e) {}
-
         const res = await fetch(`${baseUrl}/api/auth/vmind/profile`, {
-          headers: { Authorization: `Bearer ${token}` }
+          credentials: 'include'
         });
         const data = await res.json();
 
@@ -129,10 +94,10 @@ export const ProfileView: React.FC = () => {
       try {
         setVerifyingCurrentPassword(true);
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-        const token = getAuthToken();
         const res = await fetch(`${baseUrl}/api/auth/vmind/verify-current-password`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ current_password: currentPassword })
         });
         const data = await res.json();
@@ -167,11 +132,11 @@ export const ProfileView: React.FC = () => {
     try {
       setIsSaving(true);
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-      const token = getAuthToken();
 
       const res = await fetch(`${baseUrl}/api/auth/vmind/profile`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           first_name: firstName.trim(), last_name: lastName.trim(),
           email: email.trim(), phone_number: phone.trim(),
@@ -182,7 +147,6 @@ export const ProfileView: React.FC = () => {
 
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error(data.error || 'Impossible de mettre à jour le profil.');
-      if (data.token) localStorage.setItem('vmind_session', data.token);
 
       setSuccessMessage('Profil mis à jour avec succès !');
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
@@ -195,8 +159,13 @@ export const ProfileView: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+      await fetch(`${baseUrl}/api/auth/vmind/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
       localStorage.removeItem('vmind_session');
       localStorage.removeItem('vmind_mcp_token');
       localStorage.removeItem('vmind_allowed_agents');

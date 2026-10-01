@@ -155,14 +155,13 @@ export function OnboardingChat({ initialMission, onConfirm, apiEndpoint, onModif
 
     try {
       const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-      const token = localStorage.getItem('vmind_session');
       const endpoint = apiEndpoint || '/api/prospect-agent/onboarding-chat';
       const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` })
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({ messages: newMessages.filter(m => m.role !== 'system') })
       });
 

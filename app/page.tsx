@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useMode } from '@/shared/contexts/ModeContext';
-import { jwtDecode } from 'jwt-decode';
+
 import { ShieldAlert, LogOut, ArrowLeft } from 'lucide-react';
 
 // Assistant Mode Components
@@ -159,98 +159,67 @@ function HomeContent() {
   const router = useRouter();
   const { mode, setMode } = useMode();
   const [isMounted, setIsMounted] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      let rawToken = localStorage.getItem('vmind_session');
-      if (!rawToken) return false;
-      let token = rawToken;
-      if (rawToken.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(rawToken);
-          token = parsed.token || parsed.accessToken || rawToken;
-        } catch {}
-      } else if (rawToken.startsWith('"') && rawToken.endsWith('"')) {
-        token = rawToken.slice(1, -1);
-      }
-      const decoded: any = jwtDecode(token);
-      if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-        return false;
-      }
-      return true;
-    } catch {
-      return false;
-    }
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isAuthorized, setIsAuthorized] = useState<boolean>(true);
-  const [clientId, setClientId] = useState<string>(() => {
-    if (typeof window === 'undefined') return "DEMO";
-    try {
-      let rawToken = localStorage.getItem('vmind_session');
-      if (!rawToken) return "DEMO";
-      let token = rawToken;
-      if (rawToken.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(rawToken);
-          token = parsed.token || parsed.accessToken || rawToken;
-        } catch {}
-      } else if (rawToken.startsWith('"') && rawToken.endsWith('"')) {
-        token = rawToken.slice(1, -1);
+  const [clientId, setClientId] = useState<string>("DEMO");
+
+  useEffect(() => {
+    const handleMcpUpdated = (e: any) => {
+      const detail = e?.detail;
+      const targetClientId = detail?.client_id || detail?.user?.client_id;
+      if (targetClientId) {
+        setClientId(targetClientId);
       }
-      const decoded: any = jwtDecode(token);
-      return decoded.client_id || "DEMO";
-    } catch {
-      return "DEMO";
-    }
-  });
+    };
+    window.addEventListener('mcp-session-updated', handleMcpUpdated);
+    return () => window.removeEventListener('mcp-session-updated', handleMcpUpdated);
+  }, []);
 
   useEffect(() => {
     setIsMounted(true);
 
-    const checkAuth = () => {
+    const checkAuth = async () => {
       try {
-        let rawToken = localStorage.getItem('vmind_session');
-        if (!rawToken) {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+        const res = await fetch(`${baseUrl}/api/auth/vmind/me`, {
+          credentials: 'include'
+        });
+
+        // Nettoyage proactif de tout stockage résiduel dans localStorage
+        localStorage.removeItem('vmind_session');
+        localStorage.removeItem('vmind_client_id');
+        localStorage.removeItem('vmind_allowed_agents');
+        localStorage.removeItem('vmind_connector_status');
+        localStorage.removeItem('vmind_mcp_token');
+        localStorage.removeItem('vmind_mode');
+
+        if (!res.ok) {
           setIsAuthenticated(false);
           window.location.href = '/login';
           return;
         }
 
-        let token = rawToken;
-        if (rawToken.startsWith('{')) {
-          try {
-            const parsed = JSON.parse(rawToken);
-            token = parsed.token || parsed.accessToken || rawToken;
-          } catch {}
-        } else if (rawToken.startsWith('"') && rawToken.endsWith('"')) {
-          token = rawToken.slice(1, -1);
-        }
-
-        const decoded: any = jwtDecode(token);
-        // Expiration check
-        if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-          try {
-            localStorage.removeItem('vmind_session');
-            localStorage.removeItem('vmind_mcp_token');
-            localStorage.removeItem('vmind_allowed_agents');
-            sessionStorage.clear();
-          } catch {}
+        const data = await res.json();
+        if (!data.ok || !data.user) {
           setIsAuthenticated(false);
           window.location.href = '/login';
           return;
         }
 
         setIsAuthenticated(true);
-        if (decoded.client_id) {
-          setClientId(decoded.client_id);
+        if (data.user.client_id) {
+          setClientId(data.user.client_id);
         }
 
-        // Authorization check for Management mode (Administrators only)
+        // Notification globale de session pour hydrater l'ensemble des composants React
+        window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { connected: true, user: data.user } }));
+
+        // Contrôle d'autorisation pour le mode MANAGEMENT (Administrateurs uniquement)
         if (mode === 'MANAGEMENT') {
-          const roles = Array.isArray(decoded.roles)
-            ? decoded.roles
-            : typeof decoded.roles === 'string'
-              ? [decoded.roles]
+          const roles = Array.isArray(data.user.roles)
+            ? data.user.roles
+            : typeof data.user.roles === 'string'
+              ? [data.user.roles]
               : [];
           if (!roles.includes('Administrators') && !roles.includes('Utilisateur') && !roles.includes('Administrator') && !roles.includes('Superusers')) {
             setIsAuthorized(false);
@@ -260,12 +229,6 @@ function HomeContent() {
         setIsAuthorized(true);
       } catch (err) {
         console.error("Auth check failed", err);
-        try {
-          localStorage.removeItem('vmind_session');
-          localStorage.removeItem('vmind_mcp_token');
-          localStorage.removeItem('vmind_allowed_agents');
-          sessionStorage.clear();
-        } catch {}
         setIsAuthenticated(false);
         window.location.href = '/login';
       }

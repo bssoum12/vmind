@@ -1487,11 +1487,6 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
             if (params?.trigger_rules) {
               try {
                 const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-                const tokenStr = localStorage.getItem('vmind_session');
-                let token = tokenStr;
-                if (tokenStr?.trim().startsWith("{")) {
-                  try { token = JSON.parse(tokenStr).token; } catch (e) { }
-                }
                 const publicId = scheduleModalAgent.uuid || scheduleModalAgent.agent_id;
                 const updateBody: any = {
                   agent_name: scheduleModalAgent.agent_name,
@@ -1514,18 +1509,18 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                 await fetch(`${baseUrl}/api/sourcing-agent/update/${publicId}`, {
                   method: "PUT",
                   headers: {
-                    "Content-Type": "application/json",
-                    ...(token && { 'Authorization': `Bearer ${token}` })
+                    "Content-Type": "application/json"
                   },
+                  credentials: "include",
                   body: JSON.stringify(updateBody)
                 });
 
                 const startRes = await fetch(`${baseUrl}/api/sourcing-agent/start/${publicId}`, {
                   method: "POST",
                   headers: {
-                    "Content-Type": "application/json",
-                    ...(token && { 'Authorization': `Bearer ${token}` })
+                    "Content-Type": "application/json"
                   },
+                  credentials: "include",
                   body: JSON.stringify({
                     target_agent_ids: params.target_agent_ids || scheduleModalAgent.target_agent_ids,
                     update_defaults: params.update_defaults,

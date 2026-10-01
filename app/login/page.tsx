@@ -3,7 +3,7 @@
 import './login.css';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { jwtDecode } from 'jwt-decode';
+
 import {
   Shield, User, Lock, Eye, EyeOff,
   RefreshCw, Clock, ArrowRight, ShieldCheck, BarChart3,
@@ -648,19 +648,31 @@ export default function LoginPage() {
   };
 
   useEffect(() => {
-    try {
-      const token = localStorage.getItem('vmind_session');
-      if (token) {
-        const decoded: any = jwtDecode(token);
-        if (decoded.exp && decoded.exp * 1000 > Date.now()) {
+    // Nettoyage systématique des vestiges de session dans localStorage (zéro-stockage)
+    localStorage.removeItem('vmind_session');
+    localStorage.removeItem('vmind_mcp_token');
+    localStorage.removeItem('vmind_connector_status');
+    localStorage.removeItem('vmind_client_id');
+    localStorage.removeItem('vmind_allowed_agents');
+
+    // Vérification de session via cookie HttpOnly — redirection si déjà connecté.
+    // AbortController : évite le double appel de React 18 StrictMode en développement.
+    const controller = new AbortController();
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+    fetch(`${baseUrl}/api/auth/vmind/check-session`, { credentials: 'include', signal: controller.signal })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.authenticated && data?.user) {
           router.push('/');
-        } else {
-          localStorage.removeItem('vmind_session');
         }
-      }
-    } catch (e) {
-      localStorage.removeItem('vmind_session');
-    }
+      })
+      .catch(err => {
+        if (err?.name !== 'AbortError') {
+          // session absente ou erreur réseau — on reste sur /login
+        }
+      });
+
+    return () => controller.abort();
   }, [router]);
 
   useEffect(() => {
@@ -698,6 +710,7 @@ export default function LoginPage() {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/auth/vmind/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ username, password, turnstileToken, rememberMe }),
       });
       const data = await res.json();
@@ -709,7 +722,14 @@ export default function LoginPage() {
         }
         throw new Error(data.error || 'Identifiants invalides');
       }
-      localStorage.setItem('vmind_session', data.token);
+      // La session est désormais enregistrée en base de données et transportée via cookie HttpOnly
+      localStorage.removeItem('vmind_session');
+      // Nettoyage systématique pour éviter tout stockage redondant dans localStorage
+      localStorage.removeItem('vmind_allowed_agents');
+      localStorage.removeItem('vmind_client_id');
+      localStorage.removeItem('vmind_connector_status');
+      localStorage.removeItem('vmind_mcp_token');
+      localStorage.removeItem('vmind_mode');
       
       if (rememberMe) {
         localStorage.setItem('vmind_remembered_username', username);

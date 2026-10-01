@@ -569,7 +569,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
   };
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/list-agents`, { headers: { 'Authorization': `Bearer ${localStorage.getItem('vmind_session')}` } })
+    fetch(`${API_BASE_URL}/api/list-agents`, { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         let agents = [];
@@ -734,9 +734,9 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
         const res = await fetch(`${API_BASE_URL}/api/agent-leads`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`
+            'Content-Type': 'application/json'
           },
+          credentials: 'include',
           body: JSON.stringify({ ...lead, agentIds: selectedAgentIds }),
         });
         if (res.ok) {
@@ -797,9 +797,9 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`,
             'Idempotency-Key': crypto.randomUUID()
           },
+          credentials: 'include',
           body: JSON.stringify({
             fileContent: text,
             fileType: file.type || fileType,
@@ -839,9 +839,9 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`,
           'Idempotency-Key': crypto.randomUUID()
         },
+        credentials: 'include',
         body: JSON.stringify({ url: importUrl.trim(), agentIds: selectedAgentIds })
       });
       const data = await res.json();
@@ -1119,9 +1119,9 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`,
           'Idempotency-Key': crypto.randomUUID()
         },
+        credentials: 'include',
         body: JSON.stringify({ lead_ids, agentId }),
       });
 
@@ -1172,9 +1172,9 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('vmind_session')}`,
           'Idempotency-Key': crypto.randomUUID()
         },
+        credentials: 'include',
         body: JSON.stringify({ lead_ids, agentId }),
       });
 

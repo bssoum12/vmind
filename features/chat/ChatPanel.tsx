@@ -56,14 +56,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             </div>
 
             <div className="msg-body">
-              <div
-                className="msg-text"
-                dangerouslySetInnerHTML={{
-                  __html: msg.isThinking
-                    ? `<div class="thinking"><div class="thdot"></div><div class="thdot"></div><div class="thdot"></div></div>`
-                    : msg.text,
-                }}
-              />
+              <div className="msg-text">
+                {msg.isThinking ? (
+                  <div className="thinking">
+                    <div className="thdot" />
+                    <div className="thdot" />
+                    <div className="thdot" />
+                  </div>
+                ) : (
+                  msg.text
+                )}
+              </div>
               <div className="msg-meta">
                 {msg.agent ? `${msg.agent} · ` : ''}{msg.time} {msg.meta ? `· ${msg.meta}` : ''}
               </div>

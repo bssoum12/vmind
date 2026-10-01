@@ -5,7 +5,6 @@ import { sendVmindMessage } from '@/shared/api/n8n-api';
 import { ToolResultRenderer } from './renderers/ToolResultRenderer';
 import { resolveAgentFromTool, AGENTS } from '@/shared/constants/data';
 import { useConversations } from '@/shared/contexts/ConversationsContext';
-import { jwtDecode } from 'jwt-decode';
 
 interface VmindChatProps {
   initialPrompt?: string;
@@ -242,6 +241,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   const [isErpConnected, setIsErpConnected] = useState<boolean>(false);
   const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   const handleAgentReferralClick = (targetAgentId: string) => {
     // 1. Retrieve the last user question in the conversation history
@@ -262,37 +262,34 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
   const checkPermissions = (event?: any) => {
     if (typeof window === 'undefined') return;
-    const sessionToken = localStorage.getItem('vmind_session');
-    if (!sessionToken) {
-      setIsErpConnected(false);
-      setAllowedAgents([]);
-      setIsAdmin(false);
+    const sessionDetail = event?.detail;
+    const user = sessionDetail?.user || sessionDetail;
+    if (user) {
+      setCurrentUser(user);
+      setIsErpConnected(true);
+      const roles = Array.isArray(user.roles) ? user.roles : (user.roles ? [user.roles] : []);
+      setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
+      if (Array.isArray(user.allowedAgents)) {
+        setAllowedAgents(user.allowedAgents);
+      }
       return;
     }
 
-    const sessionDetail = event?.detail;
-    if (sessionDetail && (sessionDetail.connected || sessionDetail.user)) {
-      setIsErpConnected(true);
-      const agents = sessionDetail.allowedAgents || sessionDetail.user?.allowedAgents;
-      if (Array.isArray(agents)) {
-        setAllowedAgents(agents);
-      }
-    }
-
-    try {
-      let raw = sessionToken;
-      if (raw.startsWith('{')) raw = JSON.parse(sessionToken).token || sessionToken;
-      if (raw.split('.').length === 3) {
-        const decoded: any = jwtDecode(raw);
-        setIsAdmin(Boolean(decoded.roles && (decoded.roles.includes('Administrator') || decoded.roles.includes('Administrators'))));
-        if (!sessionDetail && decoded.allowedAgents && Array.isArray(decoded.allowedAgents)) {
-          setAllowedAgents(decoded.allowedAgents);
-          setIsErpConnected(decoded.allowedAgents.length > 0);
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+    fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.user) {
+          setCurrentUser(data.user);
+          setIsErpConnected(true);
+          const roles = Array.isArray(data.user.roles) ? data.user.roles : (data.user.roles ? [data.user.roles] : []);
+          setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
+          if (Array.isArray(data.user.allowedAgents)) {
+            setAllowedAgents(data.user.allowedAgents);
+          }
         }
-      }
-    } catch (e) {
-      setIsAdmin(false);
-    }
+      })
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -311,20 +308,14 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
   const getWelcomeMessage = () => {
     let fullName = "Utilisateur";
-    try {
-      const token = localStorage.getItem('vmind_session');
-      if (token) {
-        const decoded: any = jwtDecode(token);
-        const firstName = decoded.first_name || '';
-        const lastName = decoded.last_name || '';
-        if (firstName || lastName) {
-          fullName = `${firstName} ${lastName}`.trim();
-        } else if (decoded.username) {
-          fullName = decoded.username;
-        }
+    if (currentUser) {
+      const firstName = currentUser.first_name || '';
+      const lastName = currentUser.last_name || '';
+      if (firstName || lastName) {
+        fullName = `${firstName} ${lastName}`.trim();
+      } else if (currentUser.username) {
+        fullName = currentUser.username;
       }
-    } catch (e) {
-      // fallback
     }
 
     const agentName = activeAgentId === 'VMIND' ? 'VMIND' : activeAgentId;
@@ -341,14 +332,9 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       try {
         setIsLoading(true);
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        let rawMcp = localStorage.getItem("vmind_mcp_token");
-        let token = (rawMcp && rawMcp !== "connected") ? rawMcp : localStorage.getItem("vmind_session");
-        if (token && token.startsWith("{")) {
-          try { token = JSON.parse(token).token || token; } catch {}
-        }
 
         const res = await fetch(`${baseUrl}/api/conversations/${activeConversationId}/messages`, {
-          headers: { Authorization: `Bearer ${token}` }
+          credentials: 'include'
         });
         const data = await res.json();
           
@@ -475,15 +461,10 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
         // Fire and forget
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        let rawMcp = localStorage.getItem("vmind_mcp_token");
-        let token = (rawMcp && rawMcp !== "connected") ? rawMcp : localStorage.getItem("vmind_session");
-        if (token && token.startsWith("{")) {
-          try { token = JSON.parse(token).token || token; } catch {}
-        }
-        
         fetch(`${baseUrl}/api/conversations/${targetConvId}/smart-title`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ message: text || text })
         })
         .then(res => res.json())

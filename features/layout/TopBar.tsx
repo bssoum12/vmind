@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { StatusDot } from '../../components/ui/StatusDot';
 import { useClock } from '../../shared/hooks/useClock';
 import { useMode } from '@/shared/contexts/ModeContext';
-import { jwtDecode } from 'jwt-decode';
+
 import { LogOut, User, Menu } from 'lucide-react';
 
 export const TopBar: React.FC = () => {
@@ -20,87 +20,97 @@ export const TopBar: React.FC = () => {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // Ne pas exécuter sur les pages publiques
+    if (pathname === '/login' || pathname?.startsWith('/login') || pathname?.startsWith('/reset-password')) {
+      return;
+    }
+
     setMounted(true);
-    const checkTokens = () => {
+    const applyUser = (user: any) => {
+      if (!user) return;
+      if (user.username) {
+        setUsername(user.username);
+        const parts = user.username.trim().split(/\s+/);
+        if (parts.length >= 2) {
+          setAvatarInitials((parts[0][0] + parts[1][0]).toUpperCase());
+        } else if (parts[0]) {
+          setAvatarInitials(parts[0].substring(0, 2).toUpperCase());
+        }
+      }
+      
+      if (user.roles) {
+        const roles = Array.isArray(user.roles)
+          ? user.roles
+          : typeof user.roles === 'string'
+            ? [user.roles]
+            : [];
+        // Mapping exact des noms de rôles DNN → label français affiché
+        if (roles.includes('Administrators') || roles.includes('Administrator') || roles.includes('Superusers')) {
+          setRoleLabel('Administrateur');
+        } else if (roles.some((r: string) => ['usersFinances','Service Comptabilité','usersCompta','usersDecaissement','usersEncaissements','usersReglementDivers'].includes(r))) {
+          setRoleLabel('Finance & Comptabilité');
+        } else if (roles.some((r: string) => ['usersVentes','UsersCRM','GestionnaireVente','usersClaims'].includes(r))) {
+          setRoleLabel('Commercial');
+        } else if (roles.some((r: string) => ['usersAchats'].includes(r))) {
+          setRoleLabel('Achats');
+        } else if (roles.some((r: string) => ['usersStock','usersArticles','usersStore'].includes(r))) {
+          setRoleLabel('Stock & Magasin');
+        } else if (roles.some((r: string) => ['usersExploitation','usersOMC','usersEDI'].includes(r))) {
+          setRoleLabel('Exploitation');
+        } else if (roles.some((r: string) => ['usersTiers','usersSettings'].includes(r))) {
+          setRoleLabel('Paramétrage');
+        } else if (roles.some((r: string) => ['LecteurSeulement','Extranet'].includes(r))) {
+          setRoleLabel('Lecture seule');
+        } else {
+          setRoleLabel(roles[0] || 'Utilisateur');
+        }
+      }
+    };
+
+    const checkTokens = (e?: any) => {
+      if (typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname.startsWith('/login') || window.location.pathname.startsWith('/reset-password'))) {
+        return;
+      }
       try {
-        let token = localStorage.getItem('vmind_session');
-        const mcpToken = localStorage.getItem('vmind_mcp_token');
-        const connectorStatus = localStorage.getItem('vmind_connector_status');
-        
-        if (connectorStatus === 'connected' || Boolean(mcpToken)) {
+        const user = e?.detail?.user || e?.detail;
+        if (user) {
+          applyUser(user);
           setIsErpConnected(true);
         } else {
-          setIsErpConnected(false);
-        }
-
-        if (token) {
-          if (token.startsWith('{')) {
-            try {
-              const parsed = JSON.parse(token);
-              token = parsed.token || parsed.accessToken || token;
-            } catch {}
-          } else if (token.startsWith('"') && token.endsWith('"')) {
-            token = token.slice(1, -1);
-          }
-
-          if (token) {
-            const decoded: any = jwtDecode(token);
-            if (decoded.username) {
-              setUsername(decoded.username);
-              
-              // Get initials
-              const parts = decoded.username.trim().split(/\s+/);
-              if (parts.length >= 2) {
-                setAvatarInitials((parts[0][0] + parts[1][0]).toUpperCase());
-              } else if (parts[0]) {
-                setAvatarInitials(parts[0].substring(0, 2).toUpperCase());
+          const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+          fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+              if (data?.user) {
+                applyUser(data.user);
+                setIsErpConnected(true);
               }
-            }
-            
-            if (decoded.roles) {
-              const roles = Array.isArray(decoded.roles)
-                ? decoded.roles
-                : typeof decoded.roles === 'string'
-                  ? [decoded.roles]
-                  : [];
-              // Mapping exact des noms de rôles DNN → label français affiché
-              if (roles.includes('Administrators') || roles.includes('Administrator') || roles.includes('Superusers')) {
-                setRoleLabel('Administrateur');
-              } else if (roles.some((r: string) => ['usersFinances','Service Comptabilité','usersCompta','usersDecaissement','usersEncaissements','usersReglementDivers'].includes(r))) {
-                setRoleLabel('Finance & Comptabilité');
-              } else if (roles.some((r: string) => ['usersVentes','UsersCRM','GestionnaireVente','usersClaims'].includes(r))) {
-                setRoleLabel('Commercial');
-              } else if (roles.some((r: string) => ['usersAchats'].includes(r))) {
-                setRoleLabel('Achats');
-              } else if (roles.some((r: string) => ['usersStock','usersArticles','usersStore'].includes(r))) {
-                setRoleLabel('Stock & Magasin');
-              } else if (roles.some((r: string) => ['usersExploitation','usersOMC','usersEDI'].includes(r))) {
-                setRoleLabel('Exploitation');
-              } else if (roles.some((r: string) => ['usersTiers','usersSettings'].includes(r))) {
-                setRoleLabel('Paramétrage');
-              } else if (roles.some((r: string) => ['LecteurSeulement','Extranet'].includes(r))) {
-                setRoleLabel('Lecture seule');
-              } else {
-                setRoleLabel(roles[0] || 'Utilisateur');
-              }
-            }
-          }
+            })
+            .catch(() => {});
         }
       } catch (e) {
-        console.error("Erreur de lecture du token dans TopBar", e);
+        console.error("Erreur de lecture de l'utilisateur dans TopBar", e);
       }
     };
 
     checkTokens();
     window.addEventListener('mcp-session-updated', checkTokens);
     return () => window.removeEventListener('mcp-session-updated', checkTokens);
-  }, []);
+  }, [pathname]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+      await fetch(`${baseUrl}/api/auth/vmind/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      }).catch(() => {});
       localStorage.removeItem('vmind_session');
       localStorage.removeItem('vmind_mcp_token');
       localStorage.removeItem('vmind_allowed_agents');
+      localStorage.removeItem('vmind_client_id');
+      localStorage.removeItem('vmind_connector_status');
+      localStorage.removeItem('vmind_mode');
       sessionStorage.clear();
     } catch {}
     window.location.href = '/login';

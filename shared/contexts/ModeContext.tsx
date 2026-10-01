@@ -16,7 +16,10 @@ export const ModeProvider = ({ children }: { children: ReactNode }) => {
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('vmind_mode') || sessionStorage.getItem('vmind_mode');
+      try {
+        localStorage.removeItem('vmind_mode');
+      } catch {}
+      const saved = sessionStorage.getItem('vmind_mode');
       if (saved === 'MANAGEMENT' || saved === 'ASSISTANT') {
         setModeState(saved as AppMode);
       }
@@ -26,8 +29,10 @@ export const ModeProvider = ({ children }: { children: ReactNode }) => {
   const setMode = useCallback((newMode: AppMode) => {
     setModeState(newMode);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('vmind_mode', newMode);
-      sessionStorage.setItem('vmind_mode', newMode);
+      try {
+        localStorage.removeItem('vmind_mode');
+        sessionStorage.setItem('vmind_mode', newMode);
+      } catch {}
       window.dispatchEvent(new CustomEvent('vmind-mode-changed', { detail: newMode }));
     }
   }, []);

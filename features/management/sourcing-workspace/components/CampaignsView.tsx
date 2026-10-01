@@ -103,7 +103,8 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
     try {
       const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('vmind_session')}` },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           id: selectedEmail.lead_id,
           action: 'send_email',
