@@ -27,20 +27,11 @@ export function useProspectSocket(onDbUpdate?: (payload: any) => void) {
     subscribersCount++;
 
     if (!sharedSocket) {
-      let rawToken = localStorage.getItem('vmind_session') || localStorage.getItem('vmind_mcp_token');
-      let token = rawToken;
-      if (rawToken && rawToken.trim().startsWith('{')) {
-        try {
-          token = JSON.parse(rawToken).token || rawToken;
-        } catch (e) {}
-      }
-
-      if (token) {
-        sharedSocket = io(SOCKET_URL, {
-          auth: { token },
-          reconnectionDelay: 1000,
-          reconnectionDelayMax: 5000,
-        });
+      sharedSocket = io(SOCKET_URL, {
+        withCredentials: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+      });
 
         sharedSocket.on('connect', () => {
           console.log('[WEBSOCKET] Connected to server.');
@@ -58,7 +49,6 @@ export function useProspectSocket(onDbUpdate?: (payload: any) => void) {
         sharedSocket.on('connect_error', (err) => {
           console.error('[WEBSOCKET] Connection error:', err.message);
         });
-      }
     }
     
     setSocket(sharedSocket);

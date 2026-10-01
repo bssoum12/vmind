@@ -19,6 +19,7 @@ interface KpiCacheContextType {
   clearNotice: () => void;
   activeAgentId: string;
   setActiveAgentId: (agentId: string) => void;
+  clientId: string;
 }
 
 const KpiCacheContext = createContext<KpiCacheContextType | undefined>(undefined);
@@ -51,6 +52,18 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   const [cooldowns, setCooldowns] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    const handleMcpUpdate = (event?: any) => {
+      const user = event?.detail?.user || event?.detail;
+      if (user) {
+        setCurrentUser(user);
+      }
+    };
+    window.addEventListener('mcp-session-updated', handleMcpUpdate);
+    return () => window.removeEventListener('mcp-session-updated', handleMcpUpdate);
+  }, []);
 
   const updateGlobalDates = (start: string, end: string) => {
     setStartDate(start);
@@ -62,30 +75,18 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
   // Helper to check if user has ERP connected and agent is allowed
   const isAgentKpiAllowed = (agentId: string) => {
-    if (typeof window === "undefined") return false;
-    let sessionToken = localStorage.getItem("vmind_session");
-    if (!sessionToken) return false;
-    
-    try {
-      if (sessionToken.startsWith('{')) {
-        try { sessionToken = JSON.parse(sessionToken).token || sessionToken; } catch {}
-      }
-      if (sessionToken && sessionToken.split('.').length === 3) {
-        const decoded: any = jwtDecode(sessionToken);
-        if (decoded.roles && (Array.isArray(decoded.roles) ? (decoded.roles.includes("Administrator") || decoded.roles.includes("Administrators")) : (decoded.roles === "Administrator" || decoded.roles === "Administrators"))) return true;
-        if (decoded.allowedAgents && Array.isArray(decoded.allowedAgents)) {
-          return decoded.allowedAgents.includes(agentId.toUpperCase());
-        }
-      }
-    } catch (e) {}
-    
+    if (!currentUser) return false;
+    const roles = Array.isArray(currentUser.roles) ? currentUser.roles : [currentUser.roles || ''];
+    if (roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r))) return true;
+    if (Array.isArray(currentUser.allowedAgents)) {
+      return currentUser.allowedAgents.includes(agentId.toUpperCase());
+    }
     return false;
   };
 
   const fetchKpis = async (agentId: string, force = false, targetTool?: string, horizon?: string) => {
-    if (!isAuthenticated()) {
-      return;
-    }
+    if (!currentUser) return;
+    if (typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname.startsWith('/login') || window.location.pathname.startsWith('/reset-password'))) return;
 
     const agentKey = (agentId || 'vdata').toLowerCase();
     const allowedAgentUpper = agentKey.toUpperCase();
@@ -115,20 +116,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     // Set loading state for this agent independently (never aborts other specialists)
     setLoadingByAgent(prev => ({ ...prev, [agentKey]: true }));
     try {
-      let clientId = 'LOCAL';
-      const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
-      if (sessionToken) {
-        let clean = sessionToken;
-        if (clean.startsWith('{')) {
-          try { clean = JSON.parse(clean).token || clean; } catch {}
-        }
-        if (clean && clean.split('.').length === 3) {
-          try {
-            const decoded: any = jwtDecode(clean);
-            if (decoded?.client_id) clientId = decoded.client_id;
-          } catch {}
-        }
-      }
+      const clientId = currentUser?.client_id || 'LOCAL';
 
       console.log(`[KPI CONTEXT] Fetching KPIs for ${allowedAgentUpper} (tenant: ${clientId}, force: ${force}, tool: ${targetTool || 'ALL'}, horizon: ${horizon || '1m'})`);
       const response = await fetchN8nKpis(
@@ -222,18 +210,10 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     }
   };
 
-  // Helper to check if user is authenticated before fetching KPIs
-  const isAuthenticated = () => {
-    if (typeof window === "undefined") return false;
-    const sessionToken = localStorage.getItem("vmind_session");
-    return Boolean(sessionToken && sessionToken !== "null");
-  };
-
   // Chargement passif depuis PostgreSQL lors du changement d'onglet spécialiste ou de date (NE LANCE JAMAIS n8n)
   useEffect(() => {
-    if (!isAuthenticated()) {
-      return;
-    }
+    if (!currentUser) return;
+    if (typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname.startsWith('/login') || window.location.pathname.startsWith('/reset-password'))) return;
 
     const currentAgent = activeAgentId || 'VDATA';
     const lowerAgent = currentAgent.toLowerCase();
@@ -246,7 +226,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
     // Interrogation de la base PostgreSQL en mode passif (force = false)
     fetchKpis(lowerAgent, false);
-  }, [startDate, endDate, activeAgentId]);
+  }, [startDate, endDate, activeAgentId, currentUser]);
 
   // Polling automatique si un calcul est en cours en tâche de fond pour l'agent actif
   useEffect(() => {
@@ -266,9 +246,8 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   // Nettoyage lors de la déconnexion de session MCP
   useEffect(() => {
     const handleMcpUpdate = (event?: any) => {
-      const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
       const sessionDetail = event?.detail;
-      if (!sessionToken || sessionDetail === null) {
+      if (sessionDetail === null) {
         setKpisByAgent({});
         setError(null);
         setLoadingByAgent({});
@@ -297,7 +276,8 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
         notice,
         clearNotice,
         activeAgentId,
-        setActiveAgentId
+        setActiveAgentId,
+        clientId: currentUser?.client_id || 'LOCAL'
       }}
     >
       {children}

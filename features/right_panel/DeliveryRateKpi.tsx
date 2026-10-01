@@ -17,7 +17,7 @@ interface DeliveryRateKpiProps {
 }
 
 export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId }) => {
-  const { kpisByAgent, loadingByAgent, fetchKpis, startDate, endDate, error: globalError } = useKpis();
+  const { kpisByAgent, loadingByAgent, fetchKpis, startDate, endDate, error: globalError, clientId } = useKpis();
 
   const [prevTaux, setPrevTaux] = useState<number | null>(null);
   const [prevYear, setPrevYear] = useState<number>(new Date().getFullYear() - 1);
@@ -54,34 +54,9 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
   const error = !effectiveLoading && !toolData.ok && globalError ? globalError : "";
   const noData = !effectiveLoading && toolData.ok && kpis.length === 0;
 
-  function getAuthToken() {
-    if (typeof window === 'undefined') return '';
-    try {
-      const sessionStr = localStorage.getItem('vmind_session');
-      if (!sessionStr) return '';
-      if (sessionStr.startsWith('eyJ')) return sessionStr;
-      const parsed = JSON.parse(sessionStr);
-      return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
-    } catch(e) { return ''; }
-  }
-
-  function getClientIdFromSession() {
-    if (typeof window === 'undefined') return 'LOCAL';
-    try {
-      const token = getAuthToken();
-      if (token && token.split('.').length === 3) {
-        const parts = token.split('.');
-        const payload = JSON.parse(atob(parts[1]));
-        return payload?.client_id || 'LOCAL';
-      }
-    } catch {}
-    return 'LOCAL';
-  }
-
   const fetchPrevYearRate = async () => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-      const clientId = getClientIdFromSession();
       const pYear = parseInt(startDate.substring(0, 4)) - 1;
       setPrevYear(pYear);
       const prevStart = `${pYear}${startDate.substring(4)}`;
@@ -91,10 +66,10 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${getAuthToken()}`,
         },
+        credentials: 'include',
         body: JSON.stringify({ 
-          client_id: clientId,
+          client_id: clientId || 'LOCAL',
           startDate: prevStart,
           endDate: prevEnd
         }),

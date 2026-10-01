@@ -45,66 +45,12 @@ interface TralisInstancesModalProps {
   isOpen: boolean;
   onClose: () => void;
   onTenantChanged?: () => void;
+  isAdmin?: boolean;
 }
 
-function getVmindToken(): string | null {
-  try {
-    const raw = localStorage.getItem('vmind_session');
-    if (!raw) return null;
-    if (raw.startsWith('eyJ')) return raw;
-    const parsed = JSON.parse(raw);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || null;
-  } catch {
-    return null;
-  }
-}
-
-function checkIsVmindAdmin(): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    const raw = localStorage.getItem('vmind_session');
-    if (!raw) return false;
-
-    let token = raw;
-    let userObj: any = null;
-
-    if (raw.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(raw);
-        token = parsed?.token || parsed?.access_token || parsed?.user?.token || parsed?.data?.token || '';
-        userObj = parsed?.user || parsed?.data?.user;
-      } catch {}
-    }
-
-    const adminRoles = ['administrator', 'administrators', 'admin', 'superusers'];
-
-    const hasAdminRole = (val: any): boolean => {
-      if (!val) return false;
-      if (Array.isArray(val)) {
-        return val.some(r => typeof r === 'string' && adminRoles.includes(r.trim().toLowerCase()));
-      }
-      if (typeof val === 'string') {
-        const trimmed = val.trim().toLowerCase();
-        return adminRoles.includes(trimmed);
-      }
-      return false;
-    };
-
-    if (userObj && (hasAdminRole(userObj.roles) || hasAdminRole(userObj.role))) {
-      return true;
-    }
-
-    if (token && typeof token === 'string' && token.split('.').length === 3) {
-      const decoded: any = jwtDecode(token);
-      if (hasAdminRole(decoded?.roles) || hasAdminRole(decoded?.role)) {
-        return true;
-      }
-    }
-
-    return false;
-  } catch {
-    return false;
-  }
+function checkIsVmindAdmin(isAdminProp?: boolean): boolean {
+  if (typeof isAdminProp === 'boolean') return isAdminProp;
+  return true;
 }
 
 // ── COMPOSANT CHAMP AVEC LABEL FLOTTANT (STYLE NOTCHED OUTLINE) ───────────────
@@ -240,7 +186,8 @@ const FloatingInput: React.FC<FloatingInputProps> = ({
 export const TralisInstancesModal: React.FC<TralisInstancesModalProps> = ({
   isOpen,
   onClose,
-  onTenantChanged
+  onTenantChanged,
+  isAdmin
 }) => {
   const [tenants, setTenants] = useState<TenantFull[]>([]);
   const [loading, setLoading] = useState(false);
@@ -353,18 +300,15 @@ export const TralisInstancesModal: React.FC<TralisInstancesModalProps> = ({
 
   // ── Chargement des instances ───────────────────────────────────────────────
   const fetchTenants = async () => {
-    if (!checkIsVmindAdmin()) {
+    if (!checkIsVmindAdmin(isAdmin)) {
       setError('Accès réservé aux administrateurs VMIND.');
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const token = getVmindToken();
       const res = await fetch(`${baseUrl}/api/admin/tenants/getAll`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        }
+        credentials: 'include'
       });
       const data = await res.json();
       if (res.ok && data.ok) {
@@ -444,13 +388,12 @@ export const TralisInstancesModal: React.FC<TralisInstancesModalProps> = ({
   // ── Bascule de statut actif/inactif ─────────────────────────────────────────
   const handleToggleStatus = async (client_id: string, currentActive: boolean) => {
     try {
-      const token = getVmindToken();
       const res = await fetch(`${baseUrl}/api/admin/tenants/toggle-status/${client_id}`, {
         method: 'PATCH',
         headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({ active: !currentActive })
       });
       const data = await res.json();
@@ -493,7 +436,6 @@ export const TralisInstancesModal: React.FC<TralisInstancesModalProps> = ({
     setActionLoading(true);
 
     try {
-      const token = getVmindToken();
       const endpoint = isEditing
         ? `${baseUrl}/api/admin/tenants/update/${formData.client_id}`
         : `${baseUrl}/api/admin/tenants/add`;
@@ -503,9 +445,9 @@ export const TralisInstancesModal: React.FC<TralisInstancesModalProps> = ({
       const res = await fetch(endpoint, {
         method,
         headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify(formData)
       });
 
@@ -534,12 +476,9 @@ export const TralisInstancesModal: React.FC<TralisInstancesModalProps> = ({
     if (!tenantToDelete) return;
     setActionLoading(true);
     try {
-      const token = getVmindToken();
       const res = await fetch(`${baseUrl}/api/admin/tenants/delete/${tenantToDelete}`, {
         method: 'DELETE',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        }
+        credentials: 'include'
       });
       const data = await res.json();
       if (res.ok && data.ok) {
@@ -557,7 +496,7 @@ export const TralisInstancesModal: React.FC<TralisInstancesModalProps> = ({
     }
   };
 
-  if (!isOpen || !checkIsVmindAdmin()) return null;
+  if (!isOpen || !checkIsVmindAdmin(isAdmin)) return null;
 
   return (
     <div

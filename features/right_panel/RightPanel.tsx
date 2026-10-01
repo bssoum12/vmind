@@ -36,19 +36,6 @@ import { VmoveActiveFlowsMapCard } from './TableauCroiseKpi/VmoveActiveFlowsMapC
 import { KpiCacheProvider, useKpis } from '../../shared/contexts/KpiCacheContext';
 import { KpiEmptyState } from './KpiEmptyState';
 
-function getAuthToken() {
-  if (typeof window === 'undefined') return '';
-  const mcpToken = localStorage.getItem('vmind_mcp_token');
-  if (mcpToken) return mcpToken;
-  try {
-    const sessionStr = localStorage.getItem('vmind_session');
-    if (!sessionStr) return '';
-    if (sessionStr.startsWith('eyJ')) return sessionStr;
-    const parsed = JSON.parse(sessionStr);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
-  } catch(e) { return ''; }
-}
-
 interface RightPanelProps {
   logs: LogEntry[];
   onInsertPrompt: (text: string) => void;
@@ -93,46 +80,44 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
 
   const showEmptyState = !hasKpiData;
 
-  const checkPermissions = () => {
+  const checkPermissions = (event?: any) => {
     if (typeof window === 'undefined') return;
-    const mcpToken = localStorage.getItem('vmind_mcp_token');
-    const connectorStatus = localStorage.getItem('vmind_connector_status');
-    const connected = connectorStatus === 'connected' || Boolean(mcpToken);
+
+    let connected = false;
+    let currentAllowed: string[] = [];
+    let isUserAdmin = false;
+
+    // Priorité au détail de l'événement en direct mcp-session-updated (en mémoire)
+    const sessionDetail = event?.detail;
+    if (sessionDetail && (sessionDetail.connected || sessionDetail.user)) {
+      connected = true;
+      const user = sessionDetail.user || sessionDetail;
+      const agents = sessionDetail.allowedAgents || user?.allowedAgents;
+      if (Array.isArray(agents) && agents.length > 0) {
+        currentAllowed = agents;
+      }
+      const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles || ''];
+      isUserAdmin = roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r));
+    }
+
+    if (currentAllowed.length > 0) {
+      connected = true;
+    }
+
+    setIsAdmin(isUserAdmin);
+    setAllowedAgents(currentAllowed);
     setIsErpConnected(connected);
-
-    const storedAllowed = localStorage.getItem('vmind_allowed_agents');
-    if (storedAllowed) {
-      try {
-        setAllowedAgents(JSON.parse(storedAllowed));
-      } catch (e) {
-        setAllowedAgents([]);
-      }
-    } else {
-      setAllowedAgents([]);
-    }
-
-    const token = mcpToken || localStorage.getItem('vmind_session');
-    if (token) {
-      try {
-        let raw = token;
-        if (token.startsWith('{')) raw = JSON.parse(token).token;
-        const decoded: any = jwtDecode(raw);
-        setIsAdmin(Boolean(decoded.roles && decoded.roles.includes('Administrators')));
-        if (!storedAllowed && decoded.allowedAgents) {
-          setAllowedAgents(decoded.allowedAgents);
-        }
-      } catch (e) {
-        setIsAdmin(false);
-      }
-    } else {
-      setIsAdmin(false);
-    }
   };
 
   React.useEffect(() => {
     checkPermissions();
-    window.addEventListener('mcp-session-updated', checkPermissions);
-    return () => window.removeEventListener('mcp-session-updated', checkPermissions);
+    const handleUpdate = (e: Event) => checkPermissions(e);
+    window.addEventListener('mcp-session-updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('mcp-session-updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, []);
 
   const isKpiAuthorized = isErpConnected && (isAdmin || allowedAgents.includes(activeAgentId || 'VDATA'));

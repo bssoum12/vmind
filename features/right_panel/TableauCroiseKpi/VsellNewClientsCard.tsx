@@ -4,19 +4,6 @@ import React, { useEffect, useState } from "react";
 import { useKpis } from "../../../shared/contexts/KpiCacheContext";
 import { SkeletonLoader } from "@/components/vmind/SkeletonLoader";
 
-function getAuthToken() {
-  if (typeof window === 'undefined') return '';
-  const mcpToken = localStorage.getItem('vmind_mcp_token');
-  if (mcpToken) return mcpToken;
-  try {
-    const sessionStr = localStorage.getItem('vmind_session');
-    if (!sessionStr) return '';
-    if (sessionStr.startsWith('eyJ')) return sessionStr;
-    const parsed = JSON.parse(sessionStr);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
-  } catch(e) { return ''; }
-}
-
 interface NewClientItem {
   rank: number;
   client: string;

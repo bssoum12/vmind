@@ -19,26 +19,14 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    let currentUserIsAdmin = false;
-    try {
-      const raw = localStorage.getItem('vmind_session') || localStorage.getItem('vmind_mcp_token');
-      if (raw) {
-        let tokenStr = raw;
-        if (!raw.startsWith('eyJ')) {
-          try {
-            const parsed = JSON.parse(raw);
-            tokenStr = parsed?.token || parsed?.access_token || parsed?.user?.token || raw;
-          } catch (e) { }
-        }
-        if (tokenStr.startsWith('eyJ')) {
-          const payload = JSON.parse(atob(tokenStr.split('.')[1]));
-          const roles = payload.roles || payload.role;
-          const roleStr = Array.isArray(roles) ? roles[0] : roles;
-          currentUserIsAdmin = (roleStr === 'Administrator' || roleStr === 'admin' || roleStr === 'Admin');
-        }
+    const checkAdmin = (e?: any) => {
+      const user = e?.detail?.user || e?.detail;
+      if (user) {
+        const roles = Array.isArray(user.roles) ? user.roles : [user.roles || ''];
+        setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
       }
-    } catch (e) { }
-    setIsAdmin(currentUserIsAdmin);
+    };
+    window.addEventListener('mcp-session-updated', checkAdmin);
 
     const refreshData = () => {
       getAgents()
@@ -68,6 +56,7 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('vmind_agent_updated', handleAgentUpdate);
+        window.removeEventListener('mcp-session-updated', checkAdmin);
       }
       clearInterval(interval);
     };

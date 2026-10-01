@@ -52,10 +52,8 @@ function formatUserFacingMessage(raw?: string): string {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
 const getAuthHeaders = () => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : '';
   return {
-    'Content-Type': 'application/json',
-    'Authorization': token ? `Bearer ${token}` : ''
+    'Content-Type': 'application/json'
   };
 };
 
@@ -289,6 +287,7 @@ export default function LeadDetailDrawer({
       const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
+        credentials: 'include',
         body: JSON.stringify({
           id: lead.id,
           action: 'update_status',
@@ -338,6 +337,7 @@ export default function LeadDetailDrawer({
           ...getAuthHeaders(),
           'Idempotency-Key': crypto.randomUUID()
         },
+        credentials: 'include',
         body: JSON.stringify({ lead_ids: [lead.id], agentId }),
       });
 
@@ -368,6 +368,7 @@ export default function LeadDetailDrawer({
           ...getAuthHeaders(),
           'Idempotency-Key': crypto.randomUUID()
         },
+        credentials: 'include',
         body: JSON.stringify({
           id: lead.id,
           action: 'generate_email'
@@ -404,6 +405,7 @@ export default function LeadDetailDrawer({
       const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
+        credentials: 'include',
         body: JSON.stringify({
           id: lead.id,
           action: 'send_email',

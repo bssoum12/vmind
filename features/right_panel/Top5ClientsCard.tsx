@@ -3,19 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { Trophy, TrendingUp, TrendingDown, ShieldCheck, Clock, Sparkles } from 'lucide-react';
 
-function getAuthToken() {
-  if (typeof window === 'undefined') return '';
-  const mcpToken = localStorage.getItem('vmind_mcp_token');
-  if (mcpToken) return mcpToken;
-  try {
-    const sessionStr = localStorage.getItem('vmind_session');
-    if (!sessionStr) return '';
-    if (sessionStr.startsWith('eyJ')) return sessionStr;
-    const parsed = JSON.parse(sessionStr);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || '';
-  } catch(e) { return ''; }
-}
-
 interface ClientRankItem {
   rank: number;
   client: string;
@@ -45,13 +32,12 @@ export const Top5ClientsCard: React.FC<Top5ClientsCardProps> = ({ activeAgentId 
 
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
       const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || 'DEMO';
-      const token = getAuthToken();
 
       const response = await fetch(`${baseUrl}/api/tools/get-top-clients-revenue`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : ''
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ client_id: clientId })
       });

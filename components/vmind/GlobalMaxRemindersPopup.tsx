@@ -24,12 +24,8 @@ export const GlobalMaxRemindersPopup: React.FC = () => {
 
   useEffect(() => {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-    let token = typeof window !== 'undefined' ? (localStorage.getItem('vmind_session') || localStorage.getItem('vmind_mcp_token')) : null;
-    if (token && token.startsWith('{')) {
-      try { token = JSON.parse(token).token; } catch (e) {}
-    }
-    const sseUrl = `${baseUrl}/api/recovery/sse${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-    const sse = new EventSource(sseUrl);
+    const sseUrl = `${baseUrl}/api/recovery/sse`;
+    const sse = new EventSource(sseUrl, { withCredentials: true });
 
     sse.onmessage = (event) => {
       try {

@@ -58,13 +58,10 @@ export default function SourcingAgentWorkspacePage() {
   const fetchData = useCallback(async () => {
     if (!agentId) return;
     try {
-      const token = localStorage.getItem('vmind_session');
-      const headers = { 'Authorization': `Bearer ${token}` };
-
       const [agents, leadsRes, logsRes] = await Promise.all([
         getAgents().catch(() => []),
-        fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, { headers, cache: 'no-store' }),
-        fetch(`${API_BASE_URL}/api/agent-logs/${agentId}`, { headers, cache: 'no-store' })
+        fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, { credentials: 'include', cache: 'no-store' }),
+        fetch(`${API_BASE_URL}/api/agent-logs/${agentId}`, { credentials: 'include', cache: 'no-store' })
       ]);
 
       if (Array.isArray(agents)) {

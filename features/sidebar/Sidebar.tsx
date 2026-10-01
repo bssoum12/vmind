@@ -25,45 +25,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
 
   const updatePermissions = (event?: any) => {
     try {
-      const sessionToken = typeof window !== 'undefined' ? localStorage.getItem('vmind_session') : null;
-      let cleanSession = sessionToken;
-      if (cleanSession && cleanSession.startsWith('{')) {
-        try {
-          const parsed = JSON.parse(cleanSession);
-          cleanSession = parsed.token || parsed.access_token || parsed.user?.token;
-        } catch (e) {}
-      }
-
-      const isJwt = (t: any): t is string => typeof t === 'string' && t.split('.').length === 3;
-
-      let decoded: any = null;
-      if (cleanSession && isJwt(cleanSession)) {
-        decoded = jwtDecode(cleanSession);
-        if (decoded?.username) {
-          setUsername(decoded.username);
-        }
-        setIsAdmin(Boolean(decoded?.roles && (decoded.roles.includes('Administrator') || decoded.roles.includes('Administrators'))));
-      }
-
       const sessionDetail = event?.detail;
-      if (sessionDetail && (sessionDetail.connected || sessionDetail.user)) {
-        setIsErpConnected(true);
-        const agents = sessionDetail.allowedAgents || sessionDetail.user?.allowedAgents;
+      const user = sessionDetail?.user || sessionDetail;
+      if (user) {
+        if (user.username) setUsername(user.username);
+        const roles = Array.isArray(user.roles) ? user.roles : [user.roles || ''];
+        setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
+        const agents = user.allowedAgents || user.allowed_agents || [];
         if (Array.isArray(agents)) {
           setAllowedAgents(agents);
+          setIsErpConnected(agents.length > 0);
           return;
         }
       }
-
-      if (decoded?.allowedAgents && Array.isArray(decoded.allowedAgents) && decoded.allowedAgents.length > 0) {
-        setAllowedAgents(decoded.allowedAgents);
-        setIsErpConnected(true);
-      } else {
-        setAllowedAgents([]);
-        setIsErpConnected(false);
-      }
     } catch (e) {
-      console.error("Erreur de décodage du token dans la sidebar", e);
+      console.error("Erreur de synchronisation des permissions dans la sidebar", e);
     }
   };
 

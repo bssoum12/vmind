@@ -169,12 +169,10 @@ export default function AgentWorkspacePage() {
     if (!agentId) return;
     setIsLoading(true);
     try {
-      const headers = { 'Authorization': `Bearer ${localStorage.getItem('vmind_session')}` };
-
       const [leadsRes, campaignsRes, logsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, { headers, cache: 'no-store' }),
-        fetch(`${API_BASE_URL}/api/agent-campaigns/${agentId}`, { headers, cache: 'no-store' }),
-        fetch(`${API_BASE_URL}/api/agent-logs/${agentId}`, { headers, cache: 'no-store' })
+        fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, { credentials: 'include', cache: 'no-store' }),
+        fetch(`${API_BASE_URL}/api/agent-campaigns/${agentId}`, { credentials: 'include', cache: 'no-store' }),
+        fetch(`${API_BASE_URL}/api/agent-logs/${agentId}`, { credentials: 'include', cache: 'no-store' })
       ]);
 
       if (leadsRes.status === 403 || campaignsRes.status === 403 || logsRes.status === 403) {

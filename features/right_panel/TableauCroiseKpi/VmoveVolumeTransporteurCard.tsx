@@ -28,21 +28,6 @@ const MONTHS_LIST = [
   { value: 12, label: "Décembre" }
 ];
 
-function getAuthToken(): string {
-  if (typeof window === 'undefined') return '';
-  const mcpToken = localStorage.getItem('vmind_mcp_token');
-  if (mcpToken && mcpToken !== 'null') return mcpToken;
-  try {
-    const sessionStr = localStorage.getItem('vmind_session');
-    if (!sessionStr || sessionStr === 'null') return '';
-    if (sessionStr.startsWith('eyJ')) return sessionStr;
-    const parsed = JSON.parse(sessionStr);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || sessionStr || '';
-  } catch (e) {
-    return '';
-  }
-}
-
 export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardProps> = ({
   activeAgentId,
   clientId = "DEMO",

@@ -7,18 +7,6 @@ import { OdooConnectorPanel } from './components/OdooConnectorPanel';
 import { ComingSoonPanel } from './components/ComingSoonPanel';
 import { jwtDecode } from 'jwt-decode';
 
-function getVmindSessionToken(): string | null {
-  try {
-    const raw = localStorage.getItem('vmind_session');
-    if (!raw) return null;
-    if (raw.startsWith('eyJ')) return raw;
-    const parsed = JSON.parse(raw);
-    return parsed?.token || parsed?.access_token || parsed?.user?.token || parsed?.data?.token || null;
-  } catch (err) {
-    return null;
-  }
-}
-
 // ─── Shared MCP session state ─────────────────────────────────────────────────
 // Lifted to the Hub so it survives navigation between connectors.
 
@@ -43,26 +31,18 @@ export const ConnectorsHub: React.FC = () => {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
   /**
-   * Single source of truth: called once on Hub mount.
-   * Reads vmind_mcp_token from localStorage and validates with backend.
-   * If valid  → keeps Hub-level state as "connected" forever until explicit disconnect.
-   * If invalid → removes token silently, sets idle.
+   * Source de vérité : appelé une fois au montage du Hub.
+   * Valide la session avec le backend via cookie HttpOnly.
    */
   const initTralisMcp = useCallback(async () => {
-    const vmindToken = getVmindSessionToken();
-    if (!vmindToken) {
-      console.log('[ConnectorsHub] vmind_session absent → idle');
-      setTralisStatus('idle');
-      return;
-    }
-
     console.log('[ConnectorsHub] Récupération du statut du connecteur TraLIS depuis le backend');
     try {
       const res = await fetch(`${baseUrl}/api/connectors/tralis/status`, {
-        headers: { Authorization: `Bearer ${vmindToken}` },
+        credentials: 'include'
       });
 
       // Nettoyage proactif de tout vestige legacy de localStorage
+      localStorage.removeItem('vmind_session');
       localStorage.removeItem('vmind_mcp_token');
       localStorage.removeItem('vmind_connector_status');
       localStorage.removeItem('vmind_client_id');
@@ -72,12 +52,21 @@ export const ConnectorsHub: React.FC = () => {
         const data = await res.json();
         if (data.ok && data.connected) {
           console.log('[ConnectorsHub] ✅ Session TraLIS active restaurée via le backend');
+
+          const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
+          const receivedRoles: string[] = data.roles || ['Administrator'];
+          const isAdmin = receivedRoles.some((r: string) =>
+            ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
+          );
+          const receivedAgents: string[] = data.allowedAgents || [];
+          const resolvedAgents = receivedAgents.length > 0 ? receivedAgents : (isAdmin ? ALL_AGENTS : []);
+
           setTralisSession({
             user: {
               username: data.erp_username || '',
               client_id: data.client_id || 'DEMO',
-              roles: data.roles || ['Administrator'],
-              allowedAgents: data.allowedAgents || []
+              roles: receivedRoles,
+              allowedAgents: resolvedAgents
             },
             tools: data.tools || [],
             allTools: data.allTools || []
@@ -104,6 +93,7 @@ export const ConnectorsHub: React.FC = () => {
   /** Called by TralisConnectorPanel after a successful login */
   const handleTralisMcpConnected = (token: string, data: McpSession) => {
     // Nettoyage proactif de tout vestige legacy de localStorage
+    localStorage.removeItem('vmind_session');
     localStorage.removeItem('vmind_mcp_token');
     localStorage.removeItem('vmind_connector_status');
     localStorage.removeItem('vmind_client_id');
@@ -117,27 +107,25 @@ export const ConnectorsHub: React.FC = () => {
 
   /** Called by TralisConnectorPanel on explicit disconnect */
   const handleTralisMcpDisconnected = async () => {
-    const vmindToken = getVmindSessionToken();
     let remainingAgents: string[] = [];
-    if (vmindToken) {
-      try {
-        const res = await fetch(`${baseUrl}/api/connectors/tralis/disconnect`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${vmindToken}`
-          }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.ok && Array.isArray(data.allowedAgents)) {
-            remainingAgents = data.allowedAgents;
-          }
+    try {
+      const res = await fetch(`${baseUrl}/api/connectors/tralis/disconnect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.allowedAgents)) {
+          remainingAgents = data.allowedAgents;
         }
-      } catch (err) {
-        console.error('[ConnectorsHub] Failed to disconnect on backend:', err);
       }
+    } catch (err) {
+      console.error('[ConnectorsHub] Failed to disconnect on backend:', err);
     }
+    localStorage.removeItem('vmind_session');
     localStorage.removeItem('vmind_mcp_token');
     localStorage.removeItem('vmind_connector_status');
     localStorage.removeItem('vmind_client_id');

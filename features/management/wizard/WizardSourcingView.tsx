@@ -192,14 +192,8 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       setLoadingProspectAgents(true);
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-        const tokenStr = localStorage.getItem('vmind_session');
-        let token = tokenStr;
-        if (tokenStr?.trim().startsWith("{")) {
-          try { token = JSON.parse(tokenStr).token; } catch (e) { }
-        }
-
         const res = await fetch(`${baseUrl}/api/list-agents`, {
-          headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+          credentials: 'include'
         });
         if (res.ok) {
           const data = await res.json();
@@ -377,9 +371,8 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
         const endpoint = `${baseUrl}/api/sourcing-agent/check-name/${encodeURIComponent(formData.agent_name.trim())}` + (editUuid ? `?excludeUuid=${encodeURIComponent(String(editUuid))}` : '');
 
-        const token = localStorage.getItem('vmind_session');
         const res = await fetch(endpoint, {
-          headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+          credentials: 'include'
         });
 
         if (!res.ok) {
@@ -421,11 +414,6 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
 
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const tokenStr = localStorage.getItem('vmind_session');
-      let token = tokenStr;
-      if (tokenStr?.trim().startsWith("{")) {
-        try { token = JSON.parse(tokenStr).token; } catch (e) { }
-      }
 
       const endpoint = isEditMode
         ? `${baseUrl}/api/sourcing-agent/update/${editUuid}`
@@ -434,9 +422,9 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       const response = await fetch(endpoint, {
         method: isEditMode ? "PUT" : "POST",
         headers: {
-          "Content-Type": "application/json",
-          ...(token && { 'Authorization': `Bearer ${token}` })
+          "Content-Type": "application/json"
         },
+        credentials: "include",
         body: JSON.stringify(completePayload)
       });
 
@@ -508,19 +496,13 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
   const handleActivateSchedule = async (agent: LiveAgent, params: any) => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const tokenStr = localStorage.getItem('vmind_session');
-      let token = tokenStr;
-      if (tokenStr?.trim().startsWith("{")) {
-        try { token = JSON.parse(tokenStr).token; } catch (e) { }
-      }
-
       const targetUuid = agent.uuid || agent.agent_id;
       const updateRes = await fetch(`${baseUrl}/api/sourcing-agent/update/${targetUuid}`, {
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
-          ...(token && { 'Authorization': `Bearer ${token}` })
+          "Content-Type": "application/json"
         },
+        credentials: "include",
         body: JSON.stringify({
           agent_name: agent.agent_name,
           trigger_rules: params.trigger_rules,
@@ -541,9 +523,9 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       const startRes = await fetch(`${baseUrl}/api/sourcing-agent/start/${targetUuid}`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          ...(token && { 'Authorization': `Bearer ${token}` })
+          "Content-Type": "application/json"
         },
+        credentials: "include",
         body: JSON.stringify({
           target_agent_ids: params.target_agent_ids || agent.target_agent_ids,
           workflow_timezone: getBrowserTimezone()

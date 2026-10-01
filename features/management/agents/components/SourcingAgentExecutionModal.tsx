@@ -72,14 +72,9 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
     const fetchProspectAgents = async () => {
       try {
         setIsLoadingProspects(true);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-        const tokenStr = localStorage.getItem('vmind_session');
-        let token = tokenStr;
-        if (tokenStr?.trim().startsWith("{")) {
-          try { token = JSON.parse(tokenStr).token; } catch (e) { }
-        }
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
         const res = await fetch(`${baseUrl}/api/list-agents`, {
-          headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+          credentials: 'include'
         });
         if (res.ok && isMounted) {
           const data = await res.json();

@@ -6,25 +6,10 @@ import { Turnstile } from '@marsidev/react-turnstile';
 import { TralisInstancesModal } from './TralisInstancesModal';
 import { jwtDecode } from 'jwt-decode';
 
-function checkIsVmindAdmin(): boolean {
-  if (typeof window === 'undefined') return false;
+function checkIsVmindAdmin(userObj?: any): boolean {
+  if (!userObj) return false;
   try {
-    const raw = localStorage.getItem('vmind_session');
-    if (!raw) return false;
-
-    let token = raw;
-    let userObj: any = null;
-
-    if (raw.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(raw);
-        token = parsed?.token || parsed?.access_token || parsed?.user?.token || parsed?.data?.token || '';
-        userObj = parsed?.user || parsed?.data?.user;
-      } catch {}
-    }
-
     const adminRoles = ['administrator', 'administrators', 'admin', 'superusers'];
-
     const hasAdminRole = (val: any): boolean => {
       if (!val) return false;
       if (Array.isArray(val)) {
@@ -37,18 +22,7 @@ function checkIsVmindAdmin(): boolean {
       return false;
     };
 
-    if (userObj && (hasAdminRole(userObj.roles) || hasAdminRole(userObj.role))) {
-      return true;
-    }
-
-    if (token && typeof token === 'string' && token.split('.').length === 3) {
-      const decoded: any = jwtDecode(token);
-      if (hasAdminRole(decoded?.roles) || hasAdminRole(decoded?.role)) {
-        return true;
-      }
-    }
-
-    return false;
+    return hasAdminRole(userObj.roles) || hasAdminRole(userObj.role);
   } catch {
     return false;
   }
@@ -76,45 +50,7 @@ interface ToolMeta {
 
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Robustly extract the VMIND session token from localStorage.
- * Handles multiple storage formats gracefully.
- */
-function getVmindSessionToken(): string | null {
-  try {
-    const raw = localStorage.getItem('vmind_session');
-    if (!raw) {
-      console.warn('[Connectors] vmind_session: clé absente dans localStorage');
-      return null;
-    }
-
-    // Try direct string (raw JWT)
-    if (raw.startsWith('eyJ')) {
-      console.log('[Connectors] vmind_session: format token direct trouvé');
-      return raw;
-    }
-
-    const parsed = JSON.parse(raw);
-    // Various formats: { token }, { access_token }, { user: { token } }, { data: { token } }
-    const token =
-      parsed?.token ||
-      parsed?.access_token ||
-      parsed?.user?.token ||
-      parsed?.data?.token ||
-      null;
-
-    if (token) {
-      console.log('[Connectors] vmind_session: token extrait avec succès (format JSON)');
-    } else {
-      console.warn('[Connectors] vmind_session: clé trouvée mais aucun token valide dans la structure JSON', Object.keys(parsed));
-    }
-    return token;
-  } catch (err) {
-    console.error('[Connectors] vmind_session: erreur de parsing JSON', err);
-    return null;
-  }
-}
+const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -422,13 +358,10 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
     setIsProbing(true);
 
     try {
-      const vmindToken = getVmindSessionToken();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (vmindToken) headers['Authorization'] = `Bearer ${vmindToken}`;
-
       const res = await fetch(`${baseUrl}/api/connectors/tralis/probe`, {
         method: 'POST',
-        headers,
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           erp_url: trimmed,
           custom_mcp_url: trimmedCustomMcp || undefined
@@ -512,16 +445,9 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
     setLoginLoading(true);
     setLoginError('');
 
-    const token = getVmindSessionToken();
-    if (!token) {
-      setLoginError('Session VMIND introuvable. Connexion requise.');
-      setLoginLoading(false);
-      return;
-    }
-
     try {
       const res = await fetch(`${baseUrl}/api/mcp/auth/me`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include'
       });
 
       const data = await res.json();
@@ -530,7 +456,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
         console.log('[Connectors] Session VMIND acceptée par MCP — user:', data.user?.username);
         setShowModal(false);
         setLoginError('');
-        onConnected(token, data);
+        onConnected('connected', data);
       } else {
         const msg = data?.error || `Erreur ${res.status} : session non autorisée sur le serveur MCP.`;
         console.warn('[Connectors] Session VMIND refusée par MCP:', msg);
@@ -567,21 +493,10 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
     }
 
     try {
-      const vmindToken = getVmindSessionToken();
-      if (!vmindToken) {
-        setLoginError('Session VMIND requise. Connexion requise.');
-        setLoginLoading(false);
-        return;
-      }
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${vmindToken}`
-      };
-
       const res = await fetch(`${baseUrl}/api/connectors/tralis/connect`, {
         method: 'POST',
-        headers,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ 
           erp_url: loginErpUrl.trim(),
           username: loginUsername.trim(), 
@@ -1295,6 +1210,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
       {/* ── MODAL DE GESTION MULTI-TENANT (INSTANCES TRALIS) ──────────────── */}
       <TralisInstancesModal
         isOpen={showInstancesModal && isVmindAdmin}
+        isAdmin={isVmindAdmin}
         onClose={() => setShowInstancesModal(false)}
         onTenantChanged={() => {
           console.log('[Connectors] Référentiel des instances mis à jour');
