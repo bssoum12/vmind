@@ -136,11 +136,20 @@ export const ConnectorsHub: React.FC = () => {
     localStorage.removeItem('vmind_allowed_agents');
 
     const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
-    const roles: string[] = rawData.user?.roles || rawData.roles || ['Administrator'];
+    const rawRoles = rawData.user?.roles || rawData.roles;
+    const roles: string[] = (Array.isArray(rawRoles) && rawRoles.length > 0)
+      ? rawRoles
+      : (typeof rawRoles === 'string' && rawRoles ? [rawRoles] : ['Administrator']);
+
     const isAdmin = roles.some((r: string) =>
       ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
     );
-    const resolvedAgents: string[] = rawData.user?.allowedAgents || rawData.allowedAgents || (isAdmin ? ALL_AGENTS : []);
+
+    const rawAgents = rawData.user?.allowedAgents || rawData.allowedAgents;
+    const receivedAgents: string[] = (Array.isArray(rawAgents) && rawAgents.length > 0)
+      ? rawAgents
+      : [];
+    const resolvedAgents = receivedAgents.length > 0 ? receivedAgents : (isAdmin ? ALL_AGENTS : []);
 
     const normalizedSession: McpSession = {
       user: {
@@ -149,14 +158,19 @@ export const ConnectorsHub: React.FC = () => {
         roles,
         allowedAgents: resolvedAgents
       },
-      tools: rawData.tools || [],
-      allTools: rawData.allTools || []
+      tools: (Array.isArray(rawData.tools) && rawData.tools.length > 0) ? rawData.tools : [],
+      allTools: (Array.isArray(rawData.allTools) && rawData.allTools.length > 0) ? rawData.allTools : []
     };
 
     console.log('[ConnectorsHub] 🔗 connecté — user:', normalizedSession.user.username, 'agents:', resolvedAgents);
     setTralisSession(normalizedSession);
     setTralisStatus('connected');
     broadcastMcpSessionUpdate({ ...normalizedSession, connected: true });
+
+    // Synchronisation d'arrière-plan avec /status si la liste d'outils est vide
+    if (normalizedSession.tools.length === 0) {
+      initTralisMcp();
+    }
   };
 
   /** Called by TralisConnectorPanel on explicit disconnect */
