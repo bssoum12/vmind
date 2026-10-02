@@ -1486,7 +1486,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           onConfirm={async (params?: any) => {
             if (params?.trigger_rules) {
               try {
-                const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+                const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
                 const publicId = scheduleModalAgent.uuid || scheduleModalAgent.agent_id;
                 const updateBody: any = {
                   agent_name: scheduleModalAgent.agent_name,

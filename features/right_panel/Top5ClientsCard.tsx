@@ -30,7 +30,7 @@ export const Top5ClientsCard: React.FC<Top5ClientsCardProps> = ({ activeAgentId 
       setLoading(true);
       setError(null);
 
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
       const clientId = process.env.NEXT_PUBLIC_CLIENT_ID || 'DEMO';
 
       const response = await fetch(`${baseUrl}/api/tools/get-top-clients-revenue`, {

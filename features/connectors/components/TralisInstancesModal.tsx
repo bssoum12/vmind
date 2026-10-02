@@ -285,9 +285,9 @@ export const TralisInstancesModal: React.FC<TralisInstancesModalProps> = ({
     mcp_base_url: 'https://localhost:3002/mcp',
     db_server: 'localhost',
     db_port: 1433,
-    db_database: '',
+    db_database: 'TRALIS_DATA_10_04_26',
     db_user: 'mcp_user',
-    db_password: '',
+    db_password: 'Test123!',
     config_database: 'TMS_Config',
     path_vd: 'C:\\TRaLis SMTI\\PROD\\Site\\VD',
     path_e255: 'C:\\TRaLis SMTI\\PROD\\Site\\E255'
@@ -296,7 +296,7 @@ export const TralisInstancesModal: React.FC<TralisInstancesModalProps> = ({
   // Modal de confirmation de suppression
   const [tenantToDelete, setTenantToDelete] = useState<string | null>(null);
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
 
   // ── Chargement des instances ───────────────────────────────────────────────
   const fetchTenants = async () => {
@@ -360,9 +360,9 @@ export const TralisInstancesModal: React.FC<TralisInstancesModalProps> = ({
       mcp_base_url: 'https://localhost:3002/mcp',
       db_server: 'localhost',
       db_port: 1433,
-      db_database: '',
+      db_database: 'TRALIS_DATA_10_04_26',
       db_user: 'mcp_user',
-      db_password: '',
+      db_password: 'Test123!',
       config_database: 'TMS_Config',
       path_vd: 'C:\\TRaLis SMTI\\PROD\\Site\\VD',
       path_e255: 'C:\\TRaLis SMTI\\PROD\\Site\\E255'

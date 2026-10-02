@@ -181,7 +181,7 @@ function HomeContent() {
 
     const checkAuth = async () => {
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL;
         const res = await fetch(`${baseUrl}/api/auth/vmind/me`, {
           credentials: 'include'
         });

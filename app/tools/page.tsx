@@ -71,7 +71,7 @@ export default function ToolsHub() {
 
   React.useEffect(() => {
     setIsMounted(true);
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
     fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' })
       .then(res => {
         if (res.ok) {

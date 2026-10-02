@@ -61,7 +61,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
         return;
       }
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
         const res = await fetch(`${baseUrl}/api/connectors/tralis/status`, { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();

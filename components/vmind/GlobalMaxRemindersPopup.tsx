@@ -23,7 +23,7 @@ export const GlobalMaxRemindersPopup: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   useEffect(() => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
     const sseUrl = `${baseUrl}/api/recovery/sse`;
     const sse = new EventSource(sseUrl, { withCredentials: true });
 

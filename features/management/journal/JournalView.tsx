@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
 interface LogItem {
   id: number;

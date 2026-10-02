@@ -191,7 +191,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
     const fetchProspectAgents = async () => {
       setLoadingProspectAgents(true);
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
         const res = await fetch(`${baseUrl}/api/list-agents`, {
           credentials: 'include'
         });
@@ -368,7 +368,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
       }
 
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
         const endpoint = `${baseUrl}/api/sourcing-agent/check-name/${encodeURIComponent(formData.agent_name.trim())}` + (editUuid ? `?excludeUuid=${encodeURIComponent(String(editUuid))}` : '');
 
         const res = await fetch(endpoint, {
@@ -413,7 +413,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
     };
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
 
       const endpoint = isEditMode
         ? `${baseUrl}/api/sourcing-agent/update/${editUuid}`
@@ -495,7 +495,7 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
 
   const handleActivateSchedule = async (agent: LiveAgent, params: any) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
       const targetUuid = agent.uuid || agent.agent_id;
       const updateRes = await fetch(`${baseUrl}/api/sourcing-agent/update/${targetUuid}`, {
         method: "PUT",

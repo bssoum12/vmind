@@ -26,7 +26,7 @@ async function fetchIcpOptions(): Promise<IcpOptionsData> {
 
   fetchPromise = (async (): Promise<IcpOptionsData> => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
       const res = await fetch(`${baseUrl}/api/prospect-agent/icp-options`, {
         credentials: 'include'
       });

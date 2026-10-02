@@ -62,7 +62,7 @@ function getAuthHeaders(extraHeaders: Record<string, string> = {}): HeadersInit 
   };
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ;
 
 const CLAUDE_PRESETS = [
   'claude-3-5-sonnet-20241022',
@@ -118,7 +118,8 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
     setIsUnauthorized(false);
     try {
       const res = await fetch(`${API_BASE}/api/admin/prompts`, {
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include'
       });
 
       if (!res.ok) {
@@ -195,6 +196,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
       const res = await fetch(`${API_BASE}/api/admin/prompts/${activeKey}`, {
         method: 'PUT',
         headers: getAuthHeaders(),
+        credentials: 'include',
         body: JSON.stringify({
           name: formName,
           prompt_text: formPromptText,
@@ -232,7 +234,8 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
     try {
       const res = await fetch(`${API_BASE}/api/admin/prompts/${activeKey}/reset`, {
         method: 'POST',
-        headers: getAuthHeaders()
+        headers: getAuthHeaders(),
+        credentials: 'include'
       });
 
       const data = await res.json();
@@ -265,6 +268,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
       const res = await fetch(`${API_BASE}/api/admin/prompts/${activeKey}/test`, {
         method: 'POST',
         headers: getAuthHeaders(),
+        credentials: 'include',
         body: JSON.stringify({
           user_message: testUserMessage,
           prompt_text: formPromptText,

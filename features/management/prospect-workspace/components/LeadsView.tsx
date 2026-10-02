@@ -15,7 +15,7 @@ import { getAgents } from '@/shared/api/n8n-api';
 import { useToast } from '@/shared/contexts/ToastContext';
 import { LiveAgent } from '../../agents/AgentsView';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
 interface ManualLeadItem {
   id: string;

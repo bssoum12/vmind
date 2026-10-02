@@ -28,7 +28,7 @@ export const ConnectorsHub: React.FC = () => {
   const [tralisStatus,  setTralisStatus]  = useState<'loading' | 'idle' | 'connected' | 'error'>('loading');
   const [tralisSession, setTralisSession] = useState<McpSession | null>(null);
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
 
   /**
    * Source de vérité : appelé une fois au montage du Hub.
