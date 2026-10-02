@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { jwtDecode } from 'jwt-decode';
-import { ShieldAlert, AlertTriangle, X, Copy, Check, Terminal, Info } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, X, Terminal, Info } from 'lucide-react';
 
 interface CriticalIssue {
   id: string;
@@ -17,85 +16,66 @@ export const AdminCriticalAlertBadge: React.FC = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [issues, setIssues] = useState<CriticalIssue[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkHealth = (user?: any) => {
-      let adminRole = false;
-      let token: string | null = null;
-
-      if (user) {
-        const roles = Array.isArray(user.roles)
-          ? user.roles
-          : typeof user.roles === 'string'
-            ? [user.roles]
-            : [];
-        adminRole = roles.some((r: string) =>
-          ['Administrators', 'Administrator', 'Superusers', 'Admin', 'SuperAdmin'].includes(r)
-        );
-      } else {
-        try {
-          token = localStorage.getItem('vmind_session');
-          if (token) {
-            if (token.startsWith('{')) {
-              try {
-                const parsed = JSON.parse(token);
-                token = parsed.token || parsed.accessToken || token;
-              } catch {}
-            } else if (token.startsWith('"') && token.endsWith('"')) {
-              token = token.slice(1, -1);
-            }
-            if (token) {
-              const decoded: any = jwtDecode(token);
-              const roles = Array.isArray(decoded?.roles)
-                ? decoded.roles
-                : typeof decoded?.roles === 'string'
-                  ? [decoded.roles]
-                  : [];
-              adminRole = roles.some((r: string) =>
-                ['Administrators', 'Administrator', 'Superusers', 'Admin', 'SuperAdmin'].includes(r)
-              );
-            }
-          }
-        } catch {}
-      }
-
-      if (!adminRole) return;
-      setIsAdmin(true);
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-      fetch(`${apiUrl}/api/admin/config-health`, {
-        credentials: 'include',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        }
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.ok && Array.isArray(data.issues) && data.issues.length > 0) {
-            setIssues(data.issues);
-          } else {
+    const fetchHealth = (user?: any) => {
+      try {
+        if (user) {
+          const roles = Array.isArray(user.roles)
+            ? user.roles
+            : typeof user.roles === 'string'
+              ? [user.roles]
+              : [];
+          const adminRole = roles.some((r: string) =>
+            ['Administrators', 'Administrator', 'Superusers', 'Admin', 'SuperAdmin'].includes(r)
+          );
+          if (!adminRole) {
+            setIsAdmin(false);
             setIssues([]);
+            return;
           }
+        }
+
+        const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001').trim();
+        if (!apiUrl) return;
+
+        fetch(`${apiUrl}/api/admin/config-health`, {
+          credentials: 'include'
         })
-        .catch((err) => {
-          console.debug('[ADMIN HEALTH] Diagnostic passif :', err?.message || err);
-        });
+          .then((res) => {
+            if (res.status === 401 || res.status === 403) {
+              setIsAdmin(false);
+              setIssues([]);
+              return null;
+            }
+            return res.ok ? res.json() : null;
+          })
+          .then((data) => {
+            if (data && data.ok) {
+              setIsAdmin(true);
+              if (Array.isArray(data.issues)) {
+                setIssues(data.issues);
+              } else {
+                setIssues([]);
+              }
+            }
+          })
+          .catch((err) => {
+            console.debug('[ADMIN HEALTH] Diagnostic passif :', err?.message || err);
+          });
+      } catch {
+        // Échec silencieux non bloquant
+      }
     };
 
+    fetchHealth();
     const handleSessionUpdated = (e: any) => {
       const user = e?.detail?.user || e?.detail;
-      if (user) {
-        checkHealth(user);
-      }
+      fetchHealth(user);
     };
 
     window.addEventListener('mcp-session-updated', handleSessionUpdated);
-    checkHealth();
-
-    return () => {
-      window.removeEventListener('mcp-session-updated', handleSessionUpdated);
-    };
+    return () => window.removeEventListener('mcp-session-updated', handleSessionUpdated);
   }, []);
 
   // Si l'utilisateur n'est pas Admin OU qu'aucune configuration critique ne manque : 100% INVISIBLE
@@ -113,14 +93,6 @@ export const AdminCriticalAlertBadge: React.FC = () => {
     if (a.severity !== 'CRITICAL' && b.severity === 'CRITICAL') return 1;
     return 0;
   });
-
-  const handleCopy = (id: string, text: string) => {
-    if (navigator?.clipboard) {
-      navigator.clipboard.writeText(text);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-    }
-  };
 
   return (
     <>
@@ -315,53 +287,27 @@ export const AdminCriticalAlertBadge: React.FC = () => {
                       {issue.description}
                     </div>
 
-                    {/* Bloc Guidage & Code à copier */}
+                    {/* Bloc Directive Professionnelle */}
                     <div
                       style={{
-                        background: 'rgba(3, 11, 24, 0.85)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        borderRadius: '6px',
-                        padding: '10px 12px',
+                        background: 'rgba(3, 11, 24, 0.75)',
+                        border: '1px solid rgba(0, 229, 200, 0.18)',
+                        borderRadius: '8px',
+                        padding: '12px 14px',
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
                         gap: '10px'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                        <Terminal size={14} style={{ color: '#00E5C8', flexShrink: 0 }} />
-                        <span
-                          style={{
-                            fontSize: '11px',
-                            fontFamily: 'monospace',
-                            color: '#E2E8F0',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                          }}
-                        >
+                      <Terminal size={15} style={{ color: '#00E5C8', marginTop: '2px', flexShrink: 0 }} />
+                      <div>
+                        <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.6px', color: '#94A3B8', marginBottom: '3px', fontWeight: 700 }}>
+                          Action requise
+                        </div>
+                        <div style={{ fontSize: '12px', color: '#E2E8F0', lineHeight: '1.45', fontWeight: 500 }}>
                           {issue.guidance}
-                        </span>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => handleCopy(issue.id, issue.guidance)}
-                        style={{
-                          background: copiedId === issue.id ? 'rgba(0, 230, 118, 0.15)' : 'rgba(255, 255, 255, 0.06)',
-                          border: `1px solid ${copiedId === issue.id ? '#00E676' : 'rgba(255, 255, 255, 0.15)'}`,
-                          borderRadius: '4px',
-                          color: copiedId === issue.id ? '#00E676' : '#94A3B8',
-                          padding: '4px 8px',
-                          fontSize: '11px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '5px',
-                          flexShrink: 0
-                        }}
-                      >
-                        {copiedId === issue.id ? <Check size={12} /> : <Copy size={12} />}
-                        {copiedId === issue.id ? 'Copié' : 'Copier'}
-                      </button>
                     </div>
                   </div>
                 ))}

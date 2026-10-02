@@ -136,7 +136,7 @@ function ResetPasswordForm() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
       const res = await fetch(`${baseUrl}/api/auth/vmind/verify-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -222,7 +222,7 @@ function ResetPasswordForm() {
         payload.code = code;
       }
 
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
       const res = await fetch(`${baseUrl}/api/auth/vmind/activate-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

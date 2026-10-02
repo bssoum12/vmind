@@ -49,7 +49,7 @@ function formatUserFacingMessage(raw?: string): string {
   return clean || "Analyse du profil en cours...";
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
 const getAuthHeaders = () => {
   return {

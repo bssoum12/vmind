@@ -622,15 +622,10 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       if (!currentConv || currentConv.title === 'Nouvelle discussion' || currentConv.title.endsWith('...')) {
         // Fire and forget
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        let rawMcp = localStorage.getItem("vmind_mcp_token");
-        let token = (rawMcp && rawMcp !== "connected") ? rawMcp : localStorage.getItem("vmind_session");
-        if (token && token.startsWith("{")) {
-          try { token = JSON.parse(token).token || token; } catch {}
-        }
-        
         fetch(`${baseUrl}/api/conversations/${targetConvId}/smart-title`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ message: professionalMessage })
         })
         .then(res => res.json())
@@ -730,6 +725,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       const response = await fetch(`${baseUrl}${toolEndpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ client_id: clientId, ...payload })
       });
       const wrapper = await response.json();

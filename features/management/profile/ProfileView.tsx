@@ -47,7 +47,7 @@ export const ProfileView: React.FC = () => {
     const fetchProfile = async () => {
       try {
         setIsLoading(true);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
         const res = await fetch(`${baseUrl}/api/auth/vmind/profile`, {
           credentials: 'include'
         });
@@ -92,7 +92,7 @@ export const ProfileView: React.FC = () => {
     const timer = setTimeout(async () => {
       try {
         setVerifyingCurrentPassword(true);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
         const res = await fetch(`${baseUrl}/api/auth/vmind/verify-current-password`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -130,7 +130,7 @@ export const ProfileView: React.FC = () => {
 
     try {
       setIsSaving(true);
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
 
       const res = await fetch(`${baseUrl}/api/auth/vmind/profile`, {
         method: 'PUT',
@@ -160,7 +160,7 @@ export const ProfileView: React.FC = () => {
 
   const handleLogout = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
       await fetch(`${baseUrl}/api/auth/vmind/logout`, {
         method: 'POST',
         credentials: 'include'

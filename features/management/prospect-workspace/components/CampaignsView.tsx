@@ -28,7 +28,7 @@ interface CampaignsViewProps {
   onOpenLeadById: (id: number) => void;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
 export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenLeadById }: CampaignsViewProps) {
   const params = useParams();

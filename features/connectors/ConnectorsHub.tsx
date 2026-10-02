@@ -28,7 +28,7 @@ export const ConnectorsHub: React.FC = () => {
   const [tralisStatus,  setTralisStatus]  = useState<'loading' | 'idle' | 'connected' | 'error'>('loading');
   const [tralisSession, setTralisSession] = useState<McpSession | null>(null);
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
 
   /**
    * Source de vérité : appelé une fois au montage du Hub.
@@ -91,7 +91,7 @@ export const ConnectorsHub: React.FC = () => {
   useEffect(() => { initTralisMcp(); }, [initTralisMcp]);
 
   /** Called by TralisConnectorPanel after a successful login */
-  const handleTralisMcpConnected = (token: string, data: McpSession) => {
+  const handleTralisMcpConnected = (token: string, rawData: any) => {
     // Nettoyage proactif de tout vestige legacy de localStorage
     localStorage.removeItem('vmind_session');
     localStorage.removeItem('vmind_mcp_token');
@@ -99,10 +99,28 @@ export const ConnectorsHub: React.FC = () => {
     localStorage.removeItem('vmind_client_id');
     localStorage.removeItem('vmind_allowed_agents');
 
-    console.log('[ConnectorsHub] 🔗 connecté — user:', data.user?.username);
-    setTralisSession(data);
+    const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
+    const roles: string[] = rawData.user?.roles || rawData.roles || ['Administrator'];
+    const isAdmin = roles.some((r: string) =>
+      ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
+    );
+    const resolvedAgents: string[] = rawData.user?.allowedAgents || rawData.allowedAgents || (isAdmin ? ALL_AGENTS : []);
+
+    const normalizedSession: McpSession = {
+      user: {
+        username: rawData.user?.username || rawData.erp_username || 'host',
+        client_id: rawData.user?.client_id || rawData.client_id || 'LOCAL',
+        roles,
+        allowedAgents: resolvedAgents
+      },
+      tools: rawData.tools || [],
+      allTools: rawData.allTools || []
+    };
+
+    console.log('[ConnectorsHub] 🔗 connecté — user:', normalizedSession.user.username, 'agents:', resolvedAgents);
+    setTralisSession(normalizedSession);
     setTralisStatus('connected');
-    window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: data }));
+    window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { ...normalizedSession, connected: true } }));
   };
 
   /** Called by TralisConnectorPanel on explicit disconnect */

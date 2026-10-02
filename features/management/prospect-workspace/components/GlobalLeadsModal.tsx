@@ -6,7 +6,7 @@ import { useProspectSocket } from '../hooks/useProspectSocket';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { Database } from 'lucide-react';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
 interface GlobalLead {
     id: number;

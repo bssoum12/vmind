@@ -62,7 +62,7 @@ function getAuthHeaders(extraHeaders: Record<string, string> = {}): HeadersInit 
   };
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ;
 
 const CLAUDE_PRESETS = [
   'claude-3-5-sonnet-20241022',

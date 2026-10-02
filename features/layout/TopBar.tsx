@@ -73,21 +73,43 @@ export const TopBar: React.FC = () => {
         return;
       }
       try {
-        const user = e?.detail?.user || e?.detail;
-        if (user) {
-          applyUser(user);
-          setIsErpConnected(true);
-        } else {
-          const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+
+        // Déconnexion explicite via événement
+        if (e && (e.detail === null || e.detail?.connected === false)) {
+          setIsErpConnected(false);
+          // Actualiser les infos utilisateur VMIND sans basculer l'état ERP à connecté
           fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' })
             .then(res => res.ok ? res.json() : null)
             .then(data => {
-              if (data?.user) {
-                applyUser(data.user);
-                setIsErpConnected(true);
-              }
+              if (data?.user) applyUser(data.user);
             })
             .catch(() => {});
+          return;
+        }
+
+        // Connexion explicite via événement
+        const user = e?.detail?.user || (e?.detail && e.detail.connected ? e.detail : null);
+        if (user && e?.detail?.connected !== false) {
+          applyUser(user);
+          setIsErpConnected(true);
+        } else {
+          // Montage initial : interroger l'utilisateur VMIND et le statut réel du connecteur
+          fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+              if (data?.user) applyUser(data.user);
+            })
+            .catch(() => {});
+
+          fetch(`${baseUrl}/api/connectors/tralis/status`, { credentials: 'include' })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+              setIsErpConnected(Boolean(data?.ok && data?.connected));
+            })
+            .catch(() => {
+              setIsErpConnected(false);
+            });
         }
       } catch (e) {
         console.error("Erreur de lecture de l'utilisateur dans TopBar", e);

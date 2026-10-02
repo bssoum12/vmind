@@ -194,7 +194,7 @@ function HomeContent() {
 
     const checkAuth = async () => {
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL;
         const res = await fetch(`${baseUrl}/api/auth/vmind/me`, {
           credentials: 'include'
         });
@@ -236,8 +236,8 @@ function HomeContent() {
         );
         setIsAdmin(userIsAdmin);
 
-        // Notification globale de session pour hydrater l'ensemble des composants React
-        window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { connected: true, user: data.user } }));
+        // Notification globale de l'utilisateur VMIND (connecteur ERP inactif par défaut jusqu'à validation par ConnectorsHub)
+        window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { connected: false, user: data.user } }));
 
         // Contrôle d'autorisation pour le mode MANAGEMENT (Administrateurs uniquement)
         if (mode === 'MANAGEMENT') {

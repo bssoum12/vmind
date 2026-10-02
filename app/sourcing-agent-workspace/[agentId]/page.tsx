@@ -17,7 +17,7 @@ import { useToast } from '@/shared/contexts/ToastContext';
 
 import '../../../features/management/sourcing-workspace/sourcing-workspace.scss';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
 export default function SourcingAgentWorkspacePage() {
   const { agentId } = useParams();

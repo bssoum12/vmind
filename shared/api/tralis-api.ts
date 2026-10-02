@@ -7,7 +7,7 @@
 
 import { frontLog } from '../utils/frontLog';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
 // ─── TYPES ───
 
@@ -76,6 +76,7 @@ async function postTool<T>(endpoint: string, payload: any): Promise<ToolResponse
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify(payload),
     });
 

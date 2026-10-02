@@ -50,7 +50,7 @@ interface ToolMeta {
 
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
@@ -286,7 +286,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   useEffect(() => {
     const fetchTools = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001'}/api/mcp/tools/metadata`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL }/api/mcp/tools/metadata`);
         const data = await res.json();
         if (data.ok && Array.isArray(data.tools) && data.tools.length > 0) {
           setServerTools(data.tools);
@@ -301,7 +301,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   // Cloudflare Turnstile state
   const [turnstileToken, setTurnstileToken] = useState('');
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || '1x00000000000000000000AA';
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
 
   // Fonction centrale d'exécution de la sonde diagnostic (avec annulation des requêtes obsolètes)
   const executeProbe = useCallback(async (erpUrl: string, customMcpUrl?: string) => {

@@ -56,7 +56,7 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
 
   const fetchPrevYearRate = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
       const pYear = parseInt(startDate.substring(0, 4)) - 1;
       setPrevYear(pYear);
       const prevStart = `${pYear}${startDate.substring(4)}`;

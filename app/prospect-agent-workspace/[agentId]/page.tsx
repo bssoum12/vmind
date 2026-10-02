@@ -16,7 +16,7 @@ import { getAgents } from '@/shared/api/n8n-api';
 import { useProspectSocket } from '../../../features/management/prospect-workspace/hooks/useProspectSocket';
 import '../../../features/management/prospect-workspace/workspace.scss';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
 export default function AgentWorkspacePage() {
   const { agentId } = useParams();
