@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/shared/contexts/ToastContext';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const ALL_AVAILABLE_AGENTS = [
   { code: 'VDATA', name: 'Analyste Données', icon: '📊', color: '#00E5C8' },
