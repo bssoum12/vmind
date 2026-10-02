@@ -17,37 +17,32 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
   const [executionsToday, setExecutionsToday] = useState<number | null>(null);
   const [activeAgentsCount, setActiveAgentsCount] = useState<number | null>(null);
   const [successRate, setSuccessRate] = useState<number | null>(null);
-  const [isAdmin, setIsAdmin] = useState(Boolean(isAdminProp));
+  const [localIsAdmin, setLocalIsAdmin] = useState(false);
+  const isAdmin = isAdminProp !== undefined ? isAdminProp : localIsAdmin;
 
   useEffect(() => {
-    if (isAdminProp !== undefined) {
-      setIsAdmin(isAdminProp);
-    }
-  }, [isAdminProp]);
+    // Vérification directe de l'utilisateur au montage (indépendant des événements)
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+    fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.user) {
+          const rawRoles = data.user.roles || data.user.role;
+          const roles = Array.isArray(rawRoles) ? rawRoles : [rawRoles || ''];
+          setLocalIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'admin', 'Superusers', 'SuperAdmin'].includes(r)));
+        }
+      })
+      .catch(() => {});
 
-  useEffect(() => {
     const checkAdmin = (e?: any) => {
       const user = e?.detail?.user || e?.detail;
       if (user) {
-        const roles = Array.isArray(user.roles) ? user.roles : [user.roles || ''];
-        setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)));
+        const rawRoles = user.roles || user.role;
+        const roles = Array.isArray(rawRoles) ? rawRoles : [rawRoles || ''];
+        setLocalIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'admin', 'Superusers', 'SuperAdmin'].includes(r)));
       }
     };
     window.addEventListener('mcp-session-updated', checkAdmin);
-
-    // Initialisation proactive du rôle admin depuis le backend si le prop n'est pas fourni
-    if (isAdminProp === undefined) {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
-      fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data?.ok && data.user) {
-            const roles = Array.isArray(data.user.roles) ? data.user.roles : [data.user.roles || ''];
-            setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)));
-          }
-        })
-        .catch(() => {});
-    }
 
     const refreshData = () => {
       getAgents()
@@ -145,13 +140,22 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
       </div>
 
       {isAdmin && (
-        <div
-          className={`nav-item ${currentView === 'journal' ? 'active' : ''}`}
-          onClick={() => onNavigate('journal')}
-        >
-          <div className="nav-icon">📋</div>
-          <span>Journal</span>
-        </div>
+        <>
+          <div
+            className={`nav-item ${currentView === 'users' ? 'active' : ''}`}
+            onClick={() => onNavigate('users')}
+          >
+            <div className="nav-icon">👥</div>
+            <span>Utilisateurs</span>
+          </div>
+          <div
+            className={`nav-item ${currentView === 'journal' ? 'active' : ''}`}
+            onClick={() => onNavigate('journal')}
+          >
+            <div className="nav-icon">📋</div>
+            <span>Journal</span>
+          </div>
+        </>
       )}
 
       <div className="nav-section">Catégories</div>
