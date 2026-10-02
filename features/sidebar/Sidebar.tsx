@@ -26,16 +26,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
   const updatePermissions = (event?: any) => {
     try {
       const sessionDetail = event?.detail;
-      if (event && (sessionDetail === null || sessionDetail?.connected === false)) {
+      if (sessionDetail === null || sessionDetail?.connected === false) {
         setAllowedAgents([]);
         setIsErpConnected(false);
+        if (sessionDetail?.user) {
+          const user = sessionDetail.user;
+          if (user.username) setUsername(user.username);
+          const roles = Array.isArray(user.roles) ? user.roles : [user.roles || ''];
+          setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)));
+        }
         return;
       }
       const user = sessionDetail?.user || sessionDetail;
       if (user) {
         if (user.username) setUsername(user.username);
         const roles = Array.isArray(user.roles) ? user.roles : [user.roles || ''];
-        setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
+        setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)));
         const agents = user.allowedAgents || user.allowed_agents || [];
         if (Array.isArray(agents)) {
           setAllowedAgents(agents);
@@ -49,6 +55,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
   };
 
   useEffect(() => {
+    const fetchInitialUser = async () => {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+        const res = await fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.ok && data.user) {
+            if (data.user.username) setUsername(data.user.username);
+            const roles = Array.isArray(data.user.roles) ? data.user.roles : [data.user.roles || ''];
+            setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)));
+          }
+        }
+      } catch {}
+    };
+    fetchInitialUser();
+
     updatePermissions();
     window.addEventListener('mcp-session-updated', updatePermissions);
     return () => window.removeEventListener('mcp-session-updated', updatePermissions);

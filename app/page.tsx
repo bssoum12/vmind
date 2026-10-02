@@ -212,17 +212,22 @@ function HomeContent() {
           setClientId(data.user.client_id);
         }
 
+        const roles = Array.isArray(data.user.roles)
+          ? data.user.roles
+          : typeof data.user.roles === 'string'
+            ? [data.user.roles]
+            : (data.user.role ? [data.user.role] : []);
+        const userIsAdmin = roles.some((r: string) =>
+          ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
+        );
+        setIsAdmin(userIsAdmin);
+
         // Notification globale de l'utilisateur VMIND (connecteur ERP inactif par défaut jusqu'à validation par ConnectorsHub)
         window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { connected: false, user: data.user } }));
 
         // Contrôle d'autorisation pour le mode MANAGEMENT (Administrateurs uniquement)
         if (mode === 'MANAGEMENT') {
-          const roles = Array.isArray(data.user.roles)
-            ? data.user.roles
-            : typeof data.user.roles === 'string'
-              ? [data.user.roles]
-              : [];
-          if (!roles.includes('Administrators') && !roles.includes('Utilisateur') && !roles.includes('Administrator') && !roles.includes('Superusers')) {
+          if (!userIsAdmin && !roles.includes('Utilisateur')) {
             setIsAuthorized(false);
             return;
           }
@@ -643,6 +648,7 @@ function HomeContent() {
           handleSelectCategory(cat);
           setMobileSidebarOpen(false);
         }}
+        isAdmin={isAdmin}
       />
       <div className="content management-layout">
         <div className="view-container">

@@ -564,8 +564,8 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       }
 
     } catch (error: any) {
-      if (error.name === 'AbortError') return;
       setMessages((prev) => prev.filter(m => !m.isThinking));
+      if (error.name === 'AbortError') return;
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
         sender: 'vm',
@@ -575,6 +575,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       }]);
     } finally {
       setIsLoading(false);
+      setMessages((prev) => prev.filter(m => !m.isThinking));
     }
   };
 
@@ -685,6 +686,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       }
     } catch (error: any) {
       setMessages((prev) => prev.filter(m => !m.isThinking));
+      if (error.name === 'AbortError') return;
       setMessages((prev) => [...prev, {
         id: `err-${Date.now()}`,
         sender: 'vm',
@@ -694,6 +696,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       }]);
     } finally {
       setIsLoading(false);
+      setMessages((prev) => prev.filter(m => !m.isThinking));
     }
   };
 

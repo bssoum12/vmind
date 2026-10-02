@@ -6,6 +6,7 @@ import { TralisConnectorPanel } from './components/TralisConnectorPanel';
 import { OdooConnectorPanel } from './components/OdooConnectorPanel';
 import { ComingSoonPanel } from './components/ComingSoonPanel';
 import { jwtDecode } from 'jwt-decode';
+import { broadcastMcpSessionUpdate } from '@/shared/utils/sessionBroadcast';
 
 // ─── Shared MCP session state ─────────────────────────────────────────────────
 // Lifted to the Hub so it survives navigation between connectors.
@@ -90,6 +91,41 @@ export const ConnectorsHub: React.FC = () => {
   // Run ONCE when the Hub first mounts (not on every panel switch)
   useEffect(() => { initTralisMcp(); }, [initTralisMcp]);
 
+  // Synchronisation inter-onglets : écoute les modifications propagées par BroadcastChannel
+  useEffect(() => {
+    const handleSync = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const detail = customEvent.detail;
+      if (detail && (detail.connected || detail.user)) {
+        const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
+        const receivedRoles: string[] = detail.user?.roles || detail.roles || ['Administrator'];
+        const isAdmin = receivedRoles.some((r: string) =>
+          ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
+        );
+        const receivedAgents: string[] = detail.user?.allowedAgents || detail.allowedAgents || [];
+        const resolvedAgents = receivedAgents.length > 0 ? receivedAgents : (isAdmin ? ALL_AGENTS : []);
+
+        setTralisSession({
+          user: {
+            username: detail.user?.username || detail.erp_username || '',
+            client_id: detail.user?.client_id || detail.client_id || 'DEMO',
+            roles: receivedRoles,
+            allowedAgents: resolvedAgents
+          },
+          tools: detail.tools || [],
+          allTools: detail.allTools || []
+        });
+        setTralisStatus('connected');
+      } else if (detail === null || detail?.connected === false) {
+        setTralisSession(null);
+        setTralisStatus('idle');
+      }
+    };
+
+    window.addEventListener('mcp-session-updated', handleSync);
+    return () => window.removeEventListener('mcp-session-updated', handleSync);
+  }, []);
+
   /** Called by TralisConnectorPanel after a successful login */
   const handleTralisMcpConnected = (token: string, rawData: any) => {
     // Nettoyage proactif de tout vestige legacy de localStorage
@@ -120,7 +156,7 @@ export const ConnectorsHub: React.FC = () => {
     console.log('[ConnectorsHub] 🔗 connecté — user:', normalizedSession.user.username, 'agents:', resolvedAgents);
     setTralisSession(normalizedSession);
     setTralisStatus('connected');
-    window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { ...normalizedSession, connected: true } }));
+    broadcastMcpSessionUpdate({ ...normalizedSession, connected: true });
   };
 
   /** Called by TralisConnectorPanel on explicit disconnect */
@@ -151,7 +187,7 @@ export const ConnectorsHub: React.FC = () => {
     console.log('[ConnectorsHub] 🔌 Déconnecté TraLIS — agents restants:', remainingAgents);
     setTralisSession(null);
     setTralisStatus('idle');
-    window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: null }));
+    broadcastMcpSessionUpdate(null);
   };
 
   return (

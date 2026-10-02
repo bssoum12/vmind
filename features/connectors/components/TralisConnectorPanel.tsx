@@ -9,7 +9,7 @@ import { jwtDecode } from 'jwt-decode';
 function checkIsVmindAdmin(userObj?: any): boolean {
   if (!userObj) return false;
   try {
-    const adminRoles = ['administrator', 'administrators', 'admin', 'superusers'];
+    const adminRoles = ['administrator', 'administrators', 'admin', 'superusers', 'superadmin'];
     const hasAdminRole = (val: any): boolean => {
       if (!val) return false;
       if (Array.isArray(val)) {
@@ -22,7 +22,7 @@ function checkIsVmindAdmin(userObj?: any): boolean {
       return false;
     };
 
-    return hasAdminRole(userObj.roles) || hasAdminRole(userObj.role);
+    return hasAdminRole(userObj.roles) || hasAdminRole(userObj.role) || hasAdminRole(userObj.role_name);
   } catch {
     return false;
   }
@@ -265,15 +265,32 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   const probeSeqRef   = React.useRef<number>(0);
 
   useEffect(() => {
-    const updateAdmin = () => {
-      setIsVmindAdmin(checkIsVmindAdmin());
+    const fetchAdminStatus = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+        const res = await fetch(`${apiUrl}/api/auth/vmind/me`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.ok && data.user) {
+            setIsVmindAdmin(checkIsVmindAdmin(data.user));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to verify admin status in TralisConnectorPanel', err);
+      }
     };
-    updateAdmin();
+
+    fetchAdminStatus();
+
+    const updateAdmin = (e?: any) => {
+      const user = e?.detail?.user || (e?.detail && e.detail.connected ? e.detail : null);
+      if (user) {
+        setIsVmindAdmin(checkIsVmindAdmin(user));
+      }
+    };
     window.addEventListener('mcp-session-updated', updateAdmin);
-    window.addEventListener('storage', updateAdmin);
     return () => {
       window.removeEventListener('mcp-session-updated', updateAdmin);
-      window.removeEventListener('storage', updateAdmin);
     };
   }, []);
 
