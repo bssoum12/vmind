@@ -212,8 +212,8 @@ function HomeContent() {
           setClientId(data.user.client_id);
         }
 
-        // Notification globale de session pour hydrater l'ensemble des composants React
-        window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { connected: true, user: data.user } }));
+        // Notification globale de l'utilisateur VMIND (connecteur ERP inactif par défaut jusqu'à validation par ConnectorsHub)
+        window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { connected: false, user: data.user } }));
 
         // Contrôle d'autorisation pour le mode MANAGEMENT (Administrateurs uniquement)
         if (mode === 'MANAGEMENT') {

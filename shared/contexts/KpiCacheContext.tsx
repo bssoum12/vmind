@@ -53,12 +53,54 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isConnectorConnected, setIsConnectorConnected] = useState<boolean>(false);
 
   useEffect(() => {
+    const checkInitialStatus = async () => {
+      if (typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname.startsWith('/login') || window.location.pathname.startsWith('/reset-password'))) {
+        return;
+      }
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+        const res = await fetch(`${baseUrl}/api/connectors/tralis/status`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && data.connected) {
+            setIsConnectorConnected(true);
+            const user = data.user || {
+              username: data.erp_username || '',
+              client_id: data.client_id || 'LOCAL',
+              roles: data.roles || ['Administrator'],
+              allowedAgents: data.allowedAgents || ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE']
+            };
+            setCurrentUser(user);
+          } else {
+            setIsConnectorConnected(false);
+          }
+        }
+      } catch {
+        setIsConnectorConnected(false);
+      }
+    };
+    checkInitialStatus();
+
     const handleMcpUpdate = (event?: any) => {
-      const user = event?.detail?.user || event?.detail;
-      if (user) {
-        setCurrentUser(user);
+      const sessionDetail = event?.detail;
+      if (!sessionDetail || sessionDetail === null || sessionDetail.connected === false) {
+        setIsConnectorConnected(false);
+        const user = sessionDetail?.user;
+        if (user) {
+          setCurrentUser(user);
+        }
+        setKpisByAgent({});
+        setError(null);
+        setLoadingByAgent({});
+      } else {
+        const user = sessionDetail?.user || sessionDetail;
+        if (user) {
+          setCurrentUser(user);
+        }
+        setIsConnectorConnected(true);
       }
     };
     window.addEventListener('mcp-session-updated', handleMcpUpdate);
@@ -90,6 +132,12 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
     const agentKey = (agentId || 'vdata').toLowerCase();
     const allowedAgentUpper = agentKey.toUpperCase();
+
+    if (!isConnectorConnected) {
+      console.log(`[KPI CONTEXT] Connecteur ERP déconnecté — requête KPI évitée.`);
+      setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
+      return;
+    }
 
     if (!isAgentKpiAllowed(allowedAgentUpper)) {
       console.log(`[KPI CONTEXT] KPIs not allowed for agent ${allowedAgentUpper} (ERP not connected or agent not authorized)`);
@@ -199,12 +247,20 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       }
 
     } catch (err: any) {
-      console.error(`[KPI CONTEXT] Error fetching KPIs for ${allowedAgentUpper}:`, err);
-      let msg = err?.message || "Impossible de charger les indicateurs.";
-      if (msg.toLowerCase().includes("fetch failed") || msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("econnrefused")) {
-        msg = "Erreur de connexion. Le service d'analyse est temporairement inaccessible.";
+      const errMsg = err?.message || "";
+      // Interception silencieuse si le connecteur est déconnecté ou accès refusé (403)
+      if (errMsg.includes("403") || errMsg.includes("Accès refusé") || errMsg.includes("tenant non autorisé")) {
+        console.warn(`[KPI CONTEXT] Connecteur ERP non connecté ou accès refusé (403) — passage silencieux à l'état requis.`);
+        setIsConnectorConnected(false);
+        setError(null);
+      } else {
+        console.error(`[KPI CONTEXT] Error fetching KPIs for ${allowedAgentUpper}:`, err);
+        let msg = errMsg || "Impossible de charger les indicateurs.";
+        if (msg.toLowerCase().includes("fetch failed") || msg.toLowerCase().includes("failed to fetch") || msg.toLowerCase().includes("econnrefused")) {
+          msg = "Erreur de connexion. Le service d'analyse est temporairement inaccessible.";
+        }
+        setError(msg);
       }
-      setError(msg);
     } finally {
       setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
     }
@@ -212,7 +268,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
   // Chargement passif depuis PostgreSQL lors du changement d'onglet spécialiste ou de date (NE LANCE JAMAIS n8n)
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !isConnectorConnected) return;
     if (typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname.startsWith('/login') || window.location.pathname.startsWith('/reset-password'))) return;
 
     const currentAgent = activeAgentId || 'VDATA';
@@ -226,10 +282,11 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
     // Interrogation de la base PostgreSQL en mode passif (force = false)
     fetchKpis(lowerAgent, false);
-  }, [startDate, endDate, activeAgentId, currentUser]);
+  }, [startDate, endDate, activeAgentId, currentUser, isConnectorConnected]);
 
   // Polling automatique si un calcul est en cours en tâche de fond pour l'agent actif
   useEffect(() => {
+    if (!isConnectorConnected) return;
     const currentAgent = (activeAgentId || 'VDATA').toLowerCase();
     const agentState = kpisByAgent[currentAgent];
 
@@ -241,24 +298,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
       return () => clearInterval(pollTimer);
     }
-  }, [activeAgentId, kpisByAgent]);
-
-  // Nettoyage lors de la déconnexion de session MCP
-  useEffect(() => {
-    const handleMcpUpdate = (event?: any) => {
-      const sessionDetail = event?.detail;
-      if (sessionDetail === null) {
-        setKpisByAgent({});
-        setError(null);
-        setLoadingByAgent({});
-      } else {
-        const currentAgent = (activeAgentId || 'VDATA').toLowerCase();
-        fetchKpis(currentAgent, false);
-      }
-    };
-    window.addEventListener('mcp-session-updated', handleMcpUpdate);
-    return () => window.removeEventListener('mcp-session-updated', handleMcpUpdate);
-  }, [activeAgentId]);
+  }, [activeAgentId, kpisByAgent, isConnectorConnected]);
 
   return (
     <KpiCacheContext.Provider
