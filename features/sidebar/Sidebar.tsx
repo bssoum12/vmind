@@ -26,6 +26,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
   const updatePermissions = (event?: any) => {
     try {
       const sessionDetail = event?.detail;
+      if (event && (sessionDetail === null || sessionDetail?.connected === false)) {
+        setAllowedAgents([]);
+        setIsErpConnected(false);
+        return;
+      }
       const user = sessionDetail?.user || sessionDetail;
       if (user) {
         if (user.username) setUsername(user.username);
