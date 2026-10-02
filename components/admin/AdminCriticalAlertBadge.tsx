@@ -18,9 +18,25 @@ export const AdminCriticalAlertBadge: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
-    const fetchHealth = () => {
+    const fetchHealth = (user?: any) => {
       try {
-        const apiUrl = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+        if (user) {
+          const roles = Array.isArray(user.roles)
+            ? user.roles
+            : typeof user.roles === 'string'
+              ? [user.roles]
+              : [];
+          const adminRole = roles.some((r: string) =>
+            ['Administrators', 'Administrator', 'Superusers', 'Admin', 'SuperAdmin'].includes(r)
+          );
+          if (!adminRole) {
+            setIsAdmin(false);
+            setIssues([]);
+            return;
+          }
+        }
+
+        const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001').trim();
         if (!apiUrl) return;
 
         fetch(`${apiUrl}/api/admin/config-health`, {
@@ -53,8 +69,13 @@ export const AdminCriticalAlertBadge: React.FC = () => {
     };
 
     fetchHealth();
-    window.addEventListener('mcp-session-updated', fetchHealth);
-    return () => window.removeEventListener('mcp-session-updated', fetchHealth);
+    const handleSessionUpdated = (e: any) => {
+      const user = e?.detail?.user || e?.detail;
+      fetchHealth(user);
+    };
+
+    window.addEventListener('mcp-session-updated', handleSessionUpdated);
+    return () => window.removeEventListener('mcp-session-updated', handleSessionUpdated);
   }, []);
 
   // Si l'utilisateur n'est pas Admin OU qu'aucune configuration critique ne manque : 100% INVISIBLE

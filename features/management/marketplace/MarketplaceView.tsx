@@ -38,6 +38,26 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
   }, [isAdminProp]);
 
   React.useEffect(() => {
+    const handleSessionUpdated = (e: any) => {
+      const user = e?.detail?.user || e?.detail;
+      if (user) {
+        const rawRoles = user.roles || user.role;
+        const roles = Array.isArray(rawRoles)
+          ? rawRoles
+          : typeof rawRoles === 'string'
+            ? [rawRoles]
+            : [];
+        const userIsAdmin = roles.some((r: string) =>
+          ['Administrator', 'Administrators', 'admin', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
+        );
+        setIsAdmin(userIsAdmin);
+      }
+    };
+    window.addEventListener('mcp-session-updated', handleSessionUpdated);
+    return () => window.removeEventListener('mcp-session-updated', handleSessionUpdated);
+  }, []);
+
+  React.useEffect(() => {
     getMarketplaceStats()
       .then(res => {
         if (res.ok && res.templateDeployments) {

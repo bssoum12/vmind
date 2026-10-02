@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { jwtDecode } from 'jwt-decode';
 import {
   User, Mail, Phone, Lock, LogOut, CheckCircle2, AlertCircle,
   Shield, Eye, EyeOff, Server, Cpu

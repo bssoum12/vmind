@@ -167,9 +167,22 @@ function HomeContent() {
   useEffect(() => {
     const handleMcpUpdated = (e: any) => {
       const detail = e?.detail;
-      const targetClientId = detail?.client_id || detail?.user?.client_id;
+      const user = detail?.user || detail;
+      const targetClientId = detail?.client_id || user?.client_id;
       if (targetClientId) {
         setClientId(targetClientId);
+      }
+      if (user) {
+        const rawRoles = user.roles || user.role;
+        const roles = Array.isArray(rawRoles)
+          ? rawRoles
+          : typeof rawRoles === 'string'
+            ? [rawRoles]
+            : [];
+        const userIsAdmin = roles.some((r: string) =>
+          ['Administrator', 'Administrators', 'admin', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
+        );
+        setIsAdmin(userIsAdmin);
       }
     };
     window.addEventListener('mcp-session-updated', handleMcpUpdated);
@@ -212,13 +225,14 @@ function HomeContent() {
           setClientId(data.user.client_id);
         }
 
-        const roles = Array.isArray(data.user.roles)
-          ? data.user.roles
-          : typeof data.user.roles === 'string'
-            ? [data.user.roles]
-            : (data.user.role ? [data.user.role] : []);
+        const rawRoles = data.user.roles || data.user.role || data.user.role_name;
+        const roles = Array.isArray(rawRoles)
+          ? rawRoles
+          : typeof rawRoles === 'string'
+            ? [rawRoles]
+            : [];
         const userIsAdmin = roles.some((r: string) =>
-          ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
+          ['administrator', 'administrators', 'admin', 'superusers', 'superadmin'].includes(r.trim().toLowerCase())
         );
         setIsAdmin(userIsAdmin);
 
