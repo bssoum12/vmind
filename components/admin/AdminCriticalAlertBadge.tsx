@@ -20,38 +20,54 @@ export const AdminCriticalAlertBadge: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      let token = localStorage.getItem('vmind_session');
-      if (!token) return;
+    const checkHealth = (user?: any) => {
+      let adminRole = false;
+      let token: string | null = null;
 
-      if (token.startsWith('{')) {
+      if (user) {
+        const roles = Array.isArray(user.roles)
+          ? user.roles
+          : typeof user.roles === 'string'
+            ? [user.roles]
+            : [];
+        adminRole = roles.some((r: string) =>
+          ['Administrators', 'Administrator', 'Superusers', 'Admin', 'SuperAdmin'].includes(r)
+        );
+      } else {
         try {
-          const parsed = JSON.parse(token);
-          token = parsed.token || parsed.accessToken || token;
+          token = localStorage.getItem('vmind_session');
+          if (token) {
+            if (token.startsWith('{')) {
+              try {
+                const parsed = JSON.parse(token);
+                token = parsed.token || parsed.accessToken || token;
+              } catch {}
+            } else if (token.startsWith('"') && token.endsWith('"')) {
+              token = token.slice(1, -1);
+            }
+            if (token) {
+              const decoded: any = jwtDecode(token);
+              const roles = Array.isArray(decoded?.roles)
+                ? decoded.roles
+                : typeof decoded?.roles === 'string'
+                  ? [decoded.roles]
+                  : [];
+              adminRole = roles.some((r: string) =>
+                ['Administrators', 'Administrator', 'Superusers', 'Admin', 'SuperAdmin'].includes(r)
+              );
+            }
+          }
         } catch {}
-      } else if (token.startsWith('"') && token.endsWith('"')) {
-        token = token.slice(1, -1);
       }
-
-      if (!token) return;
-      const decoded: any = jwtDecode(token);
-      const roles = Array.isArray(decoded?.roles)
-        ? decoded.roles
-        : typeof decoded?.roles === 'string'
-          ? [decoded.roles]
-          : [];
-
-      const adminRole = roles.some((r: string) =>
-        ['Administrators', 'Administrator', 'Superusers'].includes(r)
-      );
 
       if (!adminRole) return;
       setIsAdmin(true);
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
       fetch(`${apiUrl}/api/admin/config-health`, {
+        credentials: 'include',
         headers: {
-          Authorization: `Bearer ${token}`
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         }
       })
         .then((res) => res.json())
@@ -65,9 +81,21 @@ export const AdminCriticalAlertBadge: React.FC = () => {
         .catch((err) => {
           console.debug('[ADMIN HEALTH] Diagnostic passif :', err?.message || err);
         });
-    } catch {
-      // Échec silencieux non bloquant
-    }
+    };
+
+    const handleSessionUpdated = (e: any) => {
+      const user = e?.detail?.user || e?.detail;
+      if (user) {
+        checkHealth(user);
+      }
+    };
+
+    window.addEventListener('mcp-session-updated', handleSessionUpdated);
+    checkHealth();
+
+    return () => {
+      window.removeEventListener('mcp-session-updated', handleSessionUpdated);
+    };
   }, []);
 
   // Si l'utilisateur n'est pas Admin OU qu'aucune configuration critique ne manque : 100% INVISIBLE

@@ -118,6 +118,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
     setIsUnauthorized(false);
     try {
       const res = await fetch(`${API_BASE}/api/admin/prompts`, {
+        credentials: 'include',
         headers: getAuthHeaders()
       });
 
@@ -194,6 +195,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
     try {
       const res = await fetch(`${API_BASE}/api/admin/prompts/${activeKey}`, {
         method: 'PUT',
+        credentials: 'include',
         headers: getAuthHeaders(),
         body: JSON.stringify({
           name: formName,
@@ -232,6 +234,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
     try {
       const res = await fetch(`${API_BASE}/api/admin/prompts/${activeKey}/reset`, {
         method: 'POST',
+        credentials: 'include',
         headers: getAuthHeaders()
       });
 
@@ -264,6 +267,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
       const startTime = Date.now();
       const res = await fetch(`${API_BASE}/api/admin/prompts/${activeKey}/test`, {
         method: 'POST',
+        credentials: 'include',
         headers: getAuthHeaders(),
         body: JSON.stringify({
           user_message: testUserMessage,

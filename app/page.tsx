@@ -167,9 +167,22 @@ function HomeContent() {
   useEffect(() => {
     const handleMcpUpdated = (e: any) => {
       const detail = e?.detail;
-      const targetClientId = detail?.client_id || detail?.user?.client_id;
+      const user = detail?.user || detail;
+      const targetClientId = detail?.client_id || user?.client_id;
       if (targetClientId) {
         setClientId(targetClientId);
+      }
+      if (user) {
+        const rawRoles = user.roles || user.role;
+        const roles = Array.isArray(rawRoles)
+          ? rawRoles
+          : typeof rawRoles === 'string'
+            ? [rawRoles]
+            : [];
+        const userIsAdmin = roles.some((r: string) =>
+          ['Administrator', 'Administrators', 'admin', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
+        );
+        setIsAdmin(userIsAdmin);
       }
     };
     window.addEventListener('mcp-session-updated', handleMcpUpdated);
@@ -212,17 +225,23 @@ function HomeContent() {
           setClientId(data.user.client_id);
         }
 
+        const rawRoles = data.user.roles || data.user.role;
+        const roles = Array.isArray(rawRoles)
+          ? rawRoles
+          : typeof rawRoles === 'string'
+            ? [rawRoles]
+            : [];
+        const userIsAdmin = roles.some((r: string) =>
+          ['Administrator', 'Administrators', 'admin', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
+        );
+        setIsAdmin(userIsAdmin);
+
         // Notification globale de session pour hydrater l'ensemble des composants React
         window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { connected: true, user: data.user } }));
 
         // Contrôle d'autorisation pour le mode MANAGEMENT (Administrateurs uniquement)
         if (mode === 'MANAGEMENT') {
-          const roles = Array.isArray(data.user.roles)
-            ? data.user.roles
-            : typeof data.user.roles === 'string'
-              ? [data.user.roles]
-              : [];
-          if (!roles.includes('Administrators') && !roles.includes('Utilisateur') && !roles.includes('Administrator') && !roles.includes('Superusers')) {
+          if (!userIsAdmin && !roles.includes('Utilisateur')) {
             setIsAuthorized(false);
             return;
           }
