@@ -1524,6 +1524,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                   body: JSON.stringify({
                     target_agent_ids: params.target_agent_ids || scheduleModalAgent.target_agent_ids,
                     update_defaults: params.update_defaults,
+                    totalLeads: params.totalLeads,
+                    leadsPerCompany: params.leadsPerCompany,
                     workflow_timezone: getBrowserTimezone()
                   })
                 });

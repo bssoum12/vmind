@@ -528,6 +528,8 @@ export const WizardSourcingView: React.FC<WizardViewProps> = ({ templateId, onCa
         credentials: "include",
         body: JSON.stringify({
           target_agent_ids: params.target_agent_ids || agent.target_agent_ids,
+          totalLeads: params.totalLeads,
+          leadsPerCompany: params.leadsPerCompany,
           workflow_timezone: getBrowserTimezone()
         })
       });

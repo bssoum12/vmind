@@ -51,7 +51,9 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
 
   // Sourcing Execution Parameters
   const [allowExistingCompanies, setAllowExistingCompanies] = useState(false);
-  const [leadsToFind, setLeadsToFind] = useState<number>(50);
+  const savedTotalLeads = Number(agent?.config?.totalLeads || (agent as any)?.totalLeads || (agent as any)?.parameters?.totalLeads);
+  const initialTotalLeads = !isNaN(savedTotalLeads) && savedTotalLeads >= 1 ? Math.min(15, savedTotalLeads) : 5;
+  const [leadsToFind, setLeadsToFind] = useState<number>(initialTotalLeads);
   const [leadsPerCompany, setLeadsPerCompany] = useState<number>(2);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -273,8 +275,8 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
   };
 
   const handleConfigConfirm = () => {
-    if (leadsToFind <= 0 || leadsToFind > 100) {
-      onToast("Le nombre de leads doit être entre 1 et 100", "err");
+    if (leadsToFind <= 0 || leadsToFind > 15) {
+      onToast("Le nombre de leads doit être entre 1 et 15", "err");
       return;
     }
     if (leadsPerCompany < 1 || leadsPerCompany > 10) {
@@ -693,18 +695,18 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
                     {/* Leads to Find */}
                     <div style={{ background: 'rgba(0,0,0,0.2)', padding: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)' }}>
                       <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#F0F4F8', marginBottom: 6 }}>
-                        Volume de leads par exécution (Max 100)
+                        Volume de leads par exécution (1 - 15)
                       </label>
                       <span style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
-                        Nombre de candidats à sourcer à chaque cycle planifié.
+                        Nombre de candidats à sourcer à chaque cycle planifié (entre 1 et 15).
                       </span>
                       <input
                         type="number"
                         min="1"
-                        max="100"
+                        max="15"
                         value={leadsToFind}
                         onChange={(e) => {
-                          const newTotal = Math.max(1, Math.min(100, parseInt(e.target.value) || 1));
+                          const newTotal = Math.max(1, Math.min(15, parseInt(e.target.value) || 1));
                           setLeadsToFind(newTotal);
                           if (leadsPerCompany > newTotal) {
                             setLeadsPerCompany(Math.min(10, newTotal));

@@ -9,11 +9,12 @@ import { SourcingAgentExecutionModal } from '../../agents/components/SourcingAge
 import { SourcingLauncherModal } from './SourcingLauncherModal';
 import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
-import { Database, FileSpreadsheet, ScanLine, UserPlus, Zap, Globe, Sparkles, UploadCloud, Target, CheckCircle2, X, Plus, Trash2, AlertCircle, RotateCcw, Copy, User, Building2, Briefcase, MapPin, Users, Compass, Mail } from 'lucide-react';
+import { Database, FileSpreadsheet, ScanLine, UserPlus, Zap, Globe, Sparkles, UploadCloud, Target, CheckCircle2, X, Plus, Trash2, AlertCircle, RotateCcw, Copy, User, Building2, Briefcase, MapPin, Users, Compass, Mail, Phone, Smartphone, Linkedin, ExternalLink, Lock, Building, Calendar, ArrowUpRight, Check } from 'lucide-react';
 import { useProspectSocket } from '../hooks/useProspectSocket';
 import { getAgents } from '@/shared/api/n8n-api';
 import { useToast } from '@/shared/contexts/ToastContext';
 import { LiveAgent } from '../../agents/AgentsView';
+import { extractLeadMobile, extractCompanyPhone, maskCompanyLogoUrl } from '@/shared/utils/phoneExtractor';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
@@ -122,6 +123,24 @@ interface Lead {
   emails_count?: number;
   agent_emails_count?: number;
   date_envoi?: string | null;
+  decision_maker?: boolean;
+  seniority?: string;
+  // Prospeo Enrichment fields
+  mobile?: string;
+  phone_hq?: string;
+  linkedin_url?: string;
+  company_logo_url?: string;
+  headline?: string;
+  city?: string;
+  country_code?: string;
+  industry?: string;
+  employee_count?: number;
+  job_history?: any;
+  sourcing_provider?: string;
+  domain?: string;
+  verification_status?: string;
+  person_raw?: any;
+  company_raw?: any;
 }
 
 interface LeadsViewProps {
@@ -161,6 +180,69 @@ const StyledCheckbox = ({ checked, onChange, isIndeterminate }: { checked: boole
     )}
   </div>
 );
+
+function LeadCompanyAvatar({ lead, initials }: { lead: Lead; initials: string }) {
+  const [imgError, setImgError] = useState(false);
+  const logoUrl = maskCompanyLogoUrl(lead.company_logo_url);
+
+  if (logoUrl && !imgError) {
+    return (
+      <div 
+        className="candidate-avatar candidate-avatar--logo"
+        title={lead.entreprise ? `${lead.entreprise} (Entreprise)` : undefined}
+        style={{
+          width: 38,
+          height: 38,
+          borderRadius: 10,
+          background: '#FFFFFF',
+          border: '1px solid rgba(255, 255, 255, 0.25)',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
+          padding: 3,
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0
+        }}
+      >
+        <img
+          src={logoUrl}
+          alt={lead.entreprise || ''}
+          onError={() => setImgError(true)}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            borderRadius: 6,
+            display: 'block'
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className="candidate-avatar"
+      style={{
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        background: 'linear-gradient(135deg, rgba(0, 229, 200, 0.2), rgba(6, 17, 31, 0.8))',
+        border: '1px solid rgba(0, 229, 200, 0.3)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontWeight: 700,
+        fontSize: '0.88rem',
+        color: 'var(--accent-primary)',
+        flexShrink: 0
+      }}
+    >
+      {initials}
+    </div>
+  );
+}
 
 // Zero Technical Jargon policy: sanitize and translate raw backend logs for the end user
 function formatUserFacingMessage(raw?: string): string {
@@ -597,10 +679,17 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
   // Filter leads
   const filteredLeads = useMemo(() => {
     return leads.filter((lead) => {
+      const directMobile = extractLeadMobile(lead.mobile, lead.person_raw);
+      const companyPhone = extractCompanyPhone(lead.phone_hq, lead.company_raw);
       const matchesSearch =
         `${lead.prenom} ${lead.nom}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
         lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (lead.entreprise || '').toLowerCase().includes(searchTerm.toLowerCase());
+        (lead.entreprise || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (directMobile || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (companyPhone || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (lead.city || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (lead.industry || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (lead.headline || '').toLowerCase().includes(searchTerm.toLowerCase());
 
       const displayedStatus = lead.est_qualifie === true ? 'Qualifié' : lead.est_qualifie === false ? 'Écarté' : lead.statut || 'Nouveau';
       const matchesStatus = statusFilter === 'All' || displayedStatus === statusFilter;
@@ -660,22 +749,38 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
       ? sortedLeads.filter(l => selectedLeadIds.includes(l.id))
       : sortedLeads;
 
-    const headers = ['Nom', 'Prénom', 'Email', 'Poste', 'Entreprise', 'Secteur', 'Taille', 'Pays', 'Source', 'Statut', 'Score', 'Potentiel', 'Date Collecte'];
-    const rows = leadsToExport.map((lead) => [
-      lead.nom,
-      lead.prenom,
-      lead.email,
-      lead.poste || '',
-      lead.entreprise || '',
-      lead.secteur || '',
-      lead.taille_ent || '',
-      lead.pays || '',
-      lead.source,
-      lead.statut,
-      lead.score !== null ? lead.score : '',
-      lead.potentiel || '',
-      lead.date_collecte
-    ]);
+    const headers = [
+      'Nom', 'Prénom', 'Email', 'Poste', 'Bio Headline', 'Entreprise', 'Site Web',
+      'Secteur / Industrie', 'Effectif', 'Ville', 'Pays', 'Mobile Direct',
+      'Standard Entreprise', 'Profil LinkedIn', 'Source', 'Statut', 'Score',
+      'Potentiel', 'Emails Envoyés', 'Date Collecte'
+    ];
+    const rows = leadsToExport.map((lead) => {
+      const directMobile = extractLeadMobile(lead.mobile, lead.person_raw) || '';
+      const companyPhone = extractCompanyPhone(lead.phone_hq, lead.company_raw) || '';
+      return [
+        lead.nom,
+        lead.prenom,
+        lead.email,
+        lead.poste || '',
+        lead.headline || '',
+        lead.entreprise || '',
+        lead.domain || '',
+        lead.industry || lead.secteur || '',
+        lead.employee_count || lead.taille_ent || '',
+        lead.city || '',
+        lead.pays || '',
+        directMobile,
+        companyPhone,
+        lead.linkedin_url || '',
+        lead.sourcing_provider ? 'Sourcing IA' : lead.source,
+        lead.statut,
+        lead.score !== null ? lead.score : '',
+        lead.potentiel || '',
+        lead.agent_emails_count ?? lead.emails_count ?? 0,
+        lead.date_collecte
+      ];
+    });
 
     const csvContent =
       'data:text/csv;charset=utf-8,\uFEFF' +
@@ -2183,7 +2288,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
             <table className="leads-table">
               <thead>
                 <tr>
-                  <th className="col-checkbox" style={{ width: '40px', textAlign: 'center', verticalAlign: 'middle' }}>
+                  <th className="col-checkbox" style={{ width: '40px', minWidth: '40px', textAlign: 'center', verticalAlign: 'middle' }}>
                     <StyledCheckbox
                       checked={paginatedLeads.length > 0 && selectedLeadIds.length === sortedLeads.length}
                       isIndeterminate={selectedLeadIds.length > 0 && selectedLeadIds.length < sortedLeads.length}
@@ -2196,37 +2301,38 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
                       }}
                     />
                   </th>
-                  <th className="col-contact" style={{ cursor: 'pointer', width: '20%' }} onClick={() => toggleSort('nom')}>
-                    Contact {sortBy === 'nom' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  <th className="col-contact" style={{ cursor: 'pointer', width: '22%', minWidth: '220px' }} onClick={() => toggleSort('nom')}>
+                    Candidat & Contact {sortBy === 'nom' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th className="col-company" style={{ width: '16%' }}>Entreprise</th>
-                  <th className="col-score" style={{ cursor: 'pointer', width: '12%' }} onClick={() => toggleSort('score')}>
-                    Score ICP {sortBy === 'score' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  <th className="col-job" style={{ width: '18%', minWidth: '170px' }}>
+                    Poste & Responsabilité
                   </th>
-                  <th className="col-status" style={{ cursor: 'pointer', width: '10%', whiteSpace: 'nowrap', textAlign: 'center' }} onClick={() => toggleSort('statut')}>
-                    Statut {sortBy === 'statut' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  <th className="col-company" style={{ width: '22%', minWidth: '210px' }}>
+                    Entreprise & Secteur
                   </th>
-                  <th className="col-emails" style={{ cursor: 'pointer', width: '10%', textAlign: 'center' }} onClick={() => toggleSort('emails_count')}>
+                  <th className="col-qualification" style={{ cursor: 'pointer', width: '14%', minWidth: '140px', textAlign: 'center' }} onClick={() => toggleSort('score')}>
+                    Qualification ICP {sortBy === 'score' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                  </th>
+                  <th className="col-emails" style={{ cursor: 'pointer', width: '8%', minWidth: '85px', textAlign: 'center' }} onClick={() => toggleSort('emails_count')}>
                     Emails {sortBy === 'emails_count' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th className="col-source" style={{ width: '10%' }}>Source</th>
-                  <th className="col-date" style={{ cursor: 'pointer', width: '12%' }} onClick={() => toggleSort('date_collecte')}>
+                  <th className="col-date" style={{ cursor: 'pointer', width: '9%', minWidth: '95px' }} onClick={() => toggleSort('date_collecte')}>
                     Collecté {sortBy === 'date_collecte' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
                   </th>
-                  <th className="col-action" style={{ width: '10%', textAlign: 'center' }}>Actions</th>
+                  <th className="col-action" style={{ width: '6%', minWidth: '85px', textAlign: 'right' }}>
+                    Dossier
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedLeads.length > 0 ? (
                   paginatedLeads.map((lead) => {
+                    const initials = `${(lead.prenom || '')[0] || ''}${(lead.nom || '')[0] || ''}`.toUpperCase() || 'L';
+                    const isDecMaker = lead.decision_maker === true || /ceo|cto|cfo|coo|cmo|cro|founder|fondateur|director|directeur|vp|president|head|leader/i.test(lead.poste || '');
                     const isQualified = lead.score !== null && lead.score >= threshold;
-                    const scoreColorClass = lead.score === null
-                      ? ''
-                      : isQualified
-                        ? 'high'
-                        : lead.score >= 40
-                          ? 'medium'
-                          : 'low';
+                    const leadDirectPhone = extractLeadMobile(lead.mobile, lead.person_raw);
+                    const companyPhone = extractCompanyPhone(lead.phone_hq, lead.company_raw);
+                    const emailCount = lead.agent_emails_count ?? lead.emails_count ?? 0;
 
                     return (
                       <tr
@@ -2242,6 +2348,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
                         }}
                         onDoubleClick={() => onOpenLead(lead)}
                       >
+                        {/* 1. SELECTION CHECKBOX */}
                         <td className="col-checkbox" style={{ textAlign: 'center', width: '40px', verticalAlign: 'middle' }}>
                           <StyledCheckbox
                             checked={selectedLeadIds.includes(lead.id)}
@@ -2254,93 +2361,368 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
                             }}
                           />
                         </td>
+
+                        {/* 2. CANDIDAT & CONTACT */}
                         <td className="col-contact">
-                          <div className="lead-name">{lead.prenom} {lead.nom}</div>
-                          {lead.poste && (
-                            <div className="lead-job-mobile">
-                              <Briefcase size={11} />
-                              <span>{lead.poste}</span>
-                            </div>
-                          )}
-                          <div className="lead-email" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{lead.email}</div>
-                        </td>
-                        <td className="col-company">
-                          <div className="company-name">{lead.entreprise}</div>
-                          <div className="company-sub-meta" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                            {lead.poste} • {lead.secteur} • {lead.pays}
-                          </div>
-                        </td>
-                        <td className="col-score">
-                          {lead.score !== null ? (
-                            <div className="score-progress-container">
-                              <div className="score-progress-bar">
-                                <div
-                                  className={`score-progress-fill ${scoreColorClass}`}
-                                  style={{ width: `${lead.score}%` }}
-                                ></div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <LeadCompanyAvatar lead={lead} initials={initials} />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0, flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                <span className="lead-name" style={{ margin: 0, fontWeight: 600, fontSize: '0.92rem', color: '#F0F4F8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }} title={`${lead.prenom} ${lead.nom}`}>
+                                  {lead.prenom} {lead.nom}
+                                </span>
+                                {lead.linkedin_url && (
+                                  <a 
+                                    href={lead.linkedin_url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    title="Profil LinkedIn certifié"
+                                    onClick={(e) => e.stopPropagation()}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      width: 17,
+                                      height: 17,
+                                      borderRadius: 4,
+                                      background: 'rgba(10, 102, 194, 0.18)',
+                                      border: '1px solid rgba(56, 189, 248, 0.4)',
+                                      color: '#38BDF8',
+                                      textDecoration: 'none',
+                                      flexShrink: 0
+                                    }}
+                                  >
+                                    <Linkedin size={10} />
+                                  </a>
+                                )}
                               </div>
-                              <span className={`score-text ${scoreColorClass}`}>{lead.score}</span>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '175px' }} title={lead.email}>{lead.email}</span>
+                                {lead.verification_status && (() => {
+                                  const statusStr = lead.verification_status.toLowerCase();
+                                  const isInvalid = statusStr.includes('invalid') || statusStr.includes('bounc');
+                                  return (
+                                    <span 
+                                      title={isInvalid ? "Email non distribuable" : "Email certifié et vérifié"}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 3,
+                                        fontSize: '0.66rem',
+                                        fontWeight: 600,
+                                        color: isInvalid ? '#FF4757' : '#00E5A0',
+                                        background: isInvalid ? 'rgba(255, 71, 87, 0.1)' : 'rgba(0, 229, 160, 0.1)',
+                                        border: `1px solid ${isInvalid ? 'rgba(255, 71, 87, 0.25)' : 'rgba(0, 229, 160, 0.25)'}`,
+                                        padding: '1px 5px',
+                                        borderRadius: 4,
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0
+                                      }}
+                                    >
+                                      {isInvalid ? <AlertCircle size={9} /> : <Check size={9} />}
+                                      <span>{isInvalid ? 'Invalide' : 'Vérifié'}</span>
+                                    </span>
+                                  );
+                                })()}
+                              </div>
+
+                              {leadDirectPhone && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1, flexWrap: 'wrap' }}>
+                                  {leadDirectPhone.includes('*') ? (
+                                    <span 
+                                      title="Numéro direct disponible (masqué) — Passer à un forfait supérieur pour débloquer"
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                        fontSize: '0.72rem',
+                                        color: '#F59E0B',
+                                        background: 'rgba(245, 158, 11, 0.1)',
+                                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                                        padding: '1px 6px',
+                                        borderRadius: 4,
+                                        letterSpacing: '0.02em',
+                                        cursor: 'default',
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0
+                                      }}
+                                    >
+                                      <Lock size={9} />
+                                      <span>{leadDirectPhone}</span>
+                                    </span>
+                                  ) : (
+                                    <a 
+                                      href={`tel:${leadDirectPhone}`} 
+                                      onClick={(e) => e.stopPropagation()}
+                                      title={`Mobile direct: ${leadDirectPhone}`}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 3,
+                                        fontSize: '0.72rem',
+                                        color: '#00E5C8',
+                                        background: 'rgba(0, 229, 200, 0.08)',
+                                        border: '1px solid rgba(0, 229, 200, 0.25)',
+                                        padding: '1px 6px',
+                                        borderRadius: 4,
+                                        textDecoration: 'none',
+                                        whiteSpace: 'nowrap',
+                                        flexShrink: 0
+                                      }}
+                                    >
+                                      <Smartphone size={9} />
+                                      <span>{leadDirectPhone}</span>
+                                    </a>
+                                  )}
+                                </div>
+                              )}
                             </div>
+                          </div>
+                        </td>
+
+                        {/* 3. POSTE & RESPONSABILITÉ */}
+                        <td className="col-job">
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Briefcase size={12} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                              <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#F0F4F8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }} title={lead.poste}>
+                                {lead.poste || 'Poste non spécifié'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                              {isDecMaker && (
+                                <span 
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 3,
+                                    fontSize: '0.68rem',
+                                    fontWeight: 700,
+                                    padding: '1px 6px',
+                                    borderRadius: 5,
+                                    background: 'rgba(0, 229, 160, 0.12)',
+                                    color: '#00E5A0',
+                                    border: '1px solid rgba(0, 229, 160, 0.3)',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  <Target size={9} /> Décideur
+                                </span>
+                              )}
+                              {lead.seniority && (
+                                <span 
+                                  style={{
+                                    fontSize: '0.68rem',
+                                    padding: '1px 5px',
+                                    borderRadius: 4,
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    color: '#CBD5E1',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  {lead.seniority}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 4. ENTREPRISE & SECTEUR */}
+                        <td className="col-company">
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Building size={12} style={{ color: '#38BDF8', flexShrink: 0 }} />
+                              <span style={{ fontWeight: 600, fontSize: '0.88rem', color: '#F0F4F8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '220px' }} title={lead.entreprise}>
+                                {lead.entreprise || 'Entreprise non spécifiée'}
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '3px 6px', fontSize: '0.74rem' }}>
+                              {(lead.industry || lead.secteur) && (
+                                <span 
+                                  title={lead.industry || lead.secteur}
+                                  style={{
+                                    background: 'rgba(255, 255, 255, 0.04)',
+                                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                                    padding: '1px 5px',
+                                    borderRadius: 4,
+                                    color: 'var(--text-secondary)',
+                                    whiteSpace: 'nowrap',
+                                    maxWidth: '160px',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  {lead.industry || lead.secteur}
+                                </span>
+                              )}
+                              {(lead.city || lead.pays) && (
+                                <span 
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 2,
+                                    color: 'var(--text-muted)',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  <MapPin size={10} />
+                                  <span>{lead.city ? `${lead.city}, ${lead.pays || lead.country_code || ''}` : lead.pays}</span>
+                                </span>
+                              )}
+                              {(lead.employee_count || lead.taille_ent) && (
+                                <span 
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 2,
+                                    background: 'rgba(56, 189, 248, 0.08)',
+                                    border: '1px solid rgba(56, 189, 248, 0.2)',
+                                    color: '#38BDF8',
+                                    padding: '1px 5px',
+                                    borderRadius: 4,
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  <Users size={9} />
+                                  <span>{lead.employee_count || lead.taille_ent} emp.</span>
+                                </span>
+                              )}
+                              {companyPhone && (
+                                <span 
+                                  title={`Standard Entreprise: ${companyPhone}`}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: 3,
+                                    color: '#38BDF8',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  <Phone size={9} />
+                                  <span>{companyPhone}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 5. QUALIFICATION ICP (Balanced Horizontal Lockup) */}
+                        <td className="col-qualification" style={{ textAlign: 'center' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px 6px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                            {lead.score !== null ? (
+                              <span 
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 2,
+                                  padding: '3px 8px',
+                                  borderRadius: 6,
+                                  background: isQualified ? 'rgba(0, 229, 160, 0.12)' : lead.score >= 40 ? 'rgba(245, 158, 11, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                                  border: `1px solid ${isQualified ? 'rgba(0, 229, 160, 0.35)' : lead.score >= 40 ? 'rgba(245, 158, 11, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`,
+                                  fontWeight: 800,
+                                  fontSize: '0.82rem',
+                                  color: isQualified ? '#00E5A0' : lead.score >= 40 ? '#F59E0B' : '#EF4444',
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0
+                                }}
+                              >
+                                <span>{lead.score}</span>
+                                <span style={{ fontSize: '0.68rem', opacity: 0.7 }}>%</span>
+                              </span>
+                            ) : null}
+
+                            <span 
+                              className={`badge badge-${lead.est_qualifie === true ? 'qualified' : lead.est_qualifie === false ? 'discarded' : lead.statut === 'Erreur' ? 'error' : 'new'}`}
+                              style={{ fontSize: '0.72rem', padding: '3px 9px', borderRadius: 6, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}
+                            >
+                              {lead.est_qualifie === true ? 'Qualifié' : lead.est_qualifie === false ? 'Écarté' : lead.statut || 'En attente'}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 6. EMAILS ENVOYÉS */}
+                        <td className="col-emails" style={{ textAlign: 'center' }}>
+                          {emailCount > 0 ? (
+                            <span 
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                fontSize: '0.76rem',
+                                fontWeight: 600,
+                                color: '#38BDF8',
+                                background: 'rgba(56, 189, 248, 0.1)',
+                                border: '1px solid rgba(56, 189, 248, 0.25)',
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              <Mail size={11} />
+                              <span>{emailCount} envoyé{emailCount > 1 ? 's' : ''}</span>
+                            </span>
                           ) : (
-                            <span className="unqualified-text" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Non qualifié</span>
+                            <span 
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                fontSize: '0.74rem',
+                                color: 'var(--text-muted)',
+                                background: 'rgba(255, 255, 255, 0.03)',
+                                border: '1px solid rgba(255, 255, 255, 0.06)',
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              <Mail size={10} style={{ opacity: 0.5 }} />
+                              <span>0</span>
+                            </span>
                           )}
                         </td>
-                        <td className="col-status" style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
-                          <span className={`badge badge-${lead.est_qualifie === true ? 'qualified' : lead.est_qualifie === false ? 'discarded' : lead.statut === 'Erreur' ? 'error' : 'new'}`}>
-                            {lead.est_qualifie === true ? 'Qualifié' : lead.est_qualifie === false ? 'Écarté' : lead.statut || 'Nouveau'}
-                          </span>
-                        </td>
-                        <td className="col-emails" style={{ textAlign: 'center' }}>
-                          <span className={`badge ${(lead.agent_emails_count ?? lead.emails_count ?? 0) > 0 ? 'badge-sent' : 'badge-new'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            {(lead.agent_emails_count ?? lead.emails_count ?? 0) > 0 ? (
-                              <>
-                                <CyberIcon name="mail" size={12} color="#00E5C8" />
-                                <span>{lead.agent_emails_count ?? lead.emails_count}</span>
-                              </>
-                            ) : '0'}
-                          </span>
-                        </td>
-                        <td className="col-source">
-                          <span style={{ fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                            {lead.source.includes('CSV') ? (
-                              <>
-                                <CyberIcon name="file" size={13} color="#38BDF8" /> CSV
-                              </>
-                            ) : lead.source.includes('Webhook') ? (
-                              <>
-                                <CyberIcon name="zap" size={13} color="#00E5C8" /> Webhook
-                              </>
-                            ) : (
-                              <>
-                                <CyberIcon name="link" size={13} color="#A855F7" /> API
-                              </>
-                            )}
-                          </span>
-                        </td>
+
+                        {/* 7. DATE DE COLLECTE */}
                         <td className="col-date">
-                          <div style={{ fontSize: '0.85rem' }}>
-                            {new Date(lead.date_collecte).toLocaleDateString('fr-FR', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric'
-                            })}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            {new Date(lead.date_collecte).toLocaleTimeString('fr-FR', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.78rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
+                            <Calendar size={11} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                            <span>
+                              {lead.date_collecte ? new Date(lead.date_collecte).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                            </span>
                           </div>
                         </td>
-                        <td className="col-action" style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+
+                        {/* 8. DOSSIER ACTION */}
+                        <td className="col-action" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                           <button
-                            className="btn btn-secondary"
-                            style={{ padding: '0.4rem 0.75rem', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: 5, ...(paginatedLeads.indexOf(lead) === 0 ? getTabBtnStyle(6) : {}) }}
+                            className="btn btn-secondary dossier-action-btn"
+                            style={{
+                              padding: '6px 12px',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 5,
+                              color: '#00E5C8',
+                              background: 'rgba(0, 229, 200, 0.08)',
+                              border: '1px solid rgba(0, 229, 200, 0.25)',
+                              borderRadius: 7,
+                              cursor: 'pointer',
+                              ...(paginatedLeads.indexOf(lead) === 0 ? getTabBtnStyle(6) : {})
+                            }}
                             onClick={(e) => { e.stopPropagation(); onOpenLead(lead); }}
                           >
                             {paginatedLeads.indexOf(lead) === 0 && renderTutorialArrow(6)}
-                            <CyberIcon name="eye" size={13} color="#00E5C8" />
-                            <span>Détail</span>
+                            <span>Dossier</span>
+                            <ArrowUpRight size={13} />
                           </button>
                         </td>
                       </tr>
@@ -2348,7 +2730,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
                   })
                 ) : (
                   <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                       Aucun prospect ne correspond aux filtres de recherche.
                     </td>
                   </tr>

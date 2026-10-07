@@ -24,11 +24,14 @@ import {
   Server,
   ShieldCheck,
   Check,
-  ArrowLeft
+  ArrowLeft,
+  Target,
+  Globe
 } from 'lucide-react';
 import { useToast } from '@/shared/contexts/ToastContext';
 
 type ProviderMode = 'auto' | 'claude' | 'omniroute';
+type SourcingProvider = 'prospeo' | 'hunter';
 
 interface PromptConfig {
   key: string;
@@ -42,12 +45,20 @@ interface PromptConfig {
   is_stream: boolean;
   description?: string;
   updated_at?: string;
+  sourcing_provider?: SourcingProvider;
 }
 
 interface ProviderStatus {
   hasClaudeCredentials: boolean;
   claudeBaseUrl: string;
   omniRouteBaseUrl: string;
+  sourcing?: {
+    active_provider: SourcingProvider;
+    hasProspeoUrl: boolean;
+    hasHunterUrl: boolean;
+    prospeoUrl: string;
+    hunterUrl: string;
+  };
 }
 
 export interface PromptsConfigViewProps {
@@ -98,6 +109,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
   const [formMaxTokens, setFormMaxTokens] = useState<number>(1000);
   const [formIsStream, setFormIsStream] = useState<boolean>(false);
   const [formDescription, setFormDescription] = useState<string>('');
+  const [formSourcingProvider, setFormSourcingProvider] = useState<SourcingProvider>('prospeo');
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string>('');
 
   // Interactive Test State
@@ -160,6 +172,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
     setFormMaxTokens(p.max_tokens ?? 1000);
     setFormIsStream(Boolean(p.is_stream));
     setFormDescription(p.description || '');
+    setFormSourcingProvider(p.sourcing_provider || 'prospeo');
     setLastUpdatedAt(p.updated_at ? new Date(p.updated_at).toLocaleString('fr-FR') : '');
   };
 
@@ -206,13 +219,18 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
           temperature: formTemperature,
           max_tokens: formMaxTokens,
           is_stream: formIsStream,
-          description: formDescription
+          description: formDescription,
+          ...(activeKey === 'sourcing_execution_chat' ? { sourcing_provider: formSourcingProvider } : {})
         })
       });
 
       const data = await res.json();
       if (!res.ok || !data.ok) {
         throw new Error(data.message || 'Échec de la sauvegarde du prompt');
+      }
+
+      if (data.provider_status) {
+        setProviderStatus(data.provider_status);
       }
 
       showToast(`Prompt "${formName || activeKey}" sauvegardé en base et actualisé en RAM !`, 'success');
@@ -244,6 +262,9 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
       }
 
       loadPromptIntoForm(data.prompt);
+      if (data.provider_status) {
+        setProviderStatus(data.provider_status);
+      }
       setPrompts(prev => prev.map(p => p.key === activeKey ? data.prompt : p));
       showToast('Le prompt a été réinitialisé aux valeurs d\'origine.', 'success');
     } catch (err: any) {
@@ -743,6 +764,176 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
 
           {/* Side Column: Controls & Parameters */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            
+            {/* Sourcing Engine Selector Card (Prospeo vs Hunter) - Displayed for Sourcing Prompt */}
+            {activeKey === 'sourcing_execution_chat' && (
+              <div style={{
+                background: 'rgba(9, 18, 32, 0.85)',
+                border: '1px solid rgba(0, 229, 200, 0.2)',
+                borderRadius: 12,
+                padding: 16,
+                boxShadow: '0 4px 20px rgba(0, 229, 200, 0.05)',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 2,
+                  background: 'linear-gradient(90deg, #00E5C8 0%, rgba(0, 229, 200, 0) 100%)'
+                }} />
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Target size={14} color="#00E5C8" />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Moteur de Sourcing (Extraction)
+                    </span>
+                  </div>
+                  <span style={{
+                    fontSize: 10,
+                    padding: '2px 8px',
+                    borderRadius: 8,
+                    fontWeight: 600,
+                    background: formSourcingProvider === 'prospeo' ? 'rgba(0, 229, 200, 0.12)' : 'rgba(255, 122, 0, 0.12)',
+                    color: formSourcingProvider === 'prospeo' ? '#00E5C8' : '#FFA940',
+                    border: `1px solid ${formSourcingProvider === 'prospeo' ? 'rgba(0, 229, 200, 0.3)' : 'rgba(255, 122, 0, 0.3)'}`
+                  }}>
+                    {formSourcingProvider === 'prospeo' ? 'Prospeo Actif' : 'Hunter Actif'}
+                  </span>
+                </div>
+
+                {/* 2-Option Selector: Prospeo vs Hunter */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: 6,
+                  background: 'rgba(4, 9, 16, 0.6)',
+                  padding: 4,
+                  borderRadius: 8,
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  marginBottom: 12
+                }}>
+                  {/* Prospeo Button */}
+                  <button
+                    type="button"
+                    onClick={() => setFormSourcingProvider('prospeo')}
+                    style={{
+                      padding: '10px 8px',
+                      borderRadius: 6,
+                      border: formSourcingProvider === 'prospeo' ? '1px solid rgba(0, 229, 200, 0.4)' : '1px solid transparent',
+                      background: formSourcingProvider === 'prospeo' ? 'rgba(0, 229, 200, 0.12)' : 'transparent',
+                      color: formSourcingProvider === 'prospeo' ? '#00E5C8' : '#8FA3B8',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 4,
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Zap size={13} color={formSourcingProvider === 'prospeo' ? '#00E5C8' : '#8FA3B8'} />
+                      <span style={{ fontSize: 12, fontWeight: 700 }}>Prospeo</span>
+                    </div>
+                    <span style={{ fontSize: 9, opacity: 0.85, fontWeight: 500, color: formSourcingProvider === 'prospeo' ? '#99F6E4' : '#64748B' }}>
+                      Recommandé
+                    </span>
+                  </button>
+
+                  {/* Hunter Button */}
+                  <button
+                    type="button"
+                    onClick={() => setFormSourcingProvider('hunter')}
+                    style={{
+                      padding: '10px 8px',
+                      borderRadius: 6,
+                      border: formSourcingProvider === 'hunter' ? '1px solid rgba(255, 169, 64, 0.4)' : '1px solid transparent',
+                      background: formSourcingProvider === 'hunter' ? 'rgba(255, 122, 0, 0.12)' : 'transparent',
+                      color: formSourcingProvider === 'hunter' ? '#FFA940' : '#8FA3B8',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 4,
+                      transition: 'all 0.15s'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <Globe size={13} color={formSourcingProvider === 'hunter' ? '#FFA940' : '#8FA3B8'} />
+                      <span style={{ fontSize: 12, fontWeight: 700 }}>Hunter</span>
+                    </div>
+                    <span style={{ fontSize: 9, opacity: 0.85, fontWeight: 500, color: formSourcingProvider === 'hunter' ? '#FED7AA' : '#64748B' }}>
+                      Moteur Alternatif
+                    </span>
+                  </button>
+                </div>
+
+                {/* Status & Routing Details */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  borderRadius: 6,
+                  padding: '8px 10px',
+                  fontSize: 11,
+                  color: '#8FA3B8',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 5
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: providerStatus?.sourcing?.hasProspeoUrl ? '#00E5C8' : '#F59E0B'
+                      }} />
+                      Endpoint Prospeo :
+                    </span>
+                    <span style={{
+                      color: providerStatus?.sourcing?.hasProspeoUrl ? '#00E5C8' : '#F59E0B',
+                      fontWeight: 600,
+                      fontSize: 10
+                    }}>
+                      {providerStatus?.sourcing?.hasProspeoUrl ? 'Détecté (.env)' : 'Non configuré'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: providerStatus?.sourcing?.hasHunterUrl ? '#00E5C8' : '#F59E0B'
+                      }} />
+                      Endpoint Hunter :
+                    </span>
+                    <span style={{
+                      color: providerStatus?.sourcing?.hasHunterUrl ? '#00E5C8' : '#F59E0B',
+                      fontWeight: 600,
+                      fontSize: 10
+                    }}>
+                      {providerStatus?.sourcing?.hasHunterUrl ? 'Détecté (.env)' : 'Non configuré'}
+                    </span>
+                  </div>
+
+                  <div style={{
+                    marginTop: 4,
+                    paddingTop: 6,
+                    borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                    fontSize: 10,
+                    lineHeight: 1.4,
+                    color: '#64748B'
+                  }}>
+                    💡 <strong style={{ color: '#8FA3B8' }}>Bascule transparente :</strong> La sauvegarde applique le routage instantanément aux prochaines exécutions et re-synchronise tous les plannings QStash actifs.
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Provider Switcher Card (Matte & Harmonious) */}
             <div style={{

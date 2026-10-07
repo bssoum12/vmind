@@ -31,7 +31,9 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
 
   // Sourcing Execution Parameters
   const [allowExistingCompanies, setAllowExistingCompanies] = useState(false);
-  const [leadsToFind, setLeadsToFind] = useState<number>(50);
+  const savedTotalLeads = Number(agent?.config?.totalLeads || (agent as any)?.totalLeads || (agent as any)?.parameters?.totalLeads);
+  const initialTotalLeads = !isNaN(savedTotalLeads) && savedTotalLeads >= 1 ? Math.min(15, savedTotalLeads) : 5;
+  const [leadsToFind, setLeadsToFind] = useState<number>(initialTotalLeads);
   const [leadsPerCompany, setLeadsPerCompany] = useState<number>(2);
   const [isExecuting, setIsExecuting] = useState(false);
   const [liveIsExecuting, setLiveIsExecuting] = useState<boolean>(() => !!agent?.is_executing);
@@ -209,8 +211,8 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
     }
 
     // Validate inputs
-    if (leadsToFind <= 0 || leadsToFind > 100) {
-      onToast("Le nombre de leads doit être entre 1 et 100", "err");
+    if (leadsToFind <= 0 || leadsToFind > 15) {
+      onToast("Le nombre de leads doit être entre 1 et 15", "err");
       return;
     }
     if (leadsPerCompany < 1 || leadsPerCompany > 10) {
@@ -541,14 +543,14 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                     <div style={{ display: 'flex', gap: 12 }}>
                       <div style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: 16, borderRadius: 12 }}>
                         <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                          Total Leads
+                          Total Leads (1 - 15)
                         </label>
                         <input
                           type="number"
-                          min={1} max={100}
+                          min={1} max={15}
                           value={leadsToFind}
                           onChange={(e) => {
-                            const newTotal = Math.max(1, Math.min(100, parseInt(e.target.value) || 1));
+                            const newTotal = Math.max(1, Math.min(15, parseInt(e.target.value) || 1));
                             setLeadsToFind(newTotal);
                             if (leadsPerCompany > newTotal) {
                               setLeadsPerCompany(Math.min(10, newTotal));
@@ -556,7 +558,7 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                           }}
                           style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 14 }}
                         />
-                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>Max 100 leads par exécution</div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>Entre 1 et 15 leads par exécution</div>
                       </div>
 
                       <div style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: 16, borderRadius: 12 }}>
