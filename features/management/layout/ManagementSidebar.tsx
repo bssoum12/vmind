@@ -9,24 +9,45 @@ interface SidebarProps {
   onNavigate: (view: string) => void;
   activeCategory: string;
   onSelectCategory: (category: string) => void;
+  isAdmin?: boolean;
 }
 
-export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, activeCategory, onSelectCategory }) => {
+export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, activeCategory, onSelectCategory, isAdmin: isAdminProp }) => {
   const [agentCount, setAgentCount] = useState<number | null>(null);
   const [executionsToday, setExecutionsToday] = useState<number | null>(null);
   const [activeAgentsCount, setActiveAgentsCount] = useState<number | null>(null);
   const [successRate, setSuccessRate] = useState<number | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(Boolean(isAdminProp));
+
+  useEffect(() => {
+    if (isAdminProp !== undefined) {
+      setIsAdmin(isAdminProp);
+    }
+  }, [isAdminProp]);
 
   useEffect(() => {
     const checkAdmin = (e?: any) => {
       const user = e?.detail?.user || e?.detail;
       if (user) {
         const roles = Array.isArray(user.roles) ? user.roles : [user.roles || ''];
-        setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
+        setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)));
       }
     };
     window.addEventListener('mcp-session-updated', checkAdmin);
+
+    // Initialisation proactive du rôle admin depuis le backend si le prop n'est pas fourni
+    if (isAdminProp === undefined) {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+      fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.ok && data.user) {
+            const roles = Array.isArray(data.user.roles) ? data.user.roles : [data.user.roles || ''];
+            setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)));
+          }
+        })
+        .catch(() => {});
+    }
 
     const refreshData = () => {
       if (typeof document !== 'undefined' && document.hidden) {

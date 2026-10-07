@@ -225,14 +225,14 @@ function HomeContent() {
           setClientId(data.user.client_id);
         }
 
-        const rawRoles = data.user.roles || data.user.role;
+        const rawRoles = data.user.roles || data.user.role || data.user.role_name;
         const roles = Array.isArray(rawRoles)
           ? rawRoles
           : typeof rawRoles === 'string'
             ? [rawRoles]
             : [];
         const userIsAdmin = roles.some((r: string) =>
-          ['Administrator', 'Administrators', 'admin', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
+          ['administrator', 'administrators', 'admin', 'superusers', 'superadmin'].includes(r.trim().toLowerCase())
         );
         setIsAdmin(userIsAdmin);
 
@@ -662,6 +662,7 @@ function HomeContent() {
           handleSelectCategory(cat);
           setMobileSidebarOpen(false);
         }}
+        isAdmin={isAdmin}
       />
       <div className="content management-layout">
         <div className="view-container">

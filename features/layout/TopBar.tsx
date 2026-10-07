@@ -8,6 +8,7 @@ import { useMode } from '@/shared/contexts/ModeContext';
 
 import { LogOut, User, Menu } from 'lucide-react';
 import { AdminCriticalAlertBadge } from '@/components/admin/AdminCriticalAlertBadge';
+import { broadcastMcpSessionUpdate } from '@/shared/utils/sessionBroadcast';
 
 export const TopBar: React.FC = () => {
   const pathname = usePathname();
@@ -135,6 +136,7 @@ export const TopBar: React.FC = () => {
       localStorage.removeItem('vmind_connector_status');
       localStorage.removeItem('vmind_mode');
       sessionStorage.clear();
+      broadcastMcpSessionUpdate(null);
     } catch {}
     window.location.href = '/login';
   };
