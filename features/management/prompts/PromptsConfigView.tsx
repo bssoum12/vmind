@@ -673,7 +673,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
           }}
         >
           <Sparkles size={16} />
-          <span>🎯 Prospection — Stratégie d'Emails</span>
+          <span> Prospection : Stratégie d'Emails</span>
           <span style={{
             fontSize: 11, padding: '2px 8px', borderRadius: 12,
             background: activeKey === 'prospect_onboarding_chat' ? 'rgba(0, 229, 200, 0.2)' : 'rgba(255, 255, 255, 0.08)',
@@ -698,7 +698,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
           }}
         >
           <Zap size={16} />
-          <span>⚡ Sourcing — Ciblage ICP & Profils</span>
+          <span> Sourcing: Ciblage ICP & Profils</span>
           <span style={{
             fontSize: 11, padding: '2px 8px', borderRadius: 12,
             background: activeKey === 'sourcing_execution_chat' ? 'rgba(0, 229, 200, 0.2)' : 'rgba(255, 255, 255, 0.08)',

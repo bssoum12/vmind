@@ -3422,6 +3422,56 @@ textarea.form-input {
   background: rgba(0, 229, 200, 0.6);
 }
 
+/* ── PROMPTS CONFIG VIEW CUSTOM SCROLLBARS (CYBER DARK x APPLE RESTRAINT) ── */
+#prompts-config-view,
+#prompts-config-view * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 229, 200, 0.35) transparent;
+  scroll-behavior: smooth;
+}
+
+#prompts-config-view::-webkit-scrollbar,
+#prompts-config-view *::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+#prompts-config-view::-webkit-scrollbar-track,
+#prompts-config-view *::-webkit-scrollbar-track {
+  background: rgba(6, 17, 31, 0.4);
+  border-radius: 9999px;
+  margin: 4px;
+}
+
+#prompts-config-view::-webkit-scrollbar-thumb,
+#prompts-config-view *::-webkit-scrollbar-thumb {
+  background: rgba(0, 229, 200, 0.28);
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 229, 200, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#prompts-config-view::-webkit-scrollbar-thumb:hover,
+#prompts-config-view *::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 229, 200, 0.65);
+  border-color: #00E5C8;
+  box-shadow: 0 0 10px rgba(0, 229, 200, 0.4);
+}
+
+#prompts-config-view::-webkit-scrollbar-thumb:active,
+#prompts-config-view *::-webkit-scrollbar-thumb:active {
+  background: linear-gradient(180deg, #00E5C8 0%, #00B4D8 100%);
+  border-color: #FFFFFF;
+  box-shadow: 0 0 14px rgba(0, 229, 200, 0.65);
+}
+
+#prompts-config-view::-webkit-scrollbar-corner,
+#prompts-config-view *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* Glassmorphism generic error bubble */
 .glass-error-bubble {
   background: linear-gradient(135deg, rgba(127, 29, 29, 0.4) 0%, rgba(100, 20, 20, 0.3) 100%) !important;
