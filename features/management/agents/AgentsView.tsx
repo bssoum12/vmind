@@ -140,6 +140,10 @@ function triggerRuleSummary(rules: any[]): string {
 }
 
 function getPlanificationSummary(agent: LiveAgent): string {
+  if (!agent.schedule_id) {
+    return 'Aucune règle';
+  }
+
   const rules = (agent.trigger_rules && agent.trigger_rules.length > 0)
     ? agent.trigger_rules
     : (agent.config?.trigger_rules || []);

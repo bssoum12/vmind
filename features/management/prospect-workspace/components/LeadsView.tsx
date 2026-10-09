@@ -902,7 +902,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Idempotency-Key': crypto.randomUUID()
+            'Idempotency-Key': `import-file:${agentId || selectedAgentIds[0]}:${file.name}:${file.size}`
           },
           credentials: 'include',
           body: JSON.stringify({
@@ -944,7 +944,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID()
+          'Idempotency-Key': `import-url:${agentId || selectedAgentIds[0]}:${encodeURIComponent(importUrl.trim().slice(0, 100))}`
         },
         credentials: 'include',
         body: JSON.stringify({ url: importUrl.trim(), agentIds: selectedAgentIds })
@@ -1219,12 +1219,16 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
       isDone: false
     });
 
+    const qualifyIdempotencyKey = count === 1
+      ? `qualify-lead:${agentId}:${lead_ids[0]}`
+      : `qualify-import:${agentId}`;
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID()
+          'Idempotency-Key': qualifyIdempotencyKey
         },
         credentials: 'include',
         body: JSON.stringify({ lead_ids, agentId }),
@@ -1272,12 +1276,16 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
     });
     setSelectedLeadIds([]);
 
+    const qualifyIdempotencyKey = count === 1
+      ? `qualify-lead:${agentId}:${lead_ids[0]}`
+      : `qualify-bulk:${agentId}`;
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/prospect-agent/qualify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Idempotency-Key': crypto.randomUUID()
+          'Idempotency-Key': qualifyIdempotencyKey
         },
         credentials: 'include',
         body: JSON.stringify({ lead_ids, agentId }),

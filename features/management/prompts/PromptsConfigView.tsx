@@ -26,7 +26,9 @@ import {
   Check,
   ArrowLeft,
   Target,
-  Globe
+  Globe,
+  Copy,
+  CheckCheck
 } from 'lucide-react';
 import { useToast } from '@/shared/contexts/ToastContext';
 
@@ -73,7 +75,7 @@ function getAuthHeaders(extraHeaders: Record<string, string> = {}): HeadersInit 
   };
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ;
+const API_BASE = process.env.NEXT_PUBLIC_API_URL;
 
 const CLAUDE_PRESETS = [
   'claude-3-5-sonnet-20241022',
@@ -98,6 +100,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
   const [saving, setSaving] = useState<boolean>(false);
   const [resetting, setResetting] = useState<boolean>(false);
   const [isUnauthorized, setIsUnauthorized] = useState<boolean>(false);
+  const [copiedPrompt, setCopiedPrompt] = useState<boolean>(false);
 
   // Form edit state for currently active prompt
   const [formName, setFormName] = useState<string>('');
@@ -196,6 +199,14 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
     if (target) {
       loadPromptIntoForm(target);
     }
+  };
+
+  const handleCopyPrompt = () => {
+    if (!formPromptText) return;
+    navigator.clipboard.writeText(formPromptText);
+    setCopiedPrompt(true);
+    showToast('Instruction système copiée dans le presse-papier', 'success');
+    setTimeout(() => setCopiedPrompt(false), 2000);
   };
 
   const handleSave = async () => {
@@ -400,19 +411,19 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        height: '100%', minHeight: 450, padding: 32, textAlign: 'center', color: '#8FA3B8'
+        height: '100%', minHeight: 480, padding: 32, textAlign: 'center', color: '#CBD5E1'
       }}>
         <div style={{
-          width: 56, height: 56, borderRadius: '50%',
-          background: 'rgba(255, 71, 87, 0.1)', border: '1px solid rgba(255, 71, 87, 0.3)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16
+          width: 64, height: 64, borderRadius: '50%',
+          background: 'rgba(255, 71, 87, 0.12)', border: '1px solid rgba(255, 71, 87, 0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20
         }}>
-          <ShieldCheck size={28} color="#FF4757" />
+          <ShieldCheck size={32} color="#FF4757" />
         </div>
-        <h2 style={{ color: '#FFFFFF', fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
+        <h2 style={{ color: '#FFFFFF', fontSize: 22, fontWeight: 700, marginBottom: 10, letterSpacing: '-0.01em' }}>
           Accès Strictement Réservé aux Administrateurs
         </h2>
-        <p style={{ maxWidth: 440, fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
+        <p style={{ maxWidth: 480, fontSize: 14.5, lineHeight: 1.6, marginBottom: 28, color: '#94A3B8' }}>
           Vous ne disposez pas des privilèges administrateur requis pour consulter ou modifier les instructions système et configurations de modèles LLM.
         </p>
         {onBack && (
@@ -420,13 +431,14 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
             type="button"
             onClick={onBack}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '10px 20px', borderRadius: 8,
-              background: 'rgba(0, 229, 200, 0.1)', border: '1px solid #00E5C8',
-              color: '#00E5C8', fontSize: 13, fontWeight: 600, cursor: 'pointer'
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '12px 24px', borderRadius: 10,
+              background: 'rgba(0, 229, 200, 0.12)', border: '1px solid #00E5C8',
+              color: '#00E5C8', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
           >
-            <ArrowLeft size={14} />
+            <ArrowLeft size={16} />
             <span>Retour au Marketplace</span>
           </button>
         )}
@@ -443,11 +455,12 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
         minHeight: '100%',
         overflowY: 'auto',
         overflowX: 'hidden',
-        padding: '24px 32px 64px',
+        padding: '28px 36px 64px',
         boxSizing: 'border-box',
-        color: '#E2E8F0',
+        color: '#F0F4F8',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif'
       }}
     >
       {/* View Header with Action Bar — Always accessible at the top */}
@@ -455,10 +468,10 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 16,
-        marginBottom: 20,
-        paddingBottom: 16,
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        gap: 20,
+        marginBottom: 24,
+        paddingBottom: 20,
+        borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
         flexShrink: 0
       }}>
         <div>
@@ -469,69 +482,80 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 6,
-                padding: '4px 10px',
-                marginBottom: 10,
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: 6,
-                color: '#8FA3B8',
-                fontSize: 11.5,
+                gap: 7,
+                padding: '6px 14px',
+                marginBottom: 12,
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: 8,
+                color: '#CBD5E1',
+                fontSize: 13,
                 fontWeight: 600,
                 cursor: 'pointer',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.color = '#00E5C8';
-                e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.3)';
-                e.currentTarget.style.background = 'rgba(0, 229, 200, 0.06)';
+                e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.5)';
+                e.currentTarget.style.background = 'rgba(0, 229, 200, 0.08)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.color = '#8FA3B8';
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
+                e.currentTarget.style.color = '#CBD5E1';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
               }}
             >
-              <ArrowLeft size={13} />
+              <ArrowLeft size={15} />
               <span>Retour au Marketplace</span>
             </button>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
             <div style={{
-              width: 32, height: 32, borderRadius: 8,
-              background: 'rgba(0, 229, 200, 0.08)',
-              border: '1px solid rgba(0, 229, 200, 0.25)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center'
+              width: 38, height: 38, borderRadius: 10,
+              background: 'rgba(0, 229, 200, 0.12)',
+              border: '1px solid rgba(0, 229, 200, 0.35)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 0 14px rgba(0, 229, 200, 0.18)'
             }}>
-              <Bot size={18} color="#00E5C8" />
+              <Bot size={22} color="#00E5C8" />
             </div>
-            <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: '#FFFFFF', letterSpacing: '-0.01em' }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0, color: '#FFFFFF', letterSpacing: '-0.02em' }}>
               Configuration des Prompts IA & Inférence
             </h1>
           </div>
-          <p style={{ margin: 0, fontSize: 12, color: '#8FA3B8' }}>
-            Ajustez les instructions système, modèles et fournisseurs LLM. Modifications instantanées en RAM sans redémarrage.
+          <p style={{ margin: 0, fontSize: 13.5, color: '#94A3B8', lineHeight: 1.5 }}>
+            Ajustez les instructions système, modèles et fournisseurs LLM. Modifications synchronisées en direct en mémoire RAM.
           </p>
         </div>
 
-        {/* Top Sticky/Accessible Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* Top Action Buttons with crisp tactile contrast */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             type="button"
             onClick={fetchPrompts}
             disabled={loading}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 12px', borderRadius: 8,
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              color: '#8FA3B8', fontSize: 12, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 16px', borderRadius: 9,
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.14)',
+              color: '#F0F4F8', fontSize: 13, fontWeight: 600,
               cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'all 0.15s'
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onMouseEnter={(e) => {
+              if (!loading) {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.09)';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.14)';
             }}
             title="Actualiser depuis la base de données"
           >
-            <RefreshCw size={13} className={loading ? 'spin' : ''} />
+            <RefreshCw size={15} className={loading ? 'spin' : ''} />
             <span>Actualiser</span>
           </button>
 
@@ -540,17 +564,29 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
             onClick={handleReset}
             disabled={resetting || saving || loading}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 12px', borderRadius: 8,
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              color: '#8FA3B8', fontSize: 12, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 16px', borderRadius: 9,
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.14)',
+              color: '#F0F4F8', fontSize: 13, fontWeight: 600,
               cursor: resetting ? 'not-allowed' : 'pointer',
-              transition: 'all 0.15s'
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+            onMouseEnter={(e) => {
+              if (!resetting) {
+                e.currentTarget.style.background = 'rgba(255, 71, 87, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(255, 71, 87, 0.35)';
+                e.currentTarget.style.color = '#FF7582';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.14)';
+              e.currentTarget.style.color = '#F0F4F8';
             }}
             title="Rétablir les valeurs d'origine de ce prompt"
           >
-            <RotateCcw size={13} />
+            <RotateCcw size={15} />
             <span>Rétablir</span>
           </button>
 
@@ -566,16 +602,25 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
             }}
             disabled={loading}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', borderRadius: 8,
-              background: 'rgba(0, 229, 200, 0.08)',
-              border: '1px solid rgba(0, 229, 200, 0.3)',
-              color: '#00E5C8', fontSize: 12, fontWeight: 700,
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 18px', borderRadius: 9,
+              background: 'rgba(0, 229, 200, 0.12)',
+              border: '1px solid rgba(0, 229, 200, 0.45)',
+              color: '#00E5C8', fontSize: 13, fontWeight: 700,
               cursor: 'pointer',
-              transition: 'all 0.15s'
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              boxShadow: '0 0 12px rgba(0, 229, 200, 0.15)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 229, 200, 0.2)';
+              e.currentTarget.style.boxShadow = '0 0 18px rgba(0, 229, 200, 0.3)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 229, 200, 0.12)';
+              e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 229, 200, 0.15)';
             }}
           >
-            <Play size={13} />
+            <Play size={15} />
             <span>Tester en direct</span>
           </button>
 
@@ -584,42 +629,56 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
             onClick={handleSave}
             disabled={saving || loading}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', borderRadius: 8,
-              background: '#00E5C8',
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '10px 22px', borderRadius: 9,
+              background: 'linear-gradient(135deg, #00E5C8 0%, #00C2A8 100%)',
               border: 'none',
-              color: '#04111D', fontSize: 12, fontWeight: 700,
+              color: '#04111D', fontSize: 13, fontWeight: 700,
               cursor: saving ? 'not-allowed' : 'pointer',
-              transition: 'all 0.15s'
+              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              boxShadow: '0 0 18px rgba(0, 229, 200, 0.35)'
+            }}
+            onMouseEnter={(e) => {
+              if (!saving) {
+                e.currentTarget.style.boxShadow = '0 0 24px rgba(0, 229, 200, 0.55)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.boxShadow = '0 0 18px rgba(0, 229, 200, 0.35)';
+              e.currentTarget.style.transform = 'none';
             }}
           >
-            {saving ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+            {saving ? <Loader2 size={16} className="spin" /> : <Save size={16} />}
             <span>{saving ? 'Sauvegarde...' : 'Sauvegarder'}</span>
           </button>
         </div>
       </div>
 
-      {/* Tabs Selector */}
+      {/* Tabs Selector — High-contrast segmented pill row */}
       <div style={{
-        display: 'flex', gap: 8, marginBottom: 20, flexShrink: 0
+        display: 'flex', gap: 10, marginBottom: 24, flexShrink: 0
       }}>
         <button
           onClick={() => handleSelectTab('prospect_onboarding_chat')}
           style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '8px 14px', borderRadius: 8,
-            background: activeKey === 'prospect_onboarding_chat' ? 'rgba(0, 229, 200, 0.1)' : 'rgba(255, 255, 255, 0.03)',
-            border: `1px solid ${activeKey === 'prospect_onboarding_chat' ? '#00E5C8' : 'rgba(255, 255, 255, 0.08)'}`,
-            color: activeKey === 'prospect_onboarding_chat' ? '#00E5C8' : '#8FA3B8',
-            fontWeight: 600, fontSize: 12, cursor: 'pointer',
-            transition: 'all 0.15s'
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '11px 18px', borderRadius: 10,
+            background: activeKey === 'prospect_onboarding_chat' ? 'rgba(0, 229, 200, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+            border: `1px solid ${activeKey === 'prospect_onboarding_chat' ? '#00E5C8' : 'rgba(255, 255, 255, 0.12)'}`,
+            color: activeKey === 'prospect_onboarding_chat' ? '#00E5C8' : '#CBD5E1',
+            fontWeight: 600, fontSize: 13.5, cursor: 'pointer',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxShadow: activeKey === 'prospect_onboarding_chat' ? '0 0 16px rgba(0, 229, 200, 0.18)' : 'none'
           }}
         >
-          <Sparkles size={14} />
+          <Sparkles size={16} />
           <span>🎯 Prospection — Stratégie d'Emails</span>
           <span style={{
-            fontSize: 9, padding: '1px 6px', borderRadius: 10,
-            background: 'rgba(255, 255, 255, 0.06)', color: activeKey === 'prospect_onboarding_chat' ? '#00E5C8' : '#8FA3B8'
+            fontSize: 11, padding: '2px 8px', borderRadius: 12,
+            background: activeKey === 'prospect_onboarding_chat' ? 'rgba(0, 229, 200, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+            color: activeKey === 'prospect_onboarding_chat' ? '#00E5C8' : '#94A3B8',
+            fontWeight: 600
           }}>
             Prospect Wizard
           </span>
@@ -628,20 +687,23 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
         <button
           onClick={() => handleSelectTab('sourcing_execution_chat')}
           style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '8px 14px', borderRadius: 8,
-            background: activeKey === 'sourcing_execution_chat' ? 'rgba(0, 229, 200, 0.1)' : 'rgba(255, 255, 255, 0.03)',
-            border: `1px solid ${activeKey === 'sourcing_execution_chat' ? '#00E5C8' : 'rgba(255, 255, 255, 0.08)'}`,
-            color: activeKey === 'sourcing_execution_chat' ? '#00E5C8' : '#8FA3B8',
-            fontWeight: 600, fontSize: 12, cursor: 'pointer',
-            transition: 'all 0.15s'
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '11px 18px', borderRadius: 10,
+            background: activeKey === 'sourcing_execution_chat' ? 'rgba(0, 229, 200, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+            border: `1px solid ${activeKey === 'sourcing_execution_chat' ? '#00E5C8' : 'rgba(255, 255, 255, 0.12)'}`,
+            color: activeKey === 'sourcing_execution_chat' ? '#00E5C8' : '#CBD5E1',
+            fontWeight: 600, fontSize: 13.5, cursor: 'pointer',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxShadow: activeKey === 'sourcing_execution_chat' ? '0 0 16px rgba(0, 229, 200, 0.18)' : 'none'
           }}
         >
-          <Zap size={14} />
+          <Zap size={16} />
           <span>⚡ Sourcing — Ciblage ICP & Profils</span>
           <span style={{
-            fontSize: 9, padding: '1px 6px', borderRadius: 10,
-            background: 'rgba(255, 255, 255, 0.06)', color: activeKey === 'sourcing_execution_chat' ? '#00E5C8' : '#8FA3B8'
+            fontSize: 11, padding: '2px 8px', borderRadius: 12,
+            background: activeKey === 'sourcing_execution_chat' ? 'rgba(0, 229, 200, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+            color: activeKey === 'sourcing_execution_chat' ? '#00E5C8' : '#94A3B8',
+            fontWeight: 600
           }}>
             Sourcing Modals
           </span>
@@ -649,37 +711,52 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
       </div>
 
       {loading ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 320, gap: 10, color: '#8FA3B8' }}>
-          <Loader2 size={20} className="spin" color="#00E5C8" />
-          <span style={{ fontSize: 13 }}>Chargement des configurations...</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 380, gap: 12, color: '#CBD5E1' }}>
+          <Loader2 size={24} className="spin" color="#00E5C8" />
+          <span style={{ fontSize: 14.5, fontWeight: 500 }}>Chargement des configurations...</span>
         </div>
       ) : (
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: '1fr 380px', 
-          gap: 20, 
+          gridTemplateColumns: 'minmax(0, 1fr) 420px', 
+          gap: 24, 
           alignItems: 'start',
           flex: 1
         }}>
           
           {/* Main Column: System Prompt Text Editor */}
           <div style={{
-            background: 'rgba(9, 18, 32, 0.85)',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            borderRadius: 12,
-            padding: 20,
+            background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.9) 0%, rgba(12, 28, 52, 0.75) 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            borderRadius: 16,
+            padding: 24,
             display: 'flex',
             flexDirection: 'column',
-            gap: 16
+            gap: 20,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)',
+            position: 'relative',
+            overflow: 'hidden'
           }}>
+            {/* Ambient Specular Line at Top */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: '10%',
+              right: '10%',
+              height: '1px',
+              background: 'linear-gradient(90deg, transparent, #00E5C8, transparent)',
+              opacity: 0.6
+            }} />
+
+            {/* Prompt Name Row */}
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#00E5C8', fontWeight: 700 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <label style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#00E5C8', fontWeight: 700 }}>
                   Nom & Rôle du Prompt
                 </label>
                 {lastUpdatedAt && (
-                  <span style={{ fontSize: 11, color: '#64748B' }}>
-                    Dernière synchro : <span style={{ color: '#94A3B8' }}>{lastUpdatedAt}</span>
+                  <span style={{ fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>
+                    Dernière synchro : <span style={{ color: '#F0F4F8', fontWeight: 600 }}>{lastUpdatedAt}</span>
                   </span>
                 )}
               </div>
@@ -688,91 +765,136 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                 value={formName}
                 onChange={(e) => setFormName(e.target.value)}
                 style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: 6,
-                  padding: '8px 12px',
+                  background: 'rgba(5, 14, 26, 0.85)',
+                  border: '1px solid rgba(255, 255, 255, 0.14)',
+                  borderRadius: 8,
+                  padding: '11px 16px',
                   color: '#FFFFFF',
-                  fontSize: 14,
+                  fontSize: 15,
                   fontWeight: 600,
                   width: '100%',
                   boxSizing: 'border-box',
-                  outline: 'none'
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                  caretColor: '#00E5C8'
                 }}
+                onFocus={(e) => e.target.style.borderColor = '#00E5C8'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.14)'}
               />
             </div>
 
+            {/* System Prompt Instruction Textarea */}
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8FA3B8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span>Instruction Système (System Prompt)</span>
-                  <span style={{ fontSize: 10, color: '#00E5C8', background: 'rgba(0, 229, 200, 0.08)', padding: '1px 6px', borderRadius: 4 }}>
-                    0ms Latence RAM
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <label style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#CBD5E1', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>Instruction Système (System Prompt)</span>
+                  </label>
+                  <span style={{ fontSize: 11, color: '#00E5C8', background: 'rgba(0, 229, 200, 0.12)', border: '1px solid rgba(0, 229, 200, 0.3)', padding: '2px 8px', borderRadius: 6, fontWeight: 600 }}>
+                    ⚡ 0ms Latence RAM
                   </span>
-                </label>
-                <span style={{ fontSize: 11, color: '#64748B' }}>
-                  {formPromptText.length} caractères | {formPromptText.split(/\s+/).filter(Boolean).length} mots
-                </span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <span style={{ fontSize: 12, color: '#94A3B8', fontWeight: 500 }}>
+                    <b style={{ color: '#F0F4F8' }}>{formPromptText.length.toLocaleString('fr-FR')}</b> caractères · <b style={{ color: '#F0F4F8' }}>{formPromptText.split(/\s+/).filter(Boolean).length.toLocaleString('fr-FR')}</b> mots
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={handleCopyPrompt}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      padding: '4px 10px',
+                      background: copiedPrompt ? 'rgba(0, 229, 200, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+                      border: `1px solid ${copiedPrompt ? '#00E5C8' : 'rgba(255, 255, 255, 0.12)'}`,
+                      borderRadius: 6,
+                      color: copiedPrompt ? '#00E5C8' : '#CBD5E1',
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title="Copier le prompt complet"
+                  >
+                    {copiedPrompt ? <CheckCheck size={13} color="#00E5C8" /> : <Copy size={13} />}
+                    <span>{copiedPrompt ? 'Copié !' : 'Copier'}</span>
+                  </button>
+                </div>
               </div>
 
               <textarea
                 value={formPromptText}
                 onChange={(e) => setFormPromptText(e.target.value)}
-                rows={19}
+                rows={21}
                 style={{
                   width: '100%',
                   boxSizing: 'border-box',
-                  background: 'rgba(4, 9, 16, 0.95)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: 8,
-                  padding: 14,
-                  color: '#CBD5E1',
-                  fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-                  fontSize: 12.5,
-                  lineHeight: '1.6',
+                  background: 'rgba(4, 11, 22, 0.95)',
+                  border: '1px solid rgba(255, 255, 255, 0.14)',
+                  borderRadius: 10,
+                  padding: '16px 18px',
+                  color: '#F1F5F9',
+                  fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", Consolas, Monaco, monospace',
+                  fontSize: 14,
+                  lineHeight: '1.65',
                   resize: 'vertical',
                   outline: 'none',
-                  caretColor: '#00E5C8'
+                  caretColor: '#00E5C8',
+                  boxShadow: 'inset 0 2px 8px rgba(0, 0, 0, 0.5)'
+                }}
+                onFocus={(e) => {
+                  e.target.style.borderColor = '#00E5C8';
+                  e.target.style.boxShadow = '0 0 0 2px rgba(0, 229, 200, 0.2), inset 0 2px 8px rgba(0, 0, 0, 0.5)';
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = 'rgba(255, 255, 255, 0.14)';
+                  e.target.style.boxShadow = 'inset 0 2px 8px rgba(0, 0, 0, 0.5)';
                 }}
               />
             </div>
 
             {/* Description */}
             <div>
-              <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748B', fontWeight: 600, display: 'block', marginBottom: 4 }}>
+              <label style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94A3B8', fontWeight: 600, display: 'block', marginBottom: 6 }}>
                 Description technique / Cas d'usage
               </label>
               <input
                 type="text"
                 value={formDescription}
                 onChange={(e) => setFormDescription(e.target.value)}
-                placeholder="Description du rôle de ce prompt..."
+                placeholder="Description du rôle de ce prompt dans le pipeline VMIND..."
                 style={{
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                  borderRadius: 6,
-                  padding: '7px 10px',
-                  color: '#8FA3B8',
-                  fontSize: 12,
+                  background: 'rgba(5, 14, 26, 0.75)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  borderRadius: 8,
+                  padding: '10px 14px',
+                  color: '#CBD5E1',
+                  fontSize: 13.5,
                   width: '100%',
                   boxSizing: 'border-box',
-                  outline: 'none'
+                  outline: 'none',
+                  caretColor: '#00E5C8'
                 }}
+                onFocus={(e) => e.target.style.borderColor = '#00E5C8'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.12)'}
               />
             </div>
           </div>
 
           {/* Side Column: Controls & Parameters */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             
             {/* Sourcing Engine Selector Card (Prospeo vs Hunter) - Displayed for Sourcing Prompt */}
             {activeKey === 'sourcing_execution_chat' && (
               <div style={{
-                background: 'rgba(9, 18, 32, 0.85)',
-                border: '1px solid rgba(0, 229, 200, 0.2)',
-                borderRadius: 12,
-                padding: 16,
-                boxShadow: '0 4px 20px rgba(0, 229, 200, 0.05)',
+                background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.9) 0%, rgba(12, 28, 52, 0.75) 100%)',
+                border: '1px solid rgba(0, 229, 200, 0.3)',
+                borderRadius: 16,
+                padding: 20,
+                boxShadow: '0 8px 24px rgba(0, 229, 200, 0.08)',
                 position: 'relative',
                 overflow: 'hidden'
               }}>
@@ -785,21 +907,21 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                   background: 'linear-gradient(90deg, #00E5C8 0%, rgba(0, 229, 200, 0) 100%)'
                 }} />
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <Target size={14} color="#00E5C8" />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                      Moteur de Sourcing (Extraction)
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Target size={16} color="#00E5C8" />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Moteur de Sourcing
                     </span>
                   </div>
                   <span style={{
-                    fontSize: 10,
-                    padding: '2px 8px',
-                    borderRadius: 8,
-                    fontWeight: 600,
-                    background: formSourcingProvider === 'prospeo' ? 'rgba(0, 229, 200, 0.12)' : 'rgba(255, 122, 0, 0.12)',
+                    fontSize: 11,
+                    padding: '3px 10px',
+                    borderRadius: 10,
+                    fontWeight: 700,
+                    background: formSourcingProvider === 'prospeo' ? 'rgba(0, 229, 200, 0.16)' : 'rgba(255, 169, 64, 0.16)',
                     color: formSourcingProvider === 'prospeo' ? '#00E5C8' : '#FFA940',
-                    border: `1px solid ${formSourcingProvider === 'prospeo' ? 'rgba(0, 229, 200, 0.3)' : 'rgba(255, 122, 0, 0.3)'}`
+                    border: `1px solid ${formSourcingProvider === 'prospeo' ? 'rgba(0, 229, 200, 0.4)' : 'rgba(255, 169, 64, 0.4)'}`
                   }}>
                     {formSourcingProvider === 'prospeo' ? 'Prospeo Actif' : 'Hunter Actif'}
                   </span>
@@ -809,36 +931,36 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                 <div style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr',
-                  gap: 6,
-                  background: 'rgba(4, 9, 16, 0.6)',
-                  padding: 4,
-                  borderRadius: 8,
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                  marginBottom: 12
+                  gap: 8,
+                  background: 'rgba(4, 11, 22, 0.75)',
+                  padding: 5,
+                  borderRadius: 10,
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  marginBottom: 14
                 }}>
                   {/* Prospeo Button */}
                   <button
                     type="button"
                     onClick={() => setFormSourcingProvider('prospeo')}
                     style={{
-                      padding: '10px 8px',
-                      borderRadius: 6,
-                      border: formSourcingProvider === 'prospeo' ? '1px solid rgba(0, 229, 200, 0.4)' : '1px solid transparent',
-                      background: formSourcingProvider === 'prospeo' ? 'rgba(0, 229, 200, 0.12)' : 'transparent',
-                      color: formSourcingProvider === 'prospeo' ? '#00E5C8' : '#8FA3B8',
+                      padding: '12px 10px',
+                      borderRadius: 8,
+                      border: formSourcingProvider === 'prospeo' ? '1px solid rgba(0, 229, 200, 0.5)' : '1px solid transparent',
+                      background: formSourcingProvider === 'prospeo' ? 'rgba(0, 229, 200, 0.16)' : 'transparent',
+                      color: formSourcingProvider === 'prospeo' ? '#00E5C8' : '#CBD5E1',
                       cursor: 'pointer',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       gap: 4,
-                      transition: 'all 0.15s'
+                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Zap size={13} color={formSourcingProvider === 'prospeo' ? '#00E5C8' : '#8FA3B8'} />
-                      <span style={{ fontSize: 12, fontWeight: 700 }}>Prospeo</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Zap size={15} color={formSourcingProvider === 'prospeo' ? '#00E5C8' : '#CBD5E1'} />
+                      <span style={{ fontSize: 13.5, fontWeight: 700 }}>Prospeo</span>
                     </div>
-                    <span style={{ fontSize: 9, opacity: 0.85, fontWeight: 500, color: formSourcingProvider === 'prospeo' ? '#99F6E4' : '#64748B' }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: formSourcingProvider === 'prospeo' ? '#99F6E4' : '#94A3B8' }}>
                       Recommandé
                     </span>
                   </button>
@@ -848,24 +970,24 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                     type="button"
                     onClick={() => setFormSourcingProvider('hunter')}
                     style={{
-                      padding: '10px 8px',
-                      borderRadius: 6,
-                      border: formSourcingProvider === 'hunter' ? '1px solid rgba(255, 169, 64, 0.4)' : '1px solid transparent',
-                      background: formSourcingProvider === 'hunter' ? 'rgba(255, 122, 0, 0.12)' : 'transparent',
-                      color: formSourcingProvider === 'hunter' ? '#FFA940' : '#8FA3B8',
+                      padding: '12px 10px',
+                      borderRadius: 8,
+                      border: formSourcingProvider === 'hunter' ? '1px solid rgba(255, 169, 64, 0.5)' : '1px solid transparent',
+                      background: formSourcingProvider === 'hunter' ? 'rgba(255, 169, 64, 0.16)' : 'transparent',
+                      color: formSourcingProvider === 'hunter' ? '#FFA940' : '#CBD5E1',
                       cursor: 'pointer',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
                       gap: 4,
-                      transition: 'all 0.15s'
+                      transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                      <Globe size={13} color={formSourcingProvider === 'hunter' ? '#FFA940' : '#8FA3B8'} />
-                      <span style={{ fontSize: 12, fontWeight: 700 }}>Hunter</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Globe size={15} color={formSourcingProvider === 'hunter' ? '#FFA940' : '#CBD5E1'} />
+                      <span style={{ fontSize: 13.5, fontWeight: 700 }}>Hunter</span>
                     </div>
-                    <span style={{ fontSize: 9, opacity: 0.85, fontWeight: 500, color: formSourcingProvider === 'hunter' ? '#FED7AA' : '#64748B' }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: formSourcingProvider === 'hunter' ? '#FED7AA' : '#94A3B8' }}>
                       Moteur Alternatif
                     </span>
                   </button>
@@ -873,90 +995,93 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
 
                 {/* Status & Routing Details */}
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid rgba(255, 255, 255, 0.05)',
-                  borderRadius: 6,
-                  padding: '8px 10px',
-                  fontSize: 11,
-                  color: '#8FA3B8',
+                  background: 'rgba(4, 11, 22, 0.7)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: 8,
+                  padding: '12px 14px',
+                  fontSize: 12,
+                  color: '#CBD5E1',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: 5
+                  gap: 7
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 500 }}>
                       <span style={{
-                        width: 6,
-                        height: 6,
+                        width: 7,
+                        height: 7,
                         borderRadius: '50%',
-                        background: providerStatus?.sourcing?.hasProspeoUrl ? '#00E5C8' : '#F59E0B'
+                        background: providerStatus?.sourcing?.hasProspeoUrl ? '#00E5C8' : '#F59E0B',
+                        boxShadow: `0 0 6px ${providerStatus?.sourcing?.hasProspeoUrl ? '#00E5C8' : '#F59E0B'}`
                       }} />
                       Endpoint Prospeo :
                     </span>
                     <span style={{
                       color: providerStatus?.sourcing?.hasProspeoUrl ? '#00E5C8' : '#F59E0B',
                       fontWeight: 600,
-                      fontSize: 10
+                      fontSize: 11.5
                     }}>
                       {providerStatus?.sourcing?.hasProspeoUrl ? 'Détecté (.env)' : 'Non configuré'}
                     </span>
                   </div>
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 500 }}>
                       <span style={{
-                        width: 6,
-                        height: 6,
+                        width: 7,
+                        height: 7,
                         borderRadius: '50%',
-                        background: providerStatus?.sourcing?.hasHunterUrl ? '#00E5C8' : '#F59E0B'
+                        background: providerStatus?.sourcing?.hasHunterUrl ? '#00E5C8' : '#F59E0B',
+                        boxShadow: `0 0 6px ${providerStatus?.sourcing?.hasHunterUrl ? '#00E5C8' : '#F59E0B'}`
                       }} />
                       Endpoint Hunter :
                     </span>
                     <span style={{
                       color: providerStatus?.sourcing?.hasHunterUrl ? '#00E5C8' : '#F59E0B',
                       fontWeight: 600,
-                      fontSize: 10
+                      fontSize: 11.5
                     }}>
                       {providerStatus?.sourcing?.hasHunterUrl ? 'Détecté (.env)' : 'Non configuré'}
                     </span>
                   </div>
 
                   <div style={{
-                    marginTop: 4,
-                    paddingTop: 6,
-                    borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-                    fontSize: 10,
-                    lineHeight: 1.4,
-                    color: '#64748B'
+                    marginTop: 6,
+                    paddingTop: 8,
+                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                    fontSize: 11.5,
+                    lineHeight: 1.5,
+                    color: '#94A3B8'
                   }}>
-                    💡 <strong style={{ color: '#8FA3B8' }}>Bascule transparente :</strong> La sauvegarde applique le routage instantanément aux prochaines exécutions et re-synchronise tous les plannings QStash actifs.
+                    💡 <strong style={{ color: '#F0F4F8' }}>Bascule transparente :</strong> La sauvegarde applique le routage instantanément aux prochaines exécutions et re-synchronise tous les plannings QStash actifs.
                   </div>
                 </div>
               </div>
             )}
             
-            {/* Provider Switcher Card (Matte & Harmonious) */}
+            {/* Provider Switcher Card */}
             <div style={{
-              background: 'rgba(9, 18, 32, 0.85)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: 12,
-              padding: 16
+              background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.9) 0%, rgba(12, 28, 52, 0.75) 100%)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: 16,
+              padding: 20,
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <ArrowRightLeft size={14} color="#00E5C8" />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <ArrowRightLeft size={16} color="#00E5C8" />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     Fournisseur LLM
                   </span>
                 </div>
                 <span style={{
-                  fontSize: 10,
-                  padding: '2px 8px',
-                  borderRadius: 8,
+                  fontSize: 11,
+                  padding: '3px 10px',
+                  borderRadius: 10,
                   fontWeight: 600,
-                  background: formProviderMode === 'auto' ? 'rgba(0, 229, 200, 0.1)' : 'rgba(255, 255, 255, 0.06)',
-                  color: formProviderMode === 'auto' ? '#00E5C8' : '#CBD5E1',
-                  border: `1px solid ${formProviderMode === 'auto' ? 'rgba(0, 229, 200, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`
+                  background: formProviderMode === 'auto' ? 'rgba(0, 229, 200, 0.14)' : 'rgba(255, 255, 255, 0.08)',
+                  color: formProviderMode === 'auto' ? '#00E5C8' : '#F0F4F8',
+                  border: `1px solid ${formProviderMode === 'auto' ? 'rgba(0, 229, 200, 0.4)' : 'rgba(255, 255, 255, 0.14)'}`
                 }}>
                   {formProviderMode === 'auto' ? 'Bascule Auto' : formProviderMode === 'claude' ? 'Claude Direct' : 'OmniRoute Direct'}
                 </span>
@@ -966,101 +1091,105 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr 1fr 1fr',
-                gap: 4,
-                background: 'rgba(4, 9, 16, 0.6)',
-                padding: 4,
-                borderRadius: 8,
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                marginBottom: 12
+                gap: 6,
+                background: 'rgba(4, 11, 22, 0.75)',
+                padding: 5,
+                borderRadius: 10,
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                marginBottom: 14
               }}>
                 <button
                   type="button"
                   onClick={() => setFormProviderMode('auto')}
                   style={{
-                    padding: '8px 4px',
-                    borderRadius: 6,
-                    border: 'none',
-                    background: formProviderMode === 'auto' ? 'rgba(0, 229, 200, 0.15)' : 'transparent',
-                    color: formProviderMode === 'auto' ? '#00E5C8' : '#8FA3B8',
-                    fontSize: 11,
+                    padding: '10px 6px',
+                    borderRadius: 7,
+                    border: formProviderMode === 'auto' ? '1px solid rgba(0, 229, 200, 0.4)' : '1px solid transparent',
+                    background: formProviderMode === 'auto' ? 'rgba(0, 229, 200, 0.16)' : 'transparent',
+                    color: formProviderMode === 'auto' ? '#00E5C8' : '#CBD5E1',
+                    fontSize: 12.5,
                     fontWeight: 700,
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: 3,
-                    transition: 'all 0.15s'
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                   }}
                 >
-                  <Zap size={13} />
+                  <Zap size={15} />
                   <span>Auto</span>
-                  <span style={{ fontSize: 9, opacity: 0.7, fontWeight: 500 }}>Claude + Secours</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 500, color: formProviderMode === 'auto' ? '#99F6E4' : '#94A3B8' }}>Claude + Secours</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setFormProviderMode('claude')}
                   style={{
-                    padding: '8px 4px',
-                    borderRadius: 6,
-                    border: 'none',
-                    background: formProviderMode === 'claude' ? 'rgba(0, 229, 200, 0.15)' : 'transparent',
-                    color: formProviderMode === 'claude' ? '#00E5C8' : '#8FA3B8',
-                    fontSize: 11,
+                    padding: '10px 6px',
+                    borderRadius: 7,
+                    border: formProviderMode === 'claude' ? '1px solid rgba(0, 229, 200, 0.4)' : '1px solid transparent',
+                    background: formProviderMode === 'claude' ? 'rgba(0, 229, 200, 0.16)' : 'transparent',
+                    color: formProviderMode === 'claude' ? '#00E5C8' : '#CBD5E1',
+                    fontSize: 12.5,
                     fontWeight: 700,
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: 3,
-                    transition: 'all 0.15s'
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                   }}
                 >
-                  <Bot size={13} />
+                  <Bot size={15} />
                   <span>Claude</span>
-                  <span style={{ fontSize: 9, opacity: 0.7, fontWeight: 500 }}>Anthropic</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 500, color: formProviderMode === 'claude' ? '#99F6E4' : '#94A3B8' }}>Anthropic</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setFormProviderMode('omniroute')}
                   style={{
-                    padding: '8px 4px',
-                    borderRadius: 6,
-                    border: 'none',
-                    background: formProviderMode === 'omniroute' ? 'rgba(0, 229, 200, 0.15)' : 'transparent',
-                    color: formProviderMode === 'omniroute' ? '#00E5C8' : '#8FA3B8',
-                    fontSize: 11,
+                    padding: '10px 6px',
+                    borderRadius: 7,
+                    border: formProviderMode === 'omniroute' ? '1px solid rgba(0, 229, 200, 0.4)' : '1px solid transparent',
+                    background: formProviderMode === 'omniroute' ? 'rgba(0, 229, 200, 0.16)' : 'transparent',
+                    color: formProviderMode === 'omniroute' ? '#00E5C8' : '#CBD5E1',
+                    fontSize: 12.5,
                     fontWeight: 700,
                     cursor: 'pointer',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: 3,
-                    transition: 'all 0.15s'
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                   }}
                 >
-                  <Server size={13} />
+                  <Server size={15} />
                   <span>OmniRoute</span>
-                  <span style={{ fontSize: 9, opacity: 0.7, fontWeight: 500 }}>Interne</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 500, color: formProviderMode === 'omniroute' ? '#99F6E4' : '#94A3B8' }}>Interne</span>
                 </button>
               </div>
 
               {/* Status Note */}
               <div style={{
-                background: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(255, 255, 255, 0.05)',
-                borderRadius: 6,
-                padding: '8px 10px',
-                fontSize: 11,
-                color: '#8FA3B8',
+                background: 'rgba(4, 11, 22, 0.7)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: 8,
+                padding: '12px 14px',
+                fontSize: 12,
+                color: '#CBD5E1',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 4
+                gap: 7
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: providerStatus?.hasClaudeCredentials ? '#00E5C8' : '#F59E0B' }} />
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 500 }}>
+                    <span style={{
+                      width: 7, height: 7, borderRadius: '50%',
+                      background: providerStatus?.hasClaudeCredentials ? '#00E5C8' : '#F59E0B',
+                      boxShadow: `0 0 6px ${providerStatus?.hasClaudeCredentials ? '#00E5C8' : '#F59E0B'}`
+                    }} />
                     Clé Claude (.env) :
                   </span>
                   <span style={{ color: providerStatus?.hasClaudeCredentials ? '#00E5C8' : '#F59E0B', fontWeight: 600 }}>
@@ -1068,8 +1197,8 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#00E5C8' }} />
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 500 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#00E5C8', boxShadow: '0 0 6px #00E5C8' }} />
                     OmniRoute :
                   </span>
                   <span style={{ color: '#00E5C8', fontWeight: 600 }}>
@@ -1081,28 +1210,29 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
 
             {/* Models & Hyperparameters Card */}
             <div style={{
-              background: 'rgba(9, 18, 32, 0.85)',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: 12,
-              padding: 16,
+              background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.9) 0%, rgba(12, 28, 52, 0.75) 100%)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: 16,
+              padding: 20,
               display: 'flex',
               flexDirection: 'column',
-              gap: 14
+              gap: 16,
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderBottom: '1px solid rgba(255, 255, 255, 0.06)', paddingBottom: 8 }}>
-                <Cpu size={14} color="#00E5C8" />
-                <span style={{ fontSize: 12, fontWeight: 700, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: 10 }}>
+                <Cpu size={16} color="#00E5C8" />
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Modèles & Inférence
                 </span>
               </div>
 
               {/* Primary Model */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <label style={{ fontSize: 11, color: '#CBD5E1', fontWeight: 600 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label style={{ fontSize: 12.5, color: '#CBD5E1', fontWeight: 600 }}>
                     Modèle Principal (Claude)
                   </label>
-                  <span style={{ fontSize: 10, color: '#00E5C8', fontWeight: 600 }}>Priorité 1</span>
+                  <span style={{ fontSize: 11, color: '#00E5C8', fontWeight: 700 }}>Priorité 1</span>
                 </div>
                 <input
                   type="text"
@@ -1112,31 +1242,36 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                   style={{
                     width: '100%',
                     boxSizing: 'border-box',
-                    background: 'rgba(4, 9, 16, 0.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: 6,
-                    padding: '7px 10px',
+                    background: 'rgba(4, 11, 22, 0.85)',
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
+                    borderRadius: 8,
+                    padding: '9px 12px',
                     color: '#FFFFFF',
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: 600,
                     outline: 'none',
-                    marginBottom: 6
+                    marginBottom: 8,
+                    caretColor: '#00E5C8'
                   }}
+                  onFocus={(e) => e.target.style.borderColor = '#00E5C8'}
+                  onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.14)'}
                 />
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {CLAUDE_PRESETS.map((m) => (
                     <button
                       key={m}
                       type="button"
                       onClick={() => setFormModel(m)}
                       style={{
-                        background: formModel === m ? 'rgba(0, 229, 200, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                        border: `1px solid ${formModel === m ? '#00E5C8' : 'rgba(255, 255, 255, 0.06)'}`,
-                        color: formModel === m ? '#00E5C8' : '#8FA3B8',
-                        padding: '2px 6px',
-                        borderRadius: 4,
-                        fontSize: 10,
-                        cursor: 'pointer'
+                        background: formModel === m ? 'rgba(0, 229, 200, 0.18)' : 'rgba(255, 255, 255, 0.05)',
+                        border: `1px solid ${formModel === m ? '#00E5C8' : 'rgba(255, 255, 255, 0.1)'}`,
+                        color: formModel === m ? '#00E5C8' : '#CBD5E1',
+                        padding: '4px 9px',
+                        borderRadius: 6,
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
                       }}
                     >
                       {m}
@@ -1147,11 +1282,11 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
 
               {/* Fallback Model */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <label style={{ fontSize: 11, color: '#CBD5E1', fontWeight: 600 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label style={{ fontSize: 12.5, color: '#CBD5E1', fontWeight: 600 }}>
                     Modèle de Secours (OmniRoute)
                   </label>
-                  <span style={{ fontSize: 10, color: '#8FA3B8', fontWeight: 600 }}>Secours</span>
+                  <span style={{ fontSize: 11, color: '#94A3B8', fontWeight: 600 }}>Secours</span>
                 </div>
                 <input
                   type="text"
@@ -1161,31 +1296,36 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                   style={{
                     width: '100%',
                     boxSizing: 'border-box',
-                    background: 'rgba(4, 9, 16, 0.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: 6,
-                    padding: '7px 10px',
+                    background: 'rgba(4, 11, 22, 0.85)',
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
+                    borderRadius: 8,
+                    padding: '9px 12px',
                     color: '#FFFFFF',
-                    fontSize: 12,
+                    fontSize: 13,
                     fontWeight: 600,
                     outline: 'none',
-                    marginBottom: 6
+                    marginBottom: 8,
+                    caretColor: '#00E5C8'
                   }}
+                  onFocus={(e) => e.target.style.borderColor = '#00E5C8'}
+                  onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.14)'}
                 />
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                   {OMNIROUTE_PRESETS.map((m) => (
                     <button
                       key={m}
                       type="button"
                       onClick={() => setFormFallbackModel(m)}
                       style={{
-                        background: formFallbackModel === m ? 'rgba(0, 229, 200, 0.12)' : 'rgba(255, 255, 255, 0.03)',
-                        border: `1px solid ${formFallbackModel === m ? '#00E5C8' : 'rgba(255, 255, 255, 0.06)'}`,
-                        color: formFallbackModel === m ? '#00E5C8' : '#8FA3B8',
-                        padding: '2px 6px',
-                        borderRadius: 4,
-                        fontSize: 10,
-                        cursor: 'pointer'
+                        background: formFallbackModel === m ? 'rgba(0, 229, 200, 0.18)' : 'rgba(255, 255, 255, 0.05)',
+                        border: `1px solid ${formFallbackModel === m ? '#00E5C8' : 'rgba(255, 255, 255, 0.1)'}`,
+                        color: formFallbackModel === m ? '#00E5C8' : '#CBD5E1',
+                        padding: '4px 9px',
+                        borderRadius: 6,
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
                       }}
                     >
                       {m}
@@ -1196,12 +1336,12 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
 
               {/* Temperature Slider */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <label style={{ fontSize: 11, color: '#8FA3B8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Thermometer size={13} color="#00E5C8" />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label style={{ fontSize: 12.5, color: '#CBD5E1', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Thermometer size={15} color="#00E5C8" />
                     <span>Température</span>
                   </label>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#00E5C8', fontFamily: 'monospace' }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 700, color: '#00E5C8', fontFamily: 'monospace' }}>
                     {formTemperature.toFixed(2)}
                   </span>
                 </div>
@@ -1212,9 +1352,9 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                   step="0.05"
                   value={formTemperature}
                   onChange={(e) => setFormTemperature(parseFloat(e.target.value))}
-                  style={{ width: '100%', accentColor: '#00E5C8', cursor: 'pointer' }}
+                  style={{ width: '100%', accentColor: '#00E5C8', cursor: 'pointer', height: 6 }}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#64748B', marginTop: 2 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#94A3B8', marginTop: 4, fontWeight: 500 }}>
                   <span>0.0 (Précis)</span>
                   <span>0.5 (Équilibré)</span>
                   <span>1.0 (Créatif)</span>
@@ -1223,12 +1363,12 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
 
               {/* Max Tokens */}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <label style={{ fontSize: 11, color: '#8FA3B8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <Hash size={13} color="#00E5C8" />
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <label style={{ fontSize: 12.5, color: '#CBD5E1', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Hash size={15} color="#00E5C8" />
                     <span>Tokens Max</span>
                   </label>
-                  <span style={{ fontSize: 10, color: '#64748B' }}>50 – 4096</span>
+                  <span style={{ fontSize: 11.5, color: '#94A3B8', fontWeight: 500 }}>50 – 4096</span>
                 </div>
                 <input
                   type="number"
@@ -1247,21 +1387,24 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                   style={{
                     width: '100%',
                     boxSizing: 'border-box',
-                    background: 'rgba(4, 9, 16, 0.8)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: 6,
-                    padding: '7px 10px',
+                    background: 'rgba(4, 11, 22, 0.85)',
+                    border: '1px solid rgba(255, 255, 255, 0.14)',
+                    borderRadius: 8,
+                    padding: '9px 12px',
                     color: '#FFFFFF',
-                    fontSize: 12,
-                    outline: 'none'
+                    fontSize: 13.5,
+                    outline: 'none',
+                    caretColor: '#00E5C8'
                   }}
+                  onFocus={(e) => e.target.style.borderColor = '#00E5C8'}
+                  onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.14)'}
                 />
               </div>
 
               {/* Streaming Toggle */}
               <div>
-                <label style={{ fontSize: 11, color: '#8FA3B8', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                  <Radio size={13} color="#00E5C8" />
+                <label style={{ fontSize: 12.5, color: '#CBD5E1', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <Radio size={15} color="#00E5C8" />
                   <span>Mode Streaming (SSE)</span>
                 </label>
                 <div
@@ -1270,57 +1413,59 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '8px 10px',
-                    borderRadius: 6,
-                    background: formIsStream ? 'rgba(0, 229, 200, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                    border: `1px solid ${formIsStream ? 'rgba(0, 229, 200, 0.3)' : 'rgba(255, 255, 255, 0.06)'}`,
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    background: formIsStream ? 'rgba(0, 229, 200, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+                    border: `1px solid ${formIsStream ? 'rgba(0, 229, 200, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
                     cursor: 'pointer',
-                    transition: 'all 0.15s'
+                    transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                   }}
                 >
-                  <span style={{ fontSize: 11, fontWeight: 600, color: formIsStream ? '#00E5C8' : '#8FA3B8' }}>
-                    {formIsStream ? 'Activé (Flux)' : 'Désactivé (Standard)'}
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: formIsStream ? '#00E5C8' : '#CBD5E1' }}>
+                    {formIsStream ? 'Activé (Flux progressif)' : 'Désactivé (Standard)'}
                   </span>
                   <div style={{
-                    width: 30, height: 16, borderRadius: 10,
-                    background: formIsStream ? '#00E5C8' : 'rgba(255, 255, 255, 0.1)',
-                    position: 'relative', transition: 'all 0.15s'
+                    width: 34, height: 18, borderRadius: 12,
+                    background: formIsStream ? '#00E5C8' : 'rgba(255, 255, 255, 0.15)',
+                    position: 'relative', transition: 'all 0.18s ease'
                   }}>
                     <div style={{
-                      width: 12, height: 12, borderRadius: '50%',
-                      background: formIsStream ? '#04111D' : '#8FA3B8',
+                      width: 14, height: 14, borderRadius: '50%',
+                      background: formIsStream ? '#04111D' : '#CBD5E1',
                       position: 'absolute', top: 2,
-                      left: formIsStream ? 16 : 2,
-                      transition: 'all 0.15s'
+                      left: formIsStream ? 18 : 2,
+                      transition: 'all 0.18s ease'
                     }} />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Quick Secondary Action Buttons at bottom of side panel */}
-            <div style={{ display: 'flex', gap: 8 }}>
+            {/* Quick Action Buttons at bottom of side panel */}
+            <div style={{ display: 'flex', gap: 10 }}>
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={saving || loading}
                 style={{
                   flex: 1,
-                  padding: '9px 12px',
-                  borderRadius: 8,
-                  background: '#00E5C8',
+                  padding: '12px 16px',
+                  borderRadius: 10,
+                  background: 'linear-gradient(135deg, #00E5C8 0%, #00C2A8 100%)',
                   border: 'none',
                   color: '#04111D',
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 700,
                   cursor: saving ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: 6
+                  gap: 8,
+                  boxShadow: '0 0 16px rgba(0, 229, 200, 0.35)',
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
-                {saving ? <Loader2 size={13} className="spin" /> : <Save size={13} />}
+                {saving ? <Loader2 size={15} className="spin" /> : <Save size={15} />}
                 <span>{saving ? 'Sauvegarde...' : 'Sauvegarder'}</span>
               </button>
 
@@ -1336,20 +1481,21 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                 }}
                 disabled={loading}
                 style={{
-                  padding: '9px 14px',
-                  borderRadius: 8,
-                  background: 'rgba(255, 255, 255, 0.04)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: '#CBD5E1',
-                  fontSize: 12,
+                  padding: '12px 18px',
+                  borderRadius: 10,
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  color: '#F0F4F8',
+                  fontSize: 13,
                   fontWeight: 600,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 6
+                  gap: 8,
+                  transition: 'all 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
                 }}
               >
-                <Play size={13} />
+                <Play size={15} />
                 <span>Tester</span>
               </button>
             </div>
@@ -1358,48 +1504,68 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
         </div>
       )}
 
-      {/* Live Test Modal — Refined Dark Aesthetic */}
+      {/* Live Test Modal — Refined Dark Glassmorphic Aesthetic */}
       {showTestModal && (
         <div style={{
           position: 'fixed', inset: 0,
-          background: 'rgba(2, 6, 12, 0.85)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(2, 6, 14, 0.85)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
           zIndex: 999999,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 20
+          padding: 24
         }}>
           <div style={{
-            width: '100%', maxWidth: 700,
-            background: 'rgba(8, 16, 28, 0.98)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            borderRadius: 12,
-            padding: 20,
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.7)',
-            display: 'flex', flexDirection: 'column', gap: 14
+            width: '100%', maxWidth: 780,
+            background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.98) 0%, rgba(12, 28, 52, 0.95) 100%)',
+            border: '1px solid rgba(0, 229, 200, 0.35)',
+            borderRadius: 16,
+            padding: 24,
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.8), 0 0 30px rgba(0, 229, 200, 0.12)',
+            display: 'flex', flexDirection: 'column', gap: 18,
+            position: 'relative'
           }}>
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Play size={16} color="#00E5C8" />
-                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#FFFFFF' }}>
-                  Test en direct : {formName || activeKey}
-                </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.12)', paddingBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: 'rgba(0, 229, 200, 0.12)', border: '1px solid rgba(0, 229, 200, 0.35)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <Play size={16} color="#00E5C8" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#FFFFFF', letterSpacing: '-0.01em' }}>
+                    Test en direct : {formName || activeKey}
+                  </h3>
+                  <span style={{ fontSize: 12, color: '#94A3B8' }}>Simulation en conditions réelles avec le moteur sélectionné</span>
+                </div>
               </div>
               <button
                 onClick={() => setShowTestModal(false)}
-                style={{ background: 'none', border: 'none', color: '#8FA3B8', cursor: 'pointer', padding: 4 }}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#CBD5E1',
+                  borderRadius: 8,
+                  cursor: 'pointer',
+                  padding: '6px 8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'all 0.15s ease'
+                }}
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
             {/* Test Input */}
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <label style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#8FA3B8', fontWeight: 600 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <label style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#CBD5E1', fontWeight: 700 }}>
                   Message utilisateur simulé
                 </label>
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 8 }}>
                   <button
                     type="button"
                     onClick={() => setTestUserMessage(
@@ -1408,10 +1574,10 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                         : "Directeurs logistique en France dans le secteur du transport"
                     )}
                     style={{
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: 4, padding: '2px 8px', fontSize: 10,
-                      color: '#94A3B8', cursor: 'pointer'
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: 6, padding: '4px 10px', fontSize: 11.5,
+                      color: '#CBD5E1', cursor: 'pointer', fontWeight: 600
                     }}
                   >
                     💼 Dialogue Onboarding
@@ -1420,10 +1586,10 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                     type="button"
                     onClick={() => setTestUserMessage("Donne-moi 3 idées d'accroches d'approche originales et percutantes pour contacter un prospect B2B.")}
                     style={{
-                      background: 'rgba(0, 229, 200, 0.08)',
-                      border: '1px solid rgba(0, 229, 200, 0.25)',
-                      borderRadius: 4, padding: '2px 8px', fontSize: 10,
-                      color: '#00E5C8', cursor: 'pointer', fontWeight: 600
+                      background: 'rgba(0, 229, 200, 0.12)',
+                      border: '1px solid rgba(0, 229, 200, 0.35)',
+                      borderRadius: 6, padding: '4px 10px', fontSize: 11.5,
+                      color: '#00E5C8', cursor: 'pointer', fontWeight: 700
                     }}
                   >
                     ✨ Test de Température (Créatif)
@@ -1434,22 +1600,25 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                 value={testUserMessage}
                 onChange={(e) => setTestUserMessage(e.target.value)}
                 rows={3}
-                placeholder="Tapez un message pour tester le prompt..."
+                placeholder="Tapez un message pour tester le prompt en conditions réelles..."
                 style={{
                   width: '100%', boxSizing: 'border-box',
-                  background: 'rgba(4, 9, 16, 0.95)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: 6, padding: 10,
-                  color: '#FFFFFF', fontSize: 12.5,
-                  outline: 'none', resize: 'vertical'
+                  background: 'rgba(4, 11, 22, 0.95)',
+                  border: '1px solid rgba(255, 255, 255, 0.14)',
+                  borderRadius: 8, padding: 12,
+                  color: '#FFFFFF', fontSize: 13.5,
+                  outline: 'none', resize: 'vertical',
+                  caretColor: '#00E5C8'
                 }}
+                onFocus={(e) => e.target.style.borderColor = '#00E5C8'}
+                onBlur={(e) => e.target.style.borderColor = 'rgba(255, 255, 255, 0.14)'}
               />
             </div>
 
             {/* Test Action */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#8FA3B8' }}>
-                <Thermometer size={13} color="#00E5C8" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: '#CBD5E1' }}>
+                <Thermometer size={15} color="#00E5C8" />
                 <span>Température active : <b style={{ color: '#00E5C8', fontFamily: 'monospace' }}>{formTemperature.toFixed(2)}</b></span>
               </div>
               <button
@@ -1457,21 +1626,23 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                 onClick={handleRunTest}
                 disabled={testLoading}
                 style={{
-                  padding: '7px 16px', borderRadius: 6,
-                  background: '#00E5C8', color: '#04111D',
-                  fontWeight: 700, fontSize: 12, border: 'none',
+                  padding: '9px 20px', borderRadius: 8,
+                  background: 'linear-gradient(135deg, #00E5C8 0%, #00C2A8 100%)',
+                  color: '#04111D',
+                  fontWeight: 700, fontSize: 13, border: 'none',
                   cursor: testLoading ? 'not-allowed' : 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 6
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  boxShadow: '0 0 16px rgba(0, 229, 200, 0.35)'
                 }}
               >
                 {testLoading ? (
                   <>
-                    <Loader2 size={13} className="spin" />
+                    <Loader2 size={15} className="spin" />
                     <span>Inférence en cours...</span>
                   </>
                 ) : (
                   <>
-                    <Send size={13} />
+                    <Send size={15} />
                     <span>Envoyer le test</span>
                   </>
                 )}
@@ -1481,31 +1652,31 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
             {/* Response Output */}
             {testResponse && (
               <div style={{
-                background: 'rgba(4, 9, 16, 0.95)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: 8, padding: 14,
-                display: 'flex', flexDirection: 'column', gap: 10
+                background: 'rgba(4, 11, 22, 0.95)',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                borderRadius: 10, padding: 16,
+                display: 'flex', flexDirection: 'column', gap: 12
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: '#8FA3B8', flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, color: '#CBD5E1', flexWrap: 'wrap', gap: 8 }}>
                   <span style={{ color: '#00E5C8', fontWeight: 700 }}>Réponse IA :</span>
                   {testMetrics && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <span style={{
-                        padding: '1px 6px', borderRadius: 4, fontWeight: 600,
-                        background: 'rgba(255, 255, 255, 0.06)',
+                        padding: '2px 8px', borderRadius: 6, fontWeight: 700,
+                        background: 'rgba(255, 255, 255, 0.08)',
                         color: testMetrics.providerUsed === 'claude' ? '#00E5C8' : '#60A5FA',
-                        border: '1px solid rgba(255, 255, 255, 0.08)'
+                        border: '1px solid rgba(255, 255, 255, 0.12)'
                       }}>
                         {testMetrics.providerUsed === 'claude' ? 'Claude' : 'OmniRoute'}
                       </span>
                       {testMetrics.fallbackTriggered && (
                         <span style={{
-                          padding: '1px 6px', borderRadius: 4, fontWeight: 600,
-                          background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B',
-                          border: '1px solid rgba(245, 158, 11, 0.25)',
-                          display: 'inline-flex', alignItems: 'center', gap: 3
+                          padding: '2px 8px', borderRadius: 6, fontWeight: 700,
+                          background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B',
+                          border: '1px solid rgba(245, 158, 11, 0.35)',
+                          display: 'inline-flex', alignItems: 'center', gap: 4
                         }}>
-                          <AlertTriangle size={10} />
+                          <AlertTriangle size={12} />
                           <span>Secours activé</span>
                         </span>
                       )}
@@ -1516,19 +1687,23 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                   )}
                 </div>
                 <div style={{
-                  whiteSpace: 'pre-wrap', color: '#CBD5E1',
-                  fontSize: 12.5, lineHeight: '1.6', fontFamily: 'monospace',
-                  maxHeight: 280, overflowY: 'auto'
+                  whiteSpace: 'pre-wrap', color: '#F1F5F9',
+                  fontSize: 14, lineHeight: '1.65',
+                  fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", Consolas, Monaco, monospace',
+                  maxHeight: 320, overflowY: 'auto',
+                  padding: 12, borderRadius: 8,
+                  background: 'rgba(0, 0, 0, 0.35)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)'
                 }}>
                   {testResponse}
                 </div>
                 <div style={{
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid rgba(255, 255, 255, 0.05)',
-                  borderRadius: 6, padding: '8px 10px',
-                  fontSize: 11, color: '#64748B', lineHeight: 1.5
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: 8, padding: '10px 14px',
+                  fontSize: 12, color: '#94A3B8', lineHeight: 1.55
                 }}>
-                  💡 <strong style={{ color: '#8FA3B8' }}>Comportement de la Température :</strong> Les prompts avec des règles de cadrage strictes (ex: extraction en 4 étapes ou JSON strict) restent volontairement disciplinés même à T=1.0. Pour constater une forte diversité lexicale, testez une consigne ouverte comme <span style={{ color: '#00E5C8' }}>✨ Test de Température (Créatif)</span>.
+                  💡 <strong style={{ color: '#F0F4F8' }}>Comportement de la Température :</strong> Les prompts avec des règles de cadrage strictes (ex: extraction en 4 étapes ou JSON strict) restent volontairement disciplinés même à T=1.0. Pour constater une forte diversité lexicale, testez une consigne ouverte comme <span style={{ color: '#00E5C8', fontWeight: 600 }}>✨ Test de Température (Créatif)</span>.
                 </div>
               </div>
             )}

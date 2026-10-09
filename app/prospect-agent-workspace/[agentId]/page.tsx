@@ -404,6 +404,7 @@ export default function AgentWorkspacePage() {
           isOpen={isDrawerOpen}
           onClose={() => setIsDrawerOpen(false)}
           onRefresh={fetchData}
+          agentId={agentId as string}
           threshold={60}
           signature=""
           defaultCc=""

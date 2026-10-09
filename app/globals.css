@@ -1658,13 +1658,13 @@ a,
 .atcard-admin-cog {
   width: 35px;
   height: 35px;
-  border-radius: 6px;
+  border-radius: 8px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 32, 53, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #7E8B9B;
+  background: rgba(12, 28, 52, 0.85);
+  border: 1px solid rgba(0, 229, 200, 0.25);
+  color: #CBD5E1;
   cursor: pointer;
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   padding: 0;
@@ -1673,11 +1673,11 @@ a,
 
 .admin-config-btn:hover,
 .atcard-admin-cog:hover {
-  background: rgba(0, 229, 200, 0.12);
-  border-color: rgba(0, 229, 200, 0.6);
+  background: rgba(0, 229, 200, 0.16);
+  border-color: #00E5C8;
   color: #00E5C8;
   transform: rotate(60deg) scale(1.08);
-  box-shadow: 0 0 10px rgba(0, 229, 200, 0.25);
+  box-shadow: 0 0 14px rgba(0, 229, 200, 0.35);
 }
 
 .admin-config-btn:active,

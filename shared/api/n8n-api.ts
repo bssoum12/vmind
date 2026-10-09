@@ -339,7 +339,7 @@ export async function triggerAIQualificationAllPending(agentId: string): Promise
     method: "POST",
     headers: {
       ...getAuthHeaders(),
-      'Idempotency-Key': crypto.randomUUID()
+      'Idempotency-Key': `qualify-all-pending:${agentId}`
     },
   });
   if (!res.ok) {

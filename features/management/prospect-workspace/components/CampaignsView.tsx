@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { Mail } from 'lucide-react';
+import { useToast } from '@/shared/contexts/ToastContext';
 
 interface EmailCampaign {
   id: number;
@@ -33,6 +34,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenLeadById }: CampaignsViewProps) {
   const params = useParams();
   const agentId = params.agentId;
+  const { showToast } = useToast();
   const [selectedEmail, setSelectedEmail] = useState<EmailCampaign | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [sujet, setSujet] = useState('');
@@ -105,7 +107,10 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
     try {
       const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `send-email:${agentId}:${selectedEmail.lead_id}`
+        },
         credentials: 'include',
         body: JSON.stringify({
           id: selectedEmail.lead_id,
@@ -121,16 +126,19 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
+          showToast('Email envoyé avec succès !', 'success');
           onRefresh();
           setSelectedEmail(null);
         } else {
-          alert(`Erreur d'envoi: ${data.error || "Erreur inconnue"}`);
+          showToast(data.error || "Erreur inconnue lors de l'envoi.", 'error');
         }
       } else {
-        alert("Erreur serveur lors de l'envoi.");
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || "Erreur serveur lors de l'envoi.", 'error');
       }
     } catch (error) {
       console.error('Email sending error:', error);
+      showToast("Erreur de connexion au serveur d'envoi.", 'error');
     } finally {
       setIsSending(false);
     }

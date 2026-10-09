@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { 
   X, 
   Mail, 
@@ -22,10 +23,14 @@ import {
   CheckCircle2,
   Users,
   AlertCircle,
-  Lock
+  Lock,
+  Eye,
+  Loader2
 } from 'lucide-react';
 import { useToast } from '@/shared/contexts/ToastContext';
 import { extractLeadMobile, extractCompanyPhone, extractJobHistory, maskCompanyLogoUrl } from '@/shared/utils/phoneExtractor';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
 interface JobHistoryItem {
   company_name?: string;
@@ -88,20 +93,27 @@ interface LeadDetailDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onRefresh: () => void;
+  agentId?: string;
   signature?: string;
   defaultCc?: string;
 }
 
-export default function LeadDetailDrawer({ lead, isOpen, onClose }: LeadDetailDrawerProps) {
+export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, agentId }: LeadDetailDrawerProps) {
   const { showToast } = useToast();
+  const params = useParams();
+  const activeAgentId = agentId || (params?.agentId as string);
+
   const [copiedEmail, setCopiedEmail] = useState(false);
   const [copiedMobile, setCopiedMobile] = useState(false);
   const [copiedPhoneHq, setCopiedPhoneHq] = useState(false);
   const [copiedProfile, setCopiedProfile] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [isRevealingPhone, setIsRevealingPhone] = useState(false);
+  const [revealedPhone, setRevealedPhone] = useState<string | null>(null);
 
   useEffect(() => {
     setLogoError(false);
+    setRevealedPhone(null);
   }, [lead?.id]);
 
   useEffect(() => {
@@ -114,10 +126,51 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose }: LeadDetailDr
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  const handleRevealPhone = async () => {
+    if (!lead || !activeAgentId || isRevealingPhone) return;
+
+    setIsRevealingPhone(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/agent-leads/${activeAgentId}/reveal-phone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': `phone-reveal:${activeAgentId}:${lead.id}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          leadId: lead.id,
+          id: lead.id,
+          agentUuid: activeAgentId
+        })
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok) {
+        const newPhone = data?.phone || data?.mobile || data?.phone_number || data?.revealed_phone;
+        if (newPhone && typeof newPhone === 'string' && !newPhone.includes('*')) {
+          setRevealedPhone(newPhone);
+        }
+        showToast('Numéro direct débloqué avec succès !', 'success');
+        onRefresh?.();
+      } else {
+        const errMsg = data?.error || 'Erreur lors du déblocage du numéro.';
+        showToast(errMsg, 'error');
+      }
+    } catch (error) {
+      console.error('Error revealing phone number:', error);
+      showToast('Erreur serveur lors de la demande de déblocage.', 'error');
+    } finally {
+      setIsRevealingPhone(false);
+    }
+  };
+
   if (!lead) return null;
 
   // Extract validated personal mobile (Zod)
-  const leadPhone = extractLeadMobile(lead.mobile, lead.person_raw);
+  const baseLeadPhone = extractLeadMobile(lead.mobile, lead.person_raw);
+  const leadPhone = revealedPhone || baseLeadPhone;
   // Extract validated company HQ standard (Zod)
   const companyPhone = extractCompanyPhone(lead.phone_hq, lead.company_raw);
 
@@ -388,7 +441,42 @@ export default function LeadDetailDrawer({ lead, isOpen, onClose }: LeadDetailDr
                         {leadPhone}
                       </a>
                     )}
-                    {!leadPhone.includes('*') && (
+                    {leadPhone.includes('*') ? (
+                      <button
+                        onClick={handleRevealPhone}
+                        disabled={isRevealingPhone}
+                        title="Révéler le numéro de téléphone direct"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(245, 158, 11, 0.08) 100%)',
+                          border: '1px solid rgba(245, 158, 11, 0.4)',
+                          borderRadius: '6px',
+                          padding: '0 10px',
+                          height: 28,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          color: '#FBBF24',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: isRevealingPhone ? 'not-allowed' : 'pointer',
+                          opacity: isRevealingPhone ? 0.7 : 1,
+                          transition: 'all 0.15s ease',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                        }}
+                      >
+                        {isRevealingPhone ? (
+                          <>
+                            <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                            <span>Déblocage...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye size={12} />
+                            <span>Révéler</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
                       <button
                         onClick={handleCopyMobile}
                         title={copiedMobile ? 'Mobile copié !' : 'Copier le mobile'}
