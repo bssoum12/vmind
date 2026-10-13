@@ -623,8 +623,9 @@ export default function SourcingAgentWorkspacePage() {
           onClose={() => setIsDrawerOpen(false)}
           onRefresh={fetchData}
           agentId={agentId as string}
-          signature=""
-          defaultCc=""
+          signature={agentData?.signature_email || agentData?.config?.campaign?.signature_email || ''}
+          signatureLogo={agentData?.signature_logo || agentData?.config?.signature_logo || agentData?.config?.campaign?.signature_logo || null}
+          defaultCc={agentData?.default_cc || agentData?.config?.campaign?.default_cc || ''}
         />
       )}
     </div>

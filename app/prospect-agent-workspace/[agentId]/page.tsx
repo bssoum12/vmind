@@ -187,8 +187,8 @@ export default function AgentWorkspacePage() {
         setSelectedLead((prev: any) => {
           if (prev) {
             const updated = data.find((l: any) => l.id === prev.id);
-            if (updated && JSON.stringify(updated) !== JSON.stringify(prev)) {
-              return updated;
+            if (updated) {
+              return { ...prev, ...updated };
             }
           }
           return prev;
@@ -391,7 +391,16 @@ export default function AgentWorkspacePage() {
           <div className="workspace-main-content-inner">
             {activeTab === 'dashboard' && <DashboardView leads={leads} campaigns={campaigns} threshold={60} agent={agentData} />}
             {activeTab === 'leads' && <LeadsView leads={leads} threshold={60} onOpenLead={handleOpenLead} onRefresh={fetchData} isNavTutorialActive={navTutorialStep > 0} agent={agentData} />}
-            {activeTab === 'outbox' && <CampaignsView campaigns={campaigns} onRefresh={fetchData} defaultCc="" onOpenLeadById={handleOpenLeadById} />}
+            {activeTab === 'outbox' && (
+              <CampaignsView 
+                campaigns={campaigns} 
+                onRefresh={fetchData} 
+                defaultCc={agentData?.default_cc || agentData?.config?.campaign?.default_cc || ''}
+                signature={agentData?.signature_email || agentData?.config?.campaign?.signature_email || ''}
+                signatureLogo={agentData?.signature_logo || agentData?.config?.signature_logo || agentData?.config?.campaign?.signature_logo || null}
+                onOpenLeadById={handleOpenLeadById} 
+              />
+            )}
             {activeTab === 'logs' && <LogsView logs={logs} />}
           </div>
         )}
@@ -406,8 +415,9 @@ export default function AgentWorkspacePage() {
           onRefresh={fetchData}
           agentId={agentId as string}
           threshold={60}
-          signature=""
-          defaultCc=""
+          signature={agentData?.signature_email || agentData?.config?.campaign?.signature_email || ''}
+          signatureLogo={agentData?.signature_logo || agentData?.config?.signature_logo || agentData?.config?.campaign?.signature_logo || null}
+          defaultCc={agentData?.default_cc || agentData?.config?.campaign?.default_cc || ''}
         />
       )}
     </div>

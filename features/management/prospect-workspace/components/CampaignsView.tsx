@@ -3,8 +3,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
-import { Mail } from 'lucide-react';
+import { Mail, FileText } from 'lucide-react';
 import { useToast } from '@/shared/contexts/ToastContext';
+import { formatEmailDraft } from '@/shared/utils/emailFormatter';
 
 interface EmailCampaign {
   id: number;
@@ -26,12 +27,21 @@ interface CampaignsViewProps {
   campaigns: EmailCampaign[];
   onRefresh: () => void;
   defaultCc: string;
+  signature?: string;
+  signatureLogo?: any;
   onOpenLeadById: (id: number) => void;
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ;
 
-export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenLeadById }: CampaignsViewProps) {
+export default function CampaignsView({ 
+  campaigns, 
+  onRefresh, 
+  defaultCc, 
+  signature = '', 
+  signatureLogo = null, 
+  onOpenLeadById 
+}: CampaignsViewProps) {
   const params = useParams();
   const agentId = params.agentId;
   const { showToast } = useToast();
@@ -40,6 +50,7 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
   const [sujet, setSujet] = useState('');
   const [corps, setCorps] = useState('');
   const [cc, setCc] = useState('');
+  const [includeSignature, setIncludeSignature] = useState(true);
   const [isSending, setIsSending] = useState(false);
   
   // Filters and Pagination
@@ -52,8 +63,9 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
   useEffect(() => {
     if (selectedEmail) {
       setSujet(selectedEmail.sujet || '');
-      setCorps(selectedEmail.corps || '');
+      setCorps(formatEmailDraft(selectedEmail.corps || ''));
       setCc(selectedEmail.cc !== undefined && selectedEmail.cc !== null ? selectedEmail.cc : (defaultCc || ''));
+      setIncludeSignature(true);
     }
   }, [selectedEmail, defaultCc]);
 
@@ -118,6 +130,8 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
           sujet,
           corps,
           cc,
+          includeSignature,
+          signature,
           emailStatut: 'Succès',
           errorMsg: null
         }),
@@ -438,10 +452,93 @@ export default function CampaignsView({ campaigns, onRefresh, defaultCc, onOpenL
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>Corps du message</div>
               <textarea 
                 className="email-textarea" 
-                style={{ width: '100%', minHeight: '200px', fontSize: '0.9rem', lineHeight: '1.5' }}
+                style={{ width: '100%', minHeight: '180px', fontSize: '0.88rem', lineHeight: '1.65', padding: '10px 12px' }}
                 value={corps}
                 onChange={(e) => setCorps(e.target.value)}
               />
+            </div>
+
+            {/* Signature Preview & Toggle */}
+            <div style={{
+              background: 'rgba(6, 17, 31, 0.75)',
+              border: '1px solid rgba(0, 229, 200, 0.2)',
+              borderRadius: 'var(--border-radius-sm)',
+              padding: '10px 12px'
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: signature ? '8px' : '0'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FileText size={13} color="#00E5C8" />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#F0F4F8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Signature de l&apos;Agent
+                  </span>
+                  {signature && (
+                    <span style={{
+                      fontSize: '0.66rem',
+                      padding: '1px 6px',
+                      borderRadius: '4px',
+                      background: includeSignature ? 'rgba(0, 229, 200, 0.15)' : 'rgba(148, 163, 184, 0.1)',
+                      color: includeSignature ? '#00E5C8' : '#94A3B8',
+                      border: `1px solid ${includeSignature ? 'rgba(0, 229, 200, 0.3)' : 'rgba(148, 163, 184, 0.2)'}`,
+                      fontWeight: 600
+                    }}>
+                      {includeSignature ? 'Active' : 'Désactivée'}
+                    </span>
+                  )}
+                </div>
+
+                {signature && (
+                  <label style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    fontSize: '0.72rem',
+                    color: includeSignature ? '#00E5C8' : '#94A3B8',
+                    fontWeight: 600,
+                    userSelect: 'none'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={includeSignature}
+                      onChange={e => setIncludeSignature(e.target.checked)}
+                      style={{ accentColor: '#00E5C8', width: '13px', height: '13px', cursor: 'pointer' }}
+                    />
+                    <span>Inclure à l&apos;envoi</span>
+                  </label>
+                )}
+              </div>
+
+              {signature ? (
+                <div style={{
+                  opacity: includeSignature ? 1 : 0.45,
+                  transition: 'opacity 0.2s ease',
+                  background: '#FFFFFF',
+                  color: '#1E293B',
+                  borderRadius: '6px',
+                  padding: '10px 12px',
+                  overflowX: 'auto',
+                  maxHeight: '140px',
+                  overflowY: 'auto',
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'
+                }}>
+                  <div 
+                    dangerouslySetInnerHTML={{ 
+                      __html: signatureLogo?.data 
+                        ? signature.replace(/cid:signature_logo/g, `data:${signatureLogo.mimeType || 'image/png'};base64,${signatureLogo.data}`)
+                        : signature 
+                    }} 
+                  />
+                </div>
+              ) : (
+                <div style={{ fontSize: '0.72rem', color: '#64748B', fontStyle: 'italic', padding: '2px 0' }}>
+                  Aucune signature configurée pour cet agent.
+                </div>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: '0.5rem' }}>

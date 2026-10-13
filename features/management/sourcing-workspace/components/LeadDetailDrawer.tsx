@@ -95,10 +95,20 @@ interface LeadDetailDrawerProps {
   onRefresh: () => void;
   agentId?: string;
   signature?: string;
+  signatureLogo?: any;
   defaultCc?: string;
 }
 
-export default function LeadDetailDrawer({ lead, isOpen, onClose, onRefresh, agentId }: LeadDetailDrawerProps) {
+export default function LeadDetailDrawer({ 
+  lead, 
+  isOpen, 
+  onClose, 
+  onRefresh, 
+  agentId,
+  signature = '',
+  signatureLogo = null,
+  defaultCc = ''
+}: LeadDetailDrawerProps) {
   const { showToast } = useToast();
   const params = useParams();
   const activeAgentId = agentId || (params?.agentId as string);

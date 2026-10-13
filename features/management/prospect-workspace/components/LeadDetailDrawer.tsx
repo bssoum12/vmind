@@ -32,11 +32,13 @@ import {
   History,
   Lock,
   Eye,
-  Loader2
+  Loader2,
+  FileText
 } from 'lucide-react';
 import { useToast } from '@/shared/contexts/ToastContext';
 import { useProspectSocket } from '../hooks/useProspectSocket';
 import { extractLeadMobile, extractCompanyPhone, extractJobHistory, maskCompanyLogoUrl } from '@/shared/utils/phoneExtractor';
+import { formatEmailDraft } from '@/shared/utils/emailFormatter';
 
 // Zero Technical Jargon policy: sanitize and translate raw backend logs for the end user
 function formatUserFacingMessage(raw?: string): string {
@@ -138,6 +140,7 @@ interface LeadDetailDrawerProps {
   threshold: number;
   agentId?: string;
   signature?: string;
+  signatureLogo?: any;
   defaultCc?: string;
 }
 
@@ -149,12 +152,14 @@ export default function LeadDetailDrawer({
   threshold, 
   agentId,
   signature = '', 
+  signatureLogo = null,
   defaultCc = '' 
 }: LeadDetailDrawerProps) {
   const { showToast } = useToast();
   const [sujet, setSujet] = useState('');
   const [corps, setCorps] = useState('');
   const [cc, setCc] = useState('');
+  const [includeSignature, setIncludeSignature] = useState(true);
   const [statut, setStatut] = useState('');
   const [isQualifying, setIsQualifying] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -167,10 +172,60 @@ export default function LeadDetailDrawer({
   const [isRevealingPhone, setIsRevealingPhone] = useState(false);
   const [revealedPhone, setRevealedPhone] = useState<string | null>(null);
 
+  const currentLeadIdRef = useRef<number | null>(null);
+
   useEffect(() => {
-    setLogoError(false);
-    setRevealedPhone(null);
-  }, [lead?.id]);
+    if (!lead) {
+      currentLeadIdRef.current = null;
+      setLogoError(false);
+      setRevealedPhone(null);
+      setStatut('');
+      setCc(defaultCc || '');
+      setSujet('');
+      setCorps('');
+      setIsGeneratingEmail(false);
+      setIsSending(false);
+      setIsQualifying(false);
+      return;
+    }
+
+    const isDifferentLead = currentLeadIdRef.current !== lead.id;
+    currentLeadIdRef.current = lead.id;
+
+    if (isDifferentLead) {
+      // Switched to a new lead or first drawer open: initialize fresh state
+      setLogoError(false);
+      setRevealedPhone(null);
+      setStatut(lead.statut || (lead as any).statut_traitement || '');
+      setCc(lead.email_cc || (lead as any).cc || defaultCc || '');
+
+      const initialSujet = (lead as any).email_sujet || (lead as any).sujet || (lead as any).subject || (lead as any).objet || '';
+      const initialCorps = (lead as any).email_corps || (lead as any).corps || (lead as any).body || (lead as any).message || '';
+
+      setSujet(initialSujet);
+      setCorps(formatEmailDraft(initialCorps));
+      setIncludeSignature(true);
+      setIsGeneratingEmail(false);
+      setIsSending(false);
+      setIsQualifying(false);
+    } else {
+      // Same lead received an updated prop from background refetch:
+      // Update status if it changed
+      const updatedStatut = lead.statut || (lead as any).statut_traitement || '';
+      if (updatedStatut && updatedStatut !== statut) {
+        setStatut(updatedStatut);
+      }
+      // If user inputs are currently empty, and background data brought in draft text, fill it:
+      const incomingSujet = (lead as any).email_sujet || (lead as any).sujet || (lead as any).subject || (lead as any).objet || '';
+      const incomingCorps = (lead as any).email_corps || (lead as any).corps || (lead as any).body || (lead as any).message || '';
+      if (!sujet.trim() && incomingSujet) {
+        setSujet(incomingSujet);
+      }
+      if (!corps.trim() && incomingCorps) {
+        setCorps(formatEmailDraft(incomingCorps));
+      }
+    }
+  }, [lead?.id, (lead as any)?.email_sujet, (lead as any)?.email_corps, lead?.statut, defaultCc]);
 
   const params = useParams();
   const activeAgentId = agentId || (params?.agentId as string);
@@ -263,14 +318,6 @@ export default function LeadDetailDrawer({
         }, 3500);
       }
     }
-
-    // 3. Email sent trigger
-    if (payload.table === 'prospect_agent_emails_envoyes') {
-      const targetLeadId = payload.new?.lead_id || payload.old?.lead_id;
-      if (!targetLeadId || targetLeadId === lead.id) {
-        onRefresh();
-      }
-    }
   });
 
   useEffect(() => {
@@ -282,19 +329,6 @@ export default function LeadDetailDrawer({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
-
-  useEffect(() => {
-    if (lead) {
-      setSujet(lead.sujet || '');
-      setStatut(lead.statut || '');
-      setCorps(lead.corps || '');
-      setCc(lead.email_cc !== undefined && lead.email_cc !== null ? lead.email_cc : (defaultCc || ''));
-
-      setIsQualifying(false);
-      setIsSending(false);
-      setIsGeneratingEmail(false);
-    }
-  }, [lead, defaultCc]);
 
   if (!lead || !isOpen) return null;
 
@@ -497,6 +531,7 @@ export default function LeadDetailDrawer({
   };
 
   const handleGenerateEmail = async () => {
+    if (!lead || !activeAgentId || isGeneratingEmail) return;
     setIsGeneratingEmail(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/agent-leads/${activeAgentId}`, {
@@ -514,14 +549,26 @@ export default function LeadDetailDrawer({
 
       if (res.ok) {
         const data = await res.json();
-        if (data.email) {
-          setSujet(data.email.sujet || '');
-          setCorps(data.email.corps || '');
+        const draft = data.email || data;
+        const draftSujet = draft?.sujet || draft?.subject || draft?.objet || '';
+        const draftCorps = draft?.corps || draft?.body || draft?.message || draft?.content || draft?.texte || '';
+        
+        const formattedCorps = formatEmailDraft(draftCorps);
+        if (draftSujet) {
+          setSujet(draftSujet);
+          (lead as any).email_sujet = draftSujet;
+          (lead as any).sujet = draftSujet;
+        }
+        if (formattedCorps) {
+          setCorps(formattedCorps);
+          (lead as any).email_corps = formattedCorps;
+          (lead as any).corps = formattedCorps;
         }
         showToast('Email personnalisé rédigé par l\'IA !', 'success');
         onRefresh();
       } else {
-        showToast('Erreur lors de la génération de l\'email', 'error');
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || 'Erreur lors de la génération de l\'email', 'error');
       }
     } catch (error) {
       console.error('Email generation error:', error);
@@ -552,6 +599,8 @@ export default function LeadDetailDrawer({
           sujet,
           corps,
           cc,
+          includeSignature,
+          signature,
           emailStatut: 'Succès',
           errorMsg: null
         }),
@@ -1781,30 +1830,37 @@ export default function LeadDetailDrawer({
 
                 <button
                   onClick={handleGenerateEmail}
-                  disabled={isGeneratingEmail}
+                  disabled={isGeneratingEmail || isSending}
                   style={{
-                    background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(0, 229, 200, 0.2))',
+                    background: isGeneratingEmail 
+                      ? 'rgba(168, 85, 247, 0.1)' 
+                      : 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(0, 229, 200, 0.2))',
                     border: '1px solid rgba(168, 85, 247, 0.4)',
-                    color: '#C084FC',
+                    color: isGeneratingEmail ? '#94A3B8' : '#C084FC',
                     padding: '6px 12px',
                     borderRadius: '8px',
                     fontSize: '0.78rem',
                     fontWeight: 600,
-                    cursor: isGeneratingEmail ? 'not-allowed' : 'pointer',
+                    cursor: (isGeneratingEmail || isSending) ? 'not-allowed' : 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    opacity: (isGeneratingEmail || isSending) ? 0.6 : 1
                   }}
                   onMouseEnter={e => {
-                    if (!isGeneratingEmail) e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.7)';
+                    if (!isGeneratingEmail && !isSending) e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.7)';
                   }}
                   onMouseLeave={e => {
-                    if (!isGeneratingEmail) e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.4)';
+                    if (!isGeneratingEmail && !isSending) e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.4)';
                   }}
                 >
-                  <Sparkles size={13} style={{ flexShrink: 0 }} />
-                  <span>{isGeneratingEmail ? 'Rédaction IA...' : 'Générer avec l\'IA'}</span>
+                  {isGeneratingEmail ? (
+                    <Loader2 size={13} className="animate-spin" style={{ flexShrink: 0 }} />
+                  ) : (
+                    <Sparkles size={13} style={{ flexShrink: 0 }} />
+                  )}
+                  <span>{isGeneratingEmail ? 'Rédaction IA en cours...' : (corps ? 'Régénérer avec l\'IA' : 'Générer avec l\'IA')}</span>
                 </button>
               </div>
 
@@ -1864,7 +1920,7 @@ export default function LeadDetailDrawer({
                     Corps du Message
                   </label>
                   <textarea
-                    rows={6}
+                    rows={7}
                     value={corps}
                     onChange={e => setCorps(e.target.value)}
                     placeholder="Bonjour {{prenom}}, suite à votre activité chez {{entreprise}}..."
@@ -1873,18 +1929,102 @@ export default function LeadDetailDrawer({
                       background: 'rgba(6, 17, 31, 0.8)',
                       border: '1px solid rgba(255, 255, 255, 0.12)',
                       borderRadius: '8px',
-                      padding: '10px 12px',
+                      padding: '12px 14px',
                       color: '#F0F4F8',
-                      fontSize: '0.85rem',
-                      lineHeight: 1.5,
+                      fontSize: '0.86rem',
+                      lineHeight: 1.65,
                       outline: 'none',
                       resize: 'vertical',
+                      minHeight: '140px',
                       fontFamily: 'inherit',
                       transition: 'border-color 0.2s'
                     }}
                     onFocus={e => e.currentTarget.style.borderColor = '#00E5C8'}
                     onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'}
                   />
+                </div>
+
+                {/* SIGNATURE PREVIEW & TOGGLE */}
+                <div style={{
+                  background: 'rgba(6, 17, 31, 0.75)',
+                  border: '1px solid rgba(0, 229, 200, 0.2)',
+                  borderRadius: '10px',
+                  padding: '12px 14px'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: signature ? '10px' : '0'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FileText size={14} color="#00E5C8" />
+                      <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#F0F4F8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Signature de l&apos;Agent
+                      </span>
+                      {signature && (
+                        <span style={{
+                          fontSize: '0.68rem',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          background: includeSignature ? 'rgba(0, 229, 200, 0.15)' : 'rgba(148, 163, 184, 0.1)',
+                          color: includeSignature ? '#00E5C8' : '#94A3B8',
+                          border: `1px solid ${includeSignature ? 'rgba(0, 229, 200, 0.3)' : 'rgba(148, 163, 184, 0.2)'}`,
+                          fontWeight: 600
+                        }}>
+                          {includeSignature ? 'Active' : 'Désactivée'}
+                        </span>
+                      )}
+                    </div>
+
+                    {signature && (
+                      <label style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.74rem',
+                        color: includeSignature ? '#00E5C8' : '#94A3B8',
+                        fontWeight: 600,
+                        userSelect: 'none'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={includeSignature}
+                          onChange={e => setIncludeSignature(e.target.checked)}
+                          style={{ accentColor: '#00E5C8', width: '14px', height: '14px', cursor: 'pointer' }}
+                        />
+                        <span>Inclure à l&apos;envoi</span>
+                      </label>
+                    )}
+                  </div>
+
+                  {signature ? (
+                    <div style={{
+                      opacity: includeSignature ? 1 : 0.45,
+                      transition: 'opacity 0.2s ease',
+                      background: '#FFFFFF',
+                      color: '#1E293B',
+                      borderRadius: '8px',
+                      padding: '12px 14px',
+                      overflowX: 'auto',
+                      maxHeight: '160px',
+                      overflowY: 'auto',
+                      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'
+                    }}>
+                      <div 
+                        dangerouslySetInnerHTML={{ 
+                          __html: signatureLogo?.data 
+                            ? signature.replace(/cid:signature_logo/g, `data:${signatureLogo.mimeType || 'image/png'};base64,${signatureLogo.data}`)
+                            : signature 
+                        }} 
+                      />
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.74rem', color: '#64748B', fontStyle: 'italic', padding: '4px 0' }}>
+                      Aucune signature configurée pour cet agent (personnalisable dans les paramètres de l&apos;agent).
+                    </div>
+                  )}
                 </div>
 
                 {/* Email Delivery Feedback */}
