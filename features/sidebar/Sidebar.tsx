@@ -220,7 +220,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
                   <Plus size={12} /> Nouvelle discussion
                 </button>
                 
-                <div style={{ maxHeight: '180px', overflowY: 'auto', paddingRight: '4px', marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div 
+                  className="sidebar-conversations-scroll"
+                  style={{ 
+                    maxHeight: '180px', 
+                    overflowY: 'auto', 
+                    paddingRight: '4px', 
+                    marginTop: '4px', 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    gap: '2px',
+                    '--agent-color': agent.color,
+                  } as React.CSSProperties}
+                >
                   {agentConvs.map(conv => {
                     const isConvActive = activeConversationId === conv.conversation_id;
                     const isEditing = editingConvId === conv.conversation_id;
