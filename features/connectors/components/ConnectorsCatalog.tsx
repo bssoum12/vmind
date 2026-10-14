@@ -3,6 +3,8 @@
 import React from 'react';
 import { Database, Layout, Globe, Search, Plus } from 'lucide-react';
 
+import { useConnections } from '@/shared/contexts/ConnectionsContext';
+
 interface ConnectorsCatalogProps {
   activeConnector: string;
   onSelectConnector: (connector: string) => void;
@@ -11,14 +13,29 @@ interface ConnectorsCatalogProps {
 
 export const ConnectorsCatalog: React.FC<ConnectorsCatalogProps> = ({ activeConnector, onSelectConnector, tralisConnected = false }) => {
   const [filter, setFilter] = React.useState<'all' | 'connected' | 'disconnected'>('all');
+  const { erpTypes, connections } = useConnections();
+
+  const erpItems = erpTypes.length > 0
+    ? erpTypes.map(erp => {
+        const isConn = connections.some(c => c.connector_type === erp.id && c.status === 'connected') || (erp.id === 'tralis' && tralisConnected);
+        return {
+          id: erp.id,
+          name: erp.display_name,
+          icon: <Database size={16} />,
+          connected: isConn
+        };
+      })
+    : [
+        { id: 'tralis', name: 'TraLIS ERP', icon: <Database size={16} />, connected: tralisConnected },
+        { id: 'sage', name: 'Sage X3', icon: <Database size={16} />, connected: false },
+        { id: 'odoo', name: 'Odoo MCP', icon: <Database size={16} />, connected: false },
+        { id: 'sap', name: 'SAP S/4HANA', icon: <Database size={16} />, connected: false },
+      ];
 
   const categories = [
     {
       title: 'ERP & Métiers',
-      items: [
-        { id: 'tralis', name: 'TraLIS MCP', icon: <img src="/logo-tralis-mcp.png" alt="TraLIS" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />, connected: tralisConnected },
-        { id: 'odoo', name: 'Odoo MCP', icon: <img src="/odoo-logo.png" alt="Odoo" style={{ width: '16px', height: '16px', objectFit: 'contain' }} />, connected: false },
-      ]
+      items: erpItems
     },
     {
       title: 'Web & Recherche',

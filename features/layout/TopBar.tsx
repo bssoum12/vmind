@@ -6,15 +6,18 @@ import { StatusDot } from '../../components/ui/StatusDot';
 import { useClock } from '../../shared/hooks/useClock';
 import { useMode } from '@/shared/contexts/ModeContext';
 
-import { LogOut, User, Menu } from 'lucide-react';
+import { LogOut, User, Menu, ChevronDown } from 'lucide-react';
 import { AdminCriticalAlertBadge } from '@/components/admin/AdminCriticalAlertBadge';
 import { broadcastMcpSessionUpdate } from '@/shared/utils/sessionBroadcast';
+import { useConnections } from '@/shared/contexts/ConnectionsContext';
 
 export const TopBar: React.FC = () => {
   const pathname = usePathname();
   const clock = useClock();
   const { mode, setMode } = useMode();
+  const { connections, activeConnection, selectActiveConnection } = useConnections();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [erpMenuOpen, setErpMenuOpen] = useState(false);
   const [username, setUsername] = useState('');
   const [roleLabel, setRoleLabel] = useState('');
   const [avatarInitials, setAvatarInitials] = useState('VM');
@@ -168,14 +171,66 @@ export const TopBar: React.FC = () => {
         </div>
       </div>
       <div className="topbar-center">
-        <div className="topbar-status">
-          <StatusDot style={{ backgroundColor: isErpConnected ? '#00e5c8' : '#8FA3B8' }} />
-          <span style={{ color: isErpConnected ? '#fff' : '#8FA3B8' }}>
-            {isErpConnected ? 'ERP CONNECTÉ' : 'ERP DÉCONNECTÉ'}
-          </span>
-          <span style={{ color: 'var(--border2)', margin: '0 6px' }}>|</span>
-          <span>{clock}</span>
-        </div>
+        {(() => {
+          const connectedList = connections.filter(c => c.status === 'connected');
+          const hasActive = activeConnection && activeConnection.status === 'connected';
+          const effectiveErpName = hasActive 
+            ? (activeConnection.erp_display_name || activeConnection.connector_type.toUpperCase())
+            : (isErpConnected ? 'TraLIS ERP' : null);
+          const effectiveTenant = hasActive && activeConnection.client_id ? activeConnection.client_id : null;
+
+          return (
+            <div className="topbar-status" style={{ position: 'relative' }}>
+              <div 
+                onClick={() => connectedList.length > 1 && setErpMenuOpen(!erpMenuOpen)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: connectedList.length > 1 ? 'pointer' : 'default' }}
+              >
+                <StatusDot style={{ backgroundColor: effectiveErpName ? '#00e5c8' : '#8FA3B8' }} />
+                <span style={{ color: effectiveErpName ? '#fff' : '#8FA3B8', fontWeight: effectiveErpName ? 600 : 400 }}>
+                  {effectiveErpName ? `${effectiveErpName}${effectiveTenant ? ` (${effectiveTenant})` : ''}` : 'AUCUN ERP CONNECTÉ'}
+                </span>
+                {connectedList.length > 1 && (
+                  <ChevronDown size={12} color="#00e5c8" style={{ transform: erpMenuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                )}
+              </div>
+
+              {erpMenuOpen && connectedList.length > 1 && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, marginTop: '8px',
+                  background: '#0e1726', border: '1px solid rgba(0, 229, 200, 0.2)',
+                  borderRadius: '8px', padding: '6px', minWidth: '180px',
+                  boxShadow: '0 10px 25px rgba(0,0,0,0.5)', zIndex: 100
+                }}>
+                  <div style={{ fontSize: '10px', color: '#6A7E95', fontWeight: 700, padding: '4px 8px', textTransform: 'uppercase' }}>
+                    Basculer d'ERP actif
+                  </div>
+                  {connectedList.map(c => (
+                    <div
+                      key={c.id}
+                      onClick={() => {
+                        selectActiveConnection(c.id);
+                        setErpMenuOpen(false);
+                      }}
+                      style={{
+                        padding: '8px 10px', borderRadius: '6px', fontSize: '12px',
+                        color: c.id === activeConnection?.id ? '#00e5c8' : '#fff',
+                        fontWeight: c.id === activeConnection?.id ? 700 : 500,
+                        background: c.id === activeConnection?.id ? 'rgba(0, 229, 200, 0.1)' : 'transparent',
+                        cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                      }}
+                    >
+                      <span>{c.erp_display_name || c.connector_type.toUpperCase()} ({c.client_id})</span>
+                      {c.id === activeConnection?.id && <span style={{ fontSize: '10px' }}>✓</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <span style={{ color: 'var(--border2)', margin: '0 6px' }}>|</span>
+              <span>{clock}</span>
+            </div>
+          );
+        })()}
 
         <div className="mode-switcher" style={{ position: 'relative', zIndex: 10 }}>
           <button 

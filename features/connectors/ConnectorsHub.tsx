@@ -4,9 +4,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ConnectorsCatalog } from './components/ConnectorsCatalog';
 import { TralisConnectorPanel } from './components/TralisConnectorPanel';
 import { OdooConnectorPanel } from './components/OdooConnectorPanel';
+import { GenericErpConnectorPanel } from './components/GenericErpConnectorPanel';
 import { ComingSoonPanel } from './components/ComingSoonPanel';
 import { jwtDecode } from 'jwt-decode';
 import { broadcastMcpSessionUpdate } from '@/shared/utils/sessionBroadcast';
+import { useConnections } from '@/shared/contexts/ConnectionsContext';
 
 // ─── Shared MCP session state ─────────────────────────────────────────────────
 // Lifted to the Hub so it survives navigation between connectors.
@@ -24,6 +26,7 @@ export interface McpSession {
 
 export const ConnectorsHub: React.FC = () => {
   const [activeConnector, setActiveConnector] = useState<string>('tralis');
+  const { erpTypes } = useConnections();
 
   // ── Global TraLIS MCP session — persists across connector navigation ──────
   const [tralisStatus,  setTralisStatus]  = useState<'loading' | 'idle' | 'connected' | 'error'>('loading');
@@ -230,6 +233,14 @@ export const ConnectorsHub: React.FC = () => {
         <div style={{ display: activeConnector === 'odoo' ? 'block' : 'none' }}>
           <OdooConnectorPanel />
         </div>
+
+        {erpTypes
+          .filter(e => e.id !== 'tralis' && e.id !== 'odoo')
+          .map(erp => (
+            <div key={erp.id} style={{ display: activeConnector === erp.id ? 'block' : 'none' }}>
+              <GenericErpConnectorPanel erpType={erp} />
+            </div>
+          ))}
 
         {activeConnector === 'web' && <ComingSoonPanel name="Recherche Web" />}
       </div>

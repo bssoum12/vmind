@@ -5,6 +5,7 @@ import { CheckCircle2, AlertTriangle, Link2, Shield, ShieldCheck, X, Database, C
 import { Turnstile } from '@marsidev/react-turnstile';
 import { TralisInstancesModal } from './TralisInstancesModal';
 import { jwtDecode } from 'jwt-decode';
+import { useConnections } from '@/shared/contexts/ConnectionsContext';
 
 function checkIsVmindAdmin(userObj?: any): boolean {
   if (!userObj) return false;
@@ -230,6 +231,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   onDisconnected,
 }) => {
   // Local UI state only (modal, form fields)
+  const { connectErp } = useConnections();
   const [showModal, setShowModal]                 = useState(false);
   const [showInstancesModal, setShowInstancesModal] = useState(false);
   const [isVmindAdmin, setIsVmindAdmin]           = useState(false);
@@ -788,25 +790,40 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
               Activer l'accès sécurisé de l'IA à notre instance ERP TraLIS.
             </p>
 
-            {/* Option A (Hidden for presentation) */}
-            <button onClick={handleUseCurrentSession} disabled={loginLoading} style={{
-              display: 'none',
-              width: '100%',
-              background: 'linear-gradient(90deg, #00E5C8 0%, #21F3D6 100%)',
-              color: '#021010', border: 'none',
-              padding: '13px', borderRadius: '12px',
-              fontSize: '14px', fontWeight: 800, cursor: 'pointer',
-              marginBottom: '20px',
-              boxShadow: '0 0 20px rgba(0, 229, 200, 0.15)',
-              justifyContent: 'center', alignItems: 'center', gap: '8px',
-              opacity: loginLoading ? 0.7 : 1,
-            }}>
-              {loginLoading ? 'Validation en cours…' : 'Utiliser ma session VMIND actuelle'}
+            {/* Option OAuth 2.1 (Standard Claude MCP) */}
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  setLoginLoading(true);
+                  await connectErp('tralis', loginCustomMcpUrl.trim() || undefined);
+                  setShowModal(false);
+                } catch (e: any) {
+                  setLoginError(e.message || "Erreur lors de la redirection OAuth");
+                } finally {
+                  setLoginLoading(false);
+                }
+              }}
+              disabled={loginLoading}
+              style={{
+                width: '100%',
+                background: 'linear-gradient(90deg, #00E5C8 0%, #21F3D6 100%)',
+                color: '#021010', border: 'none',
+                padding: '13px', borderRadius: '12px',
+                fontSize: '14px', fontWeight: 800, cursor: 'pointer',
+                marginBottom: '16px',
+                boxShadow: '0 0 20px rgba(0, 229, 200, 0.15)',
+                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                opacity: loginLoading ? 0.7 : 1,
+              }}
+            >
+              <ShieldCheck size={16} />
+              {loginLoading ? 'Connexion en cours…' : 'Connexion OAuth 2.1 (Standard Claude MCP)'}
             </button>
 
-            <div style={{ display: 'none', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.08)' }} />
-              <span style={{ fontSize: '11px', color: '#6A7E95', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>ou compte TraLIS différent</span>
+              <span style={{ fontSize: '11px', color: '#6A7E95', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>ou connexion directe credentials</span>
               <div style={{ height: 1, flex: 1, background: 'rgba(255,255,255,0.08)' }} />
             </div>
 
