@@ -47,7 +47,15 @@ function formatUserFacingMessage(raw?: string): string {
   if (lower.includes('lancée') || lower.includes('initialisation') || lower.includes('démarrage') || (lower.includes('qualification de') && lower.includes('prospect'))) {
     return "Initialisation et analyse du profil par l'IA...";
   }
+  if (lower.includes('error') || lower.includes('erreur') || lower.includes('[object object]') || lower.includes('node ::')) {
+    return "Analyse non concluante pour ce prospect.";
+  }
   const clean = raw
+    .replace(/\[object Object\]/gi, '')
+    .replace(/in the\s+[^:]+::/gi, '')
+    .replace(/worklow\s+ID:[^:]+::/gi, '')
+    .replace(/workflow\s+ID:[^:]+::/gi, '')
+    .replace(/Execution\s+ID:[^:]+::/gi, '')
     .replace(/\s*via\s+n8n\.?/gi, '')
     .replace(/\s*\(n8n\)/gi, '')
     .replace(/\bn8n\b/gi, '')
@@ -235,18 +243,23 @@ export default function LeadDetailDrawer({
     active: boolean;
     isDone: boolean;
     message: string;
+    hasError?: boolean;
   }
   const [qualifyProgress, setQualifyProgress] = useState<DrawerQualifyProgress | null>(null);
   const qualifyProgressRef = useRef<DrawerQualifyProgress | null>(null);
   qualifyProgressRef.current = qualifyProgress;
   const [fakePercent, setFakePercent] = useState<number>(14);
   const dismissTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const safetyTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Clean up auto-dismiss timer on unmount
+  // Clean up timers on unmount
   useEffect(() => {
     return () => {
       if (dismissTimerRef.current) {
         clearTimeout(dismissTimerRef.current);
+      }
+      if (safetyTimerRef.current) {
+        clearTimeout(safetyTimerRef.current);
       }
     };
   }, []);
@@ -281,6 +294,7 @@ export default function LeadDetailDrawer({
     if (payload.table === 'prospect_agent_logs_execution' && payload.new) {
       const message = (payload.new.message || '').toString();
       const statut = (payload.new.statut || payload.new.status || '').toString().toUpperCase();
+      const etape = (payload.new.etape || '').toString();
 
       const isLaunchLog = message.includes('lancée via n8n') || (message.includes('Qualification de') && message.includes('prospect'));
       if (isLaunchLog) {
@@ -288,29 +302,59 @@ export default function LeadDetailDrawer({
         return;
       }
 
-      const isLeadEval = message.includes('Score ICP') || message.includes(`Lead #${lead.id}`) || (lead.nom && message.includes(lead.nom)) || (lead.entreprise && message.includes(lead.entreprise));
-      if (isLeadEval) {
-        setQualifyProgress((prev) => (prev ? { ...prev, message } : null));
-      }
+      const isError = statut === 'ERROR' || statut === 'FAIL' || statut === 'FAILED';
+      const leadRegex = new RegExp(`(?:lead|prospect)[_\\s]*(?:id\\s*[:=]|#)\\s*${lead.id}\\b|\\blead\\s*[:#]\\s*${lead.id}\\b`, 'i');
+      const isMatchingLead = leadRegex.test(message) ||
+                             message.includes(`Lead #${lead.id}`) ||
+                             message.includes(`Prospect #${lead.id}`) ||
+                             (lead.nom && message.toLowerCase().includes(lead.nom.toLowerCase())) ||
+                             (lead.entreprise && message.toLowerCase().includes(lead.entreprise.toLowerCase()));
 
-      if (statut === 'COMPLETED' || statut === 'SUCCESS') {
-        if (payload.new.workflow_id && payload.new.workflow_id.toString().includes('qualif')) {
-          setQualifyProgress((prev) => (prev ? { ...prev, isDone: true, message: "Évaluation terminée avec succès !" } : null));
+      if (isMatchingLead || (isError && (etape.toLowerCase().includes('qualif') || message.toLowerCase().includes('qualif')))) {
+        if (isError) {
+          setQualifyProgress((prev) => (prev ? {
+            ...prev,
+            isDone: true,
+            hasError: true,
+            message: "Analyse non concluante pour ce prospect."
+          } : null));
           onRefresh();
+          if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
           if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
           dismissTimerRef.current = setTimeout(() => {
             setQualifyProgress(null);
             qualifyProgressRef.current = null;
           }, 3500);
+          return;
+        } else {
+          setQualifyProgress((prev) => (prev ? { ...prev, message: formatUserFacingMessage(message) } : null));
         }
+      }
+
+      if (statut === 'COMPLETED' || statut === 'SUCCESS' || statut === 'FAIL' || statut === 'ERROR' || statut === 'FAILED') {
+        const isFail = statut === 'FAIL' || statut === 'ERROR' || statut === 'FAILED';
+        setQualifyProgress((prev) => (prev ? {
+          ...prev,
+          isDone: true,
+          hasError: isFail,
+          message: isFail ? "Analyse non concluante pour ce prospect." : "Évaluation terminée avec succès !"
+        } : null));
+        onRefresh();
+        if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = setTimeout(() => {
+          setQualifyProgress(null);
+          qualifyProgressRef.current = null;
+        }, 3500);
       }
     }
 
     // 2. Qualifications table trigger
     if (payload.table === 'prospect_agent_qualifications' && payload.new) {
       if (payload.new.lead_id === lead.id) {
-        setQualifyProgress((prev) => (prev ? { ...prev, isDone: true, message: "Évaluation terminée avec succès !" } : null));
+        setQualifyProgress((prev) => (prev ? { ...prev, isDone: true, hasError: false, message: "Évaluation terminée avec succès !" } : null));
         onRefresh();
+        if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
         if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
         dismissTimerRef.current = setTimeout(() => {
           setQualifyProgress(null);
@@ -481,14 +525,34 @@ export default function LeadDetailDrawer({
     if (!lead || !activeAgentId) return;
     setIsQualifying(true);
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
     setFakePercent(14);
     const newState: DrawerQualifyProgress = {
       active: true,
       isDone: false,
-      message: "Initialisation et analyse du profil par l'IA..."
+      message: "Initialisation et analyse du profil par l'IA...",
+      hasError: false
     };
     setQualifyProgress(newState);
     qualifyProgressRef.current = newState;
+
+    safetyTimerRef.current = setTimeout(() => {
+      const cur = qualifyProgressRef.current;
+      if (cur && cur.active && !cur.isDone) {
+        setQualifyProgress({
+          active: true,
+          isDone: true,
+          hasError: false,
+          message: "Évaluation terminée"
+        });
+        onRefresh();
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = setTimeout(() => {
+          setQualifyProgress(null);
+          qualifyProgressRef.current = null;
+        }, 3500);
+      }
+    }, 45000);
 
     // Dispatch global window event so LeadsView (and background) activates its cyber progress bar
     if (typeof window !== 'undefined') {
@@ -515,12 +579,14 @@ export default function LeadDetailDrawer({
       if (res.ok) {
         showToast('Qualification IA lancée pour ce prospect !', 'info');
       } else {
+        if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
         const errData = await res.json().catch(() => ({}));
         showToast(errData.error || 'Erreur lors du déclenchement de la qualification IA', 'error');
         setQualifyProgress(null);
         qualifyProgressRef.current = null;
       }
     } catch (error) {
+      if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
       console.error('IA Qualification error:', error);
       showToast('Erreur de connexion au service de qualification', 'error');
       setQualifyProgress(null);
@@ -962,15 +1028,15 @@ export default function LeadDetailDrawer({
                           width: 20,
                           height: 20,
                           borderRadius: '50%',
-                          background: 'rgba(0, 229, 160, 0.15)',
-                          border: '1px solid rgba(0, 229, 160, 0.4)',
+                          background: qualifyProgress.hasError ? 'rgba(255, 71, 87, 0.15)' : 'rgba(0, 229, 160, 0.15)',
+                          border: `1px solid ${qualifyProgress.hasError ? 'rgba(255, 71, 87, 0.4)' : 'rgba(0, 229, 160, 0.4)'}`,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: '#00E5A0'
+                          color: qualifyProgress.hasError ? '#FF4757' : '#00E5A0'
                         }}
                       >
-                        <CheckCircle2 size={13} />
+                        {qualifyProgress.hasError ? <AlertCircle size={13} /> : <CheckCircle2 size={13} />}
                       </div>
                     ) : (
                       <div
@@ -994,10 +1060,14 @@ export default function LeadDetailDrawer({
                       style={{
                         fontSize: '0.82rem',
                         fontWeight: 600,
-                        color: qualifyProgress.isDone ? '#00E5A0' : '#F0F4F8'
+                        color: qualifyProgress.isDone
+                          ? (qualifyProgress.hasError ? '#FF4757' : '#00E5A0')
+                          : '#F0F4F8'
                       }}
                     >
-                      {qualifyProgress.isDone ? 'Qualification terminée avec succès' : 'Qualification IA en direct...'}
+                      {qualifyProgress.isDone
+                        ? (qualifyProgress.hasError ? 'Analyse non concluante pour ce prospect' : 'Qualification terminée avec succès')
+                        : 'Qualification IA en direct...'}
                     </span>
                   </div>
 
@@ -1007,9 +1077,17 @@ export default function LeadDetailDrawer({
                       fontFamily: 'monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas',
                       fontSize: '0.8rem',
                       fontWeight: 700,
-                      color: qualifyProgress.isDone ? '#00E5A0' : '#00E5C8',
-                      background: qualifyProgress.isDone ? 'rgba(0, 229, 160, 0.1)' : 'rgba(0, 229, 200, 0.08)',
-                      border: `1px solid ${qualifyProgress.isDone ? 'rgba(0, 229, 160, 0.3)' : 'rgba(0, 229, 200, 0.25)'}`,
+                      color: qualifyProgress.isDone
+                        ? (qualifyProgress.hasError ? '#FF4757' : '#00E5A0')
+                        : '#00E5C8',
+                      background: qualifyProgress.isDone
+                        ? (qualifyProgress.hasError ? 'rgba(255, 71, 87, 0.1)' : 'rgba(0, 229, 160, 0.1)')
+                        : 'rgba(0, 229, 200, 0.08)',
+                      border: `1px solid ${
+                        qualifyProgress.isDone
+                          ? (qualifyProgress.hasError ? 'rgba(255, 71, 87, 0.3)' : 'rgba(0, 229, 160, 0.3)')
+                          : 'rgba(0, 229, 200, 0.25)'
+                      }`,
                       padding: '2px 8px',
                       borderRadius: '6px',
                       letterSpacing: '0.04em'
@@ -1032,7 +1110,17 @@ export default function LeadDetailDrawer({
                   }}
                 >
                   {qualifyProgress.isDone ? (
-                    <div className="void-complete-bar" />
+                    qualifyProgress.hasError ? (
+                      <div
+                        className="void-complete-bar"
+                        style={{
+                          background: 'linear-gradient(90deg, #FF4757 0%, #FF6B81 100%)',
+                          boxShadow: '0 0 12px rgba(255, 71, 87, 0.45)'
+                        }}
+                      />
+                    ) : (
+                      <div className="void-complete-bar" />
+                    )
                   ) : (
                     <div className="void-stream-bar">
                       <div className="void-laser-gleam-effect" />

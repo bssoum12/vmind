@@ -428,6 +428,36 @@ export async function triggerSourcingRun(
   return res.json();
 }
 
+export interface SourcingExecutionConfig {
+  min: number;
+  max: number;
+  allowExistingCompaniesVisible: boolean;
+}
+
+/**
+ * Fetches the admin-configured execution parameters (leads range + options visibility) for Sourcing Agents.
+ */
+export async function getSourcingLeadsRange(): Promise<SourcingExecutionConfig> {
+  try {
+    const res = await secureFetch(`${getBaseUrl()}/api/sourcing-agent/leads-range`, {
+      headers: getAuthHeaders()
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ok && typeof data.min === 'number' && typeof data.max === 'number') {
+        return { 
+          min: data.min, 
+          max: data.max,
+          allowExistingCompaniesVisible: data.allow_existing_companies_visible !== false
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('[getSourcingLeadsRange] Error retrieving leads range, using default 1-15:', err);
+  }
+  return { min: 1, max: 15, allowExistingCompaniesVisible: true };
+}
+
 /**
  * Trigger immediate execution for Prospect Agent (Auto Mode)
  */

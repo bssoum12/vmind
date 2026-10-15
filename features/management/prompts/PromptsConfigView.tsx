@@ -28,7 +28,10 @@ import {
   Target,
   Globe,
   Copy,
-  CheckCheck
+  CheckCheck,
+  Eye,
+  EyeOff,
+  Database
 } from 'lucide-react';
 import { useToast } from '@/shared/contexts/ToastContext';
 
@@ -48,6 +51,9 @@ interface PromptConfig {
   description?: string;
   updated_at?: string;
   sourcing_provider?: SourcingProvider;
+  sourcing_min_leads?: number;
+  sourcing_max_leads?: number;
+  sourcing_allow_existing_companies_visible?: boolean;
 }
 
 interface ProviderStatus {
@@ -113,6 +119,9 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
   const [formIsStream, setFormIsStream] = useState<boolean>(false);
   const [formDescription, setFormDescription] = useState<string>('');
   const [formSourcingProvider, setFormSourcingProvider] = useState<SourcingProvider>('prospeo');
+  const [formSourcingMinLeads, setFormSourcingMinLeads] = useState<number>(1);
+  const [formSourcingMaxLeads, setFormSourcingMaxLeads] = useState<number>(15);
+  const [formAllowExistingVisible, setFormAllowExistingVisible] = useState<boolean>(true);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string>('');
 
   // Interactive Test State
@@ -176,6 +185,9 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
     setFormIsStream(Boolean(p.is_stream));
     setFormDescription(p.description || '');
     setFormSourcingProvider(p.sourcing_provider || 'prospeo');
+    setFormSourcingMinLeads(p.sourcing_min_leads ?? 1);
+    setFormSourcingMaxLeads(p.sourcing_max_leads ?? 15);
+    setFormAllowExistingVisible(p.sourcing_allow_existing_companies_visible !== false);
     setLastUpdatedAt(p.updated_at ? new Date(p.updated_at).toLocaleString('fr-FR') : '');
   };
 
@@ -215,6 +227,11 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
       return;
     }
 
+    if (activeKey === 'sourcing_execution_chat' && formSourcingMinLeads > formSourcingMaxLeads) {
+      showToast('Le minimum de leads ne peut pas être supérieur au maximum.', 'error');
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await fetch(`${API_BASE}/api/admin/prompts/${activeKey}`, {
@@ -231,7 +248,12 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
           max_tokens: formMaxTokens,
           is_stream: formIsStream,
           description: formDescription,
-          ...(activeKey === 'sourcing_execution_chat' ? { sourcing_provider: formSourcingProvider } : {})
+          ...(activeKey === 'sourcing_execution_chat' ? { 
+            sourcing_provider: formSourcingProvider,
+            sourcing_min_leads: formSourcingMinLeads,
+            sourcing_max_leads: formSourcingMaxLeads,
+            sourcing_allow_existing_companies_visible: formAllowExistingVisible
+          } : {})
         })
       });
 
@@ -1054,6 +1076,196 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                     color: '#94A3B8'
                   }}>
                     💡 <strong style={{ color: '#F0F4F8' }}>Bascule transparente :</strong> La sauvegarde applique le routage instantanément aux prochaines exécutions et re-synchronise tous les plannings QStash actifs.
+                  </div>
+                </div>
+
+                {/* Sourcing Leads Range Configuration (Min & Max Total Leads) */}
+                <div style={{
+                  marginTop: 14,
+                  paddingTop: 14,
+                  borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <Sliders size={14} color="#00E5C8" />
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: '#FFFFFF', letterSpacing: '0.02em' }}>
+                        Plage de Leads Souhaitée (Total Leads)
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: 11,
+                      padding: '2px 8px',
+                      borderRadius: 8,
+                      background: 'rgba(0, 229, 200, 0.12)',
+                      color: '#00E5C8',
+                      border: '1px solid rgba(0, 229, 200, 0.3)',
+                      fontWeight: 600
+                    }}>
+                      {formSourcingMinLeads} à {formSourcingMaxLeads} leads
+                    </span>
+                  </div>
+
+                  <p style={{ margin: '0 0 12px 0', fontSize: 11.5, color: '#94A3B8', lineHeight: 1.45 }}>
+                    Définit la fourchette autorisée proposée aux utilisateurs lors du lancement ou de la planification de leur agent de sourcing.
+                  </p>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {/* Min Leads */}
+                    <div style={{
+                      background: 'rgba(4, 11, 22, 0.85)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: 8,
+                      padding: '8px 10px'
+                    }}>
+                      <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+                        Minimum (Leads)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={formSourcingMaxLeads}
+                        value={formSourcingMinLeads}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10) || 1;
+                          setFormSourcingMinLeads(Math.max(1, val));
+                          if (val > formSourcingMaxLeads) {
+                            setFormSourcingMaxLeads(val);
+                          }
+                        }}
+                        style={{
+                          width: '100%',
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          borderRadius: 6,
+                          padding: '6px 10px',
+                          color: '#FFFFFF',
+                          fontSize: 14,
+                          fontWeight: 700,
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+
+                    {/* Max Leads */}
+                    <div style={{
+                      background: 'rgba(4, 11, 22, 0.85)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: 8,
+                      padding: '8px 10px'
+                    }}>
+                      <label style={{ display: 'block', fontSize: 10.5, fontWeight: 700, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+                        Maximum (Leads)
+                      </label>
+                      <input
+                        type="number"
+                        min={formSourcingMinLeads}
+                        value={formSourcingMaxLeads}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value, 10) || formSourcingMinLeads;
+                          setFormSourcingMaxLeads(Math.max(formSourcingMinLeads, val));
+                        }}
+                        style={{
+                          width: '100%',
+                          background: 'rgba(255, 255, 255, 0.04)',
+                          border: '1px solid rgba(255, 255, 255, 0.12)',
+                          borderRadius: 6,
+                          padding: '6px 10px',
+                          color: '#FFFFFF',
+                          fontSize: 14,
+                          fontWeight: 700,
+                          outline: 'none',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Allow Existing Companies Option Visibility Configuration */}
+                <div style={{
+                  marginTop: 14,
+                  paddingTop: 14,
+                  borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                      <Database size={14} color="#00E5C8" />
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: '#FFFFFF', letterSpacing: '0.02em' }}>
+                        Option « Entreprises Déjà Prospectées »
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: 11,
+                      padding: '2px 8px',
+                      borderRadius: 8,
+                      background: formAllowExistingVisible ? 'rgba(0, 229, 200, 0.12)' : 'rgba(255, 169, 64, 0.16)',
+                      color: formAllowExistingVisible ? '#00E5C8' : '#FFA940',
+                      border: `1px solid ${formAllowExistingVisible ? 'rgba(0, 229, 200, 0.3)' : 'rgba(255, 169, 64, 0.4)'}`,
+                      fontWeight: 600
+                    }}>
+                      {formAllowExistingVisible ? 'Visible (Choix utilisateur)' : 'Masquée (Forcée à OUI)'}
+                    </span>
+                  </div>
+
+                  <p style={{ margin: '0 0 10px 0', fontSize: 11.5, color: '#94A3B8', lineHeight: 1.45 }}>
+                    Contrôle si la case à cocher apparaît aux utilisateurs dans les modales. Si masquée, elle est automatiquement activée à <strong>OUI</strong> en arrière-plan.
+                  </p>
+
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 8,
+                    background: 'rgba(4, 11, 22, 0.75)',
+                    padding: 5,
+                    borderRadius: 10,
+                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setFormAllowExistingVisible(true)}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        border: formAllowExistingVisible ? '1px solid rgba(0, 229, 200, 0.5)' : '1px solid transparent',
+                        background: formAllowExistingVisible ? 'rgba(0, 229, 200, 0.16)' : 'transparent',
+                        color: formAllowExistingVisible ? '#00E5C8' : '#CBD5E1',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        transition: 'all 0.18s ease'
+                      }}
+                    >
+                      <Eye size={13} />
+                      <span>Afficher l'option</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormAllowExistingVisible(false)}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        border: !formAllowExistingVisible ? '1px solid rgba(255, 169, 64, 0.5)' : '1px solid transparent',
+                        background: !formAllowExistingVisible ? 'rgba(255, 169, 64, 0.16)' : 'transparent',
+                        color: !formAllowExistingVisible ? '#FFA940' : '#CBD5E1',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        transition: 'all 0.18s ease'
+                      }}
+                    >
+                      <EyeOff size={13} />
+                      <span>Masquer (Forcer OUI)</span>
+                    </button>
                   </div>
                 </div>
               </div>

@@ -95,9 +95,11 @@ interface QualifyProgressState {
   active: boolean;
   total: number;
   completedIds: number[];
+  failedIds: number[];
   targetIds: number[];
   latestMessage?: string;
   isDone: boolean;
+  hasErrors?: boolean;
 }
 
 interface Lead {
@@ -244,6 +246,42 @@ function LeadCompanyAvatar({ lead, initials }: { lead: Lead; initials: string })
   );
 }
 
+function extractLeadFromLog(message: string, leads: Lead[]): { leadId: number | null; leadLabel: string } {
+  if (!message) return { leadId: null, leadLabel: 'Prospect' };
+
+  // 1. Check numeric lead ID (e.g. "lead ID :176", "lead_id: 176", "Lead #176", "Prospect #176")
+  const idMatch = message.match(/(?:lead|prospect)[_\s]*(?:id\s*[:=]|#)\s*(\d+)/i) ||
+                  message.match(/\blead\s*[:#]\s*(\d+)/i);
+  if (idMatch) {
+    const id = parseInt(idMatch[1], 10);
+    if (!isNaN(id)) {
+      const found = leads.find(l => l.id === id);
+      const name = found ? `${found.prenom || ''} ${found.nom || ''}`.trim() : '';
+      const comp = found?.entreprise ? ` (${found.entreprise})` : '';
+      return { leadId: id, leadLabel: name ? `${name}${comp}` : `Prospect #${id}` };
+    }
+  }
+
+  // 2. Check name pattern: "Lead #Name (Company)" or "Prospect #Name (Company)"
+  const nameMatch = message.match(/(?:lead|prospect)\s*#\s*([^\(—\-:\n\r]+)/i);
+  if (nameMatch) {
+    const raw = nameMatch[1].trim().toLowerCase();
+    const found = leads.find(l =>
+      (l.nom && l.nom.toLowerCase().includes(raw)) ||
+      (l.prenom && l.prenom.toLowerCase().includes(raw)) ||
+      (l.entreprise && l.entreprise.toLowerCase().includes(raw))
+    );
+    if (found) {
+      const name = `${found.prenom || ''} ${found.nom || ''}`.trim() || raw;
+      const comp = found.entreprise ? ` (${found.entreprise})` : '';
+      return { leadId: found.id, leadLabel: `${name}${comp}` };
+    }
+    return { leadId: null, leadLabel: nameMatch[1].trim() };
+  }
+
+  return { leadId: null, leadLabel: 'Prospect' };
+}
+
 // Zero Technical Jargon policy: sanitize and translate raw backend logs for the end user
 function formatUserFacingMessage(raw?: string): string {
   if (!raw) return "Initialisation de l'évaluation IA...";
@@ -251,8 +289,21 @@ function formatUserFacingMessage(raw?: string): string {
   if (lower.includes('lancée') || lower.includes('initialisation') || lower.includes('démarrage') || (lower.includes('qualification de') && lower.includes('prospect'))) {
     return "Initialisation et analyse des profils par l'IA...";
   }
+  // Check if it's an error message (never show [object Object] or SQL node artifacts)
+  if (lower.includes('error') || lower.includes('erreur') || lower.includes('[object object]') || lower.includes('node ::')) {
+    const leadMatch = raw.match(/(?:lead|prospect)[_\s]*(?:id\s*[:=]|#)\s*(\d+)/i) || raw.match(/\blead\s*[:#]\s*(\d+)/i);
+    if (leadMatch) {
+      return `Analyse non concluante pour le prospect #${leadMatch[1]}`;
+    }
+    return "Analyse non concluante pour un profil";
+  }
   // Strip out any technical middleware names or API artifacts
   const clean = raw
+    .replace(/\[object Object\]/gi, '')
+    .replace(/in the\s+[^:]+::/gi, '')
+    .replace(/worklow\s+ID:[^:]+::/gi, '')
+    .replace(/workflow\s+ID:[^:]+::/gi, '')
+    .replace(/Execution\s+ID:[^:]+::/gi, '')
     .replace(/\s*via\s+n8n\.?/gi, '')
     .replace(/\s*\(n8n\)/gi, '')
     .replace(/\bn8n\b/gi, '')
@@ -337,13 +388,17 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
   const qualifyProgressRef = useRef<QualifyProgressState | null>(null);
   qualifyProgressRef.current = qualifyProgress;
   const dismissTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const safetyTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [fakePercent, setFakePercent] = useState<number>(14);
 
-  // Clean up auto-dismiss timer on unmount
+  // Clean up timers on unmount
   useEffect(() => {
     return () => {
       if (dismissTimerRef.current) {
         clearTimeout(dismissTimerRef.current);
+      }
+      if (safetyTimerRef.current) {
+        clearTimeout(safetyTimerRef.current);
       }
     };
   }, []);
@@ -357,10 +412,10 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
       return;
     }
 
-    const completed = qualifyProgress.completedIds.length;
+    const processed = qualifyProgress.completedIds.length + (qualifyProgress.failedIds?.length || 0);
     const total = Math.max(qualifyProgress.total, 1);
-    const completedFloor = Math.round((completed / total) * 100);
-    const nextCap = Math.min(Math.round(((completed + 1) / total) * 100) - 3, 94);
+    const completedFloor = Math.round((processed / total) * 100);
+    const nextCap = Math.min(Math.round(((processed + 1) / total) * 100) - 3, 94);
 
     setFakePercent(prev => Math.max(prev, completedFloor > 0 ? completedFloor : 14));
 
@@ -374,7 +429,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
     }, 450);
 
     return () => clearInterval(interval);
-  }, [qualifyProgress?.active, qualifyProgress?.isDone, qualifyProgress?.completedIds.length, qualifyProgress?.total]);
+  }, [qualifyProgress?.active, qualifyProgress?.isDone, qualifyProgress?.completedIds.length, qualifyProgress?.failedIds?.length, qualifyProgress?.total]);
 
   // Listen to qualify-start events dispatched from other components (e.g., LeadDetailDrawer)
   useEffect(() => {
@@ -382,17 +437,44 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
       const { leadIds, total } = e.detail || {};
       const count = total || (leadIds ? leadIds.length : 1);
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+      if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
       setFakePercent(14);
       const newState: QualifyProgressState = {
         active: true,
         total: count,
         completedIds: [],
+        failedIds: [],
         targetIds: leadIds || [],
         latestMessage: "Initialisation et analyse des profils par l'IA...",
-        isDone: false
+        isDone: false,
+        hasErrors: false
       };
       setQualifyProgress(newState);
       qualifyProgressRef.current = newState;
+
+      // 60s Safety timeout: ensure UI progress never hangs if workflow terminates abnormally
+      safetyTimerRef.current = setTimeout(() => {
+        const cur = qualifyProgressRef.current;
+        if (cur && cur.active && !cur.isDone) {
+          console.warn('[QUALIFY-SOCKET] Safety timeout reached (60s). Finalizing qualification progress.');
+          const finalized: QualifyProgressState = {
+            ...cur,
+            isDone: true,
+            hasErrors: (cur.failedIds && cur.failedIds.length > 0) || cur.completedIds.length < cur.total,
+            latestMessage: cur.completedIds.length > 0
+              ? `Qualification terminée (${cur.completedIds.length}/${cur.total})`
+              : "Évaluation terminée"
+          };
+          setQualifyProgress(finalized);
+          qualifyProgressRef.current = finalized;
+          onRefresh();
+          if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+          dismissTimerRef.current = setTimeout(() => {
+            setQualifyProgress(null);
+            qualifyProgressRef.current = null;
+          }, 4500);
+        }
+      }, 60000);
     };
 
     window.addEventListener('vmind:qualify-start' as any, handleQualifyStart as EventListener);
@@ -426,9 +508,11 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
           active: true,
           total: current && current.total > 0 ? current.total : parsedCount,
           completedIds: current ? current.completedIds : [],
+          failedIds: current ? (current.failedIds || []) : [],
           targetIds: current ? current.targetIds : [],
           latestMessage: "Initialisation et analyse des profils par l'IA...",
-          isDone: false
+          isDone: false,
+          hasErrors: false
         };
         setQualifyProgress(updated);
         qualifyProgressRef.current = updated;
@@ -437,41 +521,54 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
 
       if (!current || !current.active) return;
 
-      // Check if it's an actual lead evaluation log from n8n (contains Score ICP or Lead #ID)
-      const isLeadEval = message.includes('Score ICP') || /Lead\s*#\d+/i.test(message);
+      const isError = statut === 'ERROR' || statut === 'FAIL' || statut === 'FAILED';
+      const isLeadMention = message.includes('Score ICP') ||
+                            /(?:lead|prospect)\s*#/i.test(message) ||
+                            /(?:lead|prospect)[_\s]*id/i.test(message);
 
-      if (isLeadEval) {
-        const match = message.match(/Lead\s*#(\d+)/i);
-        let leadId = match ? parseInt(match[1], 10) : null;
+      // Check if it's an actual lead evaluation log from n8n (Score ICP, lead ID, or error on qualification step)
+      if (isLeadMention || (isError && (etape.toLowerCase().includes('qualif') || message.toLowerCase().includes('qualif')))) {
+        const leadInfo = extractLeadFromLog(message, leads);
+        let leadId = leadInfo.leadId;
 
-        if (!leadId) {
-          const nameMatch = message.match(/Lead\s*#([^\(—\-]+)/i);
-          if (nameMatch) {
-            const raw = nameMatch[1].trim().toLowerCase();
-            const found = leads.find(l =>
-              (l.nom && l.nom.toLowerCase().includes(raw)) ||
-              (l.prenom && l.prenom.toLowerCase().includes(raw)) ||
-              (l.entreprise && l.entreprise.toLowerCase().includes(raw))
-            );
-            if (found) {
-              leadId = found.id;
-            }
+        // Fallback: If leadId not parsed from log, pick the first unprocessed targetId
+        if (!leadId && current.targetIds.length > 0) {
+          const unprocessed = current.targetIds.filter(id =>
+            !current.completedIds.includes(id) && !(current.failedIds || []).includes(id)
+          );
+          if (unprocessed.length > 0) {
+            leadId = unprocessed[0];
           }
         }
 
         const newCompleted = [...current.completedIds];
-        if (leadId && !newCompleted.includes(leadId)) {
-          newCompleted.push(leadId);
+        const newFailed = [...(current.failedIds || [])];
+
+        if (isError) {
+          if (leadId && !newFailed.includes(leadId) && !newCompleted.includes(leadId)) {
+            newFailed.push(leadId);
+          } else if (!leadId && (newCompleted.length + newFailed.length < current.total)) {
+            newFailed.push(-Date.now());
+          }
+        } else {
+          if (leadId && !newCompleted.includes(leadId)) {
+            newCompleted.push(leadId);
+            const idx = newFailed.indexOf(leadId);
+            if (idx !== -1) newFailed.splice(idx, 1);
+          }
         }
 
-        const isFinished = newCompleted.length >= current.total;
-        console.log(`[QUALIFY-SOCKET] Lead evaluated (${newCompleted.length}/${current.total}), isFinished:`, isFinished);
+        const totalProcessed = newCompleted.length + newFailed.length;
+        const isFinished = totalProcessed >= current.total;
+        console.log(`[QUALIFY-SOCKET] Lead processed (${totalProcessed}/${current.total}) - Success: ${newCompleted.length}, Failed: ${newFailed.length}, isFinished:`, isFinished);
 
         const updated: QualifyProgressState = {
           ...current,
           completedIds: newCompleted,
+          failedIds: newFailed,
           latestMessage: message,
           isDone: isFinished,
+          hasErrors: newFailed.length > 0
         };
 
         setQualifyProgress(updated);
@@ -479,29 +576,31 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
         onRefresh();
 
         if (isFinished) {
+          if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
           if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
           dismissTimerRef.current = setTimeout(() => {
             setQualifyProgress(null);
             qualifyProgressRef.current = null;
-          }, 4000);
+          }, 4500);
         }
-      } else if (statut === 'COMPLETED' || statut === 'SUCCESS') {
-        // Only mark finished on workflow completion if ALL leads were evaluated (or at least all expected)
-        if (payload.new.workflow_id && payload.new.workflow_id.toString().includes('qualif') && current.completedIds.length >= current.total) {
-          const updated: QualifyProgressState = {
-            ...current,
-            isDone: true,
-          };
-          setQualifyProgress(updated);
-          qualifyProgressRef.current = updated;
-          onRefresh();
+      } else if (statut === 'COMPLETED' || statut === 'SUCCESS' || statut === 'FAIL' || statut === 'ERROR' || statut === 'FAILED') {
+        // Workflow completion or abnormal termination: finalize and dismiss cleanly
+        console.log('[QUALIFY-SOCKET] Workflow terminal status received:', statut);
+        const updated: QualifyProgressState = {
+          ...current,
+          isDone: true,
+          hasErrors: (current.failedIds && current.failedIds.length > 0) || isError
+        };
+        setQualifyProgress(updated);
+        qualifyProgressRef.current = updated;
+        onRefresh();
 
-          if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
-          dismissTimerRef.current = setTimeout(() => {
-            setQualifyProgress(null);
-            qualifyProgressRef.current = null;
-          }, 4000);
-        }
+        if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = setTimeout(() => {
+          setQualifyProgress(null);
+          qualifyProgressRef.current = null;
+        }, 4500);
       }
     }
 
@@ -513,32 +612,43 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
           active: true,
           total: 1,
           completedIds: [],
+          failedIds: [],
           targetIds: [qualLeadId],
           latestMessage: "Évaluation enregistrée par l'IA...",
-          isDone: false
+          isDone: false,
+          hasErrors: false
         };
 
         if (activeCurrent.targetIds.length === 0 || activeCurrent.targetIds.includes(qualLeadId)) {
           if (!activeCurrent.completedIds.includes(qualLeadId)) {
             const newCompleted = [...activeCurrent.completedIds, qualLeadId];
-            const isFinished = newCompleted.length >= activeCurrent.total;
-            console.log(`[QUALIFY-SOCKET] Qualification DB row detected for lead #${qualLeadId} (${newCompleted.length}/${activeCurrent.total})`);
+            const newFailed = (activeCurrent.failedIds || []).filter(id => id !== qualLeadId);
+            const totalProcessed = newCompleted.length + newFailed.length;
+            const isFinished = totalProcessed >= activeCurrent.total;
+            console.log(`[QUALIFY-SOCKET] Qualification DB row detected for lead #${qualLeadId} (${totalProcessed}/${activeCurrent.total})`);
+
+            const foundLead = leads.find(l => l.id === qualLeadId);
+            const leadLabel = foundLead ? `${foundLead.prenom || ''} ${foundLead.nom || ''}`.trim() : `Lead #${qualLeadId}`;
 
             const updated: QualifyProgressState = {
               ...activeCurrent,
               completedIds: newCompleted,
+              failedIds: newFailed,
+              latestMessage: `Évaluation enregistrée pour ${leadLabel}`,
               isDone: isFinished,
+              hasErrors: newFailed.length > 0
             };
             setQualifyProgress(updated);
             qualifyProgressRef.current = updated;
             onRefresh();
 
             if (isFinished) {
+              if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
               if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
               dismissTimerRef.current = setTimeout(() => {
                 setQualifyProgress(null);
                 qualifyProgressRef.current = null;
-              }, 4000);
+              }, 4500);
             }
           }
         }
@@ -1209,15 +1319,42 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
     setUploadMessage(null);
 
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
     setFakePercent(14);
     setQualifyProgress({
       active: true,
       total: count,
       completedIds: [],
+      failedIds: [],
       targetIds: lead_ids,
       latestMessage: "Initialisation et analyse des profils par l'IA...",
-      isDone: false
+      isDone: false,
+      hasErrors: false
     });
+
+    // 60s Safety timeout: ensure UI progress never hangs if workflow terminates abnormally
+    safetyTimerRef.current = setTimeout(() => {
+      const cur = qualifyProgressRef.current;
+      if (cur && cur.active && !cur.isDone) {
+        console.warn('[QUALIFY-SOCKET] Safety timeout reached (60s). Finalizing qualification progress.');
+        const finalized: QualifyProgressState = {
+          ...cur,
+          isDone: true,
+          hasErrors: (cur.failedIds && cur.failedIds.length > 0) || cur.completedIds.length < cur.total,
+          latestMessage: cur.completedIds.length > 0
+            ? `Qualification terminée (${cur.completedIds.length}/${cur.total})`
+            : "Évaluation terminée"
+        };
+        setQualifyProgress(finalized);
+        qualifyProgressRef.current = finalized;
+        onRefresh();
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = setTimeout(() => {
+          setQualifyProgress(null);
+          qualifyProgressRef.current = null;
+        }, 4500);
+      }
+    }, 60000);
 
     const qualifyIdempotencyKey = count === 1
       ? `qualify-lead:${agentId}:${lead_ids[0]}`
@@ -1238,6 +1375,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
         throw new Error('Erreur API qualification');
       }
     } catch (err: unknown) {
+      if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
       setQualifyProgress(null);
       setUploadMessage({
         text: `Erreur lors de la qualification automatique : ${err instanceof Error ? err.message : 'Erreur interne'}`,
@@ -1265,16 +1403,43 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
     setUploadMessage(null);
 
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
     setFakePercent(14);
     setQualifyProgress({
       active: true,
       total: count,
       completedIds: [],
+      failedIds: [],
       targetIds: lead_ids,
       latestMessage: "Initialisation et analyse des profils par l'IA...",
-      isDone: false
+      isDone: false,
+      hasErrors: false
     });
     setSelectedLeadIds([]);
+
+    // 60s Safety timeout: ensure UI progress never hangs if workflow terminates abnormally
+    safetyTimerRef.current = setTimeout(() => {
+      const cur = qualifyProgressRef.current;
+      if (cur && cur.active && !cur.isDone) {
+        console.warn('[QUALIFY-SOCKET] Safety timeout reached (60s). Finalizing qualification progress.');
+        const finalized: QualifyProgressState = {
+          ...cur,
+          isDone: true,
+          hasErrors: (cur.failedIds && cur.failedIds.length > 0) || cur.completedIds.length < cur.total,
+          latestMessage: cur.completedIds.length > 0
+            ? `Qualification terminée (${cur.completedIds.length}/${cur.total})`
+            : "Évaluation terminée"
+        };
+        setQualifyProgress(finalized);
+        qualifyProgressRef.current = finalized;
+        onRefresh();
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = setTimeout(() => {
+          setQualifyProgress(null);
+          qualifyProgressRef.current = null;
+        }, 4500);
+      }
+    }, 60000);
 
     const qualifyIdempotencyKey = count === 1
       ? `qualify-lead:${agentId}:${lead_ids[0]}`
@@ -1296,6 +1461,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
       }
       // Live progress and dynamic increments are handled in real-time by qualifyProgress via WebSocket!
     } catch (err: unknown) {
+      if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
       setQualifyProgress(null);
       setUploadMessage({
         text: `Erreur lors de la qualification : ${err instanceof Error ? err.message : 'Erreur interne'}`,
@@ -1467,15 +1633,33 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
                     width: 24,
                     height: 24,
                     borderRadius: '50%',
-                    background: 'rgba(0, 229, 160, 0.15)',
-                    border: '1px solid rgba(0, 229, 160, 0.4)',
+                    background: qualifyProgress.hasErrors && qualifyProgress.completedIds.length === 0
+                      ? 'rgba(255, 71, 87, 0.15)'
+                      : qualifyProgress.hasErrors
+                      ? 'rgba(255, 184, 0, 0.15)'
+                      : 'rgba(0, 229, 160, 0.15)',
+                    border: `1px solid ${
+                      qualifyProgress.hasErrors && qualifyProgress.completedIds.length === 0
+                        ? 'rgba(255, 71, 87, 0.4)'
+                        : qualifyProgress.hasErrors
+                        ? 'rgba(255, 184, 0, 0.4)'
+                        : 'rgba(0, 229, 160, 0.4)'
+                    }`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    color: '#00E5A0'
+                    color: qualifyProgress.hasErrors && qualifyProgress.completedIds.length === 0
+                      ? '#FF4757'
+                      : qualifyProgress.hasErrors
+                      ? '#FFB800'
+                      : '#00E5A0'
                   }}
                 >
-                  <CheckCircle2 size={15} />
+                  {qualifyProgress.hasErrors && qualifyProgress.completedIds.length === 0 ? (
+                    <AlertCircle size={15} />
+                  ) : (
+                    <CheckCircle2 size={15} />
+                  )}
                 </div>
               ) : (
                 <div
@@ -1501,12 +1685,22 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
                   style={{
                     fontSize: '0.9rem',
                     fontWeight: 600,
-                    color: qualifyProgress.isDone ? '#00E5A0' : '#F0F4F8',
+                    color: qualifyProgress.isDone
+                      ? (qualifyProgress.hasErrors && qualifyProgress.completedIds.length === 0
+                          ? '#FF4757'
+                          : qualifyProgress.hasErrors
+                          ? '#FFB800'
+                          : '#00E5A0')
+                      : '#F0F4F8',
                     letterSpacing: '0.01em'
                   }}
                 >
                   {qualifyProgress.isDone
-                    ? `Qualification terminée avec succès (${qualifyProgress.completedIds.length}/${qualifyProgress.total})`
+                    ? (qualifyProgress.failedIds && qualifyProgress.failedIds.length > 0
+                        ? (qualifyProgress.completedIds.length > 0
+                            ? `Qualification terminée (${qualifyProgress.completedIds.length} qualifié${qualifyProgress.completedIds.length > 1 ? 's' : ''}, ${qualifyProgress.failedIds.length} non retenu${qualifyProgress.failedIds.length > 1 ? 's' : ''})`
+                            : `Évaluation terminée (${qualifyProgress.failedIds.length} non retenu${qualifyProgress.failedIds.length > 1 ? 's' : ''})`)
+                        : `Qualification terminée avec succès (${qualifyProgress.completedIds.length}/${qualifyProgress.total})`)
                     : `Qualification IA en direct...`}
                 </span>
                 {!qualifyProgress.isDone && (
@@ -1532,7 +1726,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
                       }}
                     />
                     <span>
-                      Analyse IA en cours (Lead #{Math.min(qualifyProgress.completedIds.length + 1, qualifyProgress.total)} sur {qualifyProgress.total})...
+                      Analyse IA en cours (Lead #{Math.min(qualifyProgress.completedIds.length + (qualifyProgress.failedIds?.length || 0) + 1, qualifyProgress.total)} sur {qualifyProgress.total})...
                     </span>
                   </span>
                 )}
@@ -1547,9 +1741,29 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
                   fontFamily: 'monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas',
                   fontSize: '0.85rem',
                   fontWeight: 700,
-                  color: qualifyProgress.isDone ? '#00E5A0' : '#00E5C8',
-                  background: qualifyProgress.isDone ? 'rgba(0, 229, 160, 0.1)' : 'rgba(0, 229, 200, 0.08)',
-                  border: `1px solid ${qualifyProgress.isDone ? 'rgba(0, 229, 160, 0.3)' : 'rgba(0, 229, 200, 0.25)'}`,
+                  color: qualifyProgress.isDone
+                    ? (qualifyProgress.hasErrors && qualifyProgress.completedIds.length === 0
+                        ? '#FF4757'
+                        : qualifyProgress.hasErrors
+                        ? '#FFB800'
+                        : '#00E5A0')
+                    : '#00E5C8',
+                  background: qualifyProgress.isDone
+                    ? (qualifyProgress.hasErrors && qualifyProgress.completedIds.length === 0
+                        ? 'rgba(255, 71, 87, 0.1)'
+                        : qualifyProgress.hasErrors
+                        ? 'rgba(255, 184, 0, 0.1)'
+                        : 'rgba(0, 229, 160, 0.1)')
+                    : 'rgba(0, 229, 200, 0.08)',
+                  border: `1px solid ${
+                    qualifyProgress.isDone
+                      ? (qualifyProgress.hasErrors && qualifyProgress.completedIds.length === 0
+                          ? 'rgba(255, 71, 87, 0.3)'
+                          : qualifyProgress.hasErrors
+                          ? 'rgba(255, 184, 0, 0.3)'
+                          : 'rgba(0, 229, 160, 0.3)')
+                      : 'rgba(0, 229, 200, 0.25)'
+                  }`,
                   padding: '3px 10px',
                   borderRadius: '6px',
                   letterSpacing: '0.04em',
@@ -1559,7 +1773,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
                 }}
               >
                 <span>
-                  {Math.min(qualifyProgress.completedIds.length, qualifyProgress.total)} / {qualifyProgress.total}
+                  {Math.min(qualifyProgress.completedIds.length + (qualifyProgress.failedIds?.length || 0), qualifyProgress.total)} / {qualifyProgress.total}
                 </span>
                 <span style={{ opacity: 0.6 }}>•</span>
                 <span>
@@ -1572,6 +1786,7 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
                 type="button"
                 onClick={() => {
                   if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+                  if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
                   setQualifyProgress(null);
                 }}
                 style={{
@@ -1607,8 +1822,26 @@ export default function LeadsView({ leads, threshold, onOpenLead, onRefresh, isN
             }}
           >
             {qualifyProgress.isDone ? (
-              /* Solid Emerald Full Bar when Complete */
-              <div className="void-complete-bar" />
+              /* Solid Bar when Complete */
+              qualifyProgress.hasErrors && qualifyProgress.completedIds.length === 0 ? (
+                <div
+                  className="void-complete-bar"
+                  style={{
+                    background: 'linear-gradient(90deg, #FF4757 0%, #FF6B81 100%)',
+                    boxShadow: '0 0 15px rgba(255, 71, 87, 0.45)'
+                  }}
+                />
+              ) : qualifyProgress.hasErrors ? (
+                <div
+                  className="void-complete-bar"
+                  style={{
+                    background: 'linear-gradient(90deg, #00E5A0 0%, #FFB800 100%)',
+                    boxShadow: '0 0 15px rgba(0, 229, 160, 0.35)'
+                  }}
+                />
+              ) : (
+                <div className="void-complete-bar" />
+              )
             ) : (
               /* Infinite Full Bar Looping in the Void */
               <div className="void-stream-bar">
