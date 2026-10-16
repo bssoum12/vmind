@@ -5,6 +5,7 @@ import { sendVmindMessage } from '@/shared/api/n8n-api';
 import { ToolResultRenderer } from './renderers/ToolResultRenderer';
 import { resolveAgentFromTool, AGENTS } from '@/shared/constants/data';
 import { useConversations } from '@/shared/contexts/ConversationsContext';
+import { useConnections } from '@/shared/contexts/ConnectionsContext';
 
 interface VmindChatProps {
   initialPrompt?: string;
@@ -237,6 +238,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   activeAgentId = "VMIND"
 }) => {
   const { activeConversationId, setActiveConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle, refreshConversations } = useConversations();
+  const { activeConnection } = useConnections();
   const [input, setInput] = useState('');
   const [isErpConnected, setIsErpConnected] = useState<boolean>(false);
   const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
@@ -477,9 +479,14 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       }
 
       const controller = new AbortController();
-      abortControllersRef.current[targetConvId] = controller;
-      let response = await sendVmindMessage(text, targetConvId, effectiveAgentId, clientId, controller.signal);
-      delete abortControllersRef.current[targetConvId];
+      let response = await sendVmindMessage(
+        text,
+        targetConvId,
+        effectiveAgentId,
+        activeConnection?.client_id || clientId,
+        controller.signal,
+        activeConnection?.id
+      );
 
       if (activeConversationIdRef.current !== targetConvId) return;
 

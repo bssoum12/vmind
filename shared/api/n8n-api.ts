@@ -28,7 +28,14 @@ const getAuthHeaders = (baseHeaders: Record<string, string> = {}): Record<string
 /**
  * Appelle n8n via le Proxy du Backend pour éviter les problèmes de CORS
  */
-export async function sendVmindMessage(message: string, conversationId: string, agentId: string, clientId = "DEMO", signal?: AbortSignal): Promise<VmindN8nResponse> {
+export async function sendVmindMessage(
+  message: string,
+  conversationId: string,
+  agentId: string,
+  clientId = "DEMO",
+  signal?: AbortSignal,
+  connectionId?: number | string | null
+): Promise<VmindN8nResponse> {
   const sessionId = getVmindSessionId();
 
   // On utilise une variable d'environnement pour Vercel, ou localhost par défaut
@@ -36,7 +43,7 @@ export async function sendVmindMessage(message: string, conversationId: string, 
   const proxyUrl = `${baseUrl}/api/n8n-proxy`;
 
   const agentCode = (agentId || "VFIN").toUpperCase();
-  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode });
+  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, connection_id: connectionId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode });
 
   try {
     const response = await fetch(proxyUrl, {
@@ -46,6 +53,7 @@ export async function sendVmindMessage(message: string, conversationId: string, 
       body: JSON.stringify({
         message,
         client_id: clientId,
+        connection_id: connectionId,
         vmind_session_id: sessionId,
         conversation_id: conversationId,
         agent_id: agentId,
@@ -363,11 +371,13 @@ export async function fetchN8nKpis(
     target_tool?: string;
     forceRefresh?: boolean;
     horizon?: string;
+    connection_id?: number | string | null;
+    erp_type?: string;
   },
   signal?: AbortSignal
 ): Promise<any> {
   const proxyUrl = `${getBaseUrl()}/api/n8n-proxy/kpis-agent`;
-  const erp_name = "TraLis"; // Default ERP name
+  const erp_name = params.erp_type || "tralis";
 
   const response = await secureFetch(proxyUrl, {
     method: "POST",
@@ -378,6 +388,8 @@ export async function fetchN8nKpis(
     body: JSON.stringify({
       allowed_agents: params.allowed_agents,
       erp_name,
+      erp_type: erp_name,
+      connection_id: params.connection_id,
       startDate: params.startDate,
       endDate: params.endDate,
       target_tool: params.target_tool,
@@ -474,160 +486,3 @@ export async function triggerProspectAutoMode(agentId: string): Promise<any> {
   return res.json();
 }
 
-
-/**
- * Récupère le KPI VBUY #1 : Factures à régler (TND)
- */
-export async function getVbuyKpiFacturesARegler(
-  clientId: string = "DEMO",
-  horizon: string = "1m",
-  startDate?: string,
-  endDate?: string
-): Promise<any> {
-  const baseUrl = getBaseUrl();
-  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-factures-a-regler`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders()
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      horizon,
-      startDate,
-      endDate
-    })
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || `Erreur VBUY KPI (${response.status})`);
-  }
-
-  const json = await response.json();
-  return json?.data || json;
-}
-
-/**
- * Récupère le KPI VBUY #2 : Achats du mois (TND)
- */
-export async function getVbuyKpiAchatsDuMois(
-  clientId: string = "DEMO",
-  startDate?: string,
-  endDate?: string
-): Promise<any> {
-  const baseUrl = getBaseUrl();
-  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-achats-du-mois`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders()
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      startDate,
-      endDate
-    })
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || `Erreur VBUY KPI Achats (${response.status})`);
-  }
-
-  const json = await response.json();
-  return json?.data || json;
-}
-
-/**
- * Récupère le KPI VBUY #3 : Fournisseurs en retard de livraison
- */
-export async function getVbuyKpiFournisseursEnRetardLivraison(
-  clientId: string = "DEMO",
-  startDate?: string,
-  endDate?: string
-): Promise<any> {
-  const baseUrl = getBaseUrl();
-  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-fournisseurs-en-retard-livraison`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders()
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      startDate,
-      endDate
-    })
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || `Erreur VBUY KPI Fournisseurs en retard (${response.status})`);
-  }
-
-  const json = await response.json();
-  return json?.data || json;
-}
-
-/**
- * Récupère le KPI VBUY #4 : Commandes en attente de réception
- */
-export async function getVbuyKpiCommandesEnAttente(
-  clientId: string = "DEMO",
-  startDate?: string,
-  endDate?: string
-): Promise<any> {
-  const baseUrl = getBaseUrl();
-  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-commandes-en-attente`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders()
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      startDate,
-      endDate
-    })
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || `Erreur VBUY KPI Commandes en attente (${response.status})`);
-  }
-
-  const json = await response.json();
-  return json?.data || json;
-}
-
-/**
- * Récupère le KPI VBUY #5 : Répartition des dépenses par catégorie (Pie Chart)
- */
-export async function getVbuyKpiRepartitionParCategorie(
-  clientId: string = "DEMO",
-  startDate?: string,
-  endDate?: string
-): Promise<any> {
-  const baseUrl = getBaseUrl();
-  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-repartition-par-categorie`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders()
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      startDate,
-      endDate
-    })
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || `Erreur VBUY KPI Répartition Catégorie (${response.status})`);
-  }
-
-  const json = await response.json();
-  return json?.data || json;
-}

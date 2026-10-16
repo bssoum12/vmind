@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 
 import { ModeProvider } from "@/shared/contexts/ModeContext";
 import { SessionTimeoutProvider } from "@/components/vmind/SessionTimeoutProvider";
+import { ConnectionsProvider } from "@/shared/contexts/ConnectionsContext";
 import { KpiCacheProvider } from "@/shared/contexts/KpiCacheContext";
 import { ToastProvider } from "@/shared/contexts/ToastContext";
 
@@ -24,10 +25,12 @@ export default function RootLayout({
         <ToastProvider>
           <ModeProvider>
             <SessionTimeoutProvider>
-              <KpiCacheProvider>
-                <TopBar />
-                {children}
-              </KpiCacheProvider>
+              <ConnectionsProvider>
+                <KpiCacheProvider>
+                  <TopBar />
+                  {children}
+                </KpiCacheProvider>
+              </ConnectionsProvider>
             </SessionTimeoutProvider>
           </ModeProvider>
         </ToastProvider>
