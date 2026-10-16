@@ -140,6 +140,10 @@ function triggerRuleSummary(rules: any[]): string {
 }
 
 function getPlanificationSummary(agent: LiveAgent): string {
+  if (!agent.schedule_id) {
+    return 'Aucune règle';
+  }
+
   const rules = (agent.trigger_rules && agent.trigger_rules.length > 0)
     ? agent.trigger_rules
     : (agent.config?.trigger_rules || []);
@@ -633,11 +637,11 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     return null;
   };
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (forceFresh: boolean = false) => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getAgents();
+      const data = await getAgents(forceFresh);
       const sortedData = data.sort((a: LiveAgent, b: LiveAgent) => {
         const timeA = a.deployed_at || 0;
         const timeB = b.deployed_at || 0;
@@ -960,7 +964,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
             <Info size={12} />
             Relancer le tutoriel
           </button>
-          <button className="btn" onClick={refresh} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '11px', padding: '4px 10px', height: '28px', whiteSpace: 'nowrap' }}>
+          <button className="btn" onClick={() => refresh(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '11px', padding: '4px 10px', height: '28px', whiteSpace: 'nowrap' }}>
             <RefreshCw size={12} />
             Rafraîchir
           </button>
@@ -1524,6 +1528,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                   body: JSON.stringify({
                     target_agent_ids: params.target_agent_ids || scheduleModalAgent.target_agent_ids,
                     update_defaults: params.update_defaults,
+                    totalLeads: params.totalLeads,
+                    leadsPerCompany: params.leadsPerCompany,
                     workflow_timezone: getBrowserTimezone()
                   })
                 });

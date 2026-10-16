@@ -4,9 +4,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ConnectorsCatalog } from './components/ConnectorsCatalog';
 import { TralisConnectorPanel } from './components/TralisConnectorPanel';
 import { OdooConnectorPanel } from './components/OdooConnectorPanel';
+import { GenericErpConnectorPanel } from './components/GenericErpConnectorPanel';
 import { ComingSoonPanel } from './components/ComingSoonPanel';
 import { jwtDecode } from 'jwt-decode';
 import { broadcastMcpSessionUpdate } from '@/shared/utils/sessionBroadcast';
+import { useConnections } from '@/shared/contexts/ConnectionsContext';
 
 // ─── Shared MCP session state ─────────────────────────────────────────────────
 // Lifted to the Hub so it survives navigation between connectors.
@@ -24,6 +26,7 @@ export interface McpSession {
 
 export const ConnectorsHub: React.FC = () => {
   const [activeConnector, setActiveConnector] = useState<string>('tralis');
+  const { erpTypes } = useConnections();
 
   // ── Global TraLIS MCP session — persists across connector navigation ──────
   const [tralisStatus,  setTralisStatus]  = useState<'loading' | 'idle' | 'connected' | 'error'>('loading');
@@ -136,11 +139,20 @@ export const ConnectorsHub: React.FC = () => {
     localStorage.removeItem('vmind_allowed_agents');
 
     const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
-    const roles: string[] = rawData.user?.roles || rawData.roles || ['Administrator'];
+    const rawRoles = rawData.user?.roles || rawData.roles;
+    const roles: string[] = (Array.isArray(rawRoles) && rawRoles.length > 0)
+      ? rawRoles
+      : (typeof rawRoles === 'string' && rawRoles ? [rawRoles] : ['Administrator']);
+
     const isAdmin = roles.some((r: string) =>
       ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
     );
-    const resolvedAgents: string[] = rawData.user?.allowedAgents || rawData.allowedAgents || (isAdmin ? ALL_AGENTS : []);
+
+    const rawAgents = rawData.user?.allowedAgents || rawData.allowedAgents;
+    const receivedAgents: string[] = (Array.isArray(rawAgents) && rawAgents.length > 0)
+      ? rawAgents
+      : [];
+    const resolvedAgents = receivedAgents.length > 0 ? receivedAgents : (isAdmin ? ALL_AGENTS : []);
 
     const normalizedSession: McpSession = {
       user: {
@@ -149,14 +161,19 @@ export const ConnectorsHub: React.FC = () => {
         roles,
         allowedAgents: resolvedAgents
       },
-      tools: rawData.tools || [],
-      allTools: rawData.allTools || []
+      tools: (Array.isArray(rawData.tools) && rawData.tools.length > 0) ? rawData.tools : [],
+      allTools: (Array.isArray(rawData.allTools) && rawData.allTools.length > 0) ? rawData.allTools : []
     };
 
     console.log('[ConnectorsHub] 🔗 connecté — user:', normalizedSession.user.username, 'agents:', resolvedAgents);
     setTralisSession(normalizedSession);
     setTralisStatus('connected');
     broadcastMcpSessionUpdate({ ...normalizedSession, connected: true });
+
+    // Synchronisation d'arrière-plan avec /status si la liste d'outils est vide
+    if (normalizedSession.tools.length === 0) {
+      initTralisMcp();
+    }
   };
 
   /** Called by TralisConnectorPanel on explicit disconnect */
@@ -216,6 +233,14 @@ export const ConnectorsHub: React.FC = () => {
         <div style={{ display: activeConnector === 'odoo' ? 'block' : 'none' }}>
           <OdooConnectorPanel />
         </div>
+
+        {erpTypes
+          .filter(e => e.id !== 'tralis' && e.id !== 'odoo')
+          .map(erp => (
+            <div key={erp.id} style={{ display: activeConnector === erp.id ? 'block' : 'none' }}>
+              <GenericErpConnectorPanel erpType={erp} />
+            </div>
+          ))}
 
         {activeConnector === 'web' && <ComingSoonPanel name="Recherche Web" />}
       </div>

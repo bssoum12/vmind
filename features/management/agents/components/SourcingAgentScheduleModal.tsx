@@ -7,6 +7,7 @@ import { VMindGuide } from '@/shared/management/components/VMindGuide';
 import { extractIcpFromAgent, buildSourcingConclusionFromIcp } from '../../wizard/helpers/sourcingIcpHelper';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { parseHourString } from '@/shared/utils/timezone';
+import { getSourcingLeadsRange, getAgents } from '@/shared/api/n8n-api';
 
 export interface TriggerRule {
   interval: string;
@@ -51,7 +52,11 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
 
   // Sourcing Execution Parameters
   const [allowExistingCompanies, setAllowExistingCompanies] = useState(false);
-  const [leadsToFind, setLeadsToFind] = useState<number>(50);
+  const [allowExistingVisible, setAllowExistingVisible] = useState<boolean>(true);
+  const savedTotalLeads = Number(agent?.config?.totalLeads || (agent as any)?.totalLeads || (agent as any)?.parameters?.totalLeads);
+  const initialTotalLeads = !isNaN(savedTotalLeads) && savedTotalLeads >= 1 ? savedTotalLeads : 5;
+  const [leadsToFind, setLeadsToFind] = useState<number>(initialTotalLeads);
+  const [leadsRange, setLeadsRange] = useState<{ min: number; max: number }>({ min: 1, max: 15 });
   const [leadsPerCompany, setLeadsPerCompany] = useState<number>(2);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -99,15 +104,9 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
     const fetchProspectAgents = async () => {
       try {
         setIsLoadingProspects(true);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        const res = await fetch(`${baseUrl}/api/list-agents`, {
-          credentials: 'include'
-        });
-        if (res.ok && isMounted) {
-          const data = await res.json();
-          if (data.ok && Array.isArray(data.agents)) {
-            setAvailableProspectAgents(data.agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement')));
-          }
+        const agents = await getAgents();
+        if (isMounted && Array.isArray(agents)) {
+          setAvailableProspectAgents(agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement')));
         }
       } catch (err) {
         console.error("Failed to fetch prospect agents:", err);
@@ -118,6 +117,22 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
       }
     };
     fetchProspectAgents();
+    return () => { isMounted = false; };
+  }, []);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    getSourcingLeadsRange().then(range => {
+      if (isMounted && range) {
+        setLeadsRange(range);
+        setLeadsToFind(prev => Math.max(range.min, Math.min(range.max, prev || range.min)));
+        const visible = range.allowExistingCompaniesVisible !== false;
+        setAllowExistingVisible(visible);
+        if (!visible) {
+          setAllowExistingCompanies(true);
+        }
+      }
+    }).catch(() => {});
     return () => { isMounted = false; };
   }, []);
 
@@ -273,8 +288,8 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
   };
 
   const handleConfigConfirm = () => {
-    if (leadsToFind <= 0 || leadsToFind > 100) {
-      onToast("Le nombre de leads doit être entre 1 et 100", "err");
+    if (leadsToFind < leadsRange.min || leadsToFind > leadsRange.max) {
+      onToast(`Le nombre de leads doit être entre ${leadsRange.min} et ${leadsRange.max}`, "err");
       return;
     }
     if (leadsPerCompany < 1 || leadsPerCompany > 10) {
@@ -295,7 +310,7 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
         sourcingSummary,
         totalLeads: leadsToFind,
         leadsPerCompany,
-        ignoreDuplicates: allowExistingCompanies,
+        ignoreDuplicates: allowExistingVisible ? allowExistingCompanies : true,
         target_agent_ids: selectedTargetAgentIds,
         update_defaults: true,
         trigger_rules: triggerRules
@@ -693,18 +708,18 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
                     {/* Leads to Find */}
                     <div style={{ background: 'rgba(0,0,0,0.2)', padding: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)' }}>
                       <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#F0F4F8', marginBottom: 6 }}>
-                        Volume de leads par exécution (Max 100)
+                        Volume de leads par exécution ({leadsRange.min} - {leadsRange.max})
                       </label>
                       <span style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 12 }}>
-                        Nombre de candidats à sourcer à chaque cycle planifié.
+                        Nombre de candidats à sourcer à chaque cycle planifié (entre {leadsRange.min} et {leadsRange.max}).
                       </span>
                       <input
                         type="number"
-                        min="1"
-                        max="100"
+                        min={leadsRange.min}
+                        max={leadsRange.max}
                         value={leadsToFind}
                         onChange={(e) => {
-                          const newTotal = Math.max(1, Math.min(100, parseInt(e.target.value) || 1));
+                          const newTotal = Math.max(leadsRange.min, Math.min(leadsRange.max, parseInt(e.target.value) || leadsRange.min));
                           setLeadsToFind(newTotal);
                           if (leadsPerCompany > newTotal) {
                             setLeadsPerCompany(Math.min(10, newTotal));
@@ -759,22 +774,24 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
 
                   {/* Options */}
                   <div style={{ background: 'rgba(0,0,0,0.2)', padding: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={allowExistingCompanies}
-                        onChange={(e) => setAllowExistingCompanies(e.target.checked)}
-                        style={{ accentColor: 'var(--cyan)', width: 16, height: 16, cursor: 'pointer' }}
-                      />
-                      <div>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#F0F4F8', display: 'block' }}>
-                          Autoriser les entreprises déjà prospectées
-                        </span>
-                        <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>
-                          Permet de sourcer de nouveaux contacts dans des sociétés existantes de votre base de données.
-                        </span>
-                      </div>
-                    </label>
+                    {allowExistingVisible && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={allowExistingCompanies}
+                          onChange={(e) => setAllowExistingCompanies(e.target.checked)}
+                          style={{ accentColor: 'var(--cyan)', width: 16, height: 16, cursor: 'pointer' }}
+                        />
+                        <div>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: '#F0F4F8', display: 'block' }}>
+                            Autoriser les entreprises déjà prospectées
+                          </span>
+                          <span style={{ fontSize: 11, color: 'var(--muted)', display: 'block', marginTop: 2 }}>
+                            Permet de sourcer de nouveaux contacts dans des sociétés existantes de votre base de données.
+                          </span>
+                        </div>
+                      </label>
+                    )}
 
                     {/* Target Prospect Agents Section */}
                     <div style={{

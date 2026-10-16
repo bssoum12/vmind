@@ -222,11 +222,12 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
     };
   }, [isPublicPage]);
 
-  // 5. Vérification périodique d'arrière-plan de validité de la session (toutes les 60 secondes)
+  // 5. Vérification périodique d'arrière-plan de validité de la session (toutes les 60 secondes si actif)
   useEffect(() => {
     if (isPublicPage) return;
 
-    const interval = setInterval(async () => {
+    const checkSession = async () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
         const res = await fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' });
@@ -235,9 +236,21 @@ export const SessionTimeoutProvider = ({ children }: { children: ReactNode }) =>
           handleLogout();
         }
       } catch (e) {}
-    }, 60000);
+    };
 
-    return () => clearInterval(interval);
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        checkSession();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    const interval = setInterval(checkSession, 60000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(interval);
+    };
   }, [isPublicPage]);
 
   // Couleurs de la charte VMIND

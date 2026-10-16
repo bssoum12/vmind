@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, LayoutDashboard, Users, Mail, Activity, ArrowUpRight, X } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, Users, Activity, ArrowUpRight, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import DashboardView from '../../../features/management/sourcing-workspace/components/DashboardView';
@@ -622,8 +622,10 @@ export default function SourcingAgentWorkspacePage() {
           isOpen={isDrawerOpen}
           onClose={() => setIsDrawerOpen(false)}
           onRefresh={fetchData}
-          signature=""
-          defaultCc=""
+          agentId={agentId as string}
+          signature={agentData?.signature_email || agentData?.config?.campaign?.signature_email || ''}
+          signatureLogo={agentData?.signature_logo || agentData?.config?.signature_logo || agentData?.config?.campaign?.signature_logo || null}
+          defaultCc={agentData?.default_cc || agentData?.config?.campaign?.default_cc || ''}
         />
       )}
     </div>

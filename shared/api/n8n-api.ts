@@ -28,7 +28,14 @@ const getAuthHeaders = (baseHeaders: Record<string, string> = {}): Record<string
 /**
  * Appelle n8n via le Proxy du Backend pour éviter les problèmes de CORS
  */
-export async function sendVmindMessage(message: string, conversationId: string, agentId: string, clientId = "DEMO", signal?: AbortSignal): Promise<VmindN8nResponse> {
+export async function sendVmindMessage(
+  message: string,
+  conversationId: string,
+  agentId: string,
+  clientId = "DEMO",
+  signal?: AbortSignal,
+  connectionId?: number | string | null
+): Promise<VmindN8nResponse> {
   const sessionId = getVmindSessionId();
 
   // On utilise une variable d'environnement pour Vercel, ou localhost par défaut
@@ -36,7 +43,7 @@ export async function sendVmindMessage(message: string, conversationId: string, 
   const proxyUrl = `${baseUrl}/api/n8n-proxy`;
 
   const agentCode = (agentId || "VFIN").toUpperCase();
-  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode });
+  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, connection_id: connectionId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode });
 
   try {
     const response = await fetch(proxyUrl, {
@@ -46,6 +53,7 @@ export async function sendVmindMessage(message: string, conversationId: string, 
       body: JSON.stringify({
         message,
         client_id: clientId,
+        connection_id: connectionId,
         vmind_session_id: sessionId,
         conversation_id: conversationId,
         agent_id: agentId,
@@ -164,18 +172,44 @@ export async function resetReminders(invoiceRefs: string[]): Promise<any> {
  
 const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
 
+let inFlightGetAgents: Promise<any[]> | null = null;
+let cachedAgents: { data: any[]; timestamp: number } | null = null;
+let inFlightMarketplaceStats: Promise<MarketplaceStatsResponse> | null = null;
+let cachedMarketplaceStats: { data: MarketplaceStatsResponse; timestamp: number } | null = null;
+const CACHE_TTL_MS = 2500; // 2.5 seconds cache to deduplicate rapid successive calls
 
+export function invalidateAgentsCache(): void {
+  cachedAgents = null;
+  cachedMarketplaceStats = null;
+  cachedLeadsRange = null;
+}
 
 /**
- * Fetches all deployed agents from Redis (via backend)
+ * Fetches all deployed agents from Redis (via backend) with deduplication & caching
  */
-export async function getAgents(): Promise<any[]> {
-  const res = await secureFetch(`${getBaseUrl()}/api/list-agents`, {
-    headers: getAuthHeaders()
-  });
-  if (!res.ok) throw new Error(`Impossible de récupérer la liste des agents (${res.status})`);
-  const data = await res.json();
-  return data.agents || [];
+export async function getAgents(forceRefresh: boolean = false): Promise<any[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedAgents && (now - cachedAgents.timestamp < CACHE_TTL_MS)) {
+    return cachedAgents.data;
+  }
+  if (inFlightGetAgents) {
+    return inFlightGetAgents;
+  }
+  inFlightGetAgents = (async () => {
+    try {
+      const res = await secureFetch(`${getBaseUrl()}/api/list-agents`, {
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error(`Impossible de récupérer la liste des agents (${res.status})`);
+      const data = await res.json();
+      const agents = data.agents || [];
+      cachedAgents = { data: agents, timestamp: Date.now() };
+      return agents;
+    } finally {
+      inFlightGetAgents = null;
+    }
+  })();
+  return inFlightGetAgents;
 }
 
 export interface MarketplaceStatsResponse {
@@ -188,16 +222,30 @@ export interface MarketplaceStatsResponse {
   };
 }
 
-export async function getMarketplaceStats(): Promise<MarketplaceStatsResponse> {
-  try {
-    const res = await secureFetch(`${getBaseUrl()}/api/analytics/marketplace-stats`, {
-      headers: getAuthHeaders()
-    });
-    if (!res.ok) return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
-    return res.json();
-  } catch (_) {
-    return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
+export async function getMarketplaceStats(forceRefresh: boolean = false): Promise<MarketplaceStatsResponse> {
+  const now = Date.now();
+  if (!forceRefresh && cachedMarketplaceStats && (now - cachedMarketplaceStats.timestamp < CACHE_TTL_MS)) {
+    return cachedMarketplaceStats.data;
   }
+  if (inFlightMarketplaceStats) {
+    return inFlightMarketplaceStats;
+  }
+  inFlightMarketplaceStats = (async () => {
+    try {
+      const res = await secureFetch(`${getBaseUrl()}/api/analytics/marketplace-stats`, {
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
+      const data = await res.json();
+      cachedMarketplaceStats = { data, timestamp: Date.now() };
+      return data;
+    } catch (_) {
+      return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
+    } finally {
+      inFlightMarketplaceStats = null;
+    }
+  })();
+  return inFlightMarketplaceStats;
 }
 
 /**
@@ -213,6 +261,7 @@ export async function pauseAgent(agentName: string): Promise<any> {
     throw new Error(err.error || `Erreur lors de la mise en pause de l'agent (${res.status})`);
   }
   const result = await res.json();
+  invalidateAgentsCache();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
   }
@@ -237,6 +286,7 @@ export async function resumeAgent(agentName: string, params?: any): Promise<any>
     throw new Error(err.error || `Erreur lors de la reprise de l'agent (${res.status})`);
   }
   const result = await res.json();
+  invalidateAgentsCache();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
   }
@@ -256,6 +306,7 @@ export async function deleteAgent(agentName: string): Promise<any> {
     throw new Error(err.error || `Erreur lors de la suppression de l'agent (${res.status})`);
   }
   const result = await res.json();
+  invalidateAgentsCache();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
   }
@@ -339,7 +390,7 @@ export async function triggerAIQualificationAllPending(agentId: string): Promise
     method: "POST",
     headers: {
       ...getAuthHeaders(),
-      'Idempotency-Key': crypto.randomUUID()
+      'Idempotency-Key': `qualify-all-pending:${agentId}`
     },
   });
   if (!res.ok) {
@@ -363,11 +414,13 @@ export async function fetchN8nKpis(
     target_tool?: string;
     forceRefresh?: boolean;
     horizon?: string;
+    connection_id?: number | string | null;
+    erp_type?: string;
   },
   signal?: AbortSignal
 ): Promise<any> {
   const proxyUrl = `${getBaseUrl()}/api/n8n-proxy/kpis-agent`;
-  const erp_name = "TraLis"; // Default ERP name
+  const erp_name = params.erp_type || "tralis";
 
   const response = await secureFetch(proxyUrl, {
     method: "POST",
@@ -378,6 +431,8 @@ export async function fetchN8nKpis(
     body: JSON.stringify({
       allowed_agents: params.allowed_agents,
       erp_name,
+      erp_type: erp_name,
+      connection_id: params.connection_id,
       startDate: params.startDate,
       endDate: params.endDate,
       target_tool: params.target_tool,
@@ -428,6 +483,53 @@ export async function triggerSourcingRun(
   return res.json();
 }
 
+export interface SourcingExecutionConfig {
+  min: number;
+  max: number;
+  allowExistingCompaniesVisible: boolean;
+}
+
+let inFlightLeadsRange: Promise<SourcingExecutionConfig> | null = null;
+let cachedLeadsRange: { data: SourcingExecutionConfig; timestamp: number } | null = null;
+
+/**
+ * Fetches the admin-configured execution parameters (leads range + options visibility) for Sourcing Agents.
+ */
+export async function getSourcingLeadsRange(forceFresh: boolean = false): Promise<SourcingExecutionConfig> {
+  const now = Date.now();
+  if (!forceFresh && cachedLeadsRange && (now - cachedLeadsRange.timestamp < 3000)) {
+    return cachedLeadsRange.data;
+  }
+  if (inFlightLeadsRange) {
+    return inFlightLeadsRange;
+  }
+  inFlightLeadsRange = (async () => {
+    try {
+      const res = await secureFetch(`${getBaseUrl()}/api/sourcing-agent/leads-range`, {
+        headers: getAuthHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && typeof data.min === 'number' && typeof data.max === 'number') {
+          const config = { 
+            min: data.min, 
+            max: data.max,
+            allowExistingCompaniesVisible: data.allow_existing_companies_visible !== false
+          };
+          cachedLeadsRange = { data: config, timestamp: Date.now() };
+          return config;
+        }
+      }
+    } catch (err) {
+      console.warn('[getSourcingLeadsRange] Error retrieving leads range, using default 1-15:', err);
+    } finally {
+      inFlightLeadsRange = null;
+    }
+    return { min: 1, max: 15, allowExistingCompaniesVisible: true };
+  })();
+  return inFlightLeadsRange;
+}
+
 /**
  * Trigger immediate execution for Prospect Agent (Auto Mode)
  */
@@ -444,160 +546,3 @@ export async function triggerProspectAutoMode(agentId: string): Promise<any> {
   return res.json();
 }
 
-
-/**
- * Récupère le KPI VBUY #1 : Factures à régler (TND)
- */
-export async function getVbuyKpiFacturesARegler(
-  clientId: string = "DEMO",
-  horizon: string = "1m",
-  startDate?: string,
-  endDate?: string
-): Promise<any> {
-  const baseUrl = getBaseUrl();
-  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-factures-a-regler`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders()
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      horizon,
-      startDate,
-      endDate
-    })
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || `Erreur VBUY KPI (${response.status})`);
-  }
-
-  const json = await response.json();
-  return json?.data || json;
-}
-
-/**
- * Récupère le KPI VBUY #2 : Achats du mois (TND)
- */
-export async function getVbuyKpiAchatsDuMois(
-  clientId: string = "DEMO",
-  startDate?: string,
-  endDate?: string
-): Promise<any> {
-  const baseUrl = getBaseUrl();
-  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-achats-du-mois`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders()
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      startDate,
-      endDate
-    })
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || `Erreur VBUY KPI Achats (${response.status})`);
-  }
-
-  const json = await response.json();
-  return json?.data || json;
-}
-
-/**
- * Récupère le KPI VBUY #3 : Fournisseurs en retard de livraison
- */
-export async function getVbuyKpiFournisseursEnRetardLivraison(
-  clientId: string = "DEMO",
-  startDate?: string,
-  endDate?: string
-): Promise<any> {
-  const baseUrl = getBaseUrl();
-  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-fournisseurs-en-retard-livraison`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders()
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      startDate,
-      endDate
-    })
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || `Erreur VBUY KPI Fournisseurs en retard (${response.status})`);
-  }
-
-  const json = await response.json();
-  return json?.data || json;
-}
-
-/**
- * Récupère le KPI VBUY #4 : Commandes en attente de réception
- */
-export async function getVbuyKpiCommandesEnAttente(
-  clientId: string = "DEMO",
-  startDate?: string,
-  endDate?: string
-): Promise<any> {
-  const baseUrl = getBaseUrl();
-  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-commandes-en-attente`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders()
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      startDate,
-      endDate
-    })
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || `Erreur VBUY KPI Commandes en attente (${response.status})`);
-  }
-
-  const json = await response.json();
-  return json?.data || json;
-}
-
-/**
- * Récupère le KPI VBUY #5 : Répartition des dépenses par catégorie (Pie Chart)
- */
-export async function getVbuyKpiRepartitionParCategorie(
-  clientId: string = "DEMO",
-  startDate?: string,
-  endDate?: string
-): Promise<any> {
-  const baseUrl = getBaseUrl();
-  const response = await secureFetch(`${baseUrl}/api/tools/get-vbuy-kpi-repartition-par-categorie`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...getAuthHeaders()
-    },
-    body: JSON.stringify({
-      client_id: clientId,
-      startDate,
-      endDate
-    })
-  });
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || `Erreur VBUY KPI Répartition Catégorie (${response.status})`);
-  }
-
-  const json = await response.json();
-  return json?.data || json;
-}

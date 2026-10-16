@@ -25,10 +25,20 @@ import {
   ScanLine,
   FileSpreadsheet,
   Globe,
-  Zap
+  Zap,
+  Phone,
+  Smartphone,
+  Linkedin,
+  History,
+  Lock,
+  Eye,
+  Loader2,
+  FileText
 } from 'lucide-react';
 import { useToast } from '@/shared/contexts/ToastContext';
 import { useProspectSocket } from '../hooks/useProspectSocket';
+import { extractLeadMobile, extractCompanyPhone, extractJobHistory, maskCompanyLogoUrl } from '@/shared/utils/phoneExtractor';
+import { formatEmailDraft } from '@/shared/utils/emailFormatter';
 
 // Zero Technical Jargon policy: sanitize and translate raw backend logs for the end user
 function formatUserFacingMessage(raw?: string): string {
@@ -37,7 +47,15 @@ function formatUserFacingMessage(raw?: string): string {
   if (lower.includes('lancée') || lower.includes('initialisation') || lower.includes('démarrage') || (lower.includes('qualification de') && lower.includes('prospect'))) {
     return "Initialisation et analyse du profil par l'IA...";
   }
+  if (lower.includes('error') || lower.includes('erreur') || lower.includes('[object object]') || lower.includes('node ::')) {
+    return "Analyse non concluante pour ce prospect.";
+  }
   const clean = raw
+    .replace(/\[object Object\]/gi, '')
+    .replace(/in the\s+[^:]+::/gi, '')
+    .replace(/worklow\s+ID:[^:]+::/gi, '')
+    .replace(/workflow\s+ID:[^:]+::/gi, '')
+    .replace(/Execution\s+ID:[^:]+::/gi, '')
     .replace(/\s*via\s+n8n\.?/gi, '')
     .replace(/\s*\(n8n\)/gi, '')
     .replace(/\bn8n\b/gi, '')
@@ -56,6 +74,25 @@ const getAuthHeaders = () => {
     'Content-Type': 'application/json'
   };
 };
+
+interface JobHistoryItem {
+  company_name?: string;
+  company?: string;
+  companyName?: string;
+  entreprise?: string;
+  title?: string;
+  position?: string;
+  role?: string;
+  current?: boolean;
+  start_year?: number | string;
+  end_year?: number | string;
+  start_date?: string;
+  end_date?: string;
+  starts_at?: string;
+  ends_at?: string;
+  duration_in_months?: number;
+  description?: string;
+}
 
 interface Lead {
   id: number;
@@ -84,6 +121,23 @@ interface Lead {
   agent_emails_count?: number;
   date_envoi?: string | null;
   decision_maker?: boolean;
+  // Prospeo Enrichment fields
+  mobile?: string;
+  phone_hq?: string;
+  linkedin_url?: string;
+  company_logo_url?: string;
+  headline?: string;
+  city?: string;
+  country_code?: string;
+  industry?: string;
+  employee_count?: number;
+  job_history?: any;
+  sourcing_provider?: string;
+  domain?: string;
+  seniority?: string;
+  verification_status?: string;
+  person_raw?: any;
+  company_raw?: any;
 }
 
 interface LeadDetailDrawerProps {
@@ -92,7 +146,9 @@ interface LeadDetailDrawerProps {
   onClose: () => void;
   onRefresh: () => void;
   threshold: number;
+  agentId?: string;
   signature?: string;
+  signatureLogo?: any;
   defaultCc?: string;
 }
 
@@ -102,40 +158,108 @@ export default function LeadDetailDrawer({
   onClose, 
   onRefresh, 
   threshold, 
+  agentId,
   signature = '', 
+  signatureLogo = null,
   defaultCc = '' 
 }: LeadDetailDrawerProps) {
   const { showToast } = useToast();
   const [sujet, setSujet] = useState('');
   const [corps, setCorps] = useState('');
   const [cc, setCc] = useState('');
+  const [includeSignature, setIncludeSignature] = useState(true);
   const [statut, setStatut] = useState('');
   const [isQualifying, setIsQualifying] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isGeneratingEmail, setIsGeneratingEmail] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState(false);
+  const [copiedMobile, setCopiedMobile] = useState(false);
+  const [copiedPhoneHq, setCopiedPhoneHq] = useState(false);
   const [copiedProfile, setCopiedProfile] = useState(false);
+  const [logoError, setLogoError] = useState(false);
+  const [isRevealingPhone, setIsRevealingPhone] = useState(false);
+  const [revealedPhone, setRevealedPhone] = useState<string | null>(null);
+
+  const currentLeadIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!lead) {
+      currentLeadIdRef.current = null;
+      setLogoError(false);
+      setRevealedPhone(null);
+      setStatut('');
+      setCc(defaultCc || '');
+      setSujet('');
+      setCorps('');
+      setIsGeneratingEmail(false);
+      setIsSending(false);
+      setIsQualifying(false);
+      return;
+    }
+
+    const isDifferentLead = currentLeadIdRef.current !== lead.id;
+    currentLeadIdRef.current = lead.id;
+
+    if (isDifferentLead) {
+      // Switched to a new lead or first drawer open: initialize fresh state
+      setLogoError(false);
+      setRevealedPhone(null);
+      setStatut(lead.statut || (lead as any).statut_traitement || '');
+      setCc(lead.email_cc || (lead as any).cc || defaultCc || '');
+
+      const initialSujet = (lead as any).email_sujet || (lead as any).sujet || (lead as any).subject || (lead as any).objet || '';
+      const initialCorps = (lead as any).email_corps || (lead as any).corps || (lead as any).body || (lead as any).message || '';
+
+      setSujet(initialSujet);
+      setCorps(formatEmailDraft(initialCorps));
+      setIncludeSignature(true);
+      setIsGeneratingEmail(false);
+      setIsSending(false);
+      setIsQualifying(false);
+    } else {
+      // Same lead received an updated prop from background refetch:
+      // Update status if it changed
+      const updatedStatut = lead.statut || (lead as any).statut_traitement || '';
+      if (updatedStatut && updatedStatut !== statut) {
+        setStatut(updatedStatut);
+      }
+      // If user inputs are currently empty, and background data brought in draft text, fill it:
+      const incomingSujet = (lead as any).email_sujet || (lead as any).sujet || (lead as any).subject || (lead as any).objet || '';
+      const incomingCorps = (lead as any).email_corps || (lead as any).corps || (lead as any).body || (lead as any).message || '';
+      if (!sujet.trim() && incomingSujet) {
+        setSujet(incomingSujet);
+      }
+      if (!corps.trim() && incomingCorps) {
+        setCorps(formatEmailDraft(incomingCorps));
+      }
+    }
+  }, [lead?.id, (lead as any)?.email_sujet, (lead as any)?.email_corps, lead?.statut, defaultCc]);
 
   const params = useParams();
-  const agentId = params.agentId;
+  const activeAgentId = agentId || (params?.agentId as string);
 
   // Live Qualification Progress State (Tracked via WebSockets)
   interface DrawerQualifyProgress {
     active: boolean;
     isDone: boolean;
     message: string;
+    hasError?: boolean;
   }
   const [qualifyProgress, setQualifyProgress] = useState<DrawerQualifyProgress | null>(null);
   const qualifyProgressRef = useRef<DrawerQualifyProgress | null>(null);
   qualifyProgressRef.current = qualifyProgress;
   const [fakePercent, setFakePercent] = useState<number>(14);
   const dismissTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const safetyTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Clean up auto-dismiss timer on unmount
+  // Clean up timers on unmount
   useEffect(() => {
     return () => {
       if (dismissTimerRef.current) {
         clearTimeout(dismissTimerRef.current);
+      }
+      if (safetyTimerRef.current) {
+        clearTimeout(safetyTimerRef.current);
       }
     };
   }, []);
@@ -170,6 +294,7 @@ export default function LeadDetailDrawer({
     if (payload.table === 'prospect_agent_logs_execution' && payload.new) {
       const message = (payload.new.message || '').toString();
       const statut = (payload.new.statut || payload.new.status || '').toString().toUpperCase();
+      const etape = (payload.new.etape || '').toString();
 
       const isLaunchLog = message.includes('lancée via n8n') || (message.includes('Qualification de') && message.includes('prospect'));
       if (isLaunchLog) {
@@ -177,29 +302,45 @@ export default function LeadDetailDrawer({
         return;
       }
 
-      const isLeadEval = message.includes('Score ICP') || message.includes(`Lead #${lead.id}`) || (lead.nom && message.includes(lead.nom)) || (lead.entreprise && message.includes(lead.entreprise));
-      if (isLeadEval) {
-        setQualifyProgress((prev) => (prev ? { ...prev, message } : null));
-      }
+      const isError = statut === 'ERROR' || statut === 'FAIL' || statut === 'FAILED';
+      const leadRegex = new RegExp(`(?:lead|prospect)[_\\s]*(?:id\\s*[:=]|#)\\s*${lead.id}\\b|\\blead\\s*[:#]\\s*${lead.id}\\b`, 'i');
+      const isMatchingLead = leadRegex.test(message) ||
+                             message.includes(`Lead #${lead.id}`) ||
+                             message.includes(`Prospect #${lead.id}`) ||
+                             (lead.nom && message.toLowerCase().includes(lead.nom.toLowerCase())) ||
+                             (lead.entreprise && message.toLowerCase().includes(lead.entreprise.toLowerCase()));
 
-      if (statut === 'COMPLETED' || statut === 'SUCCESS') {
-        if (payload.new.workflow_id && payload.new.workflow_id.toString().includes('qualif')) {
-          setQualifyProgress((prev) => (prev ? { ...prev, isDone: true, message: "Évaluation terminée avec succès !" } : null));
+      if (isMatchingLead || (isError && (etape.toLowerCase().includes('qualif') || message.toLowerCase().includes('qualif')))) {
+        if (isError) {
+          setQualifyProgress((prev) => (prev ? {
+            ...prev,
+            isDone: true,
+            hasError: true,
+            message: "Analyse non concluante pour ce prospect."
+          } : null));
           onRefresh();
+          if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
           if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
           dismissTimerRef.current = setTimeout(() => {
             setQualifyProgress(null);
             qualifyProgressRef.current = null;
           }, 3500);
+          return;
+        } else {
+          setQualifyProgress((prev) => (prev ? { ...prev, message: formatUserFacingMessage(message) } : null));
         }
       }
-    }
 
-    // 2. Qualifications table trigger
-    if (payload.table === 'prospect_agent_qualifications' && payload.new) {
-      if (payload.new.lead_id === lead.id) {
-        setQualifyProgress((prev) => (prev ? { ...prev, isDone: true, message: "Évaluation terminée avec succès !" } : null));
+      if (statut === 'COMPLETED' || statut === 'SUCCESS' || statut === 'FAIL' || statut === 'ERROR' || statut === 'FAILED') {
+        const isFail = statut === 'FAIL' || statut === 'ERROR' || statut === 'FAILED';
+        setQualifyProgress((prev) => (prev ? {
+          ...prev,
+          isDone: true,
+          hasError: isFail,
+          message: isFail ? "Analyse non concluante pour ce prospect." : "Évaluation terminée avec succès !"
+        } : null));
         onRefresh();
+        if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
         if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
         dismissTimerRef.current = setTimeout(() => {
           setQualifyProgress(null);
@@ -208,11 +349,17 @@ export default function LeadDetailDrawer({
       }
     }
 
-    // 3. Email sent trigger
-    if (payload.table === 'prospect_agent_emails_envoyes') {
-      const targetLeadId = payload.new?.lead_id || payload.old?.lead_id;
-      if (!targetLeadId || targetLeadId === lead.id) {
+    // 2. Qualifications table trigger
+    if (payload.table === 'prospect_agent_qualifications' && payload.new) {
+      if (payload.new.lead_id === lead.id) {
+        setQualifyProgress((prev) => (prev ? { ...prev, isDone: true, hasError: false, message: "Évaluation terminée avec succès !" } : null));
         onRefresh();
+        if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = setTimeout(() => {
+          setQualifyProgress(null);
+          qualifyProgressRef.current = null;
+        }, 3500);
       }
     }
   });
@@ -226,19 +373,6 @@ export default function LeadDetailDrawer({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
-
-  useEffect(() => {
-    if (lead) {
-      setSujet(lead.sujet || '');
-      setStatut(lead.statut || '');
-      setCorps(lead.corps || '');
-      setCc(lead.email_cc !== undefined && lead.email_cc !== null ? lead.email_cc : (defaultCc || ''));
-
-      setIsQualifying(false);
-      setIsSending(false);
-      setIsGeneratingEmail(false);
-    }
-  }, [lead, defaultCc]);
 
   if (!lead || !isOpen) return null;
 
@@ -254,6 +388,63 @@ export default function LeadDetailDrawer({
   const strokeDashoffset = circumference - (safeScore / 100) * circumference;
   const scoreColor = safeScore >= 70 ? '#00E5C8' : safeScore >= 40 ? '#FFB800' : '#FF4757';
 
+  // Extract validated personal mobile (Zod)
+  const baseLeadPhone = extractLeadMobile(lead.mobile, lead.person_raw);
+  const leadPhone = revealedPhone || baseLeadPhone;
+  // Extract validated company HQ standard (Zod)
+  const companyPhone = extractCompanyPhone(lead.phone_hq, lead.company_raw);
+  // Extract validated job history (Zod)
+  const parsedJobHistory = extractJobHistory(lead.job_history, lead.person_raw);
+
+  const handleRevealPhone = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!lead || !activeAgentId || isRevealingPhone) return;
+
+    setIsRevealingPhone(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/agent-leads/${activeAgentId}/reveal-phone`, {
+        method: 'POST',
+        headers: {
+          ...getAuthHeaders(),
+          'Idempotency-Key': `phone-reveal:${activeAgentId}:${lead.id}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          leadId: lead.id,
+          id: lead.id,
+          agentUuid: activeAgentId
+        })
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (res.ok) {
+        const newPhone = data?.phone || data?.mobile || data?.phone_number || data?.revealed_phone;
+        if (newPhone && typeof newPhone === 'string' && !newPhone.includes('*')) {
+          setRevealedPhone(newPhone);
+        }
+        showToast('Numéro direct débloqué avec succès !', 'success');
+        onRefresh();
+      } else {
+        const errMsg = data?.error || 'Erreur lors du déblocage du numéro.';
+        showToast(errMsg, 'error');
+      }
+    } catch (error) {
+      console.error('Error revealing phone number:', error);
+      showToast('Erreur serveur lors de la demande de déblocage.', 'error');
+    } finally {
+      setIsRevealingPhone(false);
+    }
+  };
+
+  const formattedLocation = [
+    lead.city,
+    lead.pays,
+    lead.country_code ? `(${lead.country_code.toUpperCase()})` : null
+  ].filter(Boolean).join(', ') || 'Non renseigné';
+
+  const domainUrl = lead.domain ? (lead.domain.startsWith('http') ? lead.domain : `https://${lead.domain}`) : null;
+
   const handleCopyEmail = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigator.clipboard.writeText(lead.email);
@@ -262,18 +453,42 @@ export default function LeadDetailDrawer({
     setTimeout(() => setCopiedEmail(false), 2000);
   };
 
+  const handleCopyMobile = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!leadPhone) return;
+    navigator.clipboard.writeText(leadPhone);
+    setCopiedMobile(true);
+    showToast('Numéro mobile copié !', 'info');
+    setTimeout(() => setCopiedMobile(false), 2000);
+  };
+
+  const handleCopyPhoneHq = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!companyPhone) return;
+    navigator.clipboard.writeText(companyPhone);
+    setCopiedPhoneHq(true);
+    showToast('Standard entreprise copié !', 'info');
+    setTimeout(() => setCopiedPhoneHq(false), 2000);
+  };
+
   const handleCopyProfile = () => {
     const profileText = [
       `FICHE PROSPECT: ${lead.prenom} ${lead.nom}`,
       `Entreprise: ${lead.entreprise || 'Non spécifiée'}`,
+      lead.domain ? `Site Web: ${lead.domain}` : null,
       `Poste: ${lead.poste || 'Non spécifié'}`,
+      lead.headline ? `Bio / Headline: ${lead.headline}` : null,
       `Email: ${lead.email}`,
-      `Secteur: ${lead.secteur || 'Non renseigné'}`,
-      `Effectif: ${lead.taille_ent ? `${lead.taille_ent} employés` : 'Non renseigné'}`,
-      `Pays: ${lead.pays || 'Non renseigné'}`,
+      leadPhone ? `Mobile Direct: ${leadPhone}` : null,
+      companyPhone ? `Standard HQ: ${companyPhone}` : null,
+      lead.linkedin_url ? `LinkedIn: ${lead.linkedin_url}` : null,
+      `Secteur / Industrie: ${lead.industry || lead.secteur || 'Non renseigné'}`,
+      `Effectif: ${(lead.employee_count || lead.taille_ent) ? `${lead.employee_count || lead.taille_ent} collaborateurs` : 'Non renseigné'}`,
+      `Localisation: ${[lead.city, lead.pays, lead.country_code ? `(${lead.country_code.toUpperCase()})` : null].filter(Boolean).join(', ') || 'Non renseigné'}`,
       `Score IA: ${scoreVal !== null ? `${scoreVal}/100` : 'Non analysé'}`,
-      `Statut: ${statut || 'En attente'}`
-    ].join('\n');
+      `Statut: ${statut || 'En attente'}`,
+      `Provenance: ${lead.sourcing_provider ? 'Sourcing IA' : lead.source}`
+    ].filter(Boolean).join('\n');
 
     navigator.clipboard.writeText(profileText);
     setCopiedProfile(true);
@@ -284,7 +499,7 @@ export default function LeadDetailDrawer({
   const handleManualStatusChange = async (newStatus: string) => {
     setStatut(newStatus);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/agent-leads/${activeAgentId}`, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         credentials: 'include',
@@ -307,17 +522,37 @@ export default function LeadDetailDrawer({
   };
 
   const handleQualifyIA = async () => {
-    if (!lead || !agentId) return;
+    if (!lead || !activeAgentId) return;
     setIsQualifying(true);
     if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
     setFakePercent(14);
     const newState: DrawerQualifyProgress = {
       active: true,
       isDone: false,
-      message: "Initialisation et analyse du profil par l'IA..."
+      message: "Initialisation et analyse du profil par l'IA...",
+      hasError: false
     };
     setQualifyProgress(newState);
     qualifyProgressRef.current = newState;
+
+    safetyTimerRef.current = setTimeout(() => {
+      const cur = qualifyProgressRef.current;
+      if (cur && cur.active && !cur.isDone) {
+        setQualifyProgress({
+          active: true,
+          isDone: true,
+          hasError: false,
+          message: "Évaluation terminée"
+        });
+        onRefresh();
+        if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+        dismissTimerRef.current = setTimeout(() => {
+          setQualifyProgress(null);
+          qualifyProgressRef.current = null;
+        }, 3500);
+      }
+    }, 45000);
 
     // Dispatch global window event so LeadsView (and background) activates its cyber progress bar
     if (typeof window !== 'undefined') {
@@ -325,7 +560,7 @@ export default function LeadDetailDrawer({
         detail: {
           leadIds: [lead.id],
           total: 1,
-          agentId
+          agentId: activeAgentId
         }
       }));
     }
@@ -335,21 +570,23 @@ export default function LeadDetailDrawer({
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
-          'Idempotency-Key': crypto.randomUUID()
+          'Idempotency-Key': `qualify-lead:${activeAgentId}:${lead.id}`
         },
         credentials: 'include',
-        body: JSON.stringify({ lead_ids: [lead.id], agentId }),
+        body: JSON.stringify({ lead_ids: [lead.id], agentId: activeAgentId }),
       });
 
       if (res.ok) {
         showToast('Qualification IA lancée pour ce prospect !', 'info');
       } else {
+        if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
         const errData = await res.json().catch(() => ({}));
         showToast(errData.error || 'Erreur lors du déclenchement de la qualification IA', 'error');
         setQualifyProgress(null);
         qualifyProgressRef.current = null;
       }
     } catch (error) {
+      if (safetyTimerRef.current) clearTimeout(safetyTimerRef.current);
       console.error('IA Qualification error:', error);
       showToast('Erreur de connexion au service de qualification', 'error');
       setQualifyProgress(null);
@@ -360,13 +597,14 @@ export default function LeadDetailDrawer({
   };
 
   const handleGenerateEmail = async () => {
+    if (!lead || !activeAgentId || isGeneratingEmail) return;
     setIsGeneratingEmail(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/agent-leads/${activeAgentId}`, {
         method: 'PATCH',
         headers: {
           ...getAuthHeaders(),
-          'Idempotency-Key': crypto.randomUUID()
+          'Idempotency-Key': `generate-email:${activeAgentId}:${lead.id}`
         },
         credentials: 'include',
         body: JSON.stringify({
@@ -377,14 +615,26 @@ export default function LeadDetailDrawer({
 
       if (res.ok) {
         const data = await res.json();
-        if (data.email) {
-          setSujet(data.email.sujet || '');
-          setCorps(data.email.corps || '');
+        const draft = data.email || data;
+        const draftSujet = draft?.sujet || draft?.subject || draft?.objet || '';
+        const draftCorps = draft?.corps || draft?.body || draft?.message || draft?.content || draft?.texte || '';
+        
+        const formattedCorps = formatEmailDraft(draftCorps);
+        if (draftSujet) {
+          setSujet(draftSujet);
+          (lead as any).email_sujet = draftSujet;
+          (lead as any).sujet = draftSujet;
+        }
+        if (formattedCorps) {
+          setCorps(formattedCorps);
+          (lead as any).email_corps = formattedCorps;
+          (lead as any).corps = formattedCorps;
         }
         showToast('Email personnalisé rédigé par l\'IA !', 'success');
         onRefresh();
       } else {
-        showToast('Erreur lors de la génération de l\'email', 'error');
+        const errData = await res.json().catch(() => ({}));
+        showToast(errData.error || 'Erreur lors de la génération de l\'email', 'error');
       }
     } catch (error) {
       console.error('Email generation error:', error);
@@ -402,9 +652,12 @@ export default function LeadDetailDrawer({
 
     setIsSending(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/agent-leads/${agentId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/agent-leads/${activeAgentId}`, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
+        headers: {
+          ...getAuthHeaders(),
+          'Idempotency-Key': `send-email:${activeAgentId}:${lead.id}`
+        },
         credentials: 'include',
         body: JSON.stringify({
           id: lead.id,
@@ -412,6 +665,8 @@ export default function LeadDetailDrawer({
           sujet,
           corps,
           cc,
+          includeSignature,
+          signature,
           emailStatut: 'Succès',
           errorMsg: null
         }),
@@ -506,22 +761,42 @@ export default function LeadDetailDrawer({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{
-              width: '52px',
-              height: '52px',
-              borderRadius: '14px',
-              background: 'linear-gradient(135deg, rgba(0, 229, 200, 0.25), rgba(6, 17, 31, 0.95))',
-              border: '1px solid rgba(0, 229, 200, 0.45)',
-              boxShadow: '0 0 16px rgba(0, 229, 200, 0.18)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#00E5C8',
-              fontSize: '1.25rem',
-              fontWeight: 800,
-              flexShrink: 0
-            }}>
-              {initials}
+            <div 
+              title={lead.entreprise ? `${lead.entreprise} (Entreprise)` : undefined}
+              style={{
+                width: '52px',
+                height: '52px',
+                borderRadius: '14px',
+                background: lead.company_logo_url && !logoError ? '#FFFFFF' : 'linear-gradient(135deg, rgba(0, 229, 200, 0.25), rgba(6, 17, 31, 0.95))',
+                border: lead.company_logo_url && !logoError ? '1px solid rgba(255, 255, 255, 0.25)' : '1px solid rgba(0, 229, 200, 0.45)',
+                boxShadow: lead.company_logo_url && !logoError ? '0 4px 14px rgba(0, 0, 0, 0.3)' : '0 0 16px rgba(0, 229, 200, 0.18)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#00E5C8',
+                fontSize: '1.25rem',
+                fontWeight: 800,
+                flexShrink: 0,
+                padding: lead.company_logo_url && !logoError ? 5 : undefined,
+                overflow: 'hidden'
+              }}
+            >
+              {lead.company_logo_url && !logoError ? (
+                <img
+                  src={maskCompanyLogoUrl(lead.company_logo_url)}
+                  alt={lead.entreprise || ''}
+                  onError={() => setLogoError(true)}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    borderRadius: 8,
+                    display: 'block'
+                  }}
+                />
+              ) : (
+                initials
+              )}
             </div>
 
             <div>
@@ -546,10 +821,48 @@ export default function LeadDetailDrawer({
                   </span>
                 )}
               </div>
-              <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <p style={{ margin: '4px 0 0', fontSize: '0.88rem', color: '#94A3B8', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span>{lead.poste || 'Poste non spécifié'}</span>
-                {lead.entreprise && <span style={{ color: '#38BDF8', fontWeight: 600 }}>@{lead.entreprise}</span>}
+                {lead.entreprise && (
+                  <span style={{ color: '#38BDF8', fontWeight: 600 }}>
+                    @{lead.entreprise}
+                  </span>
+                )}
               </p>
+
+              {lead.headline && (
+                <p style={{ margin: '4px 0 0', fontSize: '0.78rem', color: '#94A3B8', fontStyle: 'italic', lineHeight: 1.4 }}>
+                  &ldquo;{lead.headline}&rdquo;
+                </p>
+              )}
+
+              {lead.linkedin_url && (
+                <div style={{ marginTop: 6 }}>
+                  <a
+                    href={lead.linkedin_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      padding: '3px 8px',
+                      borderRadius: 6,
+                      background: 'rgba(10, 102, 194, 0.15)',
+                      border: '1px solid rgba(10, 102, 194, 0.4)',
+                      color: '#38BDF8',
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <Linkedin size={12} />
+                    <span>Profil LinkedIn</span>
+                    <ExternalLink size={10} />
+                  </a>
+                </div>
+              )}
             </div>
           </div>
 
@@ -715,15 +1028,15 @@ export default function LeadDetailDrawer({
                           width: 20,
                           height: 20,
                           borderRadius: '50%',
-                          background: 'rgba(0, 229, 160, 0.15)',
-                          border: '1px solid rgba(0, 229, 160, 0.4)',
+                          background: qualifyProgress.hasError ? 'rgba(255, 71, 87, 0.15)' : 'rgba(0, 229, 160, 0.15)',
+                          border: `1px solid ${qualifyProgress.hasError ? 'rgba(255, 71, 87, 0.4)' : 'rgba(0, 229, 160, 0.4)'}`,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: '#00E5A0'
+                          color: qualifyProgress.hasError ? '#FF4757' : '#00E5A0'
                         }}
                       >
-                        <CheckCircle2 size={13} />
+                        {qualifyProgress.hasError ? <AlertCircle size={13} /> : <CheckCircle2 size={13} />}
                       </div>
                     ) : (
                       <div
@@ -747,10 +1060,14 @@ export default function LeadDetailDrawer({
                       style={{
                         fontSize: '0.82rem',
                         fontWeight: 600,
-                        color: qualifyProgress.isDone ? '#00E5A0' : '#F0F4F8'
+                        color: qualifyProgress.isDone
+                          ? (qualifyProgress.hasError ? '#FF4757' : '#00E5A0')
+                          : '#F0F4F8'
                       }}
                     >
-                      {qualifyProgress.isDone ? 'Qualification terminée avec succès' : 'Qualification IA en direct...'}
+                      {qualifyProgress.isDone
+                        ? (qualifyProgress.hasError ? 'Analyse non concluante pour ce prospect' : 'Qualification terminée avec succès')
+                        : 'Qualification IA en direct...'}
                     </span>
                   </div>
 
@@ -760,9 +1077,17 @@ export default function LeadDetailDrawer({
                       fontFamily: 'monospace, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas',
                       fontSize: '0.8rem',
                       fontWeight: 700,
-                      color: qualifyProgress.isDone ? '#00E5A0' : '#00E5C8',
-                      background: qualifyProgress.isDone ? 'rgba(0, 229, 160, 0.1)' : 'rgba(0, 229, 200, 0.08)',
-                      border: `1px solid ${qualifyProgress.isDone ? 'rgba(0, 229, 160, 0.3)' : 'rgba(0, 229, 200, 0.25)'}`,
+                      color: qualifyProgress.isDone
+                        ? (qualifyProgress.hasError ? '#FF4757' : '#00E5A0')
+                        : '#00E5C8',
+                      background: qualifyProgress.isDone
+                        ? (qualifyProgress.hasError ? 'rgba(255, 71, 87, 0.1)' : 'rgba(0, 229, 160, 0.1)')
+                        : 'rgba(0, 229, 200, 0.08)',
+                      border: `1px solid ${
+                        qualifyProgress.isDone
+                          ? (qualifyProgress.hasError ? 'rgba(255, 71, 87, 0.3)' : 'rgba(0, 229, 160, 0.3)')
+                          : 'rgba(0, 229, 200, 0.25)'
+                      }`,
                       padding: '2px 8px',
                       borderRadius: '6px',
                       letterSpacing: '0.04em'
@@ -785,7 +1110,17 @@ export default function LeadDetailDrawer({
                   }}
                 >
                   {qualifyProgress.isDone ? (
-                    <div className="void-complete-bar" />
+                    qualifyProgress.hasError ? (
+                      <div
+                        className="void-complete-bar"
+                        style={{
+                          background: 'linear-gradient(90deg, #FF4757 0%, #FF6B81 100%)',
+                          boxShadow: '0 0 12px rgba(255, 71, 87, 0.45)'
+                        }}
+                      />
+                    ) : (
+                      <div className="void-complete-bar" />
+                    )
                   ) : (
                     <div className="void-stream-bar">
                       <div className="void-laser-gleam-effect" />
@@ -985,7 +1320,7 @@ export default function LeadDetailDrawer({
             </div>
           </div>
 
-          {/* SECTION C: COORDONNÉES & PROFIL ENTREPRISE */}
+          {/* SECTION C: COORDONNÉES DU PROSPECT */}
           <div style={{
             background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.8) 0%, rgba(12, 28, 52, 0.5) 100%)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -997,14 +1332,14 @@ export default function LeadDetailDrawer({
               fontWeight: 700,
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
-              color: '#94A3B8',
+              color: '#00E5C8',
               margin: '0 0 14px 0',
               display: 'flex',
               alignItems: 'center',
               gap: '8px'
             }}>
-              <Briefcase size={14} color="#38BDF8" />
-              <span>Détails & Coordonnées</span>
+              <Mail size={14} color="#00E5C8" />
+              <span>Coordonnées du Prospect</span>
             </h3>
 
             <div style={{
@@ -1020,9 +1355,41 @@ export default function LeadDetailDrawer({
                 padding: '10px 12px',
                 gridColumn: 'span 2'
               }}>
-                <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '4px' }}>
-                  Adresse Email
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    Email Direct
+                  </span>
+                  {lead.verification_status && (() => {
+                    const statusStr = lead.verification_status.toLowerCase();
+                    const isInvalid = statusStr.includes('invalid') || statusStr.includes('bounc');
+                    const badgeColor = isInvalid ? '#FF4757' : '#00E5A0';
+                    const badgeBg = isInvalid ? 'rgba(255, 71, 87, 0.15)' : 'rgba(0, 229, 160, 0.15)';
+                    const badgeBorder = isInvalid ? 'rgba(255, 71, 87, 0.3)' : 'rgba(0, 229, 160, 0.35)';
+                    const label = isInvalid ? 'INVALIDE' : 'VÉRIFIÉ';
+                    const titleText = isInvalid ? 'Email non distribuable' : 'Email certifié et vérifié';
+
+                    return (
+                      <span 
+                        title={titleText}
+                        style={{
+                          fontSize: '0.68rem',
+                          padding: '2px 7px',
+                          borderRadius: '4px',
+                          background: badgeBg,
+                          color: badgeColor,
+                          border: `1px solid ${badgeBorder}`,
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4
+                        }}
+                      >
+                        {isInvalid ? <AlertCircle size={10} /> : <CheckCircle2 size={10} />}
+                        {label}
+                      </span>
+                    );
+                  })()}
+                </div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                   <span style={{ fontSize: '0.88rem', color: '#00E5C8', fontWeight: 600, wordBreak: 'break-all' }}>
                     {lead.email}
@@ -1030,37 +1397,38 @@ export default function LeadDetailDrawer({
                   <div style={{ display: 'flex', gap: '6px' }}>
                     <button
                       onClick={handleCopyEmail}
-                      title="Copier l'email"
+                      title={copiedEmail ? 'Email copié !' : "Copier l'email"}
                       style={{
-                        background: 'rgba(255, 255, 255, 0.06)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        background: copiedEmail ? 'rgba(0, 229, 160, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                        border: `1px solid ${copiedEmail ? 'rgba(0, 229, 160, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
                         borderRadius: '6px',
-                        padding: '4px 8px',
-                        fontSize: '0.72rem',
-                        color: copiedEmail ? '#00E5A0' : '#94A3B8',
-                        cursor: 'pointer',
+                        width: 28,
+                        height: 28,
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '4px'
+                        justifyContent: 'center',
+                        color: copiedEmail ? '#00E5A0' : '#94A3B8',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
                       }}
                     >
-                      {copiedEmail ? <Check size={12} /> : <Copy size={12} />}
-                      <span>{copiedEmail ? 'Copié' : 'Copier'}</span>
+                      {copiedEmail ? <Check size={13} /> : <Copy size={13} />}
                     </button>
                     <a
                       href={`mailto:${lead.email}`}
                       title="Ouvrir dans client mail"
                       style={{
-                        background: 'rgba(255, 255, 255, 0.06)',
+                        background: 'rgba(255, 255, 255, 0.05)',
                         border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '6px',
-                        padding: '4px 8px',
-                        fontSize: '0.72rem',
                         color: '#94A3B8',
+                        width: 28,
+                        height: 28,
+                        borderRadius: '6px',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '4px',
-                        textDecoration: 'none'
+                        justifyContent: 'center',
+                        textDecoration: 'none',
+                        transition: 'all 0.15s ease'
                       }}
                     >
                       <ExternalLink size={12} />
@@ -1069,7 +1437,96 @@ export default function LeadDetailDrawer({
                 </div>
               </div>
 
-              {/* Entreprise */}
+              {/* Mobile Direct */}
+              {leadPhone && (
+                <div style={{
+                  background: 'rgba(6, 17, 31, 0.6)',
+                  border: leadPhone.includes('*') ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(0, 229, 200, 0.25)',
+                  borderRadius: '10px',
+                  padding: '10px 12px',
+                  gridColumn: 'span 2'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '0.72rem', color: leadPhone.includes('*') ? '#F59E0B' : '#00E5C8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
+                      {leadPhone.includes('*') ? <Lock size={12} /> : <Smartphone size={12} />} Mobile Direct
+                    </span>
+                    {leadPhone.includes('*') && (
+                      <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: 4, background: 'rgba(245, 158, 11, 0.15)', color: '#F59E0B', border: '1px solid rgba(245, 158, 11, 0.3)', fontWeight: 600 }}>
+                        Masqué
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    {leadPhone.includes('*') ? (
+                      <span style={{ fontSize: '0.88rem', color: '#F0F4F8', fontWeight: 600, letterSpacing: '0.03em' }}>
+                        {leadPhone}
+                      </span>
+                    ) : (
+                      <a href={`tel:${leadPhone}`} style={{ fontSize: '0.88rem', color: '#F0F4F8', fontWeight: 600, textDecoration: 'none' }}>
+                        {leadPhone}
+                      </a>
+                    )}
+                    {leadPhone.includes('*') ? (
+                      <button
+                        onClick={handleRevealPhone}
+                        disabled={isRevealingPhone}
+                        title="Révéler le numéro de téléphone direct"
+                        style={{
+                          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.22) 0%, rgba(245, 158, 11, 0.08) 100%)',
+                          border: '1px solid rgba(245, 158, 11, 0.4)',
+                          borderRadius: '6px',
+                          padding: '0 10px',
+                          height: 28,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          color: '#FBBF24',
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          cursor: isRevealingPhone ? 'not-allowed' : 'pointer',
+                          opacity: isRevealingPhone ? 0.7 : 1,
+                          transition: 'all 0.15s ease',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
+                        }}
+                      >
+                        {isRevealingPhone ? (
+                          <>
+                            <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                            <span>Déblocage...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Eye size={12} />
+                            <span>Révéler</span>
+                          </>
+                        )}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleCopyMobile}
+                        title={copiedMobile ? 'Mobile copié !' : 'Copier le mobile'}
+                        style={{
+                          background: copiedMobile ? 'rgba(0, 229, 160, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                          border: `1px solid ${copiedMobile ? 'rgba(0, 229, 160, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                          borderRadius: '6px',
+                          width: 28,
+                          height: 28,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: copiedMobile ? '#00E5A0' : '#94A3B8',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {copiedMobile ? <Check size={13} /> : <Copy size={13} />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Localisation */}
               <div style={{
                 background: 'rgba(6, 17, 31, 0.6)',
                 border: '1px solid rgba(255, 255, 255, 0.06)',
@@ -1077,10 +1534,204 @@ export default function LeadDetailDrawer({
                 padding: '10px 12px'
               }}>
                 <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                  <Building2 size={12} /> Entreprise
+                  <MapPin size={12} /> Localisation
                 </span>
                 <span style={{ fontSize: '0.88rem', color: '#F0F4F8', fontWeight: 600 }}>
-                  {lead.entreprise || 'Non renseigné'}
+                  {formattedLocation}
+                </span>
+              </div>
+
+              {/* Ajouté le */}
+              <div style={{
+                background: 'rgba(6, 17, 31, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '10px',
+                padding: '10px 12px'
+              }}>
+                <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                  <Calendar size={12} /> Ajouté le
+                </span>
+                <span style={{ fontSize: '0.82rem', color: '#CBD5E1', fontWeight: 500 }}>
+                  {lead.date_collecte ? new Date(lead.date_collecte).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                </span>
+              </div>
+
+              {/* Provenance */}
+              <div style={{
+                background: 'rgba(6, 17, 31, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                gridColumn: 'span 2'
+              }}>
+                <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '4px' }}>
+                  Provenance
+                </span>
+                <span style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  color: lead.sourcing_provider ? '#00E5C8' : lead.source?.toLowerCase().includes('sourcing') ? '#00E5C8' : '#38BDF8'
+                }}>
+                  {lead.sourcing_provider ? (
+                    <Zap size={13} style={{ flexShrink: 0, color: '#00E5C8' }} />
+                  ) : lead.source?.toLowerCase().includes('sourcing') ? (
+                    <Globe size={13} style={{ flexShrink: 0 }} />
+                  ) : (
+                    <FileSpreadsheet size={13} style={{ flexShrink: 0 }} />
+                  )}
+                  <span>{lead.sourcing_provider ? 'Sourcing IA' : (lead.source || 'CSV')}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION D: ENTREPRISE & POSTE */}
+          <div style={{
+            background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.8) 0%, rgba(12, 28, 52, 0.5) 100%)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '16px',
+            padding: '18px 20px'
+          }}>
+            <h3 style={{
+              fontSize: '0.84rem',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: '#38BDF8',
+              margin: '0 0 14px 0',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <Building2 size={14} color="#38BDF8" />
+              <span>Entreprise & Poste</span>
+            </h3>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '12px'
+            }}>
+              {/* Entreprise & Site Web */}
+              <div style={{
+                background: 'rgba(6, 17, 31, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                gridColumn: 'span 2'
+              }}>
+                <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
+                  <Building2 size={12} /> Entreprise
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {lead.company_logo_url && !logoError && (
+                      <img 
+                        src={maskCompanyLogoUrl(lead.company_logo_url)} 
+                        alt="" 
+                        onError={() => setLogoError(true)}
+                        style={{ width: 18, height: 18, borderRadius: 4, objectFit: 'contain' }}
+                      />
+                    )}
+                    <span style={{ fontSize: '0.92rem', color: '#F0F4F8', fontWeight: 700 }}>
+                      {lead.entreprise || 'Non renseigné'}
+                    </span>
+                  </div>
+                  {domainUrl && (
+                    <a
+                      href={domainUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        fontSize: '0.75rem',
+                        color: '#38BDF8',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        textDecoration: 'none',
+                        background: 'rgba(56, 189, 248, 0.1)',
+                        border: '1px solid rgba(56, 189, 248, 0.25)',
+                        padding: '2px 8px',
+                        borderRadius: 6
+                      }}
+                    >
+                      <Globe size={11} />
+                      <span>{lead.domain}</span>
+                      <ExternalLink size={10} />
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Standard HQ */}
+              {companyPhone && (
+                <div style={{
+                  background: 'rgba(6, 17, 31, 0.6)',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                  borderRadius: '10px',
+                  padding: '10px 12px',
+                  gridColumn: 'span 2'
+                }}>
+                  <span style={{ fontSize: '0.72rem', color: '#38BDF8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px', fontWeight: 600 }}>
+                    <Phone size={12} /> Standard Entreprise
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                    <a href={`tel:${companyPhone}`} style={{ fontSize: '0.88rem', color: '#38BDF8', fontWeight: 600, textDecoration: 'none' }}>
+                      {companyPhone}
+                    </a>
+                    <button
+                      onClick={handleCopyPhoneHq}
+                      title={copiedPhoneHq ? 'Standard copié !' : 'Copier le standard'}
+                      style={{
+                        background: copiedPhoneHq ? 'rgba(0, 229, 160, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                        border: `1px solid ${copiedPhoneHq ? 'rgba(0, 229, 160, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                        borderRadius: '6px',
+                        width: 28,
+                        height: 28,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: copiedPhoneHq ? '#00E5A0' : '#94A3B8',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {copiedPhoneHq ? <Check size={13} /> : <Copy size={13} />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Poste */}
+              <div style={{
+                background: 'rgba(6, 17, 31, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '10px',
+                padding: '10px 12px'
+              }}>
+                <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                  <Briefcase size={12} /> Poste
+                </span>
+                <span style={{ fontSize: '0.88rem', color: '#F0F4F8', fontWeight: 600 }}>
+                  {lead.poste || 'Non renseigné'}
+                </span>
+              </div>
+
+              {/* Seniority */}
+              <div style={{
+                background: 'rgba(6, 17, 31, 0.6)',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+                borderRadius: '10px',
+                padding: '10px 12px'
+              }}>
+                <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                  <Target size={12} /> Niveau Hiérarchique
+                </span>
+                <span style={{ fontSize: '0.88rem', color: '#F0F4F8', fontWeight: 600 }}>
+                  {lead.seniority || (isDecMaker ? 'Décideur' : 'Opérationnel')}
                 </span>
               </div>
 
@@ -1095,7 +1746,7 @@ export default function LeadDetailDrawer({
                   <Layers size={12} /> Secteur
                 </span>
                 <span style={{ fontSize: '0.88rem', color: '#F0F4F8', fontWeight: 600 }}>
-                  {lead.secteur || 'Non renseigné'}
+                  {lead.industry || lead.secteur || 'Non renseigné'}
                 </span>
               </div>
 
@@ -1110,68 +1761,82 @@ export default function LeadDetailDrawer({
                   <Users size={12} /> Effectif
                 </span>
                 <span style={{ fontSize: '0.88rem', color: '#F0F4F8', fontWeight: 600 }}>
-                  {lead.taille_ent ? `${lead.taille_ent} employés` : 'Non renseigné'}
-                </span>
-              </div>
-
-              {/* Pays */}
-              <div style={{
-                background: 'rgba(6, 17, 31, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                borderRadius: '10px',
-                padding: '10px 12px'
-              }}>
-                <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                  <MapPin size={12} /> Pays / Zone
-                </span>
-                <span style={{ fontSize: '0.88rem', color: '#F0F4F8', fontWeight: 600 }}>
-                  {lead.pays || 'Non renseigné'}
-                </span>
-              </div>
-
-              {/* Source d'Ingestion */}
-              <div style={{
-                background: 'rgba(6, 17, 31, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                borderRadius: '10px',
-                padding: '10px 12px'
-              }}>
-                <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '4px' }}>
-                  Source d&apos;Origine
-                </span>
-                <span style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                  color: lead.source?.toLowerCase().includes('sourcing') ? '#00E5C8' : '#38BDF8'
-                }}>
-                  {lead.source?.toLowerCase().includes('sourcing') ? (
-                    <Globe size={13} style={{ flexShrink: 0 }} />
-                  ) : (
-                    <FileSpreadsheet size={13} style={{ flexShrink: 0 }} />
-                  )}
-                  <span>{lead.source || 'Fichier CSV'}</span>
-                </span>
-              </div>
-
-              {/* Date Collecte */}
-              <div style={{
-                background: 'rgba(6, 17, 31, 0.6)',
-                border: '1px solid rgba(255, 255, 255, 0.06)',
-                borderRadius: '10px',
-                padding: '10px 12px'
-              }}>
-                <span style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                  <Calendar size={12} /> Date Découverte
-                </span>
-                <span style={{ fontSize: '0.82rem', color: '#CBD5E1', fontWeight: 500 }}>
-                  {new Date(lead.date_collecte).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
+                  {(lead.employee_count || lead.taille_ent) ? `${lead.employee_count || lead.taille_ent} coll.` : 'Non renseigné'}
                 </span>
               </div>
             </div>
           </div>
+
+          {/* PARCOURS PROFESSIONNEL (JOB HISTORY) */}
+          {parsedJobHistory.length > 0 && (
+            <div style={{
+              background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.75) 0%, rgba(12, 28, 52, 0.5) 100%)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '16px',
+              padding: '16px 20px'
+            }}>
+              <h3 style={{
+                fontSize: '0.84rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: '#94A3B8',
+                margin: '0 0 12px 0',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <History size={14} color="#00E5C8" />
+                <span>Expérience</span>
+              </h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {parsedJobHistory.slice(0, 5).map((job, idx) => {
+                  const jobTitle = job.title || job.position || job.role || 'Poste occupé';
+                  const companyName = job.company_name || job.company || job.entreprise || job.companyName || (job.current ? lead.entreprise : null);
+                  const start = job.start_year || job.start_date || job.starts_at || '';
+                  const end = job.current ? 'Présent' : (job.end_year || job.end_date || job.ends_at || (start ? 'Présent' : ''));
+                  const duration = job.duration_in_months ? `(${Math.floor(job.duration_in_months / 12) > 0 ? `${Math.floor(job.duration_in_months / 12)} an${Math.floor(job.duration_in_months / 12) > 1 ? 's' : ''} ` : ''}${job.duration_in_months % 12} mois)` : '';
+                  const dateStr = start ? `${start} — ${end} ${duration}`.trim() : (job.current ? 'Poste Actuel' : '');
+
+                  return (
+                    <div key={idx} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                      <div style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        background: '#00E5C8',
+                        marginTop: 5,
+                        boxShadow: '0 0 6px rgba(0, 229, 200, 0.5)',
+                        flexShrink: 0
+                      }} />
+                      <div>
+                        <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#F0F4F8', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
+                          <span>{jobTitle}</span>
+                          {job.current && (
+                            <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: 4, background: 'rgba(0, 229, 160, 0.15)', color: '#00E5A0', border: '1px solid rgba(0, 229, 160, 0.35)', fontWeight: 600 }}>
+                              Poste Actuel
+                            </span>
+                          )}
+                        </div>
+                        {companyName && companyName.toLowerCase() !== 'entreprise' && (
+                          <div style={{ fontSize: '0.78rem', color: '#38BDF8', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <Building2 size={11} style={{ color: '#38BDF8', flexShrink: 0 }} />
+                            <span>{companyName}</span>
+                          </div>
+                        )}
+                        {dateStr && (
+                          <div style={{ fontSize: '0.72rem', color: '#64748B', marginTop: 2 }}>
+                            {dateStr}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* SECTION D: HISTORIQUE DE COMMUNICATION */}
           <div style={{
@@ -1253,30 +1918,37 @@ export default function LeadDetailDrawer({
 
                 <button
                   onClick={handleGenerateEmail}
-                  disabled={isGeneratingEmail}
+                  disabled={isGeneratingEmail || isSending}
                   style={{
-                    background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(0, 229, 200, 0.2))',
+                    background: isGeneratingEmail 
+                      ? 'rgba(168, 85, 247, 0.1)' 
+                      : 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(0, 229, 200, 0.2))',
                     border: '1px solid rgba(168, 85, 247, 0.4)',
-                    color: '#C084FC',
+                    color: isGeneratingEmail ? '#94A3B8' : '#C084FC',
                     padding: '6px 12px',
                     borderRadius: '8px',
                     fontSize: '0.78rem',
                     fontWeight: 600,
-                    cursor: isGeneratingEmail ? 'not-allowed' : 'pointer',
+                    cursor: (isGeneratingEmail || isSending) ? 'not-allowed' : 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    transition: 'all 0.2s'
+                    transition: 'all 0.2s',
+                    opacity: (isGeneratingEmail || isSending) ? 0.6 : 1
                   }}
                   onMouseEnter={e => {
-                    if (!isGeneratingEmail) e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.7)';
+                    if (!isGeneratingEmail && !isSending) e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.7)';
                   }}
                   onMouseLeave={e => {
-                    if (!isGeneratingEmail) e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.4)';
+                    if (!isGeneratingEmail && !isSending) e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.4)';
                   }}
                 >
-                  <Sparkles size={13} style={{ flexShrink: 0 }} />
-                  <span>{isGeneratingEmail ? 'Rédaction IA...' : 'Générer avec l\'IA'}</span>
+                  {isGeneratingEmail ? (
+                    <Loader2 size={13} className="animate-spin" style={{ flexShrink: 0 }} />
+                  ) : (
+                    <Sparkles size={13} style={{ flexShrink: 0 }} />
+                  )}
+                  <span>{isGeneratingEmail ? 'Rédaction IA en cours...' : (corps ? 'Régénérer avec l\'IA' : 'Générer avec l\'IA')}</span>
                 </button>
               </div>
 
@@ -1336,7 +2008,7 @@ export default function LeadDetailDrawer({
                     Corps du Message
                   </label>
                   <textarea
-                    rows={6}
+                    rows={7}
                     value={corps}
                     onChange={e => setCorps(e.target.value)}
                     placeholder="Bonjour {{prenom}}, suite à votre activité chez {{entreprise}}..."
@@ -1345,18 +2017,102 @@ export default function LeadDetailDrawer({
                       background: 'rgba(6, 17, 31, 0.8)',
                       border: '1px solid rgba(255, 255, 255, 0.12)',
                       borderRadius: '8px',
-                      padding: '10px 12px',
+                      padding: '12px 14px',
                       color: '#F0F4F8',
-                      fontSize: '0.85rem',
-                      lineHeight: 1.5,
+                      fontSize: '0.86rem',
+                      lineHeight: 1.65,
                       outline: 'none',
                       resize: 'vertical',
+                      minHeight: '140px',
                       fontFamily: 'inherit',
                       transition: 'border-color 0.2s'
                     }}
                     onFocus={e => e.currentTarget.style.borderColor = '#00E5C8'}
                     onBlur={e => e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'}
                   />
+                </div>
+
+                {/* SIGNATURE PREVIEW & TOGGLE */}
+                <div style={{
+                  background: 'rgba(6, 17, 31, 0.75)',
+                  border: '1px solid rgba(0, 229, 200, 0.2)',
+                  borderRadius: '10px',
+                  padding: '12px 14px'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: signature ? '10px' : '0'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <FileText size={14} color="#00E5C8" />
+                      <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#F0F4F8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Signature de l&apos;Agent
+                      </span>
+                      {signature && (
+                        <span style={{
+                          fontSize: '0.68rem',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          background: includeSignature ? 'rgba(0, 229, 200, 0.15)' : 'rgba(148, 163, 184, 0.1)',
+                          color: includeSignature ? '#00E5C8' : '#94A3B8',
+                          border: `1px solid ${includeSignature ? 'rgba(0, 229, 200, 0.3)' : 'rgba(148, 163, 184, 0.2)'}`,
+                          fontWeight: 600
+                        }}>
+                          {includeSignature ? 'Active' : 'Désactivée'}
+                        </span>
+                      )}
+                    </div>
+
+                    {signature && (
+                      <label style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.74rem',
+                        color: includeSignature ? '#00E5C8' : '#94A3B8',
+                        fontWeight: 600,
+                        userSelect: 'none'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={includeSignature}
+                          onChange={e => setIncludeSignature(e.target.checked)}
+                          style={{ accentColor: '#00E5C8', width: '14px', height: '14px', cursor: 'pointer' }}
+                        />
+                        <span>Inclure à l&apos;envoi</span>
+                      </label>
+                    )}
+                  </div>
+
+                  {signature ? (
+                    <div style={{
+                      opacity: includeSignature ? 1 : 0.45,
+                      transition: 'opacity 0.2s ease',
+                      background: '#FFFFFF',
+                      color: '#1E293B',
+                      borderRadius: '8px',
+                      padding: '12px 14px',
+                      overflowX: 'auto',
+                      maxHeight: '160px',
+                      overflowY: 'auto',
+                      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.1)'
+                    }}>
+                      <div 
+                        dangerouslySetInnerHTML={{ 
+                          __html: signatureLogo?.data 
+                            ? signature.replace(/cid:signature_logo/g, `data:${signatureLogo.mimeType || 'image/png'};base64,${signatureLogo.data}`)
+                            : signature 
+                        }} 
+                      />
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: '0.74rem', color: '#64748B', fontStyle: 'italic', padding: '4px 0' }}>
+                      Aucune signature configurée pour cet agent (personnalisable dans les paramètres de l&apos;agent).
+                    </div>
+                  )}
                 </div>
 
                 {/* Email Delivery Feedback */}

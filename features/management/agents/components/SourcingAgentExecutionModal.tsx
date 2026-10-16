@@ -4,7 +4,7 @@ import { Play, Check, Search, Target, Database, Info } from 'lucide-react';
 import { LiveAgent } from '../AgentsView';
 import { OnboardingChat } from '../../wizard/components/OnboardingChat';
 import { VMindGuide } from '@/shared/management/components/VMindGuide';
-import { triggerSourcingRun } from '@/shared/api/n8n-api';
+import { triggerSourcingRun, getSourcingLeadsRange, getAgents } from '@/shared/api/n8n-api';
 import { extractIcpFromAgent, buildSourcingConclusionFromIcp } from '../../wizard/helpers/sourcingIcpHelper';
 import { useProspectSocket } from '../../prospect-workspace/hooks/useProspectSocket';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
@@ -31,7 +31,11 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
 
   // Sourcing Execution Parameters
   const [allowExistingCompanies, setAllowExistingCompanies] = useState(false);
-  const [leadsToFind, setLeadsToFind] = useState<number>(50);
+  const savedTotalLeads = Number(agent?.config?.totalLeads || (agent as any)?.totalLeads || (agent as any)?.parameters?.totalLeads);
+  const initialTotalLeads = !isNaN(savedTotalLeads) && savedTotalLeads >= 1 ? savedTotalLeads : 5;
+  const [leadsToFind, setLeadsToFind] = useState<number>(initialTotalLeads);
+  const [leadsRange, setLeadsRange] = useState<{ min: number; max: number }>({ min: 1, max: 15 });
+  const [allowExistingVisible, setAllowExistingVisible] = useState<boolean>(true);
   const [leadsPerCompany, setLeadsPerCompany] = useState<number>(2);
   const [isExecuting, setIsExecuting] = useState(false);
   const [liveIsExecuting, setLiveIsExecuting] = useState<boolean>(() => !!agent?.is_executing);
@@ -72,15 +76,9 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
     const fetchProspectAgents = async () => {
       try {
         setIsLoadingProspects(true);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        const res = await fetch(`${baseUrl}/api/list-agents`, {
-          credentials: 'include'
-        });
-        if (res.ok && isMounted) {
-          const data = await res.json();
-          if (data.ok && Array.isArray(data.agents)) {
-            setAvailableProspectAgents(data.agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement')));
-          }
+        const agents = await getAgents();
+        if (isMounted && Array.isArray(agents)) {
+          setAvailableProspectAgents(agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement')));
         }
       } catch (err) {
         console.error("Failed to fetch prospect agents:", err);
@@ -91,6 +89,22 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
       }
     };
     fetchProspectAgents();
+    return () => { isMounted = false; };
+  }, []);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    getSourcingLeadsRange().then(range => {
+      if (isMounted && range) {
+        setLeadsRange(range);
+        setLeadsToFind(prev => Math.max(range.min, Math.min(range.max, prev || range.min)));
+        const visible = range.allowExistingCompaniesVisible !== false;
+        setAllowExistingVisible(visible);
+        if (!visible) {
+          setAllowExistingCompanies(true);
+        }
+      }
+    }).catch(() => {});
     return () => { isMounted = false; };
   }, []);
 
@@ -209,8 +223,8 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
     }
 
     // Validate inputs
-    if (leadsToFind <= 0 || leadsToFind > 100) {
-      onToast("Le nombre de leads doit être entre 1 et 100", "err");
+    if (leadsToFind < leadsRange.min || leadsToFind > leadsRange.max) {
+      onToast(`Le nombre de leads doit être entre ${leadsRange.min} et ${leadsRange.max}`, "err");
       return;
     }
     if (leadsPerCompany < 1 || leadsPerCompany > 10) {
@@ -230,7 +244,7 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
         sourcingSummary,
         totalLeads: leadsToFind,
         leadsPerCompany,
-        ignoreDuplicates: allowExistingCompanies,
+        ignoreDuplicates: allowExistingVisible ? allowExistingCompanies : true,
         target_agent_ids: selectedTargetAgentIds,
         update_defaults: true
       });
@@ -541,14 +555,14 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                     <div style={{ display: 'flex', gap: 12 }}>
                       <div style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: 16, borderRadius: 12 }}>
                         <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                          Total Leads
+                          Total Leads ({leadsRange.min} - {leadsRange.max})
                         </label>
                         <input
                           type="number"
-                          min={1} max={100}
+                          min={leadsRange.min} max={leadsRange.max}
                           value={leadsToFind}
                           onChange={(e) => {
-                            const newTotal = Math.max(1, Math.min(100, parseInt(e.target.value) || 1));
+                            const newTotal = Math.max(leadsRange.min, Math.min(leadsRange.max, parseInt(e.target.value) || leadsRange.min));
                             setLeadsToFind(newTotal);
                             if (leadsPerCompany > newTotal) {
                               setLeadsPerCompany(Math.min(10, newTotal));
@@ -556,7 +570,7 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                           }}
                           style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '10px 14px', borderRadius: 8, color: '#fff', outline: 'none', fontSize: 14 }}
                         />
-                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>Max 100 leads par exécution</div>
+                        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 6 }}>Entre {leadsRange.min} et {leadsRange.max} leads par exécution</div>
                       </div>
 
                       <div style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', padding: 16, borderRadius: 12 }}>
@@ -581,22 +595,24 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
                       </div>
                     </div>
 
-                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', background: 'rgba(255,255,255,0.02)', padding: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'} onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}>
-                      <div style={{ paddingTop: 2 }}>
-                        <input
-                          type="checkbox"
-                          checked={allowExistingCompanies}
-                          onChange={(e) => setAllowExistingCompanies(e.target.checked)}
-                          style={{ width: 16, height: 16, accentColor: 'var(--cyan)', cursor: 'pointer' }}
-                        />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>Autoriser les entreprises déjà prospectées</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.4 }}>
-                          Permet de sourcer de nouveaux contacts dans des sociétés existantes de votre base de données.
+                    {allowExistingVisible && (
+                      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer', background: 'rgba(255,255,255,0.02)', padding: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }} onMouseOver={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.04)'} onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.02)'}>
+                        <div style={{ paddingTop: 2 }}>
+                          <input
+                            type="checkbox"
+                            checked={allowExistingCompanies}
+                            onChange={(e) => setAllowExistingCompanies(e.target.checked)}
+                            style={{ width: 16, height: 16, accentColor: 'var(--cyan)', cursor: 'pointer' }}
+                          />
                         </div>
-                      </div>
-                    </label>
+                        <div>
+                          <div style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>Autoriser les entreprises déjà prospectées</div>
+                          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.4 }}>
+                            Permet de sourcer de nouveaux contacts dans des sociétés existantes de votre base de données.
+                          </div>
+                        </div>
+                      </label>
+                    )}
 
                     {/* Target Prospect Agents Selection (only shown when not hidden, e.g. from Dashboard execution) */}
                     {!hideTargetAgentsSelection && (

@@ -608,34 +608,52 @@
   /* Leads Table Styles */
   .table-container {
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-lg);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     margin-bottom: 1.5rem;
+    width: 100%;
+
+    &::-webkit-scrollbar {
+      height: 6px;
+    }
+    &::-webkit-scrollbar-track {
+      background: rgba(6, 17, 31, 0.6);
+    }
+    &::-webkit-scrollbar-thumb {
+      background: rgba(0, 229, 200, 0.25);
+      border-radius: 3px;
+      &:hover {
+        background: rgba(0, 229, 200, 0.45);
+      }
+    }
   }
 
   .leads-table {
     width: 100%;
+    min-width: 1080px;
     border-collapse: collapse;
     text-align: left;
   }
 
   .leads-table th {
-    background-color: rgba(255, 255, 255, 0.01);
+    background: rgba(6, 17, 31, 0.7);
     border-bottom: 1px solid var(--border-color);
     color: var(--text-secondary);
-    font-weight: 500;
-    font-size: 0.85rem;
+    font-weight: 600;
+    font-size: 0.74rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    padding: 1rem 1.5rem;
+    padding: 0.85rem 1.1rem;
+    white-space: nowrap;
   }
 
   .leads-table td {
-    padding: 1.1rem 1.5rem;
-    border-bottom: 1px solid var(--border-color);
-    font-size: 0.95rem;
+    padding: 0.85rem 1.1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    font-size: 0.88rem;
     vertical-align: middle;
   }
 
@@ -644,7 +662,13 @@
   }
 
   .leads-table tr:hover td {
-    background-color: rgba(255, 255, 255, 0.01);
+    background-color: rgba(0, 229, 200, 0.025);
+
+    .dossier-action-btn {
+      background: rgba(0, 229, 200, 0.16) !important;
+      border-color: rgba(0, 229, 200, 0.4) !important;
+      transform: translateX(2px);
+    }
   }
 
   .lead-job-mobile {

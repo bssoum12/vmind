@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 import { fetchN8nKpis } from '../api/n8n-api';
+import { useConnections } from './ConnectionsContext';
 import { jwtDecode } from 'jwt-decode';
 
 interface KpiCacheContextType {
@@ -54,6 +55,24 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   const [notice, setNotice] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isConnectorConnected, setIsConnectorConnected] = useState<boolean>(false);
+  const { activeConnection } = useConnections();
+
+  useEffect(() => {
+    if (activeConnection && activeConnection.status === 'connected') {
+      setIsConnectorConnected(true);
+      setCurrentUser((prev: any) => ({
+        ...(prev || {}),
+        client_id: activeConnection.client_id || 'DEMO',
+        roles: prev?.roles || ['Administrator'],
+        allowedAgents: prev?.allowedAgents || ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE']
+      }));
+      setKpisByAgent({});
+      setLastUpdatedByAgent({});
+    } else if (activeConnection && activeConnection.status !== 'connected') {
+      setIsConnectorConnected(false);
+      setKpisByAgent({});
+    }
+  }, [activeConnection?.id, activeConnection?.status, activeConnection?.client_id]);
 
   useEffect(() => {
     const checkInitialStatus = async () => {
@@ -170,7 +189,9 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       const response = await fetchN8nKpis(
         {
           allowed_agents: allowedAgentUpper,
-          client_id: clientId,
+          client_id: activeConnection?.client_id || clientId,
+          connection_id: activeConnection?.id,
+          erp_type: activeConnection?.connector_type || 'tralis',
           startDate,
           endDate,
           target_tool: targetTool,

@@ -45,6 +45,10 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
     window.addEventListener('mcp-session-updated', checkAdmin);
 
     const refreshData = () => {
+      if (typeof document !== 'undefined' && document.hidden) {
+        return;
+      }
+
       getAgents()
         .then(agents => setAgentCount(agents.length))
         .catch(() => setAgentCount(0));
@@ -63,20 +67,28 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
     refreshData();
 
     const handleAgentUpdate = () => refreshData();
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        refreshData();
+      }
+    };
+
     if (typeof window !== 'undefined') {
       window.addEventListener('vmind_agent_updated', handleAgentUpdate);
+      document.addEventListener('visibilitychange', handleVisibilityChange);
     }
 
-    const interval = setInterval(refreshData, 4000);
+    const interval = setInterval(refreshData, 30000);
 
     return () => {
       if (typeof window !== 'undefined') {
         window.removeEventListener('vmind_agent_updated', handleAgentUpdate);
         window.removeEventListener('mcp-session-updated', checkAdmin);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
       clearInterval(interval);
     };
-  }, [currentView]); // re-fetch when navigating back to agents view
+  }, []);
 
   const handleCategoryClick = (cat: string) => {
     onSelectCategory(cat);
