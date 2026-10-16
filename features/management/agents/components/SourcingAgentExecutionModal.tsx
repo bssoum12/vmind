@@ -4,7 +4,7 @@ import { Play, Check, Search, Target, Database, Info } from 'lucide-react';
 import { LiveAgent } from '../AgentsView';
 import { OnboardingChat } from '../../wizard/components/OnboardingChat';
 import { VMindGuide } from '@/shared/management/components/VMindGuide';
-import { triggerSourcingRun, getSourcingLeadsRange } from '@/shared/api/n8n-api';
+import { triggerSourcingRun, getSourcingLeadsRange, getAgents } from '@/shared/api/n8n-api';
 import { extractIcpFromAgent, buildSourcingConclusionFromIcp } from '../../wizard/helpers/sourcingIcpHelper';
 import { useProspectSocket } from '../../prospect-workspace/hooks/useProspectSocket';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
@@ -76,15 +76,9 @@ export function SourcingAgentExecutionModal({ agent, onClose, onSuccess, onToast
     const fetchProspectAgents = async () => {
       try {
         setIsLoadingProspects(true);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        const res = await fetch(`${baseUrl}/api/list-agents`, {
-          credentials: 'include'
-        });
-        if (res.ok && isMounted) {
-          const data = await res.json();
-          if (data.ok && Array.isArray(data.agents)) {
-            setAvailableProspectAgents(data.agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement')));
-          }
+        const agents = await getAgents();
+        if (isMounted && Array.isArray(agents)) {
+          setAvailableProspectAgents(agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement')));
         }
       } catch (err) {
         console.error("Failed to fetch prospect agents:", err);

@@ -7,7 +7,7 @@ import { VMindGuide } from '@/shared/management/components/VMindGuide';
 import { extractIcpFromAgent, buildSourcingConclusionFromIcp } from '../../wizard/helpers/sourcingIcpHelper';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { parseHourString } from '@/shared/utils/timezone';
-import { getSourcingLeadsRange } from '@/shared/api/n8n-api';
+import { getSourcingLeadsRange, getAgents } from '@/shared/api/n8n-api';
 
 export interface TriggerRule {
   interval: string;
@@ -104,15 +104,9 @@ export function SourcingAgentScheduleModal({ agent, onClose, onConfirm, onEditSc
     const fetchProspectAgents = async () => {
       try {
         setIsLoadingProspects(true);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
-        const res = await fetch(`${baseUrl}/api/list-agents`, {
-          credentials: 'include'
-        });
-        if (res.ok && isMounted) {
-          const data = await res.json();
-          if (data.ok && Array.isArray(data.agents)) {
-            setAvailableProspectAgents(data.agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement')));
-          }
+        const agents = await getAgents();
+        if (isMounted && Array.isArray(agents)) {
+          setAvailableProspectAgents(agents.filter((a: any) => a.run_mode === 'prospection' || (!a.run_mode && a.run_mode !== 'sourcing' && a.run_mode !== 'recouvrement')));
         }
       } catch (err) {
         console.error("Failed to fetch prospect agents:", err);

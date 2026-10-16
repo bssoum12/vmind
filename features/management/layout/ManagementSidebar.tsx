@@ -93,7 +93,7 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
       }
       clearInterval(interval);
     };
-  }, [currentView]); // re-fetch when navigating back to agents view
+  }, []);
 
   const handleCategoryClick = (cat: string) => {
     onSelectCategory(cat);

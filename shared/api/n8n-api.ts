@@ -172,18 +172,44 @@ export async function resetReminders(invoiceRefs: string[]): Promise<any> {
  
 const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
 
+let inFlightGetAgents: Promise<any[]> | null = null;
+let cachedAgents: { data: any[]; timestamp: number } | null = null;
+let inFlightMarketplaceStats: Promise<MarketplaceStatsResponse> | null = null;
+let cachedMarketplaceStats: { data: MarketplaceStatsResponse; timestamp: number } | null = null;
+const CACHE_TTL_MS = 2500; // 2.5 seconds cache to deduplicate rapid successive calls
 
+export function invalidateAgentsCache(): void {
+  cachedAgents = null;
+  cachedMarketplaceStats = null;
+  cachedLeadsRange = null;
+}
 
 /**
- * Fetches all deployed agents from Redis (via backend)
+ * Fetches all deployed agents from Redis (via backend) with deduplication & caching
  */
-export async function getAgents(): Promise<any[]> {
-  const res = await secureFetch(`${getBaseUrl()}/api/list-agents`, {
-    headers: getAuthHeaders()
-  });
-  if (!res.ok) throw new Error(`Impossible de récupérer la liste des agents (${res.status})`);
-  const data = await res.json();
-  return data.agents || [];
+export async function getAgents(forceRefresh: boolean = false): Promise<any[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedAgents && (now - cachedAgents.timestamp < CACHE_TTL_MS)) {
+    return cachedAgents.data;
+  }
+  if (inFlightGetAgents) {
+    return inFlightGetAgents;
+  }
+  inFlightGetAgents = (async () => {
+    try {
+      const res = await secureFetch(`${getBaseUrl()}/api/list-agents`, {
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) throw new Error(`Impossible de récupérer la liste des agents (${res.status})`);
+      const data = await res.json();
+      const agents = data.agents || [];
+      cachedAgents = { data: agents, timestamp: Date.now() };
+      return agents;
+    } finally {
+      inFlightGetAgents = null;
+    }
+  })();
+  return inFlightGetAgents;
 }
 
 export interface MarketplaceStatsResponse {
@@ -196,16 +222,30 @@ export interface MarketplaceStatsResponse {
   };
 }
 
-export async function getMarketplaceStats(): Promise<MarketplaceStatsResponse> {
-  try {
-    const res = await secureFetch(`${getBaseUrl()}/api/analytics/marketplace-stats`, {
-      headers: getAuthHeaders()
-    });
-    if (!res.ok) return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
-    return res.json();
-  } catch (_) {
-    return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
+export async function getMarketplaceStats(forceRefresh: boolean = false): Promise<MarketplaceStatsResponse> {
+  const now = Date.now();
+  if (!forceRefresh && cachedMarketplaceStats && (now - cachedMarketplaceStats.timestamp < CACHE_TTL_MS)) {
+    return cachedMarketplaceStats.data;
   }
+  if (inFlightMarketplaceStats) {
+    return inFlightMarketplaceStats;
+  }
+  inFlightMarketplaceStats = (async () => {
+    try {
+      const res = await secureFetch(`${getBaseUrl()}/api/analytics/marketplace-stats`, {
+        headers: getAuthHeaders()
+      });
+      if (!res.ok) return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
+      const data = await res.json();
+      cachedMarketplaceStats = { data, timestamp: Date.now() };
+      return data;
+    } catch (_) {
+      return { ok: false, templateDeployments: {}, sidebarStats: { executionsToday: 0, activeAgentsCount: 0, successRate: 97 } };
+    } finally {
+      inFlightMarketplaceStats = null;
+    }
+  })();
+  return inFlightMarketplaceStats;
 }
 
 /**
@@ -221,6 +261,7 @@ export async function pauseAgent(agentName: string): Promise<any> {
     throw new Error(err.error || `Erreur lors de la mise en pause de l'agent (${res.status})`);
   }
   const result = await res.json();
+  invalidateAgentsCache();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
   }
@@ -245,6 +286,7 @@ export async function resumeAgent(agentName: string, params?: any): Promise<any>
     throw new Error(err.error || `Erreur lors de la reprise de l'agent (${res.status})`);
   }
   const result = await res.json();
+  invalidateAgentsCache();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
   }
@@ -264,6 +306,7 @@ export async function deleteAgent(agentName: string): Promise<any> {
     throw new Error(err.error || `Erreur lors de la suppression de l'agent (${res.status})`);
   }
   const result = await res.json();
+  invalidateAgentsCache();
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
   }
@@ -446,28 +489,45 @@ export interface SourcingExecutionConfig {
   allowExistingCompaniesVisible: boolean;
 }
 
+let inFlightLeadsRange: Promise<SourcingExecutionConfig> | null = null;
+let cachedLeadsRange: { data: SourcingExecutionConfig; timestamp: number } | null = null;
+
 /**
  * Fetches the admin-configured execution parameters (leads range + options visibility) for Sourcing Agents.
  */
-export async function getSourcingLeadsRange(): Promise<SourcingExecutionConfig> {
-  try {
-    const res = await secureFetch(`${getBaseUrl()}/api/sourcing-agent/leads-range`, {
-      headers: getAuthHeaders()
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.ok && typeof data.min === 'number' && typeof data.max === 'number') {
-        return { 
-          min: data.min, 
-          max: data.max,
-          allowExistingCompaniesVisible: data.allow_existing_companies_visible !== false
-        };
-      }
-    }
-  } catch (err) {
-    console.warn('[getSourcingLeadsRange] Error retrieving leads range, using default 1-15:', err);
+export async function getSourcingLeadsRange(forceFresh: boolean = false): Promise<SourcingExecutionConfig> {
+  const now = Date.now();
+  if (!forceFresh && cachedLeadsRange && (now - cachedLeadsRange.timestamp < 3000)) {
+    return cachedLeadsRange.data;
   }
-  return { min: 1, max: 15, allowExistingCompaniesVisible: true };
+  if (inFlightLeadsRange) {
+    return inFlightLeadsRange;
+  }
+  inFlightLeadsRange = (async () => {
+    try {
+      const res = await secureFetch(`${getBaseUrl()}/api/sourcing-agent/leads-range`, {
+        headers: getAuthHeaders()
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && typeof data.min === 'number' && typeof data.max === 'number') {
+          const config = { 
+            min: data.min, 
+            max: data.max,
+            allowExistingCompaniesVisible: data.allow_existing_companies_visible !== false
+          };
+          cachedLeadsRange = { data: config, timestamp: Date.now() };
+          return config;
+        }
+      }
+    } catch (err) {
+      console.warn('[getSourcingLeadsRange] Error retrieving leads range, using default 1-15:', err);
+    } finally {
+      inFlightLeadsRange = null;
+    }
+    return { min: 1, max: 15, allowExistingCompaniesVisible: true };
+  })();
+  return inFlightLeadsRange;
 }
 
 /**
