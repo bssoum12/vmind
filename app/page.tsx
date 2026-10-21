@@ -109,7 +109,7 @@ function UnauthorizedView({ onBackToLogin, onBackToDashboard }: { onBackToLogin:
           fontSize: '14px', color: '#8FA3B8',
           lineHeight: 1.6, marginBottom: '32px'
         }}>
-          Vous ne disposez pas des privilèges nécessaires pour accéder à cette section. Veuillez contacter votre administrateur TraLIS si vous estimez qu'il s'agit d'une erreur.
+          Vous ne disposez pas des privilèges nécessaires pour accéder à cette section. Veuillez contacter votre administrateur VMIND si vous estimez qu'il s'agit d'une erreur.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -674,6 +674,7 @@ function HomeContent() {
           {(currentView === 'market' || currentView === 'marketplace') && (
             <MarketplaceView
               onDeploy={handleDeploy}
+              onNavigate={(view) => handleNavigate(view)}
               activeCategory={activeCategory}
               isAdmin={isAdmin}
               onSelectCategory={(cat) => {

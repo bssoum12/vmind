@@ -133,7 +133,8 @@ export async function deployAgent(config: any, clientId = "DEMO"): Promise<any> 
   });
 
   if (!response.ok) {
-    throw new Error(`Erreur lors du déploiement via le scheduler Vmind: ${response.statusText}`);
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || errData.error || `Erreur lors du déploiement via le scheduler Vmind: ${response.statusText}`);
   }
 
   const text = await response.text();
@@ -348,7 +349,7 @@ export async function runAgentNow(agentName: string): Promise<any> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Erreur lors du lancement de l'agent (${res.status})`);
+    throw new Error(err.message || err.error || `Erreur lors du lancement de l'agent (${res.status})`);
   }
   return res.json();
 }
