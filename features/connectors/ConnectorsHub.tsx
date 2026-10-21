@@ -65,7 +65,7 @@ export const ConnectorsHub: React.FC = () => {
           const receivedAgents: string[] = data.allowedAgents || [];
           const resolvedAgents = receivedAgents.length > 0 ? receivedAgents : (isAdmin ? ALL_AGENTS : []);
 
-          setTralisSession({
+          const sessionObj: McpSession = {
             user: {
               username: data.erp_username || '',
               client_id: data.client_id || 'DEMO',
@@ -74,9 +74,11 @@ export const ConnectorsHub: React.FC = () => {
             },
             tools: data.tools || [],
             allTools: data.allTools || []
-          });
+          };
+
+          setTralisSession(sessionObj);
           setTralisStatus('connected');
-          window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: data }));
+          broadcastMcpSessionUpdate({ ...sessionObj, ...data, connected: true });
           return;
         }
       }
@@ -84,7 +86,7 @@ export const ConnectorsHub: React.FC = () => {
       // Si aucune session active n'est trouvée ou si la validation a échoué
       setTralisSession(null);
       setTralisStatus('idle');
-      window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: null }));
+      broadcastMcpSessionUpdate(null);
     } catch (err) {
       console.error('[ConnectorsHub] Erreur lors de l\'initialisation des connecteurs:', err);
       setTralisStatus('error');
@@ -94,12 +96,33 @@ export const ConnectorsHub: React.FC = () => {
   // Run ONCE when the Hub first mounts (not on every panel switch)
   useEffect(() => { initTralisMcp(); }, [initTralisMcp]);
 
+  // Écoute directe des messages retournés par la popup OAuth 2.1
+  useEffect(() => {
+    const handleAuthMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'VMIND_MCP_CONNECTED') {
+        if (event.data.success) {
+          console.log('[ConnectorsHub] 📡 Signal VMIND_MCP_CONNECTED reçu avec succès — actualisation immédiate');
+          initTralisMcp();
+        }
+      }
+    };
+
+    window.addEventListener('message', handleAuthMessage);
+    return () => window.removeEventListener('message', handleAuthMessage);
+  }, [initTralisMcp]);
+
   // Synchronisation inter-onglets : écoute les modifications propagées par BroadcastChannel
   useEffect(() => {
     const handleSync = (e: Event) => {
       const customEvent = e as CustomEvent;
       const detail = customEvent.detail;
-      if (detail && (detail.connected || detail.user)) {
+      if (detail && detail.connected === true) {
+        // Si les métadonnées d'outils ne sont pas complètes dans le payload de diffusion, réinterroger l'API
+        if (!detail.tools || detail.tools.length === 0 || !detail.allTools || detail.allTools.length === 0) {
+          initTralisMcp();
+          return;
+        }
+
         const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
         const receivedRoles: string[] = detail.user?.roles || detail.roles || ['Administrator'];
         const isAdmin = receivedRoles.some((r: string) =>
@@ -127,7 +150,7 @@ export const ConnectorsHub: React.FC = () => {
 
     window.addEventListener('mcp-session-updated', handleSync);
     return () => window.removeEventListener('mcp-session-updated', handleSync);
-  }, []);
+  }, [initTralisMcp]);
 
   /** Called by TralisConnectorPanel after a successful login */
   const handleTralisMcpConnected = (token: string, rawData: any) => {

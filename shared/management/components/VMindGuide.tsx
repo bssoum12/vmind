@@ -49,6 +49,7 @@ export interface VMindGuideProps {
   message: string | null;
   isOpen: boolean;
   mood?: GuideMood;
+  customColor?: string;
   showBackdrop?: boolean;
   backdropOpacity?: number;
   backdropBlur?: number;
@@ -62,6 +63,7 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
   message,
   isOpen,
   mood = 'focused',
+  customColor,
   showBackdrop = false,
   backdropOpacity = 0.12,
   backdropBlur = 1,
@@ -122,6 +124,16 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
   }, [activeMessage, internalIsOpen]);
 
   const getMoodStyles = (currentMood: GuideMood) => {
+    if (customColor) {
+      return {
+        animationDuration: '0.8s',
+        opacity: 1,
+        glow: `0 0 20px ${customColor}CC`,
+        borderColor: `${customColor}99`,
+        textColor: customColor,
+        lineGradient: `linear-gradient(90deg, transparent, ${customColor}, transparent)`,
+      };
+    }
     switch (currentMood) {
       case 'curious':
         return { 

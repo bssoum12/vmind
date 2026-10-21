@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { orbitron, syne, jetBrainsMono } from "@/shared/fonts";
 import "./globals.css";
+import "@/features/skills/skills-premium.css";
 import { TopBar } from "@/features/layout/TopBar";
 
 export const metadata: Metadata = {
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 import { ModeProvider } from "@/shared/contexts/ModeContext";
 import { SessionTimeoutProvider } from "@/components/vmind/SessionTimeoutProvider";
 import { ConnectionsProvider } from "@/shared/contexts/ConnectionsContext";
+import { SkillsProvider } from "@/shared/contexts/SkillsContext";
 import { KpiCacheProvider } from "@/shared/contexts/KpiCacheContext";
 import { ToastProvider } from "@/shared/contexts/ToastContext";
 
@@ -26,10 +28,12 @@ export default function RootLayout({
           <ModeProvider>
             <SessionTimeoutProvider>
               <ConnectionsProvider>
-                <KpiCacheProvider>
-                  <TopBar />
-                  {children}
-                </KpiCacheProvider>
+                <SkillsProvider>
+                  <KpiCacheProvider>
+                    <TopBar />
+                    {children}
+                  </KpiCacheProvider>
+                </SkillsProvider>
               </ConnectionsProvider>
             </SessionTimeoutProvider>
           </ModeProvider>

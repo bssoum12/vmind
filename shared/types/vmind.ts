@@ -56,6 +56,7 @@ export type VmindN8nResponse = {
   alerts?: VmindAlert[];
   report_url?: string | null;
   report_filename?: string | null;
+  skills_used?: Array<{ slug: string; version?: number }>;
 };
 
 export interface VmindMessage {
@@ -79,4 +80,5 @@ export interface VmindMessage {
   alerts?: VmindAlert[];
   report_url?: string | null;
   report_filename?: string | null;
+  skills_used?: Array<{ slug: string; version?: number }>;
 }

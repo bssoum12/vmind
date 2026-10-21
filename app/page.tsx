@@ -30,6 +30,7 @@ const ProfileView = dynamic(() => import('@/features/management/profile/ProfileV
 const PromptsConfigView = dynamic(() => import('@/features/management/prompts/PromptsConfigView').then(m => m.PromptsConfigView), { ssr: false });
 
 const ConnectorsHub = dynamic(() => import('@/features/connectors/ConnectorsHub').then(m => m.ConnectorsHub), { ssr: false });
+const SkillsHub = dynamic(() => import('@/features/skills/SkillsHub').then(m => m.SkillsHub), { ssr: false });
 /* ─────────────────────────────────────────────────────
    Accès Non Autorisé View (Premium VMIND Design)
 ───────────────────────────────────────────────────── */
@@ -275,13 +276,13 @@ function HomeContent() {
     setTimeout(() => setInsertPrompt(undefined), 100);
   };
 
-  const [assistantView, setAssistantView] = useState<'chat' | 'connectors'>('chat');
+  const [assistantView, setAssistantView] = useState<'chat' | 'connectors' | 'skills'>('chat');
 
   useEffect(() => {
     const handleSwitchView = (e: Event) => {
       const customEvent = e as CustomEvent<string>;
-      if (customEvent.detail === 'connectors' || customEvent.detail === 'chat') {
-        setAssistantView(customEvent.detail as 'chat' | 'connectors');
+      if (customEvent.detail === 'connectors' || customEvent.detail === 'chat' || customEvent.detail === 'skills') {
+        setAssistantView(customEvent.detail as 'chat' | 'connectors' | 'skills');
       }
     };
     window.addEventListener('switch-assistant-view', handleSwitchView);
@@ -634,6 +635,10 @@ function HomeContent() {
           
           <div style={{ display: assistantView === 'connectors' ? 'block' : 'none', flex: 1, height: '100%', minWidth: 0 }}>
             <ConnectorsHub />
+          </div>
+
+          <div style={{ display: assistantView === 'skills' ? 'block' : 'none', flex: 1, height: '100%', minWidth: 0 }}>
+            <SkillsHub />
           </div>
 
           <VoiceOverlay show={voiceShow} onClose={() => setVoiceShow(false)} />
