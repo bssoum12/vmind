@@ -2,16 +2,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { ConnectorsCatalog } from './components/ConnectorsCatalog';
-import { TralisConnectorPanel } from './components/TralisConnectorPanel';
-import { OdooConnectorPanel } from './components/OdooConnectorPanel';
 import { GenericErpConnectorPanel } from './components/GenericErpConnectorPanel';
 import { ComingSoonPanel } from './components/ComingSoonPanel';
-import { jwtDecode } from 'jwt-decode';
 import { broadcastMcpSessionUpdate } from '@/shared/utils/sessionBroadcast';
 import { useConnections } from '@/shared/contexts/ConnectionsContext';
-
-// ─── Shared MCP session state ─────────────────────────────────────────────────
-// Lifted to the Hub so it survives navigation between connectors.
 
 export interface McpSession {
   user: {
@@ -24,28 +18,64 @@ export interface McpSession {
   allTools?: any[];
 }
 
+const DEFAULT_ERP_TYPES = [
+  {
+    id: 'tralis',
+    display_name: 'TraLIS ERP',
+    icon_url: '',
+    default_mcp_url: 'https://untaxed-arrange-wifi.ngrok-free.dev/mcp',
+    auth_mode: 'oauth2',
+    capabilities: {},
+    enabled: true,
+    sort_order: 1
+  },
+  {
+    id: 'sage',
+    display_name: 'Sage X3',
+    icon_url: '',
+    default_mcp_url: '',
+    auth_mode: 'oauth2',
+    capabilities: {},
+    enabled: true,
+    sort_order: 2
+  },
+  {
+    id: 'odoo',
+    display_name: 'Odoo',
+    icon_url: '',
+    default_mcp_url: '',
+    auth_mode: 'oauth2',
+    capabilities: {},
+    enabled: true,
+    sort_order: 3
+  },
+  {
+    id: 'sap',
+    display_name: 'SAP S/4HANA',
+    icon_url: '',
+    default_mcp_url: '',
+    auth_mode: 'oauth2',
+    capabilities: {},
+    enabled: true,
+    sort_order: 4
+  }
+];
+
 export const ConnectorsHub: React.FC = () => {
   const [activeConnector, setActiveConnector] = useState<string>('tralis');
-  const { erpTypes } = useConnections();
+  const { erpTypes, connections } = useConnections();
 
-  // ── Global TraLIS MCP session — persists across connector navigation ──────
-  const [tralisStatus,  setTralisStatus]  = useState<'loading' | 'idle' | 'connected' | 'error'>('loading');
+  const [tralisStatus, setTralisStatus] = useState<'loading' | 'idle' | 'connected' | 'error'>('loading');
   const [tralisSession, setTralisSession] = useState<McpSession | null>(null);
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
-  /**
-   * Source de vérité : appelé une fois au montage du Hub.
-   * Valide la session avec le backend via cookie HttpOnly.
-   */
   const initTralisMcp = useCallback(async () => {
-    console.log('[ConnectorsHub] Récupération du statut du connecteur TraLIS depuis le backend');
     try {
       const res = await fetch(`${baseUrl}/api/connectors/tralis/status`, {
         credentials: 'include'
       });
 
-      // Nettoyage proactif de tout vestige legacy de localStorage
       localStorage.removeItem('vmind_session');
       localStorage.removeItem('vmind_mcp_token');
       localStorage.removeItem('vmind_connector_status');
@@ -55,8 +85,6 @@ export const ConnectorsHub: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         if (data.ok && data.connected) {
-          console.log('[ConnectorsHub] ✅ Session TraLIS active restaurée via le backend');
-
           const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
           const receivedRoles: string[] = data.roles || ['Administrator'];
           const isAdmin = receivedRoles.some((r: string) =>
@@ -83,7 +111,6 @@ export const ConnectorsHub: React.FC = () => {
         }
       }
 
-      // Si aucune session active n'est trouvée ou si la validation a échoué
       setTralisSession(null);
       setTralisStatus('idle');
       broadcastMcpSessionUpdate(null);
@@ -93,15 +120,12 @@ export const ConnectorsHub: React.FC = () => {
     }
   }, [baseUrl]);
 
-  // Run ONCE when the Hub first mounts (not on every panel switch)
   useEffect(() => { initTralisMcp(); }, [initTralisMcp]);
 
-  // Écoute directe des messages retournés par la popup OAuth 2.1
   useEffect(() => {
     const handleAuthMessage = (event: MessageEvent) => {
       if (event.data?.type === 'VMIND_MCP_CONNECTED') {
         if (event.data.success) {
-          console.log('[ConnectorsHub] 📡 Signal VMIND_MCP_CONNECTED reçu avec succès — actualisation immédiate');
           initTralisMcp();
         }
       }
@@ -111,13 +135,11 @@ export const ConnectorsHub: React.FC = () => {
     return () => window.removeEventListener('message', handleAuthMessage);
   }, [initTralisMcp]);
 
-  // Synchronisation inter-onglets : écoute les modifications propagées par BroadcastChannel
   useEffect(() => {
     const handleSync = (e: Event) => {
       const customEvent = e as CustomEvent;
       const detail = customEvent.detail;
       if (detail && detail.connected === true) {
-        // Si les métadonnées d'outils ne sont pas complètes dans le payload de diffusion, réinterroger l'API
         if (!detail.tools || detail.tools.length === 0 || !detail.allTools || detail.allTools.length === 0) {
           initTralisMcp();
           return;
@@ -152,118 +174,23 @@ export const ConnectorsHub: React.FC = () => {
     return () => window.removeEventListener('mcp-session-updated', handleSync);
   }, [initTralisMcp]);
 
-  /** Called by TralisConnectorPanel after a successful login */
-  const handleTralisMcpConnected = (token: string, rawData: any) => {
-    // Nettoyage proactif de tout vestige legacy de localStorage
-    localStorage.removeItem('vmind_session');
-    localStorage.removeItem('vmind_mcp_token');
-    localStorage.removeItem('vmind_connector_status');
-    localStorage.removeItem('vmind_client_id');
-    localStorage.removeItem('vmind_allowed_agents');
-
-    const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
-    const rawRoles = rawData.user?.roles || rawData.roles;
-    const roles: string[] = (Array.isArray(rawRoles) && rawRoles.length > 0)
-      ? rawRoles
-      : (typeof rawRoles === 'string' && rawRoles ? [rawRoles] : ['Administrator']);
-
-    const isAdmin = roles.some((r: string) =>
-      ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
-    );
-
-    const rawAgents = rawData.user?.allowedAgents || rawData.allowedAgents;
-    const receivedAgents: string[] = (Array.isArray(rawAgents) && rawAgents.length > 0)
-      ? rawAgents
-      : [];
-    const resolvedAgents = receivedAgents.length > 0 ? receivedAgents : (isAdmin ? ALL_AGENTS : []);
-
-    const normalizedSession: McpSession = {
-      user: {
-        username: rawData.user?.username || rawData.erp_username || 'host',
-        client_id: rawData.user?.client_id || rawData.client_id || 'LOCAL',
-        roles,
-        allowedAgents: resolvedAgents
-      },
-      tools: (Array.isArray(rawData.tools) && rawData.tools.length > 0) ? rawData.tools : [],
-      allTools: (Array.isArray(rawData.allTools) && rawData.allTools.length > 0) ? rawData.allTools : []
-    };
-
-    console.log('[ConnectorsHub] 🔗 connecté — user:', normalizedSession.user.username, 'agents:', resolvedAgents);
-    setTralisSession(normalizedSession);
-    setTralisStatus('connected');
-    broadcastMcpSessionUpdate({ ...normalizedSession, connected: true });
-
-    // Synchronisation d'arrière-plan avec /status si la liste d'outils est vide
-    if (normalizedSession.tools.length === 0) {
-      initTralisMcp();
-    }
-  };
-
-  /** Called by TralisConnectorPanel on explicit disconnect */
-  const handleTralisMcpDisconnected = async () => {
-    let remainingAgents: string[] = [];
-    try {
-      const res = await fetch(`${baseUrl}/api/connectors/tralis/disconnect`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok && Array.isArray(data.allowedAgents)) {
-          remainingAgents = data.allowedAgents;
-        }
-      }
-    } catch (err) {
-      console.error('[ConnectorsHub] Failed to disconnect on backend:', err);
-    }
-    localStorage.removeItem('vmind_session');
-    localStorage.removeItem('vmind_mcp_token');
-    localStorage.removeItem('vmind_connector_status');
-    localStorage.removeItem('vmind_client_id');
-    localStorage.removeItem('vmind_allowed_agents');
-    console.log('[ConnectorsHub] 🔌 Déconnecté TraLIS — agents restants:', remainingAgents);
-    setTralisSession(null);
-    setTralisStatus('idle');
-    broadcastMcpSessionUpdate(null);
-  };
+  const isTralisConnected = connections.some(c => c.connector_type === 'tralis' && c.status === 'connected') || tralisStatus === 'connected';
+  const catalogErps = erpTypes.length > 0 ? erpTypes : DEFAULT_ERP_TYPES;
 
   return (
     <div className="connectors-hub-wrap">
       <ConnectorsCatalog
         activeConnector={activeConnector}
         onSelectConnector={setActiveConnector}
-        tralisConnected={tralisStatus === 'connected'}
+        tralisConnected={isTralisConnected}
       />
 
       <div className="connectors-content-panel">
-        {/* 
-          IMPORTANT: We always render TralisConnectorPanel (hidden via CSS when 
-          inactive) so it never unmounts and never loses its parent-managed state.
-          Other panels (ComingSoon etc.) are cheap to mount/unmount.
-        */}
-        <div style={{ display: activeConnector === 'tralis' ? 'block' : 'none' }}>
-          <TralisConnectorPanel
-            status={tralisStatus}
-            session={tralisSession}
-            onConnected={handleTralisMcpConnected}
-            onDisconnected={handleTralisMcpDisconnected}
-          />
-        </div>
-
-        <div style={{ display: activeConnector === 'odoo' ? 'block' : 'none' }}>
-          <OdooConnectorPanel />
-        </div>
-
-        {erpTypes
-          .filter(e => e.id !== 'tralis' && e.id !== 'odoo')
-          .map(erp => (
-            <div key={erp.id} style={{ display: activeConnector === erp.id ? 'block' : 'none' }}>
-              <GenericErpConnectorPanel erpType={erp} />
-            </div>
-          ))}
+        {catalogErps.map(erp => (
+          <div key={erp.id} style={{ display: activeConnector === erp.id ? 'block' : 'none' }}>
+            <GenericErpConnectorPanel erpType={erp} />
+          </div>
+        ))}
 
         {activeConnector === 'web' && <ComingSoonPanel name="Recherche Web" />}
       </div>
