@@ -72,8 +72,16 @@ export function ConnectionsProvider({ children }: { children: React.ReactNode })
       }
     };
 
+    const handleSessionUpdated = () => {
+      refreshConnections();
+    };
+
     window.addEventListener('message', handleAuthMessage);
-    return () => window.removeEventListener('message', handleAuthMessage);
+    window.addEventListener('mcp-session-updated', handleSessionUpdated);
+    return () => {
+      window.removeEventListener('message', handleAuthMessage);
+      window.removeEventListener('mcp-session-updated', handleSessionUpdated);
+    };
   }, [refreshConnections, showToast]);
 
   const selectActiveConnection = async (connectionId: number) => {
