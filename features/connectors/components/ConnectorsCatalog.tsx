@@ -1,27 +1,36 @@
 'use client';
 
 import React from 'react';
-import { Database, Globe, Search, Plus } from 'lucide-react';
+import { Database, Layout, Globe, Search, Plus } from 'lucide-react';
+
 import { useConnections } from '@/shared/contexts/ConnectionsContext';
 
 interface ConnectorsCatalogProps {
   activeConnector: string;
   onSelectConnector: (connector: string) => void;
+  tralisConnected?: boolean;
 }
 
-export const ConnectorsCatalog: React.FC<ConnectorsCatalogProps> = ({ activeConnector, onSelectConnector }) => {
+export const ConnectorsCatalog: React.FC<ConnectorsCatalogProps> = ({ activeConnector, onSelectConnector, tralisConnected = false }) => {
   const [filter, setFilter] = React.useState<'all' | 'connected' | 'disconnected'>('all');
-  const { erpTypes, connections, loading } = useConnections();
+  const { erpTypes, connections } = useConnections();
 
-  const erpItems = erpTypes.map(erp => {
-    const isConn = connections.some(c => c.connector_type === erp.id && c.status === 'connected');
-    return {
-      id: erp.id,
-      name: erp.display_name,
-      icon: <Database size={16} />,
-      connected: isConn
-    };
-  });
+  const erpItems = erpTypes.length > 0
+    ? erpTypes.map(erp => {
+        const isConn = connections.some(c => c.connector_type === erp.id && c.status === 'connected') || (erp.id === 'tralis' && tralisConnected);
+        return {
+          id: erp.id,
+          name: erp.display_name,
+          icon: <Database size={16} />,
+          connected: isConn
+        };
+      })
+    : [
+        { id: 'tralis', name: 'TraLIS ERP', icon: <Database size={16} />, connected: tralisConnected },
+        { id: 'sage', name: 'Sage X3', icon: <Database size={16} />, connected: false },
+        { id: 'odoo', name: 'Odoo MCP', icon: <Database size={16} />, connected: false },
+        { id: 'sap', name: 'SAP S/4HANA', icon: <Database size={16} />, connected: false },
+      ];
 
   const categories = [
     {
@@ -92,11 +101,7 @@ export const ConnectorsCatalog: React.FC<ConnectorsCatalogProps> = ({ activeConn
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto' }}>
-        {loading && erpTypes.length === 0 ? (
-          <div style={{ padding: '16px 8px', fontSize: '12px', color: '#6A7E95' }}>
-            Chargement des connecteurs...
-          </div>
-        ) : filteredCategories.map((category) => (
+        {filteredCategories.map((category) => (
           <div key={category.title} style={{ marginBottom: '24px' }}>
             <h3 style={{ fontSize: '11px', textTransform: 'uppercase', color: '#6A7E95', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '12px', padding: '0 8px' }}>
               {category.title}
