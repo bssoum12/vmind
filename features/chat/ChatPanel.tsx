@@ -44,7 +44,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       <div className="chat-header">
         <div>
           <div className="chat-title">ASSISTANT VMIND</div>
-          <div className="chat-subtitle">Analyse intelligente des données TraLIS</div>
+          <div className="chat-subtitle">Analyse intelligente de vos données d'entreprise</div>
         </div>
       </div>
 

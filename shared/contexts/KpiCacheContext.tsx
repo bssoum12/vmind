@@ -117,7 +117,17 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       } else {
         const user = sessionDetail?.user || sessionDetail;
         if (user) {
-          setCurrentUser(user);
+          setCurrentUser((prev: any) => {
+            if (
+              prev &&
+              prev.username === user.username &&
+              prev.client_id === user.client_id &&
+              JSON.stringify(prev.roles) === JSON.stringify(user.roles)
+            ) {
+              return prev;
+            }
+            return user;
+          });
         }
         setIsConnectorConnected(true);
       }
@@ -303,7 +313,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
     // Interrogation de la base PostgreSQL en mode passif (force = false)
     fetchKpis(lowerAgent, false);
-  }, [startDate, endDate, activeAgentId, currentUser, isConnectorConnected]);
+  }, [startDate, endDate, activeAgentId, currentUser?.client_id, currentUser?.username, isConnectorConnected]);
 
   // Polling automatique si un calcul est en cours en tâche de fond pour l'agent actif
   useEffect(() => {

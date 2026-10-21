@@ -55,7 +55,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onNavigate, currentView }) => {
           <div className="user-av">AB</div>
           <div>
             <div className="user-nm">Ahmed B.</div>
-            <div className="user-rl">DG · TraLIS</div>
+            <div className="user-rl">Direction Générale</div>
           </div>
         </div>
       </div>

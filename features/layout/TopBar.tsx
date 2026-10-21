@@ -176,7 +176,7 @@ export const TopBar: React.FC = () => {
           const hasActive = activeConnection && activeConnection.status === 'connected';
           const effectiveErpName = hasActive 
             ? (activeConnection.erp_display_name || activeConnection.connector_type.toUpperCase())
-            : (isErpConnected ? 'TraLIS ERP' : null);
+            : (isErpConnected ? 'ERP CONNECTÉ' : null);
           const effectiveTenant = hasActive && activeConnection.client_id ? activeConnection.client_id : null;
 
           return (

@@ -373,7 +373,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                 Accès aux données restreint
               </div>
               <div style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' }}>
-                Accès aux données et indicateurs TraLIS non autorisé pour cet agent. Il est possible d'échanger avec l'agent pour des questions métier ou de contacter un administrateur.
+                Accès aux données et indicateurs non autorisé pour cet agent. Il est possible d'échanger avec l'agent pour des questions métier ou de contacter un administrateur.
               </div>
             </div>
           )

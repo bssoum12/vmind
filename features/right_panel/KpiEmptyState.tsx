@@ -20,7 +20,7 @@ interface SpecialistDetails {
 const SPECIALIST_INFO: Record<string, SpecialistDetails> = {
   VDATA: {
     title: AGENTS.VDATA.desc,
-    subtitle: "Score qualité global, volume d'activité et taux de livraison TraLIS.",
+    subtitle: "Score qualité global, volume d'activité et taux de livraison.",
     Icon: BarChart3,
     color: AGENTS.VDATA.color
   },
@@ -50,7 +50,7 @@ const SPECIALIST_INFO: Record<string, SpecialistDetails> = {
   },
   VSTOCK: {
     title: AGENTS.VSTOCK.desc,
-    subtitle: 'Niveaux de stock, valorisation, taux de rotation et alertes de rupture TraLIS.',
+    subtitle: 'Niveaux de stock, valorisation, taux de rotation et alertes de rupture.',
     Icon: Package,
     color: AGENTS.VSTOCK.color
   }
@@ -172,7 +172,7 @@ export const KpiEmptyState: React.FC<KpiEmptyStateProps> = ({ agentId, onLaunch,
         color: '#556980',
         fontFamily: 'var(--font-mono)'
       }}>
-        Interrogation et synthèse IA TraLIS à la demande
+        Interrogation et synthèse IA à la demande
       </div>
     </div>
   );

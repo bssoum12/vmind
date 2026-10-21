@@ -34,12 +34,16 @@ export const ConnectorsHub: React.FC = () => {
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
 
+  const isFetchingRef = React.useRef(false);
+
   /**
    * Source de vérité : appelé une fois au montage du Hub.
    * Valide la session avec le backend via cookie HttpOnly.
    */
   const initTralisMcp = useCallback(async () => {
-    console.log('[ConnectorsHub] Récupération du statut du connecteur TraLIS depuis le backend');
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
+    console.log('[ConnectorsHub] Récupération du statut du connecteur ERP depuis le backend');
     try {
       const res = await fetch(`${baseUrl}/api/connectors/tralis/status`, {
         credentials: 'include'
@@ -55,7 +59,7 @@ export const ConnectorsHub: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         if (data.ok && data.connected) {
-          console.log('[ConnectorsHub] ✅ Session TraLIS active restaurée via le backend');
+          console.log('[ConnectorsHub] ✔ Session ERP active restaurée via le backend');
 
           const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
           const receivedRoles: string[] = data.roles || ['Administrator'];
@@ -90,6 +94,8 @@ export const ConnectorsHub: React.FC = () => {
     } catch (err) {
       console.error('[ConnectorsHub] Erreur lors de l\'initialisation des connecteurs:', err);
       setTralisStatus('error');
+    } finally {
+      isFetchingRef.current = false;
     }
   }, [baseUrl]);
 
@@ -111,18 +117,16 @@ export const ConnectorsHub: React.FC = () => {
     return () => window.removeEventListener('message', handleAuthMessage);
   }, [initTralisMcp]);
 
-  // Synchronisation inter-onglets : écoute les modifications propagées par BroadcastChannel
+  // Synchronisation inter-onglets : écoute UNIQUEMENT les modifications propagées par BroadcastChannel depuis un autre onglet
   useEffect(() => {
     const handleSync = (e: Event) => {
       const customEvent = e as CustomEvent;
+      // Ne réagir QUE si l'événement provient explicitement d'un AUTRE onglet
+      if (!(customEvent as any)._fromBroadcast) {
+        return;
+      }
       const detail = customEvent.detail;
       if (detail && detail.connected === true) {
-        // Si les métadonnées d'outils ne sont pas complètes dans le payload de diffusion, réinterroger l'API
-        if (!detail.tools || detail.tools.length === 0 || !detail.allTools || detail.allTools.length === 0) {
-          initTralisMcp();
-          return;
-        }
-
         const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
         const receivedRoles: string[] = detail.user?.roles || detail.roles || ['Administrator'];
         const isAdmin = receivedRoles.some((r: string) =>
@@ -150,7 +154,7 @@ export const ConnectorsHub: React.FC = () => {
 
     window.addEventListener('mcp-session-updated', handleSync);
     return () => window.removeEventListener('mcp-session-updated', handleSync);
-  }, [initTralisMcp]);
+  }, []);
 
   /** Called by TralisConnectorPanel after a successful login */
   const handleTralisMcpConnected = (token: string, rawData: any) => {
