@@ -34,7 +34,8 @@ export async function sendVmindMessage(
   agentId: string,
   clientId = "DEMO",
   signal?: AbortSignal,
-  connectionId?: number | string | null
+  connectionId?: number | string | null,
+  selectedSkills?: string[]
 ): Promise<VmindN8nResponse> {
   const sessionId = getVmindSessionId();
 
@@ -43,7 +44,7 @@ export async function sendVmindMessage(
   const proxyUrl = `${baseUrl}/api/n8n-proxy`;
 
   const agentCode = (agentId || "VFIN").toUpperCase();
-  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, connection_id: connectionId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode });
+  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, connection_id: connectionId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode, selected_skills: selectedSkills });
 
   try {
     const response = await fetch(proxyUrl, {
@@ -57,7 +58,8 @@ export async function sendVmindMessage(
         vmind_session_id: sessionId,
         conversation_id: conversationId,
         agent_id: agentId,
-        agent: agentCode
+        agent: agentCode,
+        ...(selectedSkills && selectedSkills.length > 0 ? { selected_skills: selectedSkills.slice(0, 3) } : {})
       }),
       signal
     });

@@ -292,6 +292,24 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
     };
   }, []);
 
+  // Fermeture automatique de la modale et réinitialisation de l'état de chargement lors de la réception du message OAuth
+  useEffect(() => {
+    const handleAuthMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'VMIND_MCP_CONNECTED') {
+        setOauthLoading(false);
+        if (event.data.success) {
+          setShowModal(false);
+          setLoginError('');
+        } else if (event.data.error) {
+          setLoginError(event.data.error);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleAuthMessage);
+    return () => window.removeEventListener('message', handleAuthMessage);
+  }, []);
+
   useEffect(() => {
     if (session?.allTools && session.allTools.length > 0) {
       setServerTools(session.allTools);

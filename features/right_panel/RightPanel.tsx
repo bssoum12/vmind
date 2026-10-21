@@ -89,7 +89,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
 
     // Priorité au détail de l'événement en direct mcp-session-updated (en mémoire)
     const sessionDetail = event?.detail;
-    if (sessionDetail && (sessionDetail.connected || sessionDetail.user)) {
+    if (sessionDetail && sessionDetail.connected === true) {
       connected = true;
       const user = sessionDetail.user || sessionDetail;
       const agents = sessionDetail.allowedAgents || user?.allowedAgents;
@@ -98,10 +98,12 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
       }
       const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles || ''];
       isUserAdmin = roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r));
-    }
-
-    if (currentAllowed.length > 0) {
-      connected = true;
+    } else if (sessionDetail?.user) {
+      // Événement d'authentification VMIND sans connecteur ERP actif
+      const user = sessionDetail.user;
+      const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles || ''];
+      isUserAdmin = roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r));
+      connected = false;
     }
 
     setIsAdmin(isUserAdmin);
@@ -193,6 +195,13 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
     return `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`;
   };
 
+  const currentAgentConfig = activeAgentId && activeAgentId !== 'VMIND'
+    ? (AGENTS as any)[activeAgentId.toUpperCase()]
+    : AGENTS.VDATA;
+  const agentColor = currentAgentConfig?.color || '#00E5C8';
+  const agentBgColor = currentAgentConfig?.bgColor || 'rgba(0, 229, 200, 0.10)';
+  const agentBorderColor = currentAgentConfig?.borderColor || 'rgba(0, 229, 200, 0.25)';
+
   return (
     <div className="right-panel">
       {/* KPIs Live */}
@@ -211,7 +220,9 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                       ? 'ACHATS & FOURNISSEURS'
                       : activeAgentId === 'VMOVE'
                         ? 'LOGISTIQUE & LIVRAISONS'
-                        : 'INDICATEURS CLÉS'}
+                        : activeAgentId === 'VSTOCK'
+                          ? 'STOCKS & INVENTAIRE'
+                          : 'INDICATEURS CLÉS'}
             </span>
           </div>
           {isKpiAuthorized && (
@@ -223,10 +234,10 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
               disabled={loadingByAgent[(activeAgentId || 'vdata').toLowerCase()]}
               title="Actualiser les indicateurs en direct depuis l'ERP (n8n)"
               style={{
-                background: loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] ? 'rgba(0, 240, 255, 0.04)' : 'rgba(0, 240, 255, 0.1)',
-                border: '1px solid rgba(0, 240, 255, 0.35)',
+                background: loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] ? `${agentColor}0A` : agentBgColor,
+                border: `1px solid ${agentColor}55`,
                 borderRadius: '6px',
-                color: '#00f0ff',
+                color: agentColor,
                 cursor: loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] ? 'not-allowed' : 'pointer',
                 padding: '5px 10px',
                 fontSize: '11px',
@@ -237,10 +248,10 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                 gap: '6px',
                 transition: 'all 0.2s ease',
                 flexShrink: 0,
-                boxShadow: '0 2px 8px rgba(0, 240, 255, 0.12)'
+                boxShadow: `0 2px 8px ${agentColor}20`
               }}
-              onMouseOver={(e) => !loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] && (e.currentTarget.style.background = 'rgba(0, 240, 255, 0.22)')}
-              onMouseOut={(e) => !loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] && (e.currentTarget.style.background = 'rgba(0, 240, 255, 0.1)')}
+              onMouseOver={(e) => !loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] && (e.currentTarget.style.background = `${agentColor}35`)}
+              onMouseOut={(e) => !loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] && (e.currentTarget.style.background = agentBgColor)}
             >
               <span style={{ 
                 display: 'inline-block', 
@@ -266,7 +277,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
             alignItems: 'center',
             gap: '6px'
           }}>
-            <span style={{ color: '#00e5c8', fontSize: '10px' }}>●</span>
+            <span style={{ color: agentColor, fontSize: '10px' }}>●</span>
             <span>Dernière actualisation : {formattedLastUpdate}</span>
           </div>
         )}
@@ -276,9 +287,9 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
             <div style={{
               padding: '24px 16px',
               backgroundColor: 'rgba(6, 17, 31, 0.7)',
-              backgroundImage: 'radial-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 0)',
+              backgroundImage: `radial-gradient(${agentColor}0A 1px, transparent 0)`,
               backgroundSize: '12px 12px',
-              border: '1px solid rgba(0, 240, 255, 0.16)',
+              border: `1px solid ${agentBorderColor}`,
               borderRadius: '10px',
               textAlign: 'center',
               display: 'flex',
@@ -292,8 +303,8 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                 width: '42px',
                 height: '42px',
                 borderRadius: '10px',
-                background: 'rgba(0, 240, 255, 0.08)',
-                border: '1px solid rgba(0, 240, 255, 0.25)',
+                background: agentBgColor,
+                border: `1px solid ${agentBorderColor}`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -315,9 +326,9 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                   marginTop: '4px',
                   padding: '7px 14px',
                   borderRadius: '6px',
-                  background: 'rgba(0, 240, 255, 0.12)',
-                  border: '1px solid rgba(0, 240, 255, 0.3)',
-                  color: '#00f0ff',
+                  background: agentBgColor,
+                  border: `1px solid ${agentColor}50`,
+                  color: agentColor,
                   fontSize: '11px',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -326,8 +337,8 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                   alignItems: 'center',
                   gap: '6px'
                 }}
-                onMouseOver={(e) => e.currentTarget.style.background = 'rgba(0, 240, 255, 0.2)'}
-                onMouseOut={(e) => e.currentTarget.style.background = 'rgba(0, 240, 255, 0.12)'}
+                onMouseOver={(e) => e.currentTarget.style.background = `${agentColor}33`}
+                onMouseOut={(e) => e.currentTarget.style.background = agentBgColor}
               >
                 Accéder aux Connecteurs →
               </button>
@@ -419,9 +430,9 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
             {/* Global Notice Banner (e.g. Cooldown) */}
             {notice && (
               <div style={{
-                background: 'rgba(0, 240, 255, 0.08)',
-                border: '1px solid rgba(0, 240, 255, 0.25)',
-                color: '#00f0ff',
+                background: agentBgColor,
+                border: `1px solid ${agentBorderColor}`,
+                color: agentColor,
                 fontSize: '11px',
                 padding: '8px 12px',
                 borderRadius: '6px',
@@ -437,7 +448,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                 </div>
                 <button 
                   onClick={clearNotice} 
-                  style={{ background: 'none', border: 'none', color: '#00f0ff', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', padding: '0 4px' }}
+                  style={{ background: 'none', border: 'none', color: agentColor, cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', padding: '0 4px' }}
                 >
                   ✕
                 </button>
@@ -499,8 +510,8 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                 {(isLoading || isInProgress) && (
                   <div style={{
                     padding: '10px 14px',
-                    background: 'rgba(0, 240, 255, 0.06)',
-                    border: '1px solid rgba(0, 240, 255, 0.22)',
+                    background: agentBgColor,
+                    border: `1px solid ${agentBorderColor}`,
                     borderRadius: '8px',
                     marginBottom: '14px',
                     display: 'flex',
@@ -510,13 +521,13 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                     <div style={{
                       width: '14px',
                       height: '14px',
-                      border: '2px solid rgba(0, 240, 255, 0.2)',
-                      borderTop: '2px solid #00f0ff',
+                      border: `2px solid ${agentColor}33`,
+                      borderTop: `2px solid ${agentColor}`,
                       borderRadius: '50%',
                       animation: 'spin 1s linear infinite',
                       flexShrink: 0
                     }} />
-                    <span style={{ fontSize: '11px', color: '#00f0ff', lineHeight: 1.4 }}>
+                    <span style={{ fontSize: '11px', color: agentColor, lineHeight: 1.4 }}>
                       Actualisation en cours en arrière-plan. La navigation vers d'autres spécialistes reste possible sans interrompre le traitement.
                     </span>
                   </div>

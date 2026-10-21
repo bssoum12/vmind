@@ -1,11 +1,14 @@
 "use client";
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { VmindMessage } from '@/shared/types/vmind';
 import { sendVmindMessage } from '@/shared/api/n8n-api';
 import { ToolResultRenderer } from './renderers/ToolResultRenderer';
 import { resolveAgentFromTool, AGENTS } from '@/shared/constants/data';
 import { useConversations } from '@/shared/contexts/ConversationsContext';
 import { useConnections } from '@/shared/contexts/ConnectionsContext';
+import { useSkills } from '@/shared/contexts/SkillsContext';
+import { importSkillMd } from '@/shared/api/skills-api';
+import { VMindGuide } from '@/shared/management/components/VMindGuide';
 
 interface VmindChatProps {
   initialPrompt?: string;
@@ -230,6 +233,24 @@ const formatDateHeader = (dateString?: string) => {
   }
 };
 
+/**
+ * Detects if an assistant message (e.g. from /skill-assistant) contains a drafted SKILL.md block.
+ */
+const extractDraftedSkillMd = (text?: string): string | null => {
+  if (!text || typeof text !== 'string') return null;
+  // Check fenced markdown/yaml block containing SKILL.md YAML frontmatter
+  const fencedMatch = text.match(/```(?:markdown|md|yaml)?\s*(---\r?\n[\s\S]*?\r?\n---\r?\n[\s\S]*?)```/i);
+  if (fencedMatch && /name\s*:/i.test(fencedMatch[1]) && /description\s*:/i.test(fencedMatch[1])) {
+    return fencedMatch[1].trim();
+  }
+  // Or direct raw frontmatter at the start of the message
+  const rawMatch = text.trim().match(/^(---\r?\n[\s\S]*?\r?\n---\r?\n[\s\S]+)$/);
+  if (rawMatch && /name\s*:/i.test(rawMatch[1]) && /description\s*:/i.test(rawMatch[1])) {
+    return rawMatch[1].trim();
+  }
+  return null;
+};
+
 export const VmindChat: React.FC<VmindChatProps> = ({
   initialPrompt,
   onOpenVoice,
@@ -239,11 +260,46 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 }) => {
   const { activeConversationId, setActiveConversationId, createNewConversation, conversations, bumpConversation, updateConversationTitle, refreshConversations } = useConversations();
   const { activeConnection } = useConnections();
+  const { activeSkills, refreshSkills } = useSkills();
   const [input, setInput] = useState('');
+  const [cursorPos, setCursorPos] = useState<number>(0);
+  const [slashDismissed, setSlashDismissed] = useState<boolean>(false);
+  const inputTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [slashHighlightIdx, setSlashHighlightIdx] = useState<number>(0);
+  const [hoveredSkillSlug, setHoveredSkillSlug] = useState<string | null>(null);
+  const [savingDraftMsgId, setSavingDraftMsgId] = useState<string | null>(null);
+  const [savedDraftSlugByMsgId, setSavedDraftSlugByMsgId] = useState<Record<string, string>>({});
+  const [draftErrorByMsgId, setDraftErrorByMsgId] = useState<Record<string, string>>({});
   const [isErpConnected, setIsErpConnected] = useState<boolean>(false);
   const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  const handleSaveDraftedSkill = async (msgId: string, draftedMd: string) => {
+    setSavingDraftMsgId(msgId);
+    setDraftErrorByMsgId((prev) => {
+      const next = { ...prev };
+      delete next[msgId];
+      return next;
+    });
+    try {
+      const imported = await importSkillMd({
+        content: draftedMd,
+        scope: 'USER',
+        comment: 'Saved from skill-assistant in chat',
+      });
+      await refreshSkills();
+      setSavedDraftSlugByMsgId((prev) => ({ ...prev, [msgId]: imported.slug }));
+    } catch (err: any) {
+      setDraftErrorByMsgId((prev) => ({
+        ...prev,
+        [msgId]: err.message || 'Impossible d\'enregistrer ce skill.',
+      }));
+    } finally {
+      setSavingDraftMsgId(null);
+    }
+  };
 
   const handleAgentReferralClick = (targetAgentId: string) => {
     // 1. Retrieve the last user question in the conversation history
@@ -265,14 +321,29 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   const checkPermissions = (event?: any) => {
     if (typeof window === 'undefined') return;
     const sessionDetail = event?.detail;
-    const user = sessionDetail?.user || sessionDetail;
-    if (user) {
-      setCurrentUser(user);
+
+    if (sessionDetail && sessionDetail.connected === true) {
+      const user = sessionDetail.user || sessionDetail;
+      if (user) {
+        setCurrentUser(user);
+        const roles = Array.isArray(user.roles) ? user.roles : (user.roles ? [user.roles] : []);
+        setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
+        const agents = sessionDetail.allowedAgents || user.allowedAgents;
+        if (Array.isArray(agents)) {
+          setAllowedAgents(agents);
+        }
+      }
       setIsErpConnected(true);
-      const roles = Array.isArray(user.roles) ? user.roles : (user.roles ? [user.roles] : []);
-      setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
-      if (Array.isArray(user.allowedAgents)) {
-        setAllowedAgents(user.allowedAgents);
+      return;
+    }
+
+    if (sessionDetail === null || sessionDetail?.connected === false) {
+      setIsErpConnected(false);
+      setAllowedAgents([]);
+      if (sessionDetail?.user) {
+        setCurrentUser(sessionDetail.user);
+        const roles = Array.isArray(sessionDetail.user.roles) ? sessionDetail.user.roles : (sessionDetail.user.roles ? [sessionDetail.user.roles] : []);
+        setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
       }
       return;
     }
@@ -283,12 +354,8 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       .then(data => {
         if (data?.user) {
           setCurrentUser(data.user);
-          setIsErpConnected(true);
           const roles = Array.isArray(data.user.roles) ? data.user.roles : (data.user.roles ? [data.user.roles] : []);
           setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
-          if (Array.isArray(data.user.allowedAgents)) {
-            setAllowedAgents(data.user.allowedAgents);
-          }
         }
       })
       .catch(() => {});
@@ -426,7 +493,9 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     const text = input.trim();
     if (!text || isLoading) return;
 
+    const skillsToSend = [...selectedSkills];
     setInput('');
+    setSelectedSkills([]);
     setIsLoading(true);
 
     const userMessage: VmindMessage = {
@@ -485,7 +554,8 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         effectiveAgentId,
         activeConnection?.client_id || clientId,
         controller.signal,
-        activeConnection?.id
+        activeConnection?.id,
+        skillsToSend
       );
 
       if (activeConversationIdRef.current !== targetConvId) return;
@@ -566,6 +636,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           alerts: response.alerts,
           report_url: response.report_url,
           report_filename: response.report_filename,
+          skills_used: Array.isArray((response as any).skills_used) ? (response as any).skills_used : undefined,
           error: response.error
         }]);
       }
@@ -794,7 +865,191 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     }
   };
 
+  // Slash-command autocomplete matching at the start, in the middle, or at the end of the input
+  const slashMatchInfo = (() => {
+    const effectiveCursor = cursorPos > 0 && cursorPos <= input.length ? cursorPos : input.length;
+    const textBeforeCursor = input.slice(0, effectiveCursor);
+    const matchBeforeCursor = textBeforeCursor.match(/(?:^|\s)\/([a-zA-Z0-9-]*)$/);
+    if (matchBeforeCursor && matchBeforeCursor.index !== undefined) {
+      const fullMatch = matchBeforeCursor[0];
+      const slashOffset = fullMatch.indexOf('/');
+      const tokenStart = matchBeforeCursor.index + slashOffset;
+      return {
+        query: matchBeforeCursor[1].toLowerCase(),
+        start: tokenStart,
+        end: effectiveCursor,
+      };
+    }
+
+    const matchAtEnd = input.match(/(?:^|\s)\/([a-zA-Z0-9-]*)$/);
+    if (matchAtEnd && matchAtEnd.index !== undefined) {
+      const fullMatch = matchAtEnd[0];
+      const slashOffset = fullMatch.indexOf('/');
+      const tokenStart = matchAtEnd.index + slashOffset;
+      return {
+        query: matchAtEnd[1].toLowerCase(),
+        start: tokenStart,
+        end: input.length,
+      };
+    }
+
+    return null;
+  })();
+
+  // Flatten activeSkills + their modular sub-skills for slash autocomplete
+  const searchableSkillItems = useMemo(() => {
+    const items: Array<{
+      id: number | string;
+      slug: string;
+      displaySlug: string;
+      title: string;
+      description: string;
+      scope: string;
+      erp_type?: string | null;
+      parentSlug?: string;
+    }> = [];
+
+    for (const s of activeSkills) {
+      // 1. Top-level skill entry
+      items.push({
+        id: s.id,
+        slug: s.slug,
+        displaySlug: s.slug,
+        title: s.title,
+        description: s.description,
+        scope: s.scope,
+        erp_type: s.erp_type,
+      });
+
+      // 2. Any folder containing a SKILL.md (Claude standard specification)
+      if (Array.isArray(s.sub_skills) && s.sub_skills.length > 0) {
+        for (const sub of s.sub_skills) {
+          items.push({
+            id: `${s.id}-${sub.slug}`,
+            slug: s.slug,
+            displaySlug: sub.slug,
+            title: sub.title,
+            description: sub.description,
+            scope: s.scope,
+            erp_type: s.erp_type,
+            parentSlug: s.slug,
+          });
+        }
+      } else if (Array.isArray(s.references)) {
+        // Fallback: any folder containing a SKILL.md is treated as a skill
+        for (const ref of s.references) {
+          const match = ref.match(/(?:^|\/)([^/]+)\/(?:SKILL|skill)\.md$/i);
+          if (match) {
+            const folderSlug = match[1];
+            const title = folderSlug
+              .split('-')
+              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+              .join(' ');
+            items.push({
+              id: `${s.id}-${folderSlug}`,
+              slug: s.slug,
+              displaySlug: folderSlug,
+              title,
+              description: `Compétence ${title} incluse dans ${s.title}`,
+              scope: s.scope,
+              erp_type: s.erp_type,
+              parentSlug: s.slug,
+            });
+          }
+        }
+      }
+    }
+
+    return items;
+  }, [activeSkills]);
+
+  const normalizeSearch = (t: string) =>
+    (t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  const slashQuery = slashMatchInfo ? slashMatchInfo.query : null;
+  const normalizedQuery = slashQuery !== null ? normalizeSearch(slashQuery) : '';
+
+  const slashSuggestions = slashQuery !== null
+    ? searchableSkillItems.filter(
+        (item) => {
+          const itemKey = item.displaySlug || item.slug;
+          if (selectedSkills.includes(itemKey) || selectedSkills.includes(item.slug)) return false;
+          if (item.parentSlug && selectedSkills.includes(item.parentSlug)) return false;
+
+          return (
+            normalizeSearch(item.displaySlug).includes(normalizedQuery) ||
+            normalizeSearch(item.slug).includes(normalizedQuery) ||
+            normalizeSearch(item.title).includes(normalizedQuery) ||
+            normalizeSearch(item.description).includes(normalizedQuery)
+          );
+        }
+      )
+    : [];
+  const showSlashMenu = !slashDismissed && slashQuery !== null && selectedSkills.length < 3;
+
+  const selectSlashSkill = (slug: string) => {
+    if (selectedSkills.length >= 3 || selectedSkills.includes(slug)) return;
+    setSelectedSkills((prev) => [...prev, slug].slice(0, 3));
+    if (slashMatchInfo) {
+      const before = input.slice(0, slashMatchInfo.start);
+      const after = input.slice(slashMatchInfo.end);
+      const nextInput =
+        before.endsWith(' ') && after.startsWith(' ') ? before + after.slice(1) : before + after;
+      setInput(nextInput);
+      const nextCaret = before.length;
+      setCursorPos(nextCaret);
+      setTimeout(() => {
+        if (inputTextareaRef.current) {
+          inputTextareaRef.current.focus();
+          inputTextareaRef.current.setSelectionRange(nextCaret, nextCaret);
+        }
+      }, 0);
+    } else {
+      setInput('');
+      setCursorPos(0);
+    }
+    setSlashHighlightIdx(0);
+    setSlashDismissed(false);
+    setHoveredSkillSlug(null);
+  };
+
+  const removeSelectedSkill = (slug: string) => {
+    setSelectedSkills((prev) => prev.filter((s) => s !== slug));
+    setHoveredSkillSlug((prev) => (prev === slug ? null : prev));
+  };
+
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showSlashMenu) {
+      if (e.key === 'ArrowDown' && slashSuggestions.length > 0) {
+        e.preventDefault();
+        const nextIdx = (slashHighlightIdx + 1) % slashSuggestions.length;
+        setSlashHighlightIdx(nextIdx);
+        const nextSlug = slashSuggestions[nextIdx]?.displaySlug || slashSuggestions[nextIdx]?.slug || null;
+        setHoveredSkillSlug(nextSlug);
+        return;
+      }
+      if (e.key === 'ArrowUp' && slashSuggestions.length > 0) {
+        e.preventDefault();
+        const nextIdx = (slashHighlightIdx - 1 + slashSuggestions.length) % slashSuggestions.length;
+        setSlashHighlightIdx(nextIdx);
+        const nextSlug = slashSuggestions[nextIdx]?.displaySlug || slashSuggestions[nextIdx]?.slug || null;
+        setHoveredSkillSlug(nextSlug);
+        return;
+      }
+      if ((e.key === 'Enter' || e.key === 'Tab') && slashSuggestions.length > 0) {
+        e.preventDefault();
+        const chosen = slashSuggestions[slashHighlightIdx] || slashSuggestions[0];
+        if (chosen) selectSlashSkill(chosen.displaySlug || chosen.slug);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setSlashDismissed(true);
+        setHoveredSkillSlug(null);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       await handleSend();
@@ -1082,10 +1337,35 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                 {/* Bubble body */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
 
-                  {/* Agent label */}
-                  {msg.tool_used && (
-                    <div className="text-[9px] uppercase tracking-widest font-bold px-1" style={{ color: agentData ? agentData.color : '#00f0ff' }}>
-                      AGENT ACTIF : {agentId} — {getToolDisplayName(toolUsed)}
+                  {/* Agent label & optional skills_used badge */}
+                  {(msg.tool_used || (Array.isArray(msg.skills_used) && msg.skills_used.length > 0)) && (
+                    <div className="flex flex-wrap items-center gap-1.5 px-1">
+                      {msg.tool_used && (
+                        <span className="text-[9px] uppercase tracking-widest font-bold" style={{ color: agentData ? agentData.color : '#00f0ff' }}>
+                          AGENT ACTIF : {agentId} — {getToolDisplayName(toolUsed)}
+                        </span>
+                      )}
+                      {Array.isArray(msg.skills_used) && msg.skills_used.map((item: any, idx: number) => {
+                        const skillSlug = typeof item === 'string' ? item : item?.slug || `skill-${idx}`;
+                        const msgColor = agentData?.color || agentColor;
+                        return (
+                          <span
+                            key={`${skillSlug}-${idx}`}
+                            style={{
+                              fontSize: '9px',
+                              fontFamily: 'monospace',
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: `${msgColor}18`,
+                              color: msgColor,
+                              border: `1px solid ${msgColor}45`,
+                            }}
+                          >
+                            /{skillSlug}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -1187,6 +1467,66 @@ export const VmindChat: React.FC<VmindChatProps> = ({
                     )}
                   </div>
 
+                  {/* "Save as Skill" button when skill-assistant drafts a SKILL.md */}
+                  {!isUser && !msg.isThinking && (() => {
+                    const draftedMd = extractDraftedSkillMd(msg.text);
+                    if (!draftedMd) return null;
+                    const savedSlug = savedDraftSlugByMsgId[msg.id];
+                    const isSaving = savingDraftMsgId === msg.id;
+                    const draftError = draftErrorByMsgId[msg.id];
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '0 4px', marginTop: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {savedSlug ? (
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '5px 11px',
+                                borderRadius: '8px',
+                                fontSize: '11px',
+                                fontWeight: 600,
+                                background: 'rgba(16, 185, 129, 0.14)',
+                                color: '#6ee7b7',
+                                border: '1px solid rgba(16, 185, 129, 0.35)',
+                              }}
+                            >
+                              ✓ Enregistré dans vos skills personnels : /{savedSlug}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={isSaving}
+                              onClick={() => handleSaveDraftedSkill(msg.id, draftedMd)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 12px',
+                                borderRadius: '8px',
+                                fontSize: '11.5px',
+                                fontWeight: 700,
+                                background: 'rgba(0, 229, 200, 0.14)',
+                                color: '#00E5C8',
+                                border: '1px solid rgba(0, 229, 200, 0.4)',
+                                cursor: isSaving ? 'not-allowed' : 'pointer',
+                                opacity: isSaving ? 0.5 : 1,
+                              }}
+                            >
+                              {isSaving ? 'Enregistrement...' : '✨ Enregistrer comme Skill personnel'}
+                            </button>
+                          )}
+                        </div>
+                        {draftError && (
+                          <span style={{ fontSize: '11px', color: '#f87171' }}>
+                            {draftError}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+
                   {/* Timestamp */}
                   <div
                     className="font-mono px-1"
@@ -1207,7 +1547,277 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="input-bar p-4 border-t border-[#1c2538] bg-[#0b101e] flex-shrink-0">
+      <div
+        className="input-bar relative p-4 border-t border-[#1c2538] bg-[#0b101e] flex-shrink-0"
+        style={{ position: 'relative' }}
+      >
+        {/* Slash-command autocomplete dropdown */}
+        {showSlashMenu && (
+          <div
+            style={{
+              position: 'absolute',
+              left: '24px',
+              right: '24px',
+              bottom: 'calc(100% + 10px)',
+              background: 'linear-gradient(165deg, rgba(13, 22, 40, 0.98) 0%, rgba(8, 13, 25, 0.99) 100%)',
+              border: `1px solid ${agentColor}55`,
+              borderRadius: '14px',
+              boxShadow: `0 20px 50px rgba(0, 0, 0, 0.75), 0 0 25px ${agentColor}22`,
+              backdropFilter: 'blur(16px)',
+              overflow: 'hidden',
+              zIndex: 50,
+            }}
+          >
+            {/* Header bar */}
+            <div
+              style={{
+                padding: '9px 14px',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.07)',
+                background: `${agentColor}12`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                <span
+                  style={{
+                    width: '7px',
+                    height: '7px',
+                    borderRadius: '50%',
+                    background: agentColor,
+                    boxShadow: `0 0 8px ${agentColor}`,
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: '10.5px',
+                    fontWeight: 700,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: agentColor,
+                  }}
+                >
+                  Skills de mon espace ({slashSuggestions.length})
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '10.5px', color: '#64748b' }}>
+                <span>↑↓ Naviguer</span>
+                <span>·</span>
+                <span>↵ Sélectionner</span>
+                <span>·</span>
+                <span>Échap Fermer</span>
+              </div>
+            </div>
+
+            {/* Skill items list */}
+            {slashSuggestions.length === 0 ? (
+              <div
+                style={{
+                  padding: '16px 14px',
+                  fontSize: '12px',
+                  color: '#8FA3B8',
+                  textAlign: 'center',
+                }}
+              >
+                {activeSkills.length === 0
+                  ? 'Aucun skill actif dans votre espace. Allez dans Skills Hub → Catalogue & Découverte et cliquez sur "+ Ajouter à mon espace".'
+                  : `Aucun skill actif ne correspond à "/${slashQuery}".`}
+              </div>
+            ) : (
+            <div style={{ maxHeight: '240px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+              {slashSuggestions.map((skill, idx) => {
+                const isHighlighted = idx === slashHighlightIdx;
+                const activeSlug = skill.displaySlug || skill.slug;
+                const isSubSkill = Boolean(skill.parentSlug);
+                const scopeColor = isSubSkill
+                  ? { text: agentColor, bg: `${agentColor}18`, border: `${agentColor}45`, label: 'Sous-skill' }
+                  : skill.scope === 'USER'
+                    ? { text: '#c084fc', bg: 'rgba(192, 132, 252, 0.14)', border: 'rgba(192, 132, 252, 0.35)', label: 'Personnel' }
+                    : skill.scope === 'ERP'
+                      ? { text: agentColor, bg: `${agentColor}18`, border: `${agentColor}45`, label: skill.erp_type ? `ERP · ${skill.erp_type.toUpperCase()}` : 'ERP' }
+                      : skill.scope === 'TENANT'
+                        ? { text: '#38bdf8', bg: 'rgba(56, 189, 248, 0.14)', border: 'rgba(56, 189, 248, 0.35)', label: 'Organisation' }
+                        : { text: '#94a3b8', bg: 'rgba(148, 163, 184, 0.14)', border: 'rgba(148, 163, 184, 0.3)', label: 'Plateforme' };
+
+                return (
+                  <button
+                    key={skill.id}
+                    type="button"
+                    onClick={() => selectSlashSkill(activeSlug)}
+                    onMouseEnter={() => {
+                      setSlashHighlightIdx(idx);
+                      setHoveredSkillSlug(activeSlug);
+                    }}
+                    onMouseLeave={() => {
+                      setHoveredSkillSlug((prev) => (prev === activeSlug ? null : prev));
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      background: isHighlighted
+                        ? `linear-gradient(90deg, ${agentColor}24 0%, ${agentColor}08 100%)`
+                        : 'transparent',
+                      border: 'none',
+                      borderLeft: isHighlighted ? `3px solid ${agentColor}` : '3px solid transparent',
+                      borderBottom:
+                        idx < slashSuggestions.length - 1 ? '1px solid rgba(255, 255, 255, 0.05)' : 'none',
+                      cursor: 'pointer',
+                      transition: 'background 0.15s ease',
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span
+                        style={{
+                          fontFamily: 'monospace',
+                          fontSize: '11.5px',
+                          fontWeight: 700,
+                          color: agentColor,
+                          background: `${agentColor}18`,
+                          border: `1px solid ${agentColor}48`,
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          flexShrink: 0,
+                        }}
+                      >
+                        /{activeSlug}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          color: '#ffffff',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {skill.title}
+                      </span>
+                    </div>
+
+                    <span
+                      style={{
+                        fontSize: '9.5px',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        padding: '3px 8px',
+                        borderRadius: '99px',
+                        color: scopeColor.text,
+                        background: scopeColor.bg,
+                        border: `1px solid ${scopeColor.border}`,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {scopeColor.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            )}
+          </div>
+        )}
+
+        {/* VMindGuide floating description popup on skill hover (SS2 style, matching agentColor) */}
+        {(() => {
+          const guideSkill = hoveredSkillSlug
+            ? searchableSkillItems.find((s) => (s.displaySlug || s.slug) === hoveredSkillSlug) ||
+              activeSkills.find((s) => s.slug === hoveredSkillSlug) ||
+              null
+            : null;
+          return (
+            <VMindGuide
+              isOpen={Boolean(guideSkill)}
+              mood="curious"
+              customColor={agentColor}
+              title={
+                guideSkill
+                  ? `/${(guideSkill as any).displaySlug || guideSkill.slug} · ${guideSkill.title}`
+                  : undefined
+              }
+              message={guideSkill ? guideSkill.description : null}
+              onClose={() => setHoveredSkillSlug(null)}
+            />
+          );
+        })()}
+
+        {/* Selected skill chips (up to 3) */}
+        {selectedSkills.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '6px',
+              marginBottom: '8px',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '10px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                color: '#64748b',
+                fontWeight: 700,
+                marginRight: '4px',
+              }}
+            >
+              Skills actifs ({selectedSkills.length}/3) :
+            </span>
+            {selectedSkills.map((slug) => {
+              const matchedItem = searchableSkillItems.find((s) => (s.displaySlug || s.slug) === slug);
+              const label = matchedItem ? (matchedItem.displaySlug || matchedItem.slug) : slug;
+              return (
+                <span
+                  key={slug}
+                  onMouseEnter={() => setHoveredSkillSlug(slug)}
+                  onMouseLeave={() => setHoveredSkillSlug((prev) => (prev === slug ? null : prev))}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '3px 10px',
+                    borderRadius: '99px',
+                    fontSize: '11.5px',
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    background: `${agentColor}22`,
+                    color: agentColor,
+                    border: `1px solid ${agentColor}60`,
+                    cursor: 'pointer',
+                  }}
+                >
+                  /{label}
+                  <button
+                    type="button"
+                    onClick={() => removeSelectedSkill(slug)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: agentColor,
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      lineHeight: 1,
+                      padding: 0,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              );
+            })}
+          </div>
+        )}
+
         <div
           className="input-wrap relative flex items-center bg-[#151b2b] rounded-xl border transition-all duration-200"
           style={{
@@ -1216,6 +1826,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           }}
         >
           <textarea
+            ref={inputTextareaRef}
             className="input-field w-full bg-transparent pl-4 pr-[100px] text-sm text-gray-200 placeholder-gray-500 outline-none resize-none"
             style={{ 
               paddingTop: '16px', 
@@ -1226,12 +1837,23 @@ export const VmindChat: React.FC<VmindChatProps> = ({
               maxHeight: '120px',
               overflowY: 'auto'
             }}
-            placeholder="Posez votre question métier..."
+            placeholder="Posez votre question métier (tapez / pour activer un skill)..."
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
+              setCursorPos(e.target.selectionStart ?? e.target.value.length);
+              setSlashDismissed(false);
+              setSlashHighlightIdx(0);
               e.target.style.height = '52px';
               e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+            }}
+            onClick={(e) => {
+              setCursorPos(e.currentTarget.selectionStart ?? e.currentTarget.value.length);
+            }}
+            onKeyUp={(e) => {
+              if (!['ArrowDown', 'ArrowUp', 'Enter', 'Tab', 'Escape'].includes(e.key)) {
+                setCursorPos(e.currentTarget.selectionStart ?? e.currentTarget.value.length);
+              }
             }}
             onKeyDown={handleKeyDown}
             disabled={isLoading}
