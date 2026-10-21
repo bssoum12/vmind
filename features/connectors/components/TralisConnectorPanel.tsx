@@ -230,7 +230,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   onDisconnected,
 }) => {
   // Local UI state only (modal, form fields)
-  const { connectErp } = useConnections();
+  const { connections, connectErp } = useConnections();
   const [showModal, setShowModal]                 = useState(false);
   const [showInstancesModal, setShowInstancesModal] = useState(false);
   const [isVmindAdmin, setIsVmindAdmin]           = useState(false);
@@ -313,23 +313,47 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   useEffect(() => {
     if (session?.allTools && session.allTools.length > 0) {
       setServerTools(session.allTools);
+      return;
     }
-  }, [session?.allTools]);
 
-  useEffect(() => {
-    const fetchTools = async () => {
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL }/api/mcp/tools/metadata`);
-        const data = await res.json();
-        if (data.ok && Array.isArray(data.tools) && data.tools.length > 0) {
-          setServerTools(data.tools);
+    const fetchDynamicTools = async () => {
+      const conn = connections.find(c => c.connector_type === 'tralis' && c.status === 'connected');
+      if (conn?.id) {
+        try {
+          const { fetchConnectionTools } = await import('@/shared/api/connections-api');
+          const discovered = await fetchConnectionTools(conn.id);
+          if (Array.isArray(discovered) && discovered.length > 0) {
+            const mapped: ToolMeta[] = discovered.map(t => {
+              const nameLower = t.name.toLowerCase();
+              let guessedAgent = 'VDATA';
+              if (nameLower.includes('fin') || nameLower.includes('facture') || nameLower.includes('reglement')) guessedAgent = 'VFIN';
+              else if (nameLower.includes('sell') || nameLower.includes('vente') || nameLower.includes('devis') || nameLower.includes('commande')) guessedAgent = 'VSELL';
+              else if (nameLower.includes('buy') || nameLower.includes('achat') || nameLower.includes('fournisseur')) guessedAgent = 'VBUY';
+              else if (nameLower.includes('stock') || nameLower.includes('article') || nameLower.includes('inventaire')) guessedAgent = 'VSTOCK';
+              else if (nameLower.includes('move') || nameLower.includes('livraison') || nameLower.includes('transport')) guessedAgent = 'VMOVE';
+
+              const isWrite = nameLower.includes('insert') || nameLower.includes('update') || nameLower.includes('delete') || nameLower.includes('post') || nameLower.includes('execute') || nameLower.includes('create');
+
+              return {
+                name: t.name,
+                description: t.description || t.name.replace(/_/g, ' '),
+                agent: guessedAgent,
+                accessType: isWrite ? 'sensitive' : 'read',
+                authLevel: isWrite ? 'approval' : 'always'
+              };
+            });
+            setServerTools(mapped);
+          }
+        } catch (err) {
+          console.warn('[TralisConnectorPanel] Erreur récupération tools dynamiques MCP:', err);
         }
-      } catch (err) {
-        console.error('Failed to fetch tools metadata:', err);
       }
     };
-    fetchTools();
-  }, []);
+
+    if (status === 'connected') {
+      fetchDynamicTools();
+    }
+  }, [session?.allTools, status, connections]);
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
 
@@ -475,7 +499,11 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
 
   // Convenience aliases
   const userInfo           = session?.user ?? null;
-  const authorizedToolNames = new Set<string>(session?.tools ?? []);
+  const authorizedToolNames = new Set<string>(
+    serverTools.length > 0
+      ? serverTools.map(t => t.name)
+      : (session?.tools ?? [])
+  );
 
   // ── Option A: Use current VMIND session ────────────────────────────────────
   // ── Disconnect — delegates to Hub ─────────────────────────────────────────
