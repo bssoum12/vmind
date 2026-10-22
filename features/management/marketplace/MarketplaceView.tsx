@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/shared/management/components/Button';
 import { AdminConfigButton } from '@/shared/management/components/AdminConfigButton';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
@@ -22,6 +23,7 @@ const AGENT_PROMPT_KEYS: Record<string, string> = {
 };
 
 export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, activeCategory, onSelectCategory, onOpenPrompts, isAdmin: isAdminProp }) => {
+  const router = useRouter();
   const [isAdmin, setIsAdmin] = React.useState<boolean>(Boolean(isAdminProp));
   const [activeTab, setActiveTab] = React.useState('all');
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -80,10 +82,15 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
   }, []);
 
   const getDynamicDeployments = (agentId: string, baseDeployments: number) => {
-    return templateDeployments[agentId] || 0;
+    return templateDeployments[agentId] || (agentId === 'supervisor' ? (templateDeployments['onboarding'] || baseDeployments) : 0);
   };
 
   const handleDeployTarget = (templateId: string) => {
+    if (templateId === 'supervisor' || templateId === 'onboarding') {
+      router.push('/supervisor-agent-workspace');
+      return;
+    }
+
     let agentPayload: any = undefined;
     const effectiveProspectUuid = linkedProspectUuid || (typeof window !== 'undefined' ? sessionStorage.getItem('vmind_guide_link_prospect_uuid') : null);
 

@@ -491,6 +491,10 @@ function HomeContent() {
   }, []);
 
   const handleDeploy = (templateId: string, agent?: any, initialStep: number = 1) => {
+    if (templateId === 'supervisor' || templateId === 'onboarding') {
+      router.push('/supervisor-agent-workspace');
+      return;
+    }
     const prevView = currentViewRef.current !== 'wizard' ? currentViewRef.current : 'market';
     setSelectedTemplate(templateId);
     setEditingAgent(agent || null);
