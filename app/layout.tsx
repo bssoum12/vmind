@@ -3,6 +3,7 @@ import { orbitron, syne, jetBrainsMono } from "@/shared/fonts";
 import "./globals.css";
 import "@/features/skills/skills-premium.css";
 import { TopBar } from "@/features/layout/TopBar";
+import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
   title: "VMIND — Plateforme Intelligence Entreprise",
@@ -38,6 +39,7 @@ export default function RootLayout({
             </SessionTimeoutProvider>
           </ModeProvider>
         </ToastProvider>
+        <Analytics />
       </body>
     </html>
   );
