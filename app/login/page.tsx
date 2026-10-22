@@ -959,7 +959,7 @@ export default function LoginPage() {
           <div style={{ display: 'flex', gap: '28px', maxWidth: '540px' }}>
             {[
               { Icon: Lock,       title: 'Accès sécurisé',          desc: 'Authentification avancée et chiffrement des données' },
-              { Icon: RefreshCw,  title: 'Rôles synchronisés',       desc: 'Profils et permissions alignés avec TraLis ERP' },
+              { Icon: RefreshCw,  title: 'Rôles synchronisés',       desc: 'Profils et permissions alignés avec votre ERP' },
               { Icon: BarChart3,  title: 'ERP connecté\nen temps réel', desc: 'Données, KPI et décisions toujours à jour' },
             ].map(({ Icon, title, desc }) => (
               <div key={title} style={{ flex: 1 }}>

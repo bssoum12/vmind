@@ -599,11 +599,11 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                       }}
                     >
                       <option value="USER">Personnel (Mon compte uniquement)</option>
-                      <option value="TENANT" disabled={!activeClientId}>
-                        Organisation {activeClientId ? `(${activeClientId})` : '(Connexion ERP requise)'}
+                      <option value="TENANT" disabled={!isAdmin && !activeClientId}>
+                        Organisation {activeClientId ? `(${activeClientId})` : ''}
                       </option>
-                      <option value="ERP" disabled={!activeErpType}>
-                        ERP {activeErpType ? `(${activeErpType.toUpperCase()})` : '(Connexion ERP requise)'}
+                      <option value="ERP" disabled={!isAdmin && !activeErpType}>
+                        Spécifique ERP
                       </option>
                       <option value="GLOBAL">Plateforme Globale (Tous les utilisateurs)</option>
                     </select>
@@ -613,7 +613,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
 
               {/* Admin extra selectors for TENANT / ERP */}
               {isAdmin && (scope === 'TENANT' || scope === 'ERP') && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: scope === 'TENANT' ? '1fr 1fr' : '1fr', gap: '14px', marginBottom: '16px' }}>
                   {scope === 'TENANT' && (
                     <div>
                       <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
@@ -621,15 +621,15 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                       </label>
                       <input
                         type="text"
-                        value={activeClientId || tenantKey}
-                        readOnly
+                        value={tenantKey}
+                        onChange={(e) => setTenantKey(e.target.value.toUpperCase())}
                         style={{
                           width: '100%',
                           padding: '9px 12px',
                           borderRadius: '8px',
                           background: 'rgba(255,255,255,0.04)',
                           border: '1px solid rgba(0, 229, 200, 0.35)',
-                          color: '#94a3b8',
+                          color: '#fff',
                           fontSize: '13px',
                         }}
                       />
@@ -638,22 +638,28 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
 
                   <div>
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
-                      ERP connecté
+                      Système ERP cible *
                     </label>
-                    <input
-                      type="text"
-                      value={(activeErpType || erpType).toLowerCase()}
-                      readOnly
+                    <select
+                      value={erpType.toLowerCase()}
+                      onChange={(e) => setErpType(e.target.value.toLowerCase())}
                       style={{
                         width: '100%',
                         padding: '9px 12px',
                         borderRadius: '8px',
-                        background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.12)',
-                        color: '#94a3b8',
+                        background: '#111c30',
+                        border: '1px solid rgba(0, 229, 200, 0.35)',
+                        color: '#fff',
                         fontSize: '13px',
                       }}
-                    />
+                    >
+                      <option value="tralis">TraLIS ERP</option>
+                      <option value="sage">Sage (100 / Cloud)</option>
+                      <option value="odoo">Odoo ERP</option>
+                      <option value="sap">SAP</option>
+                      <option value="cegid">Cegid</option>
+                      <option value="generic">ERP Standard (MCP)</option>
+                    </select>
                   </div>
                 </div>
               )}

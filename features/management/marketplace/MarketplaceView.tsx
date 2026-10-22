@@ -7,9 +7,11 @@ import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
 import { VMindGuide, VMindGuideArrow } from '@/shared/management/components/VMindGuide';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { getMarketplaceStats } from '@/shared/api/n8n-api';
+import { useConnections } from '@/shared/contexts/ConnectionsContext';
 
 interface MarketplaceViewProps {
   onDeploy: (templateId: string, agent?: any, initialStep?: number) => void;
+  onNavigate?: (view: string) => void;
   activeCategory: string;
   onSelectCategory: (category: string) => void;
   onOpenPrompts?: (promptKey?: string) => void;
@@ -21,8 +23,11 @@ const AGENT_PROMPT_KEYS: Record<string, string> = {
   sourcing: 'sourcing_execution_chat',
 };
 
-export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, activeCategory, onSelectCategory, onOpenPrompts, isAdmin: isAdminProp }) => {
+export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, onNavigate, activeCategory, onSelectCategory, onOpenPrompts, isAdmin: isAdminProp }) => {
   const [isAdmin, setIsAdmin] = React.useState<boolean>(Boolean(isAdminProp));
+  const { activeConnection } = useConnections();
+  const [showErpRequiredModal, setShowErpRequiredModal] = React.useState(false);
+  const [blockedAgentName, setBlockedAgentName] = React.useState("Agent de Recouvrement");
   const [activeTab, setActiveTab] = React.useState('all');
   const [searchQuery, setSearchQuery] = React.useState('');
   const [highlightedTemplateId, setHighlightedTemplateId] = React.useState<string | null>(null);
@@ -84,6 +89,16 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
   };
 
   const handleDeployTarget = (templateId: string) => {
+    const targetAgent = AGENT_TEMPLATES.find(t => t.id === templateId);
+    const requiresErp = templateId === 'recouvrement' || templateId === 'recovery' ||
+      (targetAgent?.connections && targetAgent.connections.some(c => ['tralis', 'sage', 'odoo', 'erp'].includes(c.toLowerCase())));
+
+    if (requiresErp && (!activeConnection || activeConnection.status !== 'connected')) {
+      setBlockedAgentName(targetAgent?.name || 'Agent de Recouvrement');
+      setShowErpRequiredModal(true);
+      return;
+    }
+
     let agentPayload: any = undefined;
     const effectiveProspectUuid = linkedProspectUuid || (typeof window !== 'undefined' ? sessionStorage.getItem('vmind_guide_link_prospect_uuid') : null);
 
@@ -465,6 +480,84 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
           </div>
         )}
       </div>
+
+      {/* Modale d'interception Zero-Trust : Connexion ERP obligatoire */}
+      {showErpRequiredModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(4, 16, 30, 0.85)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 99999,
+          padding: '20px'
+        }}>
+          <div style={{
+            background: 'linear-gradient(180deg, #0A192F 0%, #06101E 100%)',
+            border: '1px solid rgba(0, 229, 200, 0.4)',
+            borderRadius: '16px',
+            padding: '32px',
+            maxWidth: '480px',
+            width: '100%',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔌</div>
+            <h3 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: 800, marginBottom: '10px' }}>
+              Connexion ERP Requise
+            </h3>
+            <p style={{ color: '#8FA3B8', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+              L&apos;<strong>{blockedAgentName}</strong> nécessite une liaison active avec votre ERP pour accéder aux factures et à la balance âgée.
+              Veuillez connecter votre ERP avant de configurer et déployer cet agent.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setShowErpRequiredModal(false)}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '8px',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#8FA3B8',
+                  cursor: 'pointer',
+                  fontSize: '13px'
+                }}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowErpRequiredModal(false);
+                  if (onNavigate) {
+                    onNavigate('integrations');
+                  } else {
+                    window.dispatchEvent(new CustomEvent('vmind-assistant-view', { detail: 'connectors' }));
+                    const navBtn = document.querySelector('[data-view="integrations"]') as HTMLElement;
+                    if (navBtn) navBtn.click();
+                  }
+                }}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
+                  border: 'none',
+                  color: '#04101E',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  boxShadow: '0 0 20px rgba(0, 229, 200, 0.4)'
+                }}
+              >
+                Connecter mon ERP
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
