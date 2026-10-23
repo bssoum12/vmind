@@ -311,7 +311,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   }, []);
 
   useEffect(() => {
-    if (session?.allTools && session.allTools.length > 0) {
+    if (false && session?.allTools && session.allTools.length > 0) {
       setServerTools(session.allTools);
       return;
     }
@@ -345,7 +345,12 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
             setServerTools(mapped);
           }
         } catch (err) {
-          console.warn('[TralisConnectorPanel] Erreur récupération tools dynamiques MCP:', err);
+          console.warn('[TralisConnectorPanel] Session MCP perdue ou inaccessible. Déconnexion automatique...');
+          setServerTools([]);
+          if (onDisconnected) {
+            onDisconnected();
+            if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { connected: false } }));
+          }
         }
       }
     };

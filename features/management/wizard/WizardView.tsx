@@ -246,7 +246,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel, ag
 
       return {
         agent_name: agentToEdit.agent_name || agentToEdit.nom || `${template?.name || 'Assistant'} - ${randomSuffix}`,
-        run_mode: agentToEdit.run_mode || 'daily_recovery_check',
+        run_mode: agentToEdit.run_mode || 'Recouvrement',
         workflow_timezone: agentToEdit.workflow_timezone || getBrowserTimezone(),
         recovery_config: {
           tone: recConfig.tone || 'courteous',
@@ -306,7 +306,7 @@ export const WizardView: React.FC<WizardViewProps> = ({ templateId, onCancel, ag
 
     return {
       agent_name: `${template?.name || 'Assistant'} - ${randomSuffix}`,
-      run_mode: 'daily_recovery_check',
+      run_mode: 'Recouvrement',
       workflow_timezone: getBrowserTimezone(),
       recovery_config: {
         tone: 'courteous',

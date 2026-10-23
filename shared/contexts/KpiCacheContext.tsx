@@ -95,10 +95,12 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
             setCurrentUser(user);
           } else {
             setIsConnectorConnected(false);
+
           }
         }
       } catch {
         setIsConnectorConnected(false);
+
       }
     };
     checkInitialStatus();
@@ -107,6 +109,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       const sessionDetail = event?.detail;
       if (!sessionDetail || sessionDetail === null || sessionDetail.connected === false) {
         setIsConnectorConnected(false);
+
         const user = sessionDetail?.user;
         if (user) {
           setCurrentUser(user);
@@ -270,9 +273,10 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     } catch (err: any) {
       const errMsg = err?.message || "";
       // Interception silencieuse si le connecteur est déconnecté ou accès refusé (403)
-      if (errMsg.includes("403") || errMsg.includes("Accès refusé") || errMsg.includes("tenant non autorisé")) {
+      if (errMsg.includes("403") || errMsg.includes("401") || errMsg.includes("502") || errMsg.includes("Accès refusé") || errMsg.includes("tenant non autorisé") || errMsg.includes("Impossible de joindre") || errMsg.includes("Cannot POST")) {
         console.warn(`[KPI CONTEXT] Connecteur ERP non connecté ou accès refusé (403) — passage silencieux à l'état requis.`);
         setIsConnectorConnected(false);
+
         setError(null);
       } else {
         console.error(`[KPI CONTEXT] Error fetching KPIs for ${allowedAgentUpper}:`, err);
