@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { 
   X, GitFork, ArrowRight, CheckCircle2, XCircle, Sliders, AlertOctagon, 
-  Sparkles, Loader2, AlertTriangle, ShieldCheck, Zap 
+  Sparkles, Loader2, AlertTriangle, ShieldCheck, Zap,
+  Building2, MapPin, Briefcase, Users, Check, RefreshCw, BarChart2
 } from 'lucide-react';
 import { SupervisorLink } from '../types/supervisor.types';
 
@@ -25,7 +26,7 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
 
   const handleRunAiDiagnostic = async () => {
     if (!sourceUuid || !targetUuid) {
-      setEvalError("Identifiants des agents introuvables pour cette liaison.");
+      setEvalError('Identifiants des agents introuvables pour cette liaison.');
       return;
     }
 
@@ -69,359 +70,422 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
     }
   };
 
+  const getDimensionIcon = (dim: string) => {
+    const lower = (dim || '').toLowerCase();
+    if (lower.includes('secteur') || lower.includes('industrie')) return <Building2 size={13} />;
+    if (lower.includes('zone') || lower.includes('géo') || lower.includes('pays') || lower.includes('localisation')) return <MapPin size={13} />;
+    if (lower.includes('sénior') || lower.includes('poste') || lower.includes('titre') || lower.includes('fonction')) return <Briefcase size={13} />;
+    if (lower.includes('taille') || lower.includes('effectif')) return <Users size={13} />;
+    return <Sliders size={13} />;
+  };
+
   const displayScore = evalResult?.evaluation?.sync_score ?? link.alignmentScore;
   const displaySummary = evalResult?.evaluation?.summary ?? link.summary;
   const rejectionsAnalysis = evalResult?.evaluation?.rejections_analysis;
   const aiCriteriaMatrix = evalResult?.evaluation?.criteria_matrix;
   const aiRecommendations = evalResult?.evaluation?.recommendations;
 
+  const statusKey = link.status || 'UNANALYZED';
+
   return (
     <>
       <div className="diagnostic-drawer-backdrop" onClick={onClose} />
-      <aside className="diagnostic-drawer">
-        {/* Drawer Header */}
-        <div className="drawer-header">
-          <div className="drawer-title-group">
-            <div className="drawer-tag-row">
-              <span className="drawer-type-badge link">
-                <GitFork size={11} style={{ marginRight: '4px' }} />
-                Liaison Pipeline
-              </span>
-              <span className={`status-badge ${link.status}`}>
-                {getStatusLabel(link.status)}
+      <aside className="diagnostic-drawer edge-drawer">
+        {/* Drawer Header with Connected Flow Bridge */}
+        <header className="drawer-header edge-header">
+          <div className="edge-header-top">
+            <div className="drawer-context-pill">
+              <GitFork size={12} className="context-icon" />
+              <span>Diagnostic de flux inter-agents</span>
+              <span className={`edge-status-pill ${statusKey}`}>
+                <span className="pulse-dot" />
+                {getStatusLabel(statusKey)}
               </span>
             </div>
-            <h2 className="drawer-name" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span>{link.sourceName}</span>
-              <ArrowRight size={16} style={{ color: '#00E5C8' }} />
-              <span>{link.targetName}</span>
-            </h2>
-          </div>
-          <button className="drawer-close-btn" onClick={onClose} title="Fermer">
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Drawer Body */}
-        <div className="drawer-content">
-          {/* OmniRoute Action Button */}
-          <div style={{ marginBottom: '16px' }}>
-            <button
-              className="link-audit-btn"
-              onClick={handleRunAiDiagnostic}
-              disabled={isEvaluating}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '12px 16px',
-                borderRadius: '8px',
-                background: evalResult 
-                  ? 'linear-gradient(135deg, rgba(0, 229, 200, 0.12) 0%, rgba(157, 78, 221, 0.15) 100%)'
-                  : 'linear-gradient(135deg, rgba(0, 229, 200, 0.22) 0%, rgba(157, 78, 221, 0.25) 100%)',
-                border: '1px solid rgba(0, 229, 200, 0.45)',
-                color: '#F0F4F8',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: isEvaluating ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 4px 18px rgba(0, 229, 200, 0.12)'
-              }}
-            >
-              {isEvaluating ? (
-                <>
-                  <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-                  <span>Diagnostic approfondi en cours...</span>
-                </>
-              ) : evalResult ? (
-                <>
-                  <Sparkles size={16} style={{ color: '#00E5C8' }} />
-                  <span>Actualiser le Diagnostic IA</span>
-                </>
-              ) : (
-                <>
-                  <Zap size={16} style={{ color: '#00E5C8' }} />
-                  <span>Lancer le Diagnostic IA Approfondi</span>
-                </>
-              )}
+            <button className="drawer-close-btn" onClick={onClose} title="Fermer" aria-label="Fermer">
+              <X size={17} />
             </button>
-            {evalError && (
-              <div style={{ marginTop: '8px', color: '#FF4757', fontSize: '12px', textAlign: 'center' }}>
-                ⚠️ {evalError}
-              </div>
-            )}
           </div>
 
-          {/* Alignment Score Card */}
-          <div className="health-score-card">
-            <div className="gauge-text">
-              <span className="gauge-label">Score de Synchronisation Inter-Agents</span>
-              <span className="gauge-status-desc">
-                {link.status === 'HEALTHY' && 'Les critères de sourcing alimentent adéquatement l\'agent de prospection.'}
-                {link.status === 'WARNING' && 'Quelques discordances de filtres réduisent le débit qualifié.'}
-                {link.status === 'CRITICAL' && 'Perte de leads : le ciblage amont est en décalage avec les critères aval.'}
-                {link.status === 'UNANALYZED' && 'Liaison en attente d\'analyse comparative.'}
-              </span>
+          <div className="agent-flow-bridge">
+            <div className="flow-agent-chip sourcing">
+              <span className="chip-role">SOURCING</span>
+              <span className="chip-name" title={link.sourceName}>{link.sourceName}</span>
             </div>
-            <div className={`gauge-score-value ${link.status.toLowerCase()}`}>
-              {displayScore === null || displayScore === undefined ? '—' : `${displayScore}%`}
+
+            <div className="flow-bridge-connector">
+              <div className="flow-track" />
+              <div className="flow-volume-tag">
+                <ArrowRight size={12} className="flow-arrow" />
+                <span>{link.throughput?.leadsTransferred || 0} leads</span>
+              </div>
+              <div className="flow-track" />
+            </div>
+
+            <div className="flow-agent-chip prospect">
+              <span className="chip-role">PROSPECTION</span>
+              <span className="chip-name" title={link.targetName}>{link.targetName}</span>
             </div>
           </div>
+        </header>
 
-          {/* Diagnostic Summary */}
-          {displaySummary && (
-            <div className="drawer-section">
-              <div className="section-heading">
-                <AlertOctagon size={15} />
-                <span>Diagnostic de Cohérence</span>
+        {/* Drawer Scrollable Content */}
+        <div className="drawer-content">
+
+          {/* Unified Hero Synchronization & Action Card */}
+          <div className={`hero-sync-card ${statusKey.toLowerCase()}`}>
+            <div className="hero-sync-top">
+              <div className={`score-badge ${statusKey.toLowerCase()}`}>
+                <span className="score-val">
+                  {displayScore === null || displayScore === undefined ? '—' : `${displayScore}%`}
+                </span>
+                <span className="score-tag">SYNCHRO</span>
               </div>
-              <div className="summary-box">
-                {displaySummary}
+
+              <div className="hero-sync-details">
+                <h3 className="hero-sync-title">
+                  {statusKey === 'HEALTHY' && 'Liaison Parfaitement Alignée'}
+                  {statusKey === 'WARNING' && 'Friction Légère Détectée'}
+                  {statusKey === 'CRITICAL' && 'Incohérence de Filtrage Détectée'}
+                  {statusKey === 'UNANALYZED' && 'Liaison en Attente d\'Analyse'}
+                </h3>
+                <p className="hero-sync-desc">
+                  {displaySummary || (
+                    statusKey === 'HEALTHY'
+                      ? 'Les critères de sourcing alimentent de manière fluide le profil cible de prospection.'
+                      : 'Un décalage de critères entre la source et la cible impacte le débit utile du pipeline.'
+                  )}
+                </p>
               </div>
             </div>
-          )}
 
-          {/* Root-cause Rejections Analysis (from OmniRoute) */}
-          {rejectionsAnalysis && (
-            <div className="drawer-section">
-              <div className="section-heading">
-                <AlertTriangle size={15} style={{ color: '#FF4757' }} />
-                <span>Analyse de la Cause Racine des Rejets</span>
-              </div>
-              <div 
-                className="summary-box" 
-                style={{ 
-                  borderLeft: '3px solid #FF4757', 
-                  background: 'rgba(255, 71, 87, 0.08)', 
-                  color: '#F0F4F8',
-                  lineHeight: '1.5'
-                }}
+            {/* AI Evaluation Button */}
+            <div className="hero-ai-action">
+              <button
+                className={`ai-trigger-btn ${evalResult ? 'evaluated' : ''}`}
+                onClick={handleRunAiDiagnostic}
+                disabled={isEvaluating}
               >
-                {rejectionsAnalysis}
-              </div>
+                {isEvaluating ? (
+                  <>
+                    <Loader2 size={15} className="spin-icon" />
+                    <span>Diagnostic approfondi en cours...</span>
+                  </>
+                ) : evalResult ? (
+                  <>
+                    <RefreshCw size={14} className="ai-icon" />
+                    <span>Diagnostic IA actualisé • Relancer</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={14} className="ai-icon" />
+                    <span>Lancer le diagnostic IA approfondi</span>
+                  </>
+                )}
+              </button>
+              {evalError && (
+                <div className="ai-error-banner">
+                  <AlertTriangle size={13} />
+                  <span>{evalError}</span>
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
-          {/* Throughput & Funnel */}
+          {/* Pipeline Throughput Funnel */}
           {link.throughput && (
-            <div className="drawer-section">
-              <div className="section-heading">
-                <Sliders size={15} />
-                <span>Débit du Pipeline</span>
+            <section className="drawer-section">
+              <div className="section-header">
+                <div className="section-title-wrap">
+                  <Sliders size={14} className="section-icon" />
+                  <h4 className="section-title">Débit & Entonnoir de Transfert</h4>
+                </div>
+                <span className="section-kpi-badge">
+                  {link.throughput.conversionRate}% retenus
+                </span>
               </div>
-              <div className="funnel-grid">
-                <div className="funnel-card">
-                  <span className="funnel-label">Leads Transférés</span>
-                  <span className="funnel-number">{link.throughput.leadsTransferred}</span>
+
+              <div className="throughput-flow-strip">
+                <div className="throughput-step">
+                  <span className="t-label">Transférés</span>
+                  <span className="t-val text-cyan">{link.throughput.leadsTransferred}</span>
+                  <span className="t-sub">Sourcing amont</span>
                 </div>
-                <div className="funnel-card">
-                  <span className="funnel-label">Leads Qualifiés</span>
-                  <span className="funnel-number" style={{ color: '#00E5A0' }}>
-                    {link.throughput.leadsQualified}
+
+                <div className="throughput-bridge">
+                  <div className="bridge-track">
+                    <div 
+                      className="bridge-fill" 
+                      style={{ 
+                        width: `${Math.min(100, Math.max(0, link.throughput.conversionRate))}%`,
+                        background: link.throughput.conversionRate < 50 ? '#FF4757' : 'linear-gradient(90deg, #00E5C8, #00E5A0)'
+                      }} 
+                    />
+                  </div>
+                  <span className="bridge-stat">
+                    <ArrowRight size={11} />
+                    {link.throughput.conversionRate}% qualifiés
                   </span>
                 </div>
-                <div className="funnel-card">
-                  <span className="funnel-label">Taux d'Acceptation</span>
-                  <span className="funnel-number" style={{ color: link.throughput.conversionRate < 50 ? '#FF4757' : '#00E5A0' }}>
-                    {link.throughput.conversionRate}%
-                  </span>
+
+                <div className="throughput-step">
+                  <span className="t-label">Qualifiés</span>
+                  <span className="t-val text-emerald">{link.throughput.leadsQualified}</span>
+                  <span className="t-sub">Prospection aval</span>
                 </div>
-                <div className="funnel-card">
-                  <span className="funnel-label">Leads Non Retenus</span>
-                  <span className="funnel-number" style={{ color: '#FF4757' }}>
+
+                <div className="throughput-step rejected">
+                  <span className="t-label">Écartés</span>
+                  <span className={`t-val ${link.throughput.leadsRejected > 0 ? 'text-coral' : 'text-muted'}`}>
                     {link.throughput.leadsRejected}
                   </span>
+                  <span className="t-sub">Non qualifiés</span>
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
-          {/* AI Criteria Alignment Matrix (If evaluated via OmniRoute) */}
-          {Array.isArray(aiCriteriaMatrix) && aiCriteriaMatrix.length > 0 ? (
-            <div className="drawer-section">
-              <div className="section-heading">
-                <Sparkles size={15} style={{ color: '#00E5C8' }} />
-                <span>Matrice d'Alignement Sémantique</span>
+          {/* Root-cause Rejections Analysis */}
+          {rejectionsAnalysis && (
+            <section className="drawer-section">
+              <div className="section-header">
+                <div className="section-title-wrap">
+                  <AlertTriangle size={14} style={{ color: '#FF4757' }} />
+                  <h4 className="section-title">Cause Racine des Rejets</h4>
+                </div>
+                <span className="section-kpi-badge warning">Analyse IA</span>
               </div>
-              <div className="criteria-matrix">
-                {aiCriteriaMatrix.map((item: any, idx: number) => {
+              <div className="root-cause-card">
+                <p>{rejectionsAnalysis}</p>
+              </div>
+            </section>
+          )}
+
+          {/* Criteria Alignment Matrix */}
+          <section className="drawer-section">
+            <div className="section-header">
+              <div className="section-title-wrap">
+                <CheckCircle2 size={14} className="section-icon text-cyan" />
+                <h4 className="section-title">
+                  {Array.isArray(aiCriteriaMatrix) && aiCriteriaMatrix.length > 0
+                    ? 'Matrice d\'Alignement Sémantique IA'
+                    : 'Matrice de Correspondance des Filtres'}
+                </h4>
+              </div>
+              <span className="section-kpi-badge">
+                {Array.isArray(aiCriteriaMatrix) && aiCriteriaMatrix.length > 0 ? 'Deep AI' : 'Filtres ICP'}
+              </span>
+            </div>
+
+            <div className="matrix-cards-list">
+              {Array.isArray(aiCriteriaMatrix) && aiCriteriaMatrix.length > 0 ? (
+                // AI Evaluated Matrix
+                aiCriteriaMatrix.map((item: any, idx: number) => {
                   const isMatch = item.statut === 'aligne';
                   const isPartial = item.statut === 'partiel';
+                  const matchStatus = isMatch ? 'match' : isPartial ? 'partial' : 'mismatch';
+
                   return (
-                    <div key={idx} className="matrix-row" style={{ flexDirection: 'column', gap: '8px', alignItems: 'stretch' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div className="matrix-dimension" style={{ fontWeight: 600, color: '#F0F4F8' }}>
-                          {isMatch ? (
-                            <CheckCircle2 size={14} style={{ color: '#00E5A0', flexShrink: 0 }} />
-                          ) : isPartial ? (
-                            <AlertTriangle size={14} style={{ color: '#FFB800', flexShrink: 0 }} />
-                          ) : (
-                            <XCircle size={14} style={{ color: '#FF4757', flexShrink: 0 }} />
-                          )}
-                          <span>{item.critere}</span>
+                    <div key={idx} className={`matrix-card ${matchStatus}`}>
+                      <div className="matrix-card-top">
+                        <div className="matrix-dim-header">
+                          <span className="dim-icon">{getDimensionIcon(item.critere)}</span>
+                          <span className="dim-title">{item.critere}</span>
                         </div>
-                        <span 
-                          style={{
-                            fontSize: '10px',
-                            fontWeight: 700,
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            textTransform: 'uppercase',
-                            background: isMatch ? 'rgba(0, 229, 160, 0.15)' : isPartial ? 'rgba(255, 184, 0, 0.15)' : 'rgba(255, 71, 87, 0.15)',
-                            color: isMatch ? '#00E5A0' : isPartial ? '#FFB800' : '#FF4757',
-                            border: `1px solid ${isMatch ? 'rgba(0, 229, 160, 0.3)' : isPartial ? 'rgba(255, 184, 0, 0.3)' : 'rgba(255, 71, 87, 0.3)'}`
-                          }}
-                        >
-                          {item.statut === 'aligne' ? 'Aligné' : item.statut === 'partiel' ? 'Partiel' : 'Discordant'}
+                        <span className={`matrix-status-chip ${matchStatus}`}>
+                          {isMatch ? (
+                            <>
+                              <CheckCircle2 size={11} />
+                              <span>Aligné</span>
+                            </>
+                          ) : isPartial ? (
+                            <>
+                              <AlertTriangle size={11} />
+                              <span>Partiel</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle size={11} />
+                              <span>Discordance</span>
+                            </>
+                          )}
                         </span>
                       </div>
 
-                      <div className="matrix-values">
-                        <div className="val-pill" style={{ flex: 1 }}>
-                          <span className="agent-role-mini">Sourcing</span>
-                          <span className="val-text" style={{ fontSize: '11px' }}>{item.sourcing}</span>
+                      <div className="matrix-compare-grid">
+                        <div className="compare-col sourcing">
+                          <span className="col-badge sourcing">
+                            <span className="dot cyan" /> SOURCING
+                          </span>
+                          <span className="col-content">{item.sourcing || 'Non spécifié'}</span>
                         </div>
-                        <ArrowRight size={12} style={{ color: '#8FA3B8', flexShrink: 0 }} />
-                        <div className="val-pill" style={{ flex: 1 }}>
-                          <span className="agent-role-mini">Prospect</span>
-                          <span className="val-text" style={{ fontSize: '11px' }}>{item.prospect}</span>
+
+                        <div className="compare-arrow">
+                          <ArrowRight size={13} />
+                        </div>
+
+                        <div className="compare-col prospect">
+                          <span className="col-badge prospect">
+                            <span className="dot purple" /> PROSPECTION
+                          </span>
+                          <span className="col-content">{item.prospect || 'Tous profils'}</span>
                         </div>
                       </div>
 
                       {item.explication && (
-                        <div style={{ fontSize: '11px', color: '#8FA3B8', padding: '4px 8px', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '4px' }}>
-                          💡 {item.explication}
+                        <div className="matrix-note-row">
+                          <span className="note-bulb">💡</span>
+                          <span className="note-text">{item.explication}</span>
                         </div>
                       )}
                     </div>
                   );
-                })}
+                })
+              ) : link.alignmentMatrix && link.alignmentMatrix.length > 0 ? (
+                // Baseline Link Alignment Matrix
+                link.alignmentMatrix.map((item, idx) => {
+                  const matchStatus = item.isMatch ? 'match' : 'mismatch';
+                  return (
+                    <div key={idx} className={`matrix-card ${matchStatus}`}>
+                      <div className="matrix-card-top">
+                        <div className="matrix-dim-header">
+                          <span className="dim-icon">{getDimensionIcon(item.dimension)}</span>
+                          <span className="dim-title">{item.dimension}</span>
+                        </div>
+                        <span className={`matrix-status-chip ${matchStatus}`}>
+                          {item.isMatch ? (
+                            <>
+                              <CheckCircle2 size={11} />
+                              <span>Aligné</span>
+                            </>
+                          ) : (
+                            <>
+                              <XCircle size={11} />
+                              <span>Discordance</span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+
+                      <div className="matrix-compare-grid">
+                        <div className="compare-col sourcing">
+                          <span className="col-badge sourcing">
+                            <span className="dot cyan" /> SOURCING
+                          </span>
+                          <span className="col-content">{item.sourcingValue || 'Mission amont'}</span>
+                        </div>
+
+                        <div className="compare-arrow">
+                          <ArrowRight size={13} />
+                        </div>
+
+                        <div className="compare-col prospect">
+                          <span className="col-badge prospect">
+                            <span className="dot purple" /> PROSPECTION
+                          </span>
+                          <span className="col-content">{item.prospectValue || 'Tous profils'}</span>
+                        </div>
+                      </div>
+
+                      {item.note && (
+                        <div className="matrix-note-row">
+                          <span className="note-bulb">ℹ️</span>
+                          <span className="note-text">{item.note}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="matrix-empty-card">
+                  <span>Aucun critère spécifique requis pour cette liaison.</span>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Recommendations & Adjustments */}
+          <section className="drawer-section">
+            <div className="section-header">
+              <div className="section-title-wrap">
+                <Sliders size={14} className="section-icon" />
+                <h4 className="section-title">
+                  {aiRecommendations ? 'Recommandations d\'Optimisation IA' : 'Ajustements Recommandés'}
+                </h4>
               </div>
             </div>
-          ) : (
-            /* Baseline Criteria Alignment Matrix */
-            link.alignmentMatrix && link.alignmentMatrix.length > 0 && (
-              <div className="drawer-section">
-                <div className="section-heading">
-                  <CheckCircle2 size={15} />
-                  <span>Matrice d'Alignement des Filtres</span>
-                </div>
-                <div className="criteria-matrix">
-                  {link.alignmentMatrix.map((item, idx) => (
-                    <div key={idx} className="matrix-row">
-                      <div className="matrix-dimension">
-                        {item.isMatch ? (
-                          <CheckCircle2 size={13} style={{ color: '#00E5A0', flexShrink: 0 }} />
-                        ) : (
-                          <XCircle size={13} style={{ color: '#FF4757', flexShrink: 0 }} />
-                        )}
-                        <span>{item.dimension}</span>
-                      </div>
-                      <div className="matrix-values">
-                        <div className="val-pill">
-                          <span className="agent-role-mini">Sourcing</span>
-                          <span className="val-text">{item.sourcingValue}</span>
-                        </div>
-                        <ArrowRight size={12} style={{ color: '#8FA3B8', flexShrink: 0 }} />
-                        <div className="val-pill">
-                          <span className="agent-role-mini">Prospect</span>
-                          <span className="val-text">{item.prospectValue}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          )}
 
-          {/* AI Concrete Recommendations (OmniRoute) */}
-          {aiRecommendations ? (
-            <div className="drawer-section">
-              <div className="section-heading">
-                <Sliders size={15} />
-                <span>Recommandations d'Ajustements IA</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {aiRecommendations ? (
+              <div className="recommendations-container">
                 {aiRecommendations.ajustement_sourcing && (
-                  <div className="recommendation-card" style={{ borderLeft: '3px solid #00E5C8' }}>
-                    <div className="rec-header">
-                      <div>
-                        <div style={{ fontSize: '11px', color: '#00E5C8', fontWeight: 700 }}>
-                          Agent Fournisseur : {link.sourceName}
-                        </div>
-                        <span className="rec-label">Ajustement du Ciblage Sourcing</span>
+                  <div className="rec-card sourcing-card">
+                    <div className="rec-card-header">
+                      <div className="rec-meta">
+                        <span className="rec-agent-tag sourcing">{link.sourceName}</span>
+                        <h5 className="rec-subject">Ajustement du Ciblage Sourcing</h5>
                       </div>
-                      <span className="impact-badge high">Action Immédiate</span>
+                      <span className="rec-impact high">Action Immédiate</span>
                     </div>
-                    <p className="rationale-text" style={{ marginTop: '8px' }}>
-                      {aiRecommendations.ajustement_sourcing}
-                    </p>
+                    <p className="rec-body">{aiRecommendations.ajustement_sourcing}</p>
                   </div>
                 )}
                 {aiRecommendations.ajustement_prospection && (
-                  <div className="recommendation-card" style={{ borderLeft: '3px solid #C77DFF' }}>
-                    <div className="rec-header">
-                      <div>
-                        <div style={{ fontSize: '11px', color: '#C77DFF', fontWeight: 700 }}>
-                          Agent Qualificateur : {link.targetName}
-                        </div>
-                        <span className="rec-label">Ajustement des Critères ICP</span>
+                  <div className="rec-card prospect-card">
+                    <div className="rec-card-header">
+                      <div className="rec-meta">
+                        <span className="rec-agent-tag prospect">{link.targetName}</span>
+                        <h5 className="rec-subject">Ajustement des Critères ICP</h5>
                       </div>
-                      <span className="impact-badge medium">Optimisation</span>
+                      <span className="rec-impact medium">Optimisation</span>
                     </div>
-                    <p className="rationale-text" style={{ marginTop: '8px' }}>
-                      {aiRecommendations.ajustement_prospection}
-                    </p>
+                    <p className="rec-body">{aiRecommendations.ajustement_prospection}</p>
                   </div>
                 )}
               </div>
-            </div>
-          ) : (
-            /* Baseline Friction Recommendations */
-            <div className="drawer-section">
-              <div className="section-heading">
-                <Sliders size={15} />
-                <span>Ajustements Recommandés ({link.recommendations.length})</span>
-              </div>
-              {link.recommendations.length === 0 ? (
-                <div className="summary-box" style={{ color: '#00E5A0', textAlign: 'center' }}>
-                  ✓ Aucun conflit détecté sur cette liaison. Les deux agents collaborent de façon optimale.
+            ) : link.recommendations.length === 0 ? (
+              <div className="perfect-alignment-card">
+                <div className="perfect-icon-glow">
+                  <ShieldCheck size={26} />
                 </div>
-              ) : (
-                link.recommendations.map(rec => (
-                  <div key={rec.id} className="recommendation-card">
-                    <div className="rec-header">
-                      <div>
-                        <div style={{ fontSize: '11px', color: '#00E5C8', fontWeight: 700 }}>
-                          Agent Cible : {rec.targetAgentName}
-                        </div>
-                        <span className="rec-label">{rec.label}</span>
+                <div className="perfect-text-wrap">
+                  <h5 className="perfect-title">Liaison Optimale & Sans Friction</h5>
+                  <p className="perfect-desc">
+                    Les critères de l&apos;agent de sourcing alimentent à 100% le profil cible de prospection.
+                    Aucun conflit ni déperdition de leads n&apos;a été détecté sur cette liaison.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="recommendations-container">
+                {link.recommendations.map(rec => (
+                  <div key={rec.id} className="rec-card standard-card">
+                    <div className="rec-card-header">
+                      <div className="rec-meta">
+                        <span className="rec-agent-tag default">{rec.targetAgentName || 'Agent'}</span>
+                        <h5 className="rec-subject">{rec.label}</h5>
                       </div>
-                      <span className={`impact-badge ${rec.impact}`}>
+                      <span className={`rec-impact ${rec.impact}`}>
                         Impact {rec.impact === 'high' ? 'Élevé' : 'Moyen'}
                       </span>
                     </div>
 
-                    <div className="diff-row">
+                    <div className="rec-diff-row">
                       <span className="diff-from">{rec.currentValue}</span>
-                      <ArrowRight size={14} className="diff-arrow" />
+                      <ArrowRight size={13} className="diff-arrow" />
                       <span className="diff-to">{rec.suggestedValue}</span>
                     </div>
 
-                    <p className="rationale-text">
-                      <strong>Pourquoi :</strong> {rec.rationale}
+                    <p className="rec-body">
+                      <strong>Raison :</strong> {rec.rationale}
                     </p>
                   </div>
-                ))
-              )}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </section>
+
         </div>
       </aside>
     </>
   );
 };
-
