@@ -400,27 +400,16 @@ function HologramV() {
             repeatCount="indefinite"
           />
           
-          {/* Left Outer Wall */}
-          <path d="M 185 60 L 232 150 L 244 140 L 197 50 Z" fill="url(#v-side-grad)" stroke={C} strokeWidth="1" strokeOpacity="0.4" />
-          {/* Right Outer Wall */}
-          <path d="M 295 60 L 248 150 L 260 140 L 307 50 Z" fill="url(#v-side-grad)" stroke={C} strokeWidth="1" strokeOpacity="0.4" />
-          {/* Left Inner Wall */}
-          <path d="M 210 60 L 240 115 L 252 105 L 222 50 Z" fill="url(#v-side-grad)" stroke={C} strokeWidth="1" strokeOpacity="0.25" />
-          {/* Right Inner Wall */}
-          <path d="M 270 60 L 240 115 L 252 105 L 282 50 Z" fill="url(#v-side-grad)" stroke={C} strokeWidth="1" strokeOpacity="0.25" />
-
-          {/* Left Top Cap */}
-          <polygon points="185,60 210,60 222,50 197,50" fill="url(#v-cap-grad)" stroke="none" />
-          {/* Right Top Cap */}
-          <polygon points="295,60 270,60 282,50 307,50" fill="url(#v-cap-grad)" stroke="none" />
-
-          {/* Front Face */}
-          <path d="M 185 60 L 232 150 L 248 150 L 295 60 L 270 60 L 240 115 L 210 60 Z" 
-                fill="url(#v-face-grad)" stroke={C2} strokeWidth="3" filter="url(#neon-glow)" strokeLinejoin="round" />
-          
-          {/* Highlight Inner White Core */}
-          <path d="M 185 60 L 232 150 L 248 150 L 295 60 L 270 60 L 240 115 L 210 60 Z" 
-                fill="none" stroke="#FFFFFF" strokeWidth="1" strokeOpacity="0.8" strokeLinejoin="round" />
+          {/* Logo Officiel VMIND en Lévitation (remplace l'alphabet V) */}
+          <image
+            href="/LOGO-VMIND.png"
+            x="165"
+            y="25"
+            width="150"
+            height="150"
+            preserveAspectRatio="xMidYMid meet"
+            filter="url(#neon-glow)"
+          />
         </g>
       </svg>
     </div>
@@ -901,9 +890,18 @@ export default function LoginPage() {
         backdropFilter: 'blur(4px)',
       }}>
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={cyan} strokeWidth="2.8" strokeLinecap="round"><path d="M4 4l8 16 8-16" /></svg>
-          <span style={{ fontSize: '13px', fontWeight: 900, letterSpacing: '0.14em', color: white }}>VMIND</span>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <img
+            src="/vmind-logo-paysage.png"
+            alt="VMIND"
+            style={{
+              height: '24px',
+              width: 'auto',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 0 8px rgba(0, 229, 200, 0.45))',
+              display: 'block'
+            }}
+          />
         </div>
 
         {/* Center */}
@@ -931,11 +929,20 @@ export default function LoginPage() {
 
           {/* Brand headline */}
           <div style={{ marginBottom: '6px' }}>
-            <h1 style={{
-              fontSize: '62px', fontWeight: 900, color: cyan,
-              letterSpacing: '0.03em', lineHeight: 1, margin: 0,
-              textShadow: `0 0 28px rgba(0,229,200,0.42), 0 0 60px rgba(0,229,200,0.16)`,
-            }}>VMIND</h1>
+            <h1 style={{ margin: 0, padding: 0 }}>
+              <img
+                src="/logotype.png"
+                alt="VMIND"
+                style={{
+                  height: '52px',
+                  width: 'auto',
+                  maxWidth: '260px',
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 0 28px rgba(0,229,200,0.55))',
+                  display: 'block'
+                }}
+              />
+            </h1>
             <p style={{ fontSize: '10px', color: muted, letterSpacing: '0.35em', fontWeight: 600, marginTop: '8px', textTransform: 'uppercase' }}>
               Intelligence d&apos;entreprise
             </p>
@@ -949,7 +956,7 @@ export default function LoginPage() {
             Bienvenue sur votre espace intelligent connecté à <span style={{ color: cyan, fontWeight: 700 }}>votre ERP</span>
           </h2>
           <p style={{ fontSize: '14px', color: muted, lineHeight: 1.7, maxWidth: '540px', marginBottom: '38px' }}>
-            Accédez à vos données, analyses, pilotes et anticipations. VMIND se connecte à <span style={{ color: cyan, fontWeight: 600 }}>votre ERP</span> en temps réel.
+            Accédez à vos données, analyses, pilotes et anticipations. <span className="vmind-brand-text" style={{ color: cyan, fontWeight: 700, letterSpacing: '0.06em' }}>VMIND</span> se connecte à <span style={{ color: cyan, fontWeight: 600 }}>votre ERP</span> en temps réel.
           </p>
 
           {/* Holographic V */}
@@ -999,12 +1006,19 @@ export default function LoginPage() {
               <div key="forgot-password" className="slide-left">
                 {/* Header */}
                 <div style={{ textAlign: 'center', marginBottom: '34px' }}>
-                  <div style={{ marginBottom: '14px' }}>
-                    <span style={{
-                      fontSize: '26px', fontWeight: 900, color: cyan,
-                      letterSpacing: '0.14em',
-                      textShadow: `0 0 18px rgba(0, 229, 200, 0.4)`,
-                    }}>VMIND</span>
+                  <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}>
+                    <img
+                      src="/logotype.png"
+                      alt="VMIND"
+                      style={{
+                        height: '24px',
+                        width: 'auto',
+                        maxWidth: '120px',
+                        objectFit: 'contain',
+                        filter: 'drop-shadow(0 0 16px rgba(0,229,200,0.5))',
+                        display: 'block'
+                      }}
+                    />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '14px' }}>
                     <div style={{ height: '1px', width: '40px', background: `linear-gradient(90deg, transparent, rgba(0, 229, 200, 0.4))` }} />
@@ -1205,12 +1219,19 @@ export default function LoginPage() {
               <div key="login" className="slide-left">
                 {/* Header */}
                 <div style={{ textAlign: 'center', marginBottom: '34px' }}>
-                  <div style={{ marginBottom: '14px' }}>
-                    <span style={{
-                      fontSize: '26px', fontWeight: 900, color: cyan,
-                      letterSpacing: '0.14em',
-                      textShadow: `0 0 18px rgba(0,229,200,0.4)`,
-                    }}>VMIND</span>
+                  <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}>
+                    <img
+                      src="/logotype.png"
+                      alt="VMIND"
+                      style={{
+                        height: '24px',
+                        width: 'auto',
+                        maxWidth: '120px',
+                        objectFit: 'contain',
+                        filter: 'drop-shadow(0 0 16px rgba(0,229,200,0.5))',
+                        display: 'block'
+                      }}
+                    />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '14px' }}>
                     <div style={{ height: '1px', width: '40px', background: `linear-gradient(90deg, transparent, rgba(0,229,200,0.4))` }} />
@@ -1218,7 +1239,7 @@ export default function LoginPage() {
                     <div style={{ height: '1px', width: '40px', background: `linear-gradient(90deg, rgba(0,229,200,0.4), transparent)` }} />
                   </div>
                   <h2 style={{ fontSize: '13.5px', fontWeight: 700, color: white, letterSpacing: '0.1em', marginBottom: '8px' }}>CONNEXION SÉCURISÉE</h2>
-                  <p style={{ fontSize: '12.5px', color: muted, lineHeight: 1.5 }}>Veuillez vous authentifier pour accéder à votre espace VMIND.</p>
+                  <p style={{ fontSize: '12.5px', color: muted, lineHeight: 1.5 }}>Veuillez vous authentifier pour accéder à votre espace <span className="vmind-brand-text" style={{ color: cyan, fontWeight: 700, letterSpacing: '0.06em' }}>VMIND</span>.</p>
                 </div>
 
                 {/* Form */}
@@ -1231,7 +1252,7 @@ export default function LoginPage() {
 
                   {/* Username */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                    <label style={{ fontSize: '10px', fontWeight: 700, color: cyan, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Identifiant VMIND</label>
+                    <label style={{ fontSize: '10px', fontWeight: 700, color: cyan, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Identifiant <span className="vmind-brand-text" style={{ letterSpacing: '0.08em' }}>VMIND</span></label>
                     <div style={{ position: 'relative' }}>
                       <User size={16} color={muted} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
                       <input type="text" className="vmind-input" value={username} onChange={e => setUsername(e.target.value)}
@@ -1300,7 +1321,7 @@ export default function LoginPage() {
                         fontFamily: 'inherit',
                       }}
                     >
-                      {loading ? 'CONNEXION EN COURS...' : 'SE CONNECTER À VMIND'}
+                      {loading ? 'CONNEXION EN COURS...' : (<span>SE CONNECTER À <span className="vmind-brand-text" style={{ letterSpacing: '0.12em' }}>VMIND</span></span>)}
                       {!loading && <ArrowRight size={17} strokeWidth={2.5} />}
                     </button>
 
@@ -1316,12 +1337,19 @@ export default function LoginPage() {
               <div key="signup" className="slide-right">
                 {/* Header */}
                 <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-                  <div style={{ marginBottom: '14px' }}>
-                    <span style={{
-                      fontSize: '26px', fontWeight: 900, color: cyan,
-                      letterSpacing: '0.14em',
-                      textShadow: `0 0 18px rgba(0,229,200,0.4)`,
-                    }}>VMIND</span>
+                  <div style={{ marginBottom: '14px', display: 'flex', justifyContent: 'center' }}>
+                    <img
+                      src="/logotype.png"
+                      alt="VMIND"
+                      style={{
+                        height: '24px',
+                        width: 'auto',
+                        maxWidth: '120px',
+                        objectFit: 'contain',
+                        filter: 'drop-shadow(0 0 16px rgba(0,229,200,0.5))',
+                        display: 'block'
+                      }}
+                    />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginBottom: '14px' }}>
                     <div style={{ height: '1px', width: '40px', background: `linear-gradient(90deg, transparent, rgba(0,229,200,0.4))` }} />
@@ -1329,7 +1357,7 @@ export default function LoginPage() {
                     <div style={{ height: '1px', width: '40px', background: `linear-gradient(90deg, rgba(0,229,200,0.4), transparent)` }} />
                   </div>
                   <h2 style={{ fontSize: '13.5px', fontWeight: 700, color: white, letterSpacing: '0.1em', marginBottom: '8px' }}>CRÉER UN COMPTE</h2>
-                  <p style={{ fontSize: '12.5px', color: muted, lineHeight: 1.5 }}>Renseignez vos informations pour créer votre compte VMIND.</p>
+                  <p style={{ fontSize: '12.5px', color: muted, lineHeight: 1.5 }}>Renseignez vos informations pour créer votre compte <span className="vmind-brand-text" style={{ color: cyan, fontWeight: 700, letterSpacing: '0.06em' }}>VMIND</span>.</p>
                 </div>
 
                 {signupSuccess ? (
@@ -1470,7 +1498,7 @@ export default function LoginPage() {
 
             {/* Card footer */}
             <div style={{ marginTop: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '11px', color: 'rgba(143,163,184,0.55)' }}>
-              <Lock size={11} /> Authentification VMIND
+              <Lock size={11} /> Authentification <span className="vmind-brand-text" style={{ letterSpacing: '0.08em' }}>VMIND</span>
             </div>
           </div>
         </div>
@@ -1486,7 +1514,7 @@ export default function LoginPage() {
         <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <ShieldCheck size={12} color={cyan} /> Infrastructure sécurisée par VirtualDev
         </span>
-        <span>© 2026 VMIND • Tous droits réservés</span>
+        <span>© 2026 <span className="vmind-brand-text" style={{ color: '#D8E3F0', letterSpacing: '0.08em', fontWeight: 700 }}>VMIND</span> • Tous droits réservés</span>
         <span style={{ display: 'flex', gap: '20px' }}>
           <a href="#" className="footer-link" style={{ color: muted, textDecoration: 'none' }}>Confidentialité</a>
           <a href="#" className="footer-link" style={{ color: muted, textDecoration: 'none' }}>Support</a>
