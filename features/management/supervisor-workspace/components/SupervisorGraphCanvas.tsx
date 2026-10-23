@@ -254,6 +254,19 @@ export const SupervisorGraphCanvas: React.FC<SupervisorGraphCanvasProps> = ({
     }
   }, [dimensions, autoFitGraph]);
 
+  // When nodes arrive or update from the server, configure forces and smoothly auto-fit
+  useEffect(() => {
+    if (graphData.nodes.length > 0 && fgRef.current) {
+      configureForces(fgRef.current);
+      const t1 = setTimeout(() => autoFitGraph(300), 120);
+      const t2 = setTimeout(() => autoFitGraph(500), 550);
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
+    }
+  }, [nodeIdKey, configureForces, autoFitGraph, graphData.nodes.length]);
+
   // Custom link color helper
   const getLinkColor = useCallback((link: any) => {
     if (link.id === selectedLinkId) return '#00E5C8';

@@ -86,11 +86,6 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
   };
 
   const handleDeployTarget = (templateId: string) => {
-    if (templateId === 'supervisor' || templateId === 'onboarding') {
-      router.push('/supervisor-agent-workspace');
-      return;
-    }
-
     let agentPayload: any = undefined;
     const effectiveProspectUuid = linkedProspectUuid || (typeof window !== 'undefined' ? sessionStorage.getItem('vmind_guide_link_prospect_uuid') : null);
 

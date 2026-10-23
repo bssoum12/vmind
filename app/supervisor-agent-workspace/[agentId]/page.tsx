@@ -6,12 +6,8 @@ import { SupervisorWorkspace } from '@/features/management/supervisor-workspace/
 
 export default function SupervisorAgentWorkspaceDynamicPage() {
   const params = useParams();
-  const agentId = (params?.agentId as string) || 'supervisor-fleet';
+  const agentId = params?.agentId as string;
 
-  return (
-    <SupervisorWorkspace
-      agentId={agentId}
-      agentName="Superviseur Commercial - A9B2X1"
-    />
-  );
+  return <SupervisorWorkspace agentId={agentId} />;
 }
+

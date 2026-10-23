@@ -7,7 +7,7 @@ import { CompanyContext } from '../types/supervisor.types';
 interface CompanyContextModalProps {
   context: CompanyContext;
   onClose: () => void;
-  onSaveContext: (updatedContext: CompanyContext) => void;
+  onSaveContext: (updatedContext: CompanyContext) => void | Promise<void>;
 }
 
 export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
@@ -16,15 +16,23 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
   onSaveContext
 }) => {
   const [formData, setFormData] = useState<CompanyContext>({ ...context });
+  const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveContext(formData);
-    setIsSaved(true);
-    setTimeout(() => {
-      onClose();
-    }, 600);
+    setIsSaving(true);
+    try {
+      await onSaveContext(formData);
+      setIsSaved(true);
+      setTimeout(() => {
+        onClose();
+      }, 600);
+    } catch {
+      // error handled by caller toast
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -86,11 +94,11 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
           </div>
 
           <div className="modal-footer">
-            <button type="button" className="btn-secondary" onClick={onClose}>
+            <button type="button" className="btn-secondary" onClick={onClose} disabled={isSaving}>
               Fermer
             </button>
-            <button type="submit" className="btn-primary">
-              {isSaved ? 'Enregistré ✓' : 'Enregistrer le Contexte'}
+            <button type="submit" className="btn-primary" disabled={isSaving}>
+              {isSaving ? 'Enregistrement...' : isSaved ? 'Enregistré ✓' : 'Enregistrer le Contexte'}
             </button>
           </div>
         </form>

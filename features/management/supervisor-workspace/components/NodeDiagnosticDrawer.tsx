@@ -1,33 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
-import { X, Activity, AlertTriangle, CheckCircle2, Sliders, ArrowRight, Check, Zap, Info } from 'lucide-react';
-import { SupervisorNode, ParameterRecommendation } from '../types/supervisor.types';
+import React from 'react';
+import { X, Activity, AlertTriangle, Sliders, ArrowRight, Zap } from 'lucide-react';
+import { SupervisorNode } from '../types/supervisor.types';
 
 interface NodeDiagnosticDrawerProps {
   node: SupervisorNode;
   onClose: () => void;
-  onApplyRecommendation: (recId: string) => void;
-  onTriggerTargetedAudit: (nodeId: string) => Promise<void>;
 }
 
 export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
   node,
   onClose,
-  onApplyRecommendation,
-  onTriggerTargetedAudit
 }) => {
-  const [isAuditing, setIsAuditing] = useState(false);
-
-  const handleAuditClick = async () => {
-    setIsAuditing(true);
-    try {
-      await onTriggerTargetedAudit(node.id);
-    } finally {
-      setIsAuditing(false);
-    }
-  };
-
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'HEALTHY': return 'Sain & Conforme';
@@ -69,7 +54,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
                 {node.status === 'HEALTHY' && 'Paramétrage optimal en phase avec les résultats.'}
                 {node.status === 'WARNING' && 'Des ajustements sont recommandés pour optimiser le pipe.'}
                 {node.status === 'CRITICAL' && 'Pertes de leads détectées : intervention requise.'}
-                {node.status === 'UNANALYZED' && 'L\'agent n\'a pas encore fait l\'objet d\'un scan ciblé.'}
+                {node.status === 'UNANALYZED' && 'Données d\'activité insuffisantes pour calculer un score.'}
               </span>
             </div>
             <div className={`gauge-score-value ${node.status.toLowerCase()}`}>
@@ -98,7 +83,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
             </div>
             <div className="funnel-grid">
               <div className="funnel-card">
-                <span className="funnel-label">Leads Traités</span>
+                <span className="funnel-label">{node.type === 'sourcing' ? 'Leads Extraits' : 'Leads Traités'}</span>
                 <span className="funnel-number">{node.metrics.totalLeads}</span>
               </div>
               {node.metrics.qualificationRate !== undefined && (
@@ -164,7 +149,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
           <div className="drawer-section">
             <div className="section-heading">
               <Zap size={15} />
-              <span>Recommandations Précises ({node.recommendations.length})</span>
+              <span>Recommandations Stratégiques ({node.recommendations.length})</span>
             </div>
             {node.recommendations.length === 0 ? (
               <div className="summary-box" style={{ color: '#00E5A0', textAlign: 'center' }}>
@@ -172,7 +157,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
               </div>
             ) : (
               node.recommendations.map(rec => (
-                <div key={rec.id} className={`recommendation-card ${rec.applied ? 'applied' : ''}`}>
+                <div key={rec.id} className="recommendation-card">
                   <div className="rec-header">
                     <span className="rec-label">{rec.label}</span>
                     <span className={`impact-badge ${rec.impact}`}>
@@ -189,40 +174,10 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
                   <p className="rationale-text">
                     <strong>Pourquoi :</strong> {rec.rationale}
                   </p>
-
-                  <button
-                    className="apply-rec-btn"
-                    disabled={rec.applied}
-                    onClick={() => onApplyRecommendation(rec.id)}
-                  >
-                    {rec.applied ? (
-                      <>
-                        <Check size={14} />
-                        <span>Modification appliquée ✓</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sliders size={14} />
-                        <span>Appliquer cette recommandation</span>
-                      </>
-                    )}
-                  </button>
                 </div>
               ))
             )}
           </div>
-        </div>
-
-        {/* Drawer Footer Actions */}
-        <div className="drawer-footer">
-          <button
-            className="targeted-audit-btn"
-            disabled={isAuditing}
-            onClick={handleAuditClick}
-          >
-            <Zap size={16} />
-            <span>{isAuditing ? 'Audit ciblé en cours...' : 'Analyser cet agent uniquement'}</span>
-          </button>
         </div>
       </aside>
     </>

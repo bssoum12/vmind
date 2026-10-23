@@ -50,6 +50,7 @@ export interface LiveAgent {
   uuid?: string;
   config?: any;
   target_agent_ids?: (number | string)[];
+  supervised_agent_ids?: (number | string)[];
   is_executing?: boolean;
 }
 
@@ -763,6 +764,13 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
       return;
     }
 
+    if (agent.run_mode === 'supervisor') {
+      const publicId = agent.uuid || (agent as any).agent_id;
+      showToast(`Ouverture de l'espace de supervision...`, 'ok');
+      router.push(`/supervisor-agent-workspace/${publicId}`);
+      return;
+    }
+
     // Default behavior for recouvrement
     setActionLoading(agent.agent_name);
     try {
@@ -1112,10 +1120,32 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                                 fontSize: '11px',
                                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                               }}>
-                                {agent.run_mode || resolveAgentType(agent)}
+                                {agent.run_mode === 'supervisor' ? 'Superviseur IA' : (agent.run_mode || resolveAgentType(agent))}
                               </span>
                               {agent.run_mode === 'sourcing' && (
                                 <TargetAgentsBadge targets={getTargetAgentNames(agent)} />
+                              )}
+                              {agent.run_mode === 'supervisor' && (
+                                <span style={{
+                                  fontSize: '11px',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  background: 'rgba(157, 78, 221, 0.12)',
+                                  color: '#C77DFF',
+                                  border: '1px solid rgba(157, 78, 221, 0.3)',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  <span>👁️</span>
+                                  <span>
+                                    {(() => {
+                                      const raw = agent.supervised_agent_ids || agent.config?.supervised_agent_ids;
+                                      return Array.isArray(raw) ? `${raw.length} supervisé(s)` : 'Superviseur';
+                                    })()}
+                                  </span>
+                                </span>
                               )}
                             </div>
                           </div>
@@ -1248,15 +1278,18 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                             ⚙️
                           </button>
 
-                          {/* Open Workspace (Prospect and Sourcing) - Tutorial Step 2 */}
-                          {(agent.run_mode === 'prospection' || agent.run_mode === 'sourcing') && (
+                          {/* Open Workspace (Prospect, Sourcing, Supervisor) - Tutorial Step 2 */}
+                          {(agent.run_mode === 'prospection' || agent.run_mode === 'sourcing' || agent.run_mode === 'supervisor') && (
                             <button
                               className="row-btn"
                               onClick={() => {
                                 setNavigatingTo(agent.agent_name);
-                                const route = agent.run_mode === 'sourcing'
-                                  ? `/sourcing-agent-workspace/${agent.uuid || (agent as any).agent_id}`
-                                  : `/prospect-agent-workspace/${agent.uuid || (agent as any).agent_id || 1}`;
+                                let route = `/prospect-agent-workspace/${agent.uuid || (agent as any).agent_id || 1}`;
+                                if (agent.run_mode === 'sourcing') {
+                                  route = `/sourcing-agent-workspace/${agent.uuid || (agent as any).agent_id}`;
+                                } else if (agent.run_mode === 'supervisor') {
+                                  route = `/supervisor-agent-workspace/${agent.uuid || (agent as any).agent_id}`;
+                                }
                                 router.push(route);
                               }}
                               title="Ouvrir l'espace de travail"

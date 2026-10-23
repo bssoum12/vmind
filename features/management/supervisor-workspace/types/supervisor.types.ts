@@ -74,6 +74,8 @@ export interface SupervisorLink {
   id: string;
   source: string | SupervisorNode;
   target: string | SupervisorNode;
+  sourceUuid?: string;
+  targetUuid?: string;
   sourceName: string;
   targetName: string;
   status: HealthStatus;
@@ -108,3 +110,22 @@ export interface FleetAuditSummary {
   unanalyzedCount: number;
   topPriorities: string[];
 }
+
+export const DEFAULT_COMPANY_CONTEXT: CompanyContext = {
+  website: '',
+  valueProposition: '',
+  targetCustomers: '',
+  competitors: ''
+};
+
+export const DEFAULT_FLEET_SUMMARY: FleetAuditSummary = {
+  lastAuditedAt: 'En attente',
+  overallScore: 0,
+  totalAgents: 0,
+  healthyCount: 0,
+  warningCount: 0,
+  criticalCount: 0,
+  unanalyzedCount: 0,
+  topPriorities: []
+};
+

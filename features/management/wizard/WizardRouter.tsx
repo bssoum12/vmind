@@ -5,6 +5,8 @@ import { WizardView } from './WizardView';
 import { WizardProspectionView } from './WizardProspectionView';
 import { WizardSourcingView } from './WizardSourcingView';
 
+import { WizardSupervisorView } from './WizardSupervisorView';
+
 interface WizardRouterProps {
   templateId: string;
   onCancel: () => void;
@@ -19,6 +21,10 @@ export const WizardRouter: React.FC<WizardRouterProps> = ({ templateId, onCancel
 
   if (templateId === 'sourcing') {
     return <WizardSourcingView templateId={templateId} onCancel={onCancel} agentToEdit={agentToEdit} initialStep={initialStep} />;
+  }
+
+  if (templateId === 'supervisor') {
+    return <WizardSupervisorView templateId={templateId} onCancel={onCancel} agentToEdit={agentToEdit} initialStep={initialStep} />;
   }
 
   // Default to the original wizard for all other templates
