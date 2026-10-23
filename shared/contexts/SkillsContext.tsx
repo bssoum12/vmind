@@ -27,6 +27,7 @@ export function SkillsProvider({ children }: { children: React.ReactNode }) {
 
   const refreshSkills = useCallback(async () => {
     try {
+      if (typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname.startsWith('/login') || window.location.pathname.startsWith('/reset-password'))) { setLoading(false); return; }
       setLoading(true);
       const { skills } = await fetchInstalledSkills(activeConnection?.id ?? null);
       setInstalledSkills(skills);

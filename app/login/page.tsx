@@ -515,7 +515,7 @@ export default function LoginPage() {
   // Turnstile State
   const [turnstileToken, setTurnstileToken] = useState('');
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
-  const isTurnstileConfigured = !!(siteKey && siteKey !== 'your_cloudflare_site_key');
+  const isTurnstileConfigured = !!(siteKey && siteKey !== 'your_cloudflare_site_key' && process.env.NEXT_PUBLIC_DISABLE_TURNSTILE !== 'true');
 
   // Reset turnstile token when form step or active form changes
   useEffect(() => {
@@ -906,10 +906,10 @@ export default function LoginPage() {
 
         {/* Center */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px', fontSize: '10.5px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: muted }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: cyan }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: cyan, boxShadow: `0 0 8px ${cyan}`, display: 'inline-block' }} />
-            ERP Connecté
-          </span>          
+
+
+
+
           <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
             <Shield size={10} /> Accès Sécurisé
           </span>
