@@ -311,10 +311,12 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   }, []);
 
   useEffect(() => {
-    if (false && session?.allTools && session.allTools.length > 0) {
-      setServerTools(session.allTools);
+    /*
+
       return;
     }
+
+    */
 
     const fetchDynamicTools = async () => {
       const conn = connections.find(c => c.connector_type === 'tralis' && c.status === 'connected');
@@ -358,7 +360,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
     if (status === 'connected') {
       fetchDynamicTools();
     }
-  }, [session?.allTools, status, connections]);
+  }, [status, connections, onDisconnected]);
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
 
