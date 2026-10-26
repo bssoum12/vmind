@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CheckCircle2, AlertTriangle, Link2, Shield, ShieldCheck, X, Database, ChevronDown, ChevronUp, Eye, FileEdit, Zap, Server } from 'lucide-react';
 import { TralisInstancesModal } from './TralisInstancesModal';
 import { jwtDecode } from 'jwt-decode';
@@ -310,57 +310,69 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
     return () => window.removeEventListener('message', handleAuthMessage);
   }, []);
 
-  useEffect(() => {
-    /*
+  // Verrou anti-rebond pour éviter les boucles d'appels tools
+  const fetchedConnIdRef = useRef<number | null>(null);
+  const isFetchingRef = useRef<boolean>(false);
 
+  useEffect(() => {
+    // Si la session contient déjà des outils (initialisation ou cache), on les utilise immédiatement
+    if (session?.allTools && session.allTools.length > 0) {
+      setServerTools(session.allTools);
       return;
     }
 
-    */
+    if (status !== 'connected') {
+      fetchedConnIdRef.current = null;
+      isFetchingRef.current = false;
+      return;
+    }
+
+    const conn = connections.find(c => c.connector_type === 'tralis' && c.status === 'connected');
+    if (!conn?.id) return;
+
+    // Déjà chargé pour cette connexion ou requête en cours : on évite le re-fetch inutile
+    if (fetchedConnIdRef.current === conn.id || isFetchingRef.current) {
+      return;
+    }
 
     const fetchDynamicTools = async () => {
-      const conn = connections.find(c => c.connector_type === 'tralis' && c.status === 'connected');
-      if (conn?.id) {
-        try {
-          const { fetchConnectionTools } = await import('@/shared/api/connections-api');
-          const discovered = await fetchConnectionTools(conn.id);
-          if (Array.isArray(discovered) && discovered.length > 0) {
-            const mapped: ToolMeta[] = discovered.map(t => {
-              const nameLower = t.name.toLowerCase();
-              let guessedAgent = 'VDATA';
-              if (nameLower.includes('fin') || nameLower.includes('facture') || nameLower.includes('reglement')) guessedAgent = 'VFIN';
-              else if (nameLower.includes('sell') || nameLower.includes('vente') || nameLower.includes('devis') || nameLower.includes('commande')) guessedAgent = 'VSELL';
-              else if (nameLower.includes('buy') || nameLower.includes('achat') || nameLower.includes('fournisseur')) guessedAgent = 'VBUY';
-              else if (nameLower.includes('stock') || nameLower.includes('article') || nameLower.includes('inventaire')) guessedAgent = 'VSTOCK';
-              else if (nameLower.includes('move') || nameLower.includes('livraison') || nameLower.includes('transport')) guessedAgent = 'VMOVE';
+      isFetchingRef.current = true;
+      try {
+        const { fetchConnectionTools } = await import('@/shared/api/connections-api');
+        const discovered = await fetchConnectionTools(conn.id);
+        if (Array.isArray(discovered) && discovered.length > 0) {
+          const mapped: ToolMeta[] = discovered.map(t => {
+            const nameLower = t.name.toLowerCase();
+            let guessedAgent = 'VDATA';
+            if (nameLower.includes('fin') || nameLower.includes('facture') || nameLower.includes('reglement')) guessedAgent = 'VFIN';
+            else if (nameLower.includes('sell') || nameLower.includes('vente') || nameLower.includes('devis') || nameLower.includes('commande')) guessedAgent = 'VSELL';
+            else if (nameLower.includes('buy') || nameLower.includes('achat') || nameLower.includes('fournisseur')) guessedAgent = 'VBUY';
+            else if (nameLower.includes('stock') || nameLower.includes('article') || nameLower.includes('inventaire')) guessedAgent = 'VSTOCK';
+            else if (nameLower.includes('move') || nameLower.includes('livraison') || nameLower.includes('transport')) guessedAgent = 'VMOVE';
 
-              const isWrite = nameLower.includes('insert') || nameLower.includes('update') || nameLower.includes('delete') || nameLower.includes('post') || nameLower.includes('execute') || nameLower.includes('create');
+            const isWrite = nameLower.includes('insert') || nameLower.includes('update') || nameLower.includes('delete') || nameLower.includes('post') || nameLower.includes('execute') || nameLower.includes('create');
 
-              return {
-                name: t.name,
-                description: t.description || t.name.replace(/_/g, ' '),
-                agent: guessedAgent,
-                accessType: isWrite ? 'sensitive' : 'read',
-                authLevel: isWrite ? 'approval' : 'always'
-              };
-            });
-            setServerTools(mapped);
-          }
-        } catch (err) {
-          console.warn('[TralisConnectorPanel] Session MCP perdue ou inaccessible. Déconnexion automatique...');
-          setServerTools([]);
-          if (onDisconnected) {
-            onDisconnected();
-            if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { connected: false } }));
-          }
+            return {
+              name: t.name,
+              description: t.description || t.name.replace(/_/g, ' '),
+              agent: guessedAgent,
+              accessType: isWrite ? 'sensitive' : 'read',
+              authLevel: isWrite ? 'approval' : 'always'
+            };
+          });
+          setServerTools(mapped);
+          fetchedConnIdRef.current = conn.id;
         }
+      } catch (err: any) {
+        // En cas d'erreur de sonde d'outils, on consigne sans jamais déconnecter l'utilisateur de force
+        console.warn('[TralisConnectorPanel] Avertissement récupération tools dynamiques MCP:', err?.message || err);
+      } finally {
+        isFetchingRef.current = false;
       }
     };
 
-    if (status === 'connected') {
-      fetchDynamicTools();
-    }
-  }, [status, connections, onDisconnected]);
+    fetchDynamicTools();
+  }, [status, session?.allTools, connections]);
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
 
@@ -515,6 +527,27 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
   // ── Option A: Use current VMIND session ────────────────────────────────────
   // ── Disconnect — delegates to Hub ─────────────────────────────────────────
   const handleDisconnect = () => onDisconnected();
+
+  // ── Validation stricte du formulaire de connexion ─────────────────────────
+  const trimmedErpUrl = loginErpUrl.trim();
+  const isErpUrlFilled = trimmedErpUrl.length > 0;
+  const isErpUrlValid = isErpUrlFilled && !urlValidationMsg;
+
+  // Passerelle en mode manuel requise si la sonde a retourné une passerelle inaccessible ou manuel explicite
+  const isManualMcpRequired = Boolean(
+    probeResult && (!probeResult.mcpReachable || probeResult.requiresManualMcp)
+  );
+
+  const trimmedCustomMcp = loginCustomMcpUrl.trim();
+  const isCustomMcpFilled = trimmedCustomMcp.length > 0;
+  const isCustomMcpFormatValid = !isCustomMcpFilled || (
+    trimmedCustomMcp.startsWith('https://') ||
+    trimmedCustomMcp.startsWith('http://localhost') ||
+    trimmedCustomMcp.startsWith('http://127.0.0.1')
+  );
+
+  const isCustomMcpSatisfied = !isManualMcpRequired || (isCustomMcpFilled && isCustomMcpFormatValid);
+  const canSubmit = isErpUrlValid && isCustomMcpSatisfied && !oauthLoading && !isProbing;
 
   // ── Build tool sections ────────────────────────────────────────────────────
   const dynamicMetadata = [...serverTools];
@@ -781,7 +814,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
             {/* Champ URL ERP TraLIS avec validation réactive */}
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '12px', color: '#8FA3B8', marginBottom: '6px', fontWeight: 600 }}>
-                URL de l'instance TraLIS (Optionnel si instance locale)
+                URL de l'instance TraLIS *
               </label>
               <input
                 ref={erpInputRef}
@@ -990,8 +1023,14 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
                   flexDirection: 'column',
                   gap: '6px'
                 }}>
-                  <label style={{ display: 'block', fontSize: '11.5px', color: '#8FA3B8', fontWeight: 600 }}>
-                    URL personnalisée du serveur MCP (Optionnel)
+                  <label style={{ display: 'block', fontSize: '11.5px', color: isManualMcpRequired ? '#FFB800' : '#8FA3B8', fontWeight: 600 }}>
+                    {isManualMcpRequired ? (
+                      <>
+                        URL personnalisée du serveur MCP <span style={{ color: '#FF4D5E' }}>*</span> (Obligatoire en mode manuel)
+                      </>
+                    ) : (
+                      "URL personnalisée du serveur MCP (Optionnel)"
+                    )}
                   </label>
                   <input
                     type="text"
@@ -1000,10 +1039,25 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
                     placeholder="https://mcp.exemple.com/mcp"
                     style={{
                       width: '100%', padding: '9px 12px', boxSizing: 'border-box',
-                      background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'rgba(0,0,0,0.3)',
+                      border: isManualMcpRequired && !isCustomMcpFilled
+                        ? '1px solid rgba(255, 184, 0, 0.65)'
+                        : (trimmedCustomMcp && !isCustomMcpFormatValid ? '1px solid rgba(255, 77, 94, 0.6)' : '1px solid rgba(255,255,255,0.08)'),
                       borderRadius: '8px', color: '#fff', fontSize: '13px', outline: 'none',
                     }}
                   />
+                  {isManualMcpRequired && !isCustomMcpFilled && (
+                    <span style={{ fontSize: '11px', color: '#FFB800', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <AlertTriangle size={12} />
+                      <span>La passerelle MCP automatique est introuvable. Ce champ est obligatoire.</span>
+                    </span>
+                  )}
+                  {trimmedCustomMcp && !isCustomMcpFormatValid && (
+                    <span style={{ fontSize: '11px', color: '#FF4D5E', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <AlertTriangle size={12} />
+                      <span>L'URL doit commencer par https:// ou http://localhost</span>
+                    </span>
+                  )}
                   <span style={{ fontSize: '10.5px', color: '#6A7E95', lineHeight: 1.4 }}>
                     À renseigner si le serveur MCP est déployé sur une adresse dédiée ou derrière un tunnel réseau spécifique.
                   </span>
@@ -1039,10 +1093,13 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
             <button
               type="button"
               onClick={async () => {
+                if (!canSubmit) return;
                 try {
                   setOauthLoading(true);
                   setLoginError('');
-                  const targetUrl = loginCustomMcpUrl.trim() || loginErpUrl.trim() || undefined;
+                  const targetUrl = (isManualMcpRequired && loginCustomMcpUrl.trim())
+                    ? loginCustomMcpUrl.trim()
+                    : (loginCustomMcpUrl.trim() || loginErpUrl.trim());
                   await connectErp('tralis', targetUrl);
                   setShowModal(false);
                 } catch (e: any) {
@@ -1051,22 +1108,56 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
                   setOauthLoading(false);
                 }
               }}
-              disabled={oauthLoading}
+              disabled={!canSubmit}
               style={{
                 width: '100%',
-                background: 'linear-gradient(90deg, #00E5C8 0%, #21F3D6 100%)',
-                color: '#021010', border: 'none',
+                background: canSubmit
+                  ? 'linear-gradient(90deg, #00E5C8 0%, #21F3D6 100%)'
+                  : 'rgba(255, 255, 255, 0.08)',
+                color: canSubmit ? '#021010' : '#6A7E95',
+                border: canSubmit ? 'none' : '1px solid rgba(255, 255, 255, 0.1)',
                 padding: '13px', borderRadius: '12px',
-                fontSize: '14px', fontWeight: 800, cursor: 'pointer',
-                marginBottom: '16px',
-                boxShadow: '0 0 20px rgba(0, 229, 200, 0.15)',
+                fontSize: '14px', fontWeight: 800,
+                cursor: canSubmit ? 'pointer' : 'not-allowed',
+                marginBottom: canSubmit ? '16px' : '10px',
+                boxShadow: canSubmit ? '0 0 20px rgba(0, 229, 200, 0.15)' : 'none',
                 display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
-                opacity: oauthLoading ? 0.7 : 1,
+                opacity: oauthLoading ? 0.7 : (canSubmit ? 1 : 0.6),
+                transition: 'all 0.2s ease',
               }}
             >
               <ShieldCheck size={16} />
               {oauthLoading ? 'Connexion en cours…' : 'Connexion OAuth 2.1 (Protocole MCP Standard)'}
             </button>
+
+            {/* Message d'aide contextuel si le formulaire n'est pas encore éligible */}
+            {!canSubmit && !oauthLoading && (
+              <div style={{
+                fontSize: '11.5px',
+                color: '#8FA3B8',
+                textAlign: 'center',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}>
+                <AlertTriangle size={13} color="#FFB800" />
+                <span>
+                  {!isErpUrlFilled
+                    ? "Veuillez renseigner l'URL de l'instance TraLIS pour activer la connexion."
+                    : urlValidationMsg
+                      ? "L'URL de l'instance saisie est incomplète ou invalide."
+                      : isProbing
+                        ? "Diagnostic d'instance en cours…"
+                        : isManualMcpRequired && !isCustomMcpFilled
+                          ? "Passerelle en mode manuel : renseignez l'URL personnalisée MCP ci-dessus."
+                          : !isCustomMcpSatisfied
+                            ? "Format de l'URL MCP personnalisée invalide."
+                            : "Formulaire en attente de validation."}
+                </span>
+              </div>
+            )}
 
             {/* Note de sécurité VMIND */}
             <div style={{

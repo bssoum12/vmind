@@ -137,7 +137,7 @@ export const ConnectorsHub: React.FC = () => {
     initTralisMcp();
   };
 
-  const handleTralisMcpDisconnected = async () => {
+  const handleTralisMcpDisconnected = useCallback(async () => {
     try {
       await fetch(`${baseUrl}/api/connectors/tralis/disconnect`, {
         method: 'POST',
@@ -155,7 +155,7 @@ export const ConnectorsHub: React.FC = () => {
     setTralisSession(null);
     setTralisStatus('idle');
     broadcastMcpSessionUpdate(null);
-  };
+  }, [baseUrl]);
 
   return (
     <div className="connectors-hub-wrap">
