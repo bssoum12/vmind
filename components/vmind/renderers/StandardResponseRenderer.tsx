@@ -94,9 +94,9 @@ const GENERIC_TEXTS = new Set([
 ]);
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
-  'compare_agency_performance_jan_apr': 'Analyse par agence',
-  'analyze_delay_by_client_type': 'Retards par type de client',
-  'generate_monthly_activity_report': 'Rapport mensuel',
+  'get_kpi_dashboard': 'Tableau de bord',
+  'get_dossiers': 'Dossiers',
+  'get_factures_vente': 'Factures',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -274,7 +274,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
         <KpiRenderer kpis={kpis} />
       ) : null}
 
-      {message.tool_used === 'generate_monthly_activity_report' && (
+      {(Boolean(report_url) || message.tool_used?.includes('report')) && (
         <MonthlyReportResultRenderer
           alerts={alerts}
           reportUrl={report_url}

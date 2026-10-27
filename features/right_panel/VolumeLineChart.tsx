@@ -25,7 +25,7 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
 
   // Read current active data from Context
   const agentData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
-  const toolData = agentData.get_dossier_volume_evolution || agentData || {};
+  const toolData = agentData.get_kpi_dashboard || agentData.get_dossiers || agentData.volume_evolution || agentData || {};
 
   const activeData: ChartDataPoint[] = toolData.chart?.data || [];
   const totalDossiersCurrent = activeData.reduce((acc, d) => acc + d.value, 0);
@@ -42,7 +42,7 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
       const prevStart = `${pYear}${startDate.substring(4)}`;
       const prevEnd = `${pYear}${endDate.substring(4)}`;
 
-      const response = await fetch(`${baseUrl}/api/tools/get-dossier-volume-evolution`, {
+      const response = await fetch(`${baseUrl}/api/tools/get-kpi-dashboard`, {
         method: 'POST',
         credentials: 'include',
         headers: {

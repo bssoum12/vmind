@@ -16,8 +16,8 @@ export const VfinMonthlyRevenueCard: React.FC<VfinMonthlyRevenueCardProps> = ({ 
   // Read current active data from Context
   const agentData = kpisByAgent["vfin"] || {};
   
-  const revToolData = agentData.get_monthly_validated_revenue || {};
-  const compToolData = agentData.compare_monthly_revenue || {};
+  const revToolData = agentData.get_kpi_dashboard || agentData.revenue || agentData.factures || agentData;
+  const compToolData = agentData.compare_revenue || agentData.comparison || {};
 
   const revKpis = revToolData.ok && revToolData.kpis ? revToolData.kpis : [];
   const compKpis = compToolData.ok && compToolData.kpis ? compToolData.kpis : [];
@@ -34,7 +34,7 @@ export const VfinMonthlyRevenueCard: React.FC<VfinMonthlyRevenueCardProps> = ({ 
   const evoKpi = compKpis.find((k: any) => k.label.includes("Évolution"));
 
   // Fallback to compare_monthly_margin details if compare_monthly_revenue is missing
-  const marginToolData = agentData.compare_monthly_margin || {};
+  const marginToolData = agentData.margin || {};
   const marginDetails = marginToolData.data?.details || marginToolData.details || {};
 
   let caPrecedent = prevCaKpi ? prevCaKpi.value : null;

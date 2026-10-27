@@ -20,7 +20,7 @@ export const VfinMarginCard: React.FC<VfinMarginCardProps> = ({ activeAgentId })
 
   // Read current active data from Context
   const agentData = kpisByAgent["vfin"] || {};
-  const toolData = agentData.compare_monthly_margin || {};
+  const toolData = agentData.get_kpi_dashboard || agentData.margin || {};
 
   const kpis = toolData.ok && toolData.kpis ? toolData.kpis : [];
 

@@ -23,7 +23,7 @@ export const VsellNewClientsCard: React.FC<VsellNewClientsCardProps> = ({ active
 
   // Read n8n context data
   const agentData = kpisByAgent["vsell"] || kpisByAgent["VSELL"] || {};
-  const toolData = agentData.get_new_clients_this_month || {};
+  const toolData = agentData.get_kpi_dashboard || agentData.get_tiers || agentData.new_clients || {};
   const clients: NewClientItem[] = toolData.ok && Array.isArray(toolData.data) 
     ? toolData.data 
     : (Array.isArray(agentData.new_clients) ? agentData.new_clients : []);

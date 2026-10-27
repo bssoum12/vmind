@@ -119,14 +119,14 @@ export const VmoveBlNonFacturesCard: React.FC<VmoveBlNonFacturesCardProps> = ({
 
   const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const agentData = kpisByAgent["vmove"] || kpisByAgent["VMOVE"] || {};
-  const n8nToolData = agentData.get_vmove_kpi_bl_non_factures;
+  const n8nToolData = agentData.get_kpi_dashboard || agentData.get_expeditions || agentData.bl_non_factures;
 
   const effectiveLoading = (loadingByAgent["vmove"] || loadingByAgent["VMOVE"]) && !n8nToolData;
   const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
   const payload = n8nToolData?.data || n8nToolData;
 
   const handleRefresh = () => {
-    fetchKpis('vmove', true, 'get_vmove_kpi_bl_non_factures');
+    fetchKpis('vmove', true, 'get_expeditions');
   };
 
   if (!isVisible) return null;
