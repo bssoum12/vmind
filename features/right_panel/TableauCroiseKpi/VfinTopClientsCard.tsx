@@ -23,7 +23,7 @@ export const VfinTopClientsCard: React.FC<VfinTopClientsCardProps> = ({ activeAg
 
   // Read current active data from Context
   const agentData = kpisByAgent["vfin"] || {};
-  const toolData = agentData.get_top_clients_revenue || agentData.get_top_clients || {};
+  const toolData = agentData.get_kpi_dashboard || agentData.get_tiers || agentData.top_clients || {};
 
   const clients: ClientRevenue[] = Array.isArray(toolData.data) 
     ? toolData.data 

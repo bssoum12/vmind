@@ -33,7 +33,7 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
 
   // Read current active data from Context
   const agentData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
-  const toolData = agentData.get_delivery_rate || agentData.data || agentData || {};
+  const toolData = agentData.get_kpi_dashboard || agentData.delivery_rate || agentData.data || agentData || {};
 
   const kpis = toolData.ok && toolData.kpis ? toolData.kpis : (toolData.data?.kpis || []);
   const details = toolData.details || toolData.data?.details || null;
@@ -62,7 +62,7 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
       const prevStart = `${pYear}${startDate.substring(4)}`;
       const prevEnd = `${pYear}${endDate.substring(4)}`;
 
-      const prevResponse = await fetch(`${baseUrl}/api/tools/get-delivery-rate`, {
+      const prevResponse = await fetch(`${baseUrl}/api/tools/get-kpi-dashboard`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

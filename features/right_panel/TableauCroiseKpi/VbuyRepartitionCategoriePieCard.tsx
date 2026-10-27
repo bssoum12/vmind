@@ -31,7 +31,7 @@ export const VbuyRepartitionCategoriePieCard: React.FC<VbuyRepartitionCategorieP
 
   const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const agentData = kpisByAgent["vbuy"] || kpisByAgent["VBUY"] || {};
-  const n8nToolData = agentData.get_vbuy_kpi_repartition_par_categorie;
+  const n8nToolData = agentData.get_kpi_dashboard || agentData.get_achats_fournisseurs || agentData.repartition_categories;
 
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [isMounted, setIsMounted] = useState<boolean>(false);
@@ -138,7 +138,7 @@ export const VbuyRepartitionCategoriePieCard: React.FC<VbuyRepartitionCategorieP
             VBUY
           </span>
           <button
-            onClick={() => fetchKpis('vbuy', true, 'get_vbuy_kpi_repartition_par_categorie')}
+            onClick={() => fetchKpis('vbuy', true, 'get_achats_fournisseurs')}
             disabled={effectiveLoading}
             style={{
               background: 'transparent',

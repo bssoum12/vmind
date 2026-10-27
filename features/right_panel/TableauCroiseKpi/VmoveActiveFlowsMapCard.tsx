@@ -127,7 +127,7 @@ export const VmoveActiveFlowsMapCard: React.FC<VmoveActiveFlowsMapCardProps> = (
 }) => {
   const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const agentData = kpisByAgent["vmove"] || kpisByAgent["VMOVE"] || {};
-  const n8nToolData = agentData.get_vmove_kpi_active_flows;
+  const n8nToolData = agentData.get_kpi_dashboard || agentData.get_expeditions || agentData.active_flows;
 
   const effectiveLoading = (loadingByAgent["vmove"] || loadingByAgent["VMOVE"]) && !n8nToolData;
   const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
@@ -169,7 +169,7 @@ export const VmoveActiveFlowsMapCard: React.FC<VmoveActiveFlowsMapCardProps> = (
   }, []);
 
   const handleRefreshClick = () => {
-    fetchKpis('vmove', true, 'get_vmove_kpi_active_flows');
+    fetchKpis('vmove', true, 'get_expeditions');
   };
 
   // Close widget on outside click

@@ -20,7 +20,7 @@ export const VbuyCommandesEnAttenteCard: React.FC<VbuyCommandesEnAttenteCardProp
 
   const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const agentData = kpisByAgent["vbuy"] || kpisByAgent["VBUY"] || {};
-  const n8nToolData = agentData.get_vbuy_kpi_commandes_en_attente;
+  const n8nToolData = agentData.get_kpi_dashboard || agentData.get_commandes_achat || agentData.commandes_en_attente;
 
   const [expandedDetails, setExpandedDetails] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
@@ -111,7 +111,7 @@ export const VbuyCommandesEnAttenteCard: React.FC<VbuyCommandesEnAttenteCardProp
             VBUY
           </span>
           <button
-            onClick={() => fetchKpis('vbuy', true, 'get_vbuy_kpi_commandes_en_attente')}
+            onClick={() => fetchKpis('vbuy', true, 'get_commandes_achat')}
             disabled={effectiveLoading}
             style={{
               background: 'transparent',

@@ -23,7 +23,7 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
 
   // Read current active data from Context
   const agentData = kpisByAgent["vfin"] || {};
-  const toolData = agentData.get_six_month_revenue_trend || {};
+  const toolData = agentData.get_kpi_dashboard || agentData.revenue_trend || {};
 
   const data: TrendDataPoint[] = Array.isArray(toolData.data) 
     ? toolData.data 

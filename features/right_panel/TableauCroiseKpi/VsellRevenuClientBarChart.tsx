@@ -23,7 +23,7 @@ export const VsellRevenuClientBarChart: React.FC<VsellRevenuClientBarChartProps>
 
   // Read n8n context data
   const agentData = kpisByAgent["vsell"] || kpisByAgent["VSELL"] || {};
-  const toolData = agentData.get_top_clients_revenue || {};
+  const toolData = agentData.get_kpi_dashboard || agentData.get_tiers || agentData.top_clients || {};
   const clients: ClientRevenue[] = toolData.ok && Array.isArray(toolData.data) 
     ? toolData.data 
     : (Array.isArray(agentData.top_clients) ? agentData.top_clients : []);

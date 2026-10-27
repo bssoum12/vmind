@@ -69,15 +69,15 @@ export const AGENTS: Record<Exclude<AgentId, "VMIND">, AgentConfig> = {
 };
 
 export const TOOL_AGENT_MAPPING: Record<string, AgentId> = {
-  getCustomerProfile: "VDATA",
-  getInvoiceDetail: "VDATA",
-  getDossierDetail: "VDATA",
-  getExpeditionStatus: "VDATA",
-  searchCotations: "VDATA",
-  getPurchaseInvoiceDetail: "VDATA",
+
+
+
+
+
+
 };
 
 export function resolveAgentFromTool(toolName?: string | null): AgentId | null {
   if (!toolName) return null;
-  return TOOL_AGENT_MAPPING[toolName] ?? null;
+  const lower = String(toolName).toLowerCase(); if (lower.includes('vmove') || lower.includes('dossier') || lower.includes('expedition') || lower.includes('transport')) return 'VMOVE'; if (lower.includes('vfin') || lower.includes('facture') || lower.includes('recouvrement') || lower.includes('tresorerie') || lower.includes('creance')) return 'VFIN'; if (lower.includes('vsell') || lower.includes('cotation') || lower.includes('client') || lower.includes('crm')) return 'VSELL'; if (lower.includes('vbuy') || lower.includes('achat') || lower.includes('fournisseur') || lower.includes('commande')) return 'VBUY'; if (lower.includes('vstock') || lower.includes('stock') || lower.includes('article')) return 'VSTOCK'; return 'VDATA';
 }
