@@ -205,11 +205,11 @@ export const AgentMultiSelect: React.FC<AgentMultiSelectProps> = ({
       {/* Grid of selectable agent cards */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))',
         gap: '12px',
-        maxHeight: '340px',
+        maxHeight: '380px',
         overflowY: 'auto',
-        paddingRight: '4px'
+        paddingRight: '6px'
       }}>
         {filteredAgents.map((agent: any) => {
           const isSelected = isAgentSelected(agent);
@@ -218,11 +218,13 @@ export const AgentMultiSelect: React.FC<AgentMultiSelectProps> = ({
           const accent = isSourcing ? '#00D1B2' : '#E01A59';
           const iconBg = isSourcing ? 'rgba(0, 209, 178, 0.14)' : 'rgba(224, 26, 89, 0.14)';
           const roleLabel = isSourcing ? 'Agent de Sourcing' : 'Agent de Prospection';
+          const agentFullName = agent.agent_name || agent.nom || 'Agent';
 
           return (
             <div
               key={agent.uuid || agent.agent_id || agent.agent_name}
               onClick={() => toggleAgent(agent)}
+              title={agentFullName}
               style={{
                 padding: '12px 14px',
                 borderRadius: '10px',
@@ -231,6 +233,7 @@ export const AgentMultiSelect: React.FC<AgentMultiSelectProps> = ({
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
+                minHeight: '66px',
                 gap: '12px',
                 transition: 'all 0.18s ease',
                 boxShadow: isSelected ? '0 0 16px rgba(0, 229, 200, 0.15)' : 'none'
@@ -273,15 +276,21 @@ export const AgentMultiSelect: React.FC<AgentMultiSelectProps> = ({
 
               {/* Agent Info */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontWeight: 600,
-                  color: isSelected ? '#FFFFFF' : '#F0F4F8',
-                  fontSize: '13px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {agent.agent_name || agent.nom}
+                <div
+                  title={agentFullName}
+                  style={{
+                    fontWeight: 600,
+                    color: isSelected ? '#FFFFFF' : '#F0F4F8',
+                    fontSize: '13px',
+                    lineHeight: 1.35,
+                    wordBreak: 'break-word',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {agentFullName}
                 </div>
                 <div style={{
                   fontSize: '11px',
@@ -289,13 +298,14 @@ export const AgentMultiSelect: React.FC<AgentMultiSelectProps> = ({
                   display: 'flex',
                   alignItems: 'center',
                   gap: '5px',
-                  marginTop: '2px',
+                  marginTop: '4px',
                   fontWeight: 500
                 }}>
                   <span style={{
-                    width: 5, height: 5, borderRadius: '50%',
+                    width: 6, height: 6, borderRadius: '50%',
                     background: accent,
-                    display: 'inline-block'
+                    display: 'inline-block',
+                    flexShrink: 0
                   }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {roleLabel}

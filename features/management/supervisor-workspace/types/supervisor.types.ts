@@ -47,6 +47,7 @@ export interface SupervisorNode {
   };
   findings: DiagnosticFinding[];
   recommendations: ParameterRecommendation[];
+  missionUpdatedAt?: string | null;
   // Force graph coordinates
   x?: number;
   y?: number;
@@ -91,13 +92,21 @@ export interface SupervisorLink {
   alignmentMatrix: AlignmentDimension[];
   topRejectionReasons: RejectionReasonStat[];
   recommendations: ParameterRecommendation[];
+  missionCutoffDate?: string | null;
+  evaluation?: any;
+  lastEvaluatedAt?: string | null;
+  leadsCountAtEval?: number;
 }
 
 export interface CompanyContext {
   website: string;
-  valueProposition: string;
-  targetCustomers: string;
-  competitors: string;
+  summary?: string;
+  additional_info?: string;
+  valueProposition?: string;
+  value_proposition?: string;
+  targetCustomers?: string;
+  target_customers?: string;
+  competitors?: string;
 }
 
 export interface FleetAuditSummary {

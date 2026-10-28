@@ -6,7 +6,7 @@ import { ArrowLeft, Building2, RotateCw } from 'lucide-react';
 import { SupervisorGraphCanvas } from './SupervisorGraphCanvas';
 import { NodeDiagnosticDrawer } from './NodeDiagnosticDrawer';
 import { EdgeDiagnosticDrawer } from './EdgeDiagnosticDrawer';
-import { CompanyContextModal } from './CompanyContextModal';
+import { CompanyContextModal } from '@/features/company-context';
 import {
   SupervisorNode,
   SupervisorLink,
@@ -166,28 +166,40 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
     setSelectedLinkId(null);
   };
 
-  const handleSaveCompanyContext = async (updated: CompanyContext) => {
-    setCompanyContext(updated);
-    try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-      const targetParam = agentId || initialAgentName || 'default';
-      const res = await fetch(`${baseUrl}/api/supervisor-agent/context/${encodeURIComponent(targetParam)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(updated),
+  const handleLinkEvaluationUpdated = useCallback((updatedLink: SupervisorLink, fullEvalPayload: any) => {
+    setLinks(prevLinks => {
+      return prevLinks.map(l => {
+        const matches = (l.id === updatedLink.id) ||
+          (l.sourceUuid === updatedLink.sourceUuid && l.targetUuid === updatedLink.targetUuid) ||
+          (l.source === updatedLink.source && l.target === updatedLink.target);
+
+        if (!matches) return l;
+
+        const evalObj = fullEvalPayload?.evaluation || fullEvalPayload;
+        const newScore = evalObj?.sync_score ?? evalObj?.score ?? l.alignmentScore;
+        const newSummary = evalObj?.summary ?? l.summary;
+        let newStatus = l.status;
+        if (typeof newScore === 'number') {
+          if (newScore < 50) newStatus = 'CRITICAL';
+          else if (newScore < 75) newStatus = 'WARNING';
+          else newStatus = 'HEALTHY';
+        }
+
+        return {
+          ...l,
+          alignmentScore: newScore,
+          summary: newSummary,
+          status: newStatus,
+          evaluation: fullEvalPayload?.evaluation_data || fullEvalPayload,
+          lastEvaluatedAt: fullEvalPayload?.evaluated_at || fullEvalPayload?.created_at || new Date().toISOString(),
+          leadsCountAtEval: fullEvalPayload?.metrics?.transferred ?? l.throughput?.leadsTransferred,
+        };
       });
+    });
+  }, []);
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'Erreur lors de l’enregistrement');
-      }
-
-      showToast('Contexte Entreprise sauvegardé avec succès', 'ok');
-    } catch (err: any) {
-      console.error('[SupervisorWorkspace] Save Context Error:', err);
-      showToast(err.message || 'Échec de la sauvegarde du contexte', 'err');
-    }
+  const handleSaveCompanyContext = (updated: any) => {
+    setCompanyContext(updated);
   };
 
   const healthyCount = fleetSummary.healthyCount;
@@ -348,7 +360,9 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
       {selectedLink && (
         <EdgeDiagnosticDrawer
           link={selectedLink}
+          supervisorId={agentId}
           onClose={handleClearSelection}
+          onEvaluationComplete={handleLinkEvaluationUpdated}
         />
       )}
 

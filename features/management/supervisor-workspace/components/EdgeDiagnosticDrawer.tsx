@@ -1,37 +1,74 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, GitFork, ArrowRight, CheckCircle2, XCircle, Sliders, AlertOctagon, 
   Sparkles, Loader2, AlertTriangle, ShieldCheck, Zap,
-  Building2, MapPin, Briefcase, Users, Check, RefreshCw, BarChart2
+  Building2, MapPin, Briefcase, Users, Check, RefreshCw, BarChart2, Clock
 } from 'lucide-react';
 import { SupervisorLink } from '../types/supervisor.types';
+import { useToast } from '@/shared/contexts/ToastContext';
 
 interface EdgeDiagnosticDrawerProps {
   link: SupervisorLink;
+  supervisorId?: string;
   onClose: () => void;
+  onEvaluationComplete?: (link: SupervisorLink, data: any) => void;
 }
 
 export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
   link,
+  supervisorId,
   onClose,
+  onEvaluationComplete,
 }) => {
+  const { showToast } = useToast();
   const [isEvaluating, setIsEvaluating] = useState(false);
-  const [evalResult, setEvalResult] = useState<any>(null);
+  const [evalResult, setEvalResult] = useState<any>(() => {
+    if (link.evaluation) {
+      return {
+        success: true,
+        cached: true,
+        evaluation: link.evaluation.evaluation || link.evaluation,
+        metrics: link.evaluation.metrics || link.throughput,
+        evaluated_at: link.lastEvaluatedAt
+      };
+    }
+    return null;
+  });
+  const [cachedNotice, setCachedNotice] = useState<string | null>(null);
   const [evalError, setEvalError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (link.evaluation) {
+      setEvalResult({
+        success: true,
+        cached: true,
+        evaluation: link.evaluation.evaluation || link.evaluation,
+        metrics: link.evaluation.metrics || link.throughput,
+        evaluated_at: link.lastEvaluatedAt
+      });
+    } else {
+      setEvalResult(null);
+    }
+    setCachedNotice(null);
+    setEvalError(null);
+  }, [link.id, link.evaluation, link.lastEvaluatedAt]);
 
   const sourceUuid = link.sourceUuid || (typeof link.source === 'string' ? link.source : (link.source as any)?.id);
   const targetUuid = link.targetUuid || (typeof link.target === 'string' ? link.target : (link.target as any)?.id);
 
-  const handleRunAiDiagnostic = async () => {
+  const handleRunAiDiagnostic = async (force: boolean = false) => {
     if (!sourceUuid || !targetUuid) {
-      setEvalError('Identifiants des agents introuvables pour cette liaison.');
+      const err = 'Identifiants des agents introuvables pour cette liaison.';
+      setEvalError(err);
+      showToast(err, 'err');
       return;
     }
 
     setIsEvaluating(true);
     setEvalError(null);
+    setCachedNotice(null);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
       const res = await fetch(`${baseUrl}/api/supervisor/evaluate-link`, {
@@ -42,7 +79,9 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
         credentials: 'include',
         body: JSON.stringify({
           source_agent_uuid: sourceUuid,
-          target_agent_uuid: targetUuid
+          target_agent_uuid: targetUuid,
+          supervisor_agent_uuid: supervisorId || null,
+          force
         })
       });
 
@@ -53,9 +92,24 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
 
       const data = await res.json();
       setEvalResult(data);
+
+      if (data.cached) {
+        const msg = data.message || "Aucun nouveau lead n'a été transféré depuis la dernière analyse. Les résultats précédents restent valides.";
+        setCachedNotice(msg);
+        showToast("Aucun nouveau lead transféré. Les résultats affichés sont à jour.", "info");
+      } else {
+        setCachedNotice(null);
+        showToast(force ? "Nouvelle analyse IA forcée avec succès" : "Diagnostic IA de liaison complété avec succès", "ok");
+      }
+
+      if (onEvaluationComplete) {
+        onEvaluationComplete(link, data);
+      }
     } catch (err: any) {
       console.error('[EdgeDiagnosticDrawer] Error evaluating link:', err);
-      setEvalError(err.message || 'Impossible d\'exécuter le diagnostic de liaison');
+      const errMsg = err.message || 'Impossible d\'exécuter le diagnostic de liaison';
+      setEvalError(errMsg);
+      showToast(errMsg, 'err');
     } finally {
       setIsEvaluating(false);
     }
@@ -63,20 +117,20 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'HEALTHY': return 'Liaison Alignée';
-      case 'WARNING': return 'Friction détectée';
-      case 'CRITICAL': return 'Incohérence majeure';
-      default: return 'Non analysée';
+      case 'HEALTHY': return 'Alignée';
+      case 'WARNING': return 'Friction';
+      case 'CRITICAL': return 'Discordance';
+      default: return 'En attente';
     }
   };
 
   const getDimensionIcon = (dim: string) => {
     const lower = (dim || '').toLowerCase();
-    if (lower.includes('secteur') || lower.includes('industrie')) return <Building2 size={13} />;
-    if (lower.includes('zone') || lower.includes('géo') || lower.includes('pays') || lower.includes('localisation')) return <MapPin size={13} />;
-    if (lower.includes('sénior') || lower.includes('poste') || lower.includes('titre') || lower.includes('fonction')) return <Briefcase size={13} />;
-    if (lower.includes('taille') || lower.includes('effectif')) return <Users size={13} />;
-    return <Sliders size={13} />;
+    if (lower.includes('secteur') || lower.includes('industrie')) return <Building2 size={14} />;
+    if (lower.includes('zone') || lower.includes('géo') || lower.includes('pays') || lower.includes('localisation')) return <MapPin size={14} />;
+    if (lower.includes('sénior') || lower.includes('poste') || lower.includes('titre') || lower.includes('fonction')) return <Briefcase size={14} />;
+    if (lower.includes('taille') || lower.includes('effectif')) return <Users size={14} />;
+    return <Sliders size={14} />;
   };
 
   const displayScore = evalResult?.evaluation?.sync_score ?? link.alignmentScore;
@@ -84,405 +138,356 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
   const rejectionsAnalysis = evalResult?.evaluation?.rejections_analysis;
   const aiCriteriaMatrix = evalResult?.evaluation?.criteria_matrix;
   const aiRecommendations = evalResult?.evaluation?.recommendations;
+  const evaluatedAt = evalResult?.evaluated_at || link.lastEvaluatedAt;
 
   const statusKey = link.status || 'UNANALYZED';
 
   return (
     <>
       <div className="diagnostic-drawer-backdrop" onClick={onClose} />
-      <aside className="diagnostic-drawer edge-drawer">
-        {/* Drawer Header with Connected Flow Bridge */}
-        <header className="drawer-header edge-header">
-          <div className="edge-header-top">
-            <div className="drawer-context-pill">
-              <GitFork size={12} className="context-icon" />
-              <span>Diagnostic de flux inter-agents</span>
-              <span className={`edge-status-pill ${statusKey}`}>
-                <span className="pulse-dot" />
-                {getStatusLabel(statusKey)}
+      <aside className="diagnostic-drawer edge-drawer apple-style">
+        {/* Apple Minimalist Header */}
+        <header className="drawer-header edge-header-apple">
+          <div className="header-top-row">
+            <div className="header-meta">
+              <span className="eyebrow-tag">Flux Inter-Agents</span>
+              <span className={`status-dot-badge ${statusKey.toLowerCase()}`}>
+                <span className="dot" />
+                <span>{getStatusLabel(statusKey)}</span>
               </span>
             </div>
-            <button className="drawer-close-btn" onClick={onClose} title="Fermer" aria-label="Fermer">
-              <X size={17} />
+            <button className="apple-close-btn" onClick={onClose} title="Fermer" aria-label="Fermer">
+              <X size={15} />
             </button>
           </div>
 
-          <div className="agent-flow-bridge">
-            <div className="flow-agent-chip sourcing">
-              <span className="chip-role">SOURCING</span>
-              <span className="chip-name" title={link.sourceName}>{link.sourceName}</span>
-            </div>
-
-            <div className="flow-bridge-connector">
-              <div className="flow-track" />
-              <div className="flow-volume-tag">
-                <ArrowRight size={12} className="flow-arrow" />
-                <span>{link.throughput?.leadsTransferred || 0} leads</span>
-              </div>
-              <div className="flow-track" />
-            </div>
-
-            <div className="flow-agent-chip prospect">
-              <span className="chip-role">PROSPECTION</span>
-              <span className="chip-name" title={link.targetName}>{link.targetName}</span>
-            </div>
+          <div className="agents-connection-title">
+            <span className="agent-name source" title={link.sourceName}>{link.sourceName}</span>
+            <span className="connection-target-wrap">
+              <ArrowRight size={14} className="arrow-icon" />
+              <span className="agent-name target" title={link.targetName}>{link.targetName}</span>
+            </span>
           </div>
         </header>
 
         {/* Drawer Scrollable Content */}
-        <div className="drawer-content">
+        <div className="drawer-content apple-drawer-content">
 
-          {/* Unified Hero Synchronization & Action Card */}
-          <div className={`hero-sync-card ${statusKey.toLowerCase()}`}>
-            <div className="hero-sync-top">
-              <div className={`score-badge ${statusKey.toLowerCase()}`}>
-                <span className="score-val">
+          {/* 1. Hero Alignment Score Card */}
+          <section className={`apple-hero-card ${statusKey.toLowerCase()}`}>
+            <div className="hero-score-row">
+              <div className="hero-score-block">
+                <span className={`score-number ${statusKey.toLowerCase()}`}>
                   {displayScore === null || displayScore === undefined ? '—' : `${displayScore}%`}
                 </span>
-                <span className="score-tag">SYNCHRO</span>
+                <span className="score-caption">Alignement</span>
               </div>
-
-              <div className="hero-sync-details">
-                <h3 className="hero-sync-title">
-                  {statusKey === 'HEALTHY' && 'Liaison Parfaitement Alignée'}
-                  {statusKey === 'WARNING' && 'Friction Légère Détectée'}
-                  {statusKey === 'CRITICAL' && 'Incohérence de Filtrage Détectée'}
-                  {statusKey === 'UNANALYZED' && 'Liaison en Attente d\'Analyse'}
+              <div className="hero-status-block">
+                <h3 className="hero-title">
+                  {statusKey === 'HEALTHY' && 'Flux optimal'}
+                  {statusKey === 'WARNING' && 'Légère friction'}
+                  {statusKey === 'CRITICAL' && 'Discordance de filtrage'}
+                  {statusKey === 'UNANALYZED' && 'En attente d\'analyse'}
                 </h3>
-                <p className="hero-sync-desc">
-                  {displaySummary || (
-                    statusKey === 'HEALTHY'
-                      ? 'Les critères de sourcing alimentent de manière fluide le profil cible de prospection.'
-                      : 'Un décalage de critères entre la source et la cible impacte le débit utile du pipeline.'
-                  )}
-                </p>
+                {evaluatedAt && (
+                  <span className="hero-timestamp">
+                    Analysé le {new Date(evaluatedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à {new Date(evaluatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* AI Evaluation Button */}
-            <div className="hero-ai-action">
-              <button
-                className={`ai-trigger-btn ${evalResult ? 'evaluated' : ''}`}
-                onClick={handleRunAiDiagnostic}
-                disabled={isEvaluating}
-              >
-                {isEvaluating ? (
-                  <>
-                    <Loader2 size={15} className="spin-icon" />
-                    <span>Diagnostic approfondi en cours...</span>
-                  </>
-                ) : evalResult ? (
-                  <>
-                    <RefreshCw size={14} className="ai-icon" />
-                    <span>Diagnostic IA actualisé • Relancer</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap size={14} className="ai-icon" />
-                    <span>Lancer le diagnostic IA approfondi</span>
-                  </>
-                )}
-              </button>
-              {evalError && (
-                <div className="ai-error-banner">
-                  <AlertTriangle size={13} />
-                  <span>{evalError}</span>
+            <p className="hero-summary-text">
+              {displaySummary || (
+                statusKey === 'HEALTHY'
+                  ? 'Les critères de sourcing alimentent parfaitement le profil recherché en prospection.'
+                  : 'Des discordances de critères entraînent la disqualification de leads.'
+              )}
+            </p>
+
+            {/* Action buttons */}
+            <div className="hero-actions-row">
+              {evalResult ? (
+                <div className="apple-btn-group">
+                  <button
+                    className="apple-action-btn secondary"
+                    onClick={() => handleRunAiDiagnostic(false)}
+                    disabled={isEvaluating}
+                    title="Vérifie si de nouveaux leads ont été transférés"
+                  >
+                    {isEvaluating ? (
+                      <>
+                        <Loader2 size={13} className="spin-icon" />
+                        <span>Vérification...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw size={13} />
+                        <span>Actualiser</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    className="apple-action-btn primary"
+                    onClick={() => handleRunAiDiagnostic(true)}
+                    disabled={isEvaluating}
+                    title="Force une réanalyse IA complète"
+                  >
+                    {isEvaluating ? (
+                      <>
+                        <Loader2 size={13} className="spin-icon" />
+                        <span>Analyse...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap size={13} />
+                        <span>Forcer l&apos;analyse</span>
+                      </>
+                    )}
+                  </button>
                 </div>
+              ) : (
+                <button
+                  className="apple-action-btn primary full"
+                  onClick={() => handleRunAiDiagnostic(false)}
+                  disabled={isEvaluating}
+                >
+                  {isEvaluating ? (
+                    <>
+                      <Loader2 size={14} className="spin-icon" />
+                      <span>Analyse IA en cours...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap size={14} />
+                      <span>Lancer l&apos;analyse IA</span>
+                    </>
+                  )}
+                </button>
               )}
             </div>
-          </div>
 
-          {/* Pipeline Throughput Funnel */}
+            {/* Anti-waste Notice */}
+            {cachedNotice && (
+              <div className="apple-notice-card">
+                <div className="notice-content">
+                  <ShieldCheck size={14} className="notice-icon" />
+                  <span className="notice-text">{cachedNotice}</span>
+                </div>
+                <button
+                  type="button"
+                  className="notice-force-btn"
+                  onClick={() => handleRunAiDiagnostic(true)}
+                  disabled={isEvaluating}
+                >
+                  Forcer
+                </button>
+              </div>
+            )}
+
+            {evalError && (
+              <div className="apple-error-card">
+                <AlertTriangle size={13} />
+                <span>{evalError}</span>
+              </div>
+            )}
+          </section>
+
+          {/* 2. Pipeline Flow Metrics */}
           {link.throughput && (
-            <section className="drawer-section">
-              <div className="section-header">
+            <section className="apple-section pipeline-section">
+              <div className="apple-section-header">
                 <div className="section-title-wrap">
-                  <Sliders size={14} className="section-icon" />
-                  <h4 className="section-title">Débit & Entonnoir de Transfert</h4>
+                  <GitFork size={14} className="section-icon" />
+                  <h4 className="apple-section-title">Transfert de leads</h4>
                 </div>
-                <span className="section-kpi-badge">
-                  {link.throughput.conversionRate}% retenus
-                </span>
+                {link.missionCutoffDate && (
+                  <span className="apple-section-sub">
+                    Depuis le {new Date(link.missionCutoffDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                  </span>
+                )}
               </div>
 
-              <div className="throughput-flow-strip">
-                <div className="throughput-step">
-                  <span className="t-label">Transférés</span>
-                  <span className="t-val text-cyan">{link.throughput.leadsTransferred}</span>
-                  <span className="t-sub">Sourcing amont</span>
+              <div className="apple-metrics-grid">
+                <div className="apple-metric-cell">
+                  <span className="metric-val">{link.throughput.leadsTransferred}</span>
+                  <span className="metric-lbl">Transférés</span>
                 </div>
-
-                <div className="throughput-bridge">
-                  <div className="bridge-track">
-                    <div 
-                      className="bridge-fill" 
-                      style={{ 
-                        width: `${Math.min(100, Math.max(0, link.throughput.conversionRate))}%`,
-                        background: link.throughput.conversionRate < 50 ? '#FF4757' : 'linear-gradient(90deg, #00E5C8, #00E5A0)'
-                      }} 
-                    />
-                  </div>
-                  <span className="bridge-stat">
-                    <ArrowRight size={11} />
-                    {link.throughput.conversionRate}% qualifiés
+                <div className="apple-metric-cell highlight">
+                  <span className="metric-val">{link.throughput.leadsQualified}</span>
+                  <span className="metric-lbl">
+                    Qualifiés {link.throughput.leadsTransferred > 0 ? `(${link.throughput.conversionRate}%)` : ''}
                   </span>
                 </div>
-
-                <div className="throughput-step">
-                  <span className="t-label">Qualifiés</span>
-                  <span className="t-val text-emerald">{link.throughput.leadsQualified}</span>
-                  <span className="t-sub">Prospection aval</span>
-                </div>
-
-                <div className="throughput-step rejected">
-                  <span className="t-label">Écartés</span>
-                  <span className={`t-val ${link.throughput.leadsRejected > 0 ? 'text-coral' : 'text-muted'}`}>
-                    {link.throughput.leadsRejected}
-                  </span>
-                  <span className="t-sub">Non qualifiés</span>
+                <div className="apple-metric-cell">
+                  <span className="metric-val muted">{link.throughput.leadsRejected}</span>
+                  <span className="metric-lbl">Écartés</span>
                 </div>
               </div>
+
+              {link.throughput.leadsTransferred > 0 && (
+                <div className="apple-progress-bar">
+                  <div
+                    className="progress-fill"
+                    style={{ width: `${Math.min(100, Math.max(0, link.throughput.conversionRate))}%` }}
+                  />
+                </div>
+              )}
             </section>
           )}
 
-          {/* Root-cause Rejections Analysis */}
+          {/* 3. Rejections Root Cause (if any) */}
           {rejectionsAnalysis && (
-            <section className="drawer-section">
-              <div className="section-header">
+            <section className="apple-section rejections-section">
+              <div className="apple-section-header">
                 <div className="section-title-wrap">
-                  <AlertTriangle size={14} style={{ color: '#FF4757' }} />
-                  <h4 className="section-title">Cause Racine des Rejets</h4>
+                  <AlertOctagon size={14} className="section-icon warning" />
+                  <h4 className="apple-section-title">Motif des rejets</h4>
                 </div>
-                <span className="section-kpi-badge warning">Analyse IA</span>
               </div>
-              <div className="root-cause-card">
+              <div className="apple-card readable-text rejection-card">
                 <p>{rejectionsAnalysis}</p>
               </div>
             </section>
           )}
 
-          {/* Criteria Alignment Matrix */}
-          <section className="drawer-section">
-            <div className="section-header">
+          {/* 4. Criteria Alignment Matrix */}
+          <section className="apple-section criteria-section">
+            <div className="apple-section-header">
               <div className="section-title-wrap">
-                <CheckCircle2 size={14} className="section-icon text-cyan" />
-                <h4 className="section-title">
-                  {Array.isArray(aiCriteriaMatrix) && aiCriteriaMatrix.length > 0
-                    ? 'Matrice d\'Alignement Sémantique IA'
-                    : 'Matrice de Correspondance des Filtres'}
-                </h4>
+                <Sliders size={14} className="section-icon" />
+                <h4 className="apple-section-title">Adéquation des critères</h4>
               </div>
-              <span className="section-kpi-badge">
-                {Array.isArray(aiCriteriaMatrix) && aiCriteriaMatrix.length > 0 ? 'Deep AI' : 'Filtres ICP'}
-              </span>
             </div>
 
-            <div className="matrix-cards-list">
+            <div className="apple-criteria-list">
               {Array.isArray(aiCriteriaMatrix) && aiCriteriaMatrix.length > 0 ? (
-                // AI Evaluated Matrix
                 aiCriteriaMatrix.map((item: any, idx: number) => {
                   const isMatch = item.statut === 'aligne';
                   const isPartial = item.statut === 'partiel';
-                  const matchStatus = isMatch ? 'match' : isPartial ? 'partial' : 'mismatch';
+                  const statusClass = isMatch ? 'match' : isPartial ? 'partial' : 'mismatch';
 
                   return (
-                    <div key={idx} className={`matrix-card ${matchStatus}`}>
-                      <div className="matrix-card-top">
-                        <div className="matrix-dim-header">
-                          <span className="dim-icon">{getDimensionIcon(item.critere)}</span>
-                          <span className="dim-title">{item.critere}</span>
+                    <div key={idx} className={`apple-criterion-card ${statusClass}`}>
+                      <div className="criterion-top-row">
+                        <div className="criterion-title-wrap">
+                          <span className="criterion-icon">{getDimensionIcon(item.critere)}</span>
+                          <span className="criterion-name">{item.critere}</span>
                         </div>
-                        <span className={`matrix-status-chip ${matchStatus}`}>
-                          {isMatch ? (
-                            <>
-                              <CheckCircle2 size={11} />
-                              <span>Aligné</span>
-                            </>
-                          ) : isPartial ? (
-                            <>
-                              <AlertTriangle size={11} />
-                              <span>Partiel</span>
-                            </>
-                          ) : (
-                            <>
-                              <XCircle size={11} />
-                              <span>Discordance</span>
-                            </>
-                          )}
+                        <span className={`criterion-badge ${statusClass}`}>
+                          {isMatch ? 'Aligné' : isPartial ? 'Partiel' : 'Discordant'}
                         </span>
                       </div>
 
-                      <div className="matrix-compare-grid">
-                        <div className="compare-col sourcing">
-                          <span className="col-badge sourcing">
-                            <span className="dot cyan" /> SOURCING
-                          </span>
-                          <span className="col-content">{item.sourcing || 'Non spécifié'}</span>
+                      <div className="criterion-values-row">
+                        <div className="value-col">
+                          <span className="col-label">Sourcing</span>
+                          <span className="col-value">{item.sourcing || 'Non spécifié'}</span>
                         </div>
-
-                        <div className="compare-arrow">
-                          <ArrowRight size={13} />
-                        </div>
-
-                        <div className="compare-col prospect">
-                          <span className="col-badge prospect">
-                            <span className="dot purple" /> PROSPECTION
-                          </span>
-                          <span className="col-content">{item.prospect || 'Tous profils'}</span>
+                        <div className="value-col">
+                          <span className="col-label">Prospection</span>
+                          <span className="col-value">{item.prospect || 'Tous profils'}</span>
                         </div>
                       </div>
 
                       {item.explication && (
-                        <div className="matrix-note-row">
-                          <span className="note-bulb">💡</span>
-                          <span className="note-text">{item.explication}</span>
-                        </div>
+                        <p className="criterion-note">{item.explication}</p>
                       )}
                     </div>
                   );
                 })
               ) : link.alignmentMatrix && link.alignmentMatrix.length > 0 ? (
-                // Baseline Link Alignment Matrix
                 link.alignmentMatrix.map((item, idx) => {
-                  const matchStatus = item.isMatch ? 'match' : 'mismatch';
+                  const statusClass = item.isMatch ? 'match' : 'mismatch';
                   return (
-                    <div key={idx} className={`matrix-card ${matchStatus}`}>
-                      <div className="matrix-card-top">
-                        <div className="matrix-dim-header">
-                          <span className="dim-icon">{getDimensionIcon(item.dimension)}</span>
-                          <span className="dim-title">{item.dimension}</span>
+                    <div key={idx} className={`apple-criterion-card ${statusClass}`}>
+                      <div className="criterion-top-row">
+                        <div className="criterion-title-wrap">
+                          <span className="criterion-icon">{getDimensionIcon(item.dimension)}</span>
+                          <span className="criterion-name">{item.dimension}</span>
                         </div>
-                        <span className={`matrix-status-chip ${matchStatus}`}>
-                          {item.isMatch ? (
-                            <>
-                              <CheckCircle2 size={11} />
-                              <span>Aligné</span>
-                            </>
-                          ) : (
-                            <>
-                              <XCircle size={11} />
-                              <span>Discordance</span>
-                            </>
-                          )}
+                        <span className={`criterion-badge ${statusClass}`}>
+                          {item.isMatch ? 'Aligné' : 'Discordant'}
                         </span>
                       </div>
 
-                      <div className="matrix-compare-grid">
-                        <div className="compare-col sourcing">
-                          <span className="col-badge sourcing">
-                            <span className="dot cyan" /> SOURCING
-                          </span>
-                          <span className="col-content">{item.sourcingValue || 'Mission amont'}</span>
+                      <div className="criterion-values-row">
+                        <div className="value-col">
+                          <span className="col-label">Sourcing</span>
+                          <span className="col-value">{item.sourcingValue || 'Mission amont'}</span>
                         </div>
-
-                        <div className="compare-arrow">
-                          <ArrowRight size={13} />
-                        </div>
-
-                        <div className="compare-col prospect">
-                          <span className="col-badge prospect">
-                            <span className="dot purple" /> PROSPECTION
-                          </span>
-                          <span className="col-content">{item.prospectValue || 'Tous profils'}</span>
+                        <div className="value-col">
+                          <span className="col-label">Prospection</span>
+                          <span className="col-value">{item.prospectValue || 'Tous profils'}</span>
                         </div>
                       </div>
 
                       {item.note && (
-                        <div className="matrix-note-row">
-                          <span className="note-bulb">ℹ️</span>
-                          <span className="note-text">{item.note}</span>
-                        </div>
+                        <p className="criterion-note">{item.note}</p>
                       )}
                     </div>
                   );
                 })
               ) : (
-                <div className="matrix-empty-card">
+                <div className="apple-card empty">
                   <span>Aucun critère spécifique requis pour cette liaison.</span>
                 </div>
               )}
             </div>
           </section>
 
-          {/* Recommendations & Adjustments */}
-          <section className="drawer-section">
-            <div className="section-header">
-              <div className="section-title-wrap">
-                <Sliders size={14} className="section-icon" />
-                <h4 className="section-title">
-                  {aiRecommendations ? 'Recommandations d\'Optimisation IA' : 'Ajustements Recommandés'}
-                </h4>
-              </div>
-            </div>
-
-            {aiRecommendations ? (
-              <div className="recommendations-container">
-                {aiRecommendations.ajustement_sourcing && (
-                  <div className="rec-card sourcing-card">
-                    <div className="rec-card-header">
-                      <div className="rec-meta">
-                        <span className="rec-agent-tag sourcing">{link.sourceName}</span>
-                        <h5 className="rec-subject">Ajustement du Ciblage Sourcing</h5>
-                      </div>
-                      <span className="rec-impact high">Action Immédiate</span>
-                    </div>
-                    <p className="rec-body">{aiRecommendations.ajustement_sourcing}</p>
-                  </div>
-                )}
-                {aiRecommendations.ajustement_prospection && (
-                  <div className="rec-card prospect-card">
-                    <div className="rec-card-header">
-                      <div className="rec-meta">
-                        <span className="rec-agent-tag prospect">{link.targetName}</span>
-                        <h5 className="rec-subject">Ajustement des Critères ICP</h5>
-                      </div>
-                      <span className="rec-impact medium">Optimisation</span>
-                    </div>
-                    <p className="rec-body">{aiRecommendations.ajustement_prospection}</p>
-                  </div>
-                )}
-              </div>
-            ) : link.recommendations.length === 0 ? (
-              <div className="perfect-alignment-card">
-                <div className="perfect-icon-glow">
-                  <ShieldCheck size={26} />
-                </div>
-                <div className="perfect-text-wrap">
-                  <h5 className="perfect-title">Liaison Optimale & Sans Friction</h5>
-                  <p className="perfect-desc">
-                    Les critères de l&apos;agent de sourcing alimentent à 100% le profil cible de prospection.
-                    Aucun conflit ni déperdition de leads n&apos;a été détecté sur cette liaison.
-                  </p>
+          {/* 5. Recommendations */}
+          {(aiRecommendations || link.recommendations.length > 0) && (
+            <section className="apple-section recommendations-section">
+              <div className="apple-section-header">
+                <div className="section-title-wrap">
+                  <Sparkles size={14} className="section-icon" />
+                  <h4 className="apple-section-title">Recommandations</h4>
                 </div>
               </div>
-            ) : (
-              <div className="recommendations-container">
-                {link.recommendations.map(rec => (
-                  <div key={rec.id} className="rec-card standard-card">
-                    <div className="rec-card-header">
-                      <div className="rec-meta">
-                        <span className="rec-agent-tag default">{rec.targetAgentName || 'Agent'}</span>
-                        <h5 className="rec-subject">{rec.label}</h5>
+
+              {aiRecommendations ? (
+                <div className="apple-recs-stack">
+                  {aiRecommendations.ajustement_sourcing && (
+                    <div className="apple-card rec-card sourcing">
+                      <div className="rec-header">
+                        <span className="rec-agent">{link.sourceName}</span>
+                        <span className="rec-tag sourcing">Sourcing</span>
                       </div>
-                      <span className={`rec-impact ${rec.impact}`}>
-                        Impact {rec.impact === 'high' ? 'Élevé' : 'Moyen'}
-                      </span>
+                      <p className="rec-text">{aiRecommendations.ajustement_sourcing}</p>
                     </div>
-
-                    <div className="rec-diff-row">
-                      <span className="diff-from">{rec.currentValue}</span>
-                      <ArrowRight size={13} className="diff-arrow" />
-                      <span className="diff-to">{rec.suggestedValue}</span>
+                  )}
+                  {aiRecommendations.ajustement_prospection && (
+                    <div className="apple-card rec-card prospection">
+                      <div className="rec-header">
+                        <span className="rec-agent">{link.targetName}</span>
+                        <span className="rec-tag prospection">Prospection</span>
+                      </div>
+                      <p className="rec-text">{aiRecommendations.ajustement_prospection}</p>
                     </div>
-
-                    <p className="rec-body">
-                      <strong>Raison :</strong> {rec.rationale}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+                  )}
+                </div>
+              ) : (
+                <div className="apple-recs-stack">
+                  {link.recommendations.map(rec => (
+                    <div key={rec.id} className="apple-card rec-card">
+                      <div className="rec-header">
+                        <span className="rec-agent">{rec.targetAgentName || 'Agent'}</span>
+                        <span className="rec-tag">{rec.label}</span>
+                      </div>
+                      <div className="rec-change-row">
+                        <span className="change-from">{rec.currentValue}</span>
+                        <ArrowRight size={12} className="change-arrow" />
+                        <span className="change-to">{rec.suggestedValue}</span>
+                      </div>
+                      <p className="rec-text">{rec.rationale}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
 
         </div>
       </aside>
