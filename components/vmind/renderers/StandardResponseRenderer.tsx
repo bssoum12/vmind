@@ -167,6 +167,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
     alerts,
     report_url,
     report_filename,
+    skills_used,
   } = message;
 
   if (isThinking) {
@@ -248,7 +249,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', animation: 'fadeIn 0.5s' }}>
-      {(message.tool_used || message.source) && (
+      {(message.tool_used || message.source || (skills_used && skills_used.length > 0)) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
           {message.tool_used && (
             <span className="premium-badge">
@@ -261,6 +262,15 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
               {message.source}
             </span>
           )}
+          {skills_used && skills_used.map((skill, idx) => {
+            const slug = typeof skill === 'string' ? skill : skill.slug;
+            return (
+              <span key={`skill-${idx}-${slug}`} className="premium-badge" style={{ background: 'rgba(168, 85, 247, 0.15)', borderColor: 'rgba(168, 85, 247, 0.35)', color: '#c084fc' }}>
+                <span className="status-dot" style={{ display: 'inline-block', width: '6px', height: '6px', background: '#c084fc', borderRadius: '50%', boxShadow: '0 0 8px #c084fc' }}></span>
+                {`Compétence : ${slug}`}
+              </span>
+            );
+          })}
         </div>
       )}
       

@@ -77,7 +77,7 @@ const VBUY_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Top 5 fournisseurs ?": "Quels sont les 5 principaux fournisseurs par volume d'achat ?",
   "Délais de livraison dépassés ?": "Quels fournisseurs ont des délais de livraison dépassés ?",
   "Commandes en attente de réception ?": "Quelles commandes fournisseurs sont en attente de réception ?",
-  "Rpartition par catgorie (Trimestre) ?": "Quelle est la rpartition des achats par catgorie ce trimestre ?"
+  "Répartition par catégorie (Trimestre) ?": "Quelle est la répartition des achats par catégorie ce trimestre ?"
 };
 
 const VMOVE_FAST_TRACK_REGISTRY: Record<string, string> = {
@@ -522,6 +522,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           report_url: response.report_url,
           report_filename: response.report_filename,
           skills_used: Array.isArray((response as any).skills_used) ? (response as any).skills_used : undefined,
+
           error: response.error
         }]);
       }
@@ -546,6 +547,8 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     if (isLoading) return;
     
     const professionalMessage = FAST_TRACK_REGISTRY[shortLabel];
+    const skillsToSend = [...selectedSkills];
+    setSelectedSkills([]);
     if (!professionalMessage) return;
 
     setInput('');
@@ -603,7 +606,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
         const controller = new AbortController();
         abortControllersRef.current[targetConvId] = controller;
-        let response = await sendVmindMessage(professionalMessage, targetConvId, effectiveAgentId, clientId, controller.signal);
+        let response = await sendVmindMessage(professionalMessage, targetConvId, effectiveAgentId, activeConnection?.client_id || clientId, controller.signal, activeConnection?.id, skillsToSend);
         delete abortControllersRef.current[targetConvId];
 
         if (activeConversationIdRef.current !== targetConvId) return;
@@ -615,7 +618,40 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
         const isOk = response && (response.ok === true || (response.ok as any) === "true");
 
-      if (!isOk) {
+      const detailsStr = typeof response?.details === 'string' 
+        ? response.details 
+        : JSON.stringify(response?.details || '');
+      const textStr = typeof response?.text === 'string' ? response.text : '';
+      const messageStr = typeof response?.message === 'string' ? response.message : '';
+
+      const isForbidden = 
+        response?.error === 'FORBIDDEN' ||
+        response?.error === 'FORBIDDEN_TOOL_EXECUTION' ||
+        response?.error === 'UNAUTHORIZED_TOOL_EXECUTION' ||
+        detailsStr.includes('FORBIDDEN_TOOL_EXECUTION') ||
+        detailsStr.includes('UNAUTHORIZED_TOOL_EXECUTION') ||
+        detailsStr.includes('status": "unauthorized') ||
+        detailsStr.includes('status":"unauthorized') ||
+        detailsStr.includes("Vous n'avez pas les permissions nécessaires") ||
+        textStr.includes('FORBIDDEN_TOOL_EXECUTION') ||
+        messageStr.includes('FORBIDDEN_TOOL_EXECUTION');
+
+      if (isForbidden) {
+        const agentName = effectiveAgentId || activeAgentId || 'cet agent';
+        setMessages((prev) => [...prev, {
+          id: `vm-${Date.now()}`,
+          sender: 'vm',
+          text: `ℹ️ Vous n'avez pas l'autorisation d'accéder aux données Erp en direct pour l'agent ${agentName}. Je reste à votre disposition pour toute question méthodologique ou conseil métier dans ce domaine.`,
+          time: formatTime(), rawDate: new Date().toISOString(),
+          tool_used: null,
+          response_type: 'full',
+          title: 'Accès restreint',
+          kpis: [],
+          table: { columns: [], rows: [] },
+          chart: { type: null, title: '', description: '', xKey: '', yKey: '', data: [] },
+          details: null
+        }]);
+      } else if (!isOk) {
         setMessages((prev) => [...prev, {
           id: `err-${Date.now()}`,
           sender: 'vm',
@@ -644,6 +680,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
           alerts: response.alerts,
           report_url: response.report_url,
           report_filename: response.report_filename,
+          skills_used: Array.isArray((response as any).skills_used) ? (response as any).skills_used : undefined,
           error: response.error
         }]);
       }
