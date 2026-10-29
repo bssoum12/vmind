@@ -38,6 +38,8 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
   });
   const [cachedNotice, setCachedNotice] = useState<string | null>(null);
   const [evalError, setEvalError] = useState<string | null>(null);
+  const [lastEvaluatedAt, setLastEvaluatedAt] = useState<string | null>(link.lastEvaluatedAt || null);
+  const [showCachedModal, setShowCachedModal] = useState<boolean>(false);
 
   useEffect(() => {
     if (link.evaluation) {
@@ -53,10 +55,44 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
     }
     setCachedNotice(null);
     setEvalError(null);
+    setLastEvaluatedAt(link.lastEvaluatedAt || null);
   }, [link.id, link.evaluation, link.lastEvaluatedAt]);
 
   const sourceUuid = link.sourceUuid || (typeof link.source === 'string' ? link.source : (link.source as any)?.id);
   const targetUuid = link.targetUuid || (typeof link.target === 'string' ? link.target : (link.target as any)?.id);
+
+  // Spec §4.1 (supersedes old §10): on open, fetch the last stored evaluation
+  // read-only — no n8n call, no LLM cost. This refines/overrides the
+  // fleet-graph prop prefill above with the authoritative `stale` flag.
+  useEffect(() => {
+    if (!sourceUuid || !targetUuid) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+        const res = await fetch(
+          `${baseUrl}/api/supervisor/link-evaluation/latest?source_agent_uuid=${encodeURIComponent(sourceUuid)}&target_agent_uuid=${encodeURIComponent(targetUuid)}`,
+          { credentials: 'include' }
+        );
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (cancelled || !data?.evaluation) return;
+
+        setEvalResult(data);
+        setLastEvaluatedAt(data.evaluated_at || null);
+        if (data.stale) {
+          setCachedNotice('La mission source, les leads transférés ou le contexte entreprise ont changé depuis cette évaluation. Les résultats ci-dessous peuvent être dépassés.');
+        } else {
+          setCachedNotice(null);
+        }
+      } catch (e) {
+        console.warn('[EdgeDiagnosticDrawer] Could not load the latest stored evaluation:', e);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [link.id, sourceUuid, targetUuid]);
 
   const handleRunAiDiagnostic = async (force: boolean = false) => {
     if (!sourceUuid || !targetUuid) {
@@ -94,12 +130,12 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
       setEvalResult(data);
 
       if (data.cached) {
-        const msg = data.message || "Aucun nouveau lead n'a été transféré depuis la dernière analyse. Les résultats précédents restent valides.";
-        setCachedNotice(msg);
-        showToast("Aucun nouveau lead transféré. Les résultats affichés sont à jour.", "info");
+        setShowCachedModal(true);
       } else {
+        setShowCachedModal(false);
         setCachedNotice(null);
-        showToast(force ? "Nouvelle analyse IA forcée avec succès" : "Diagnostic IA de liaison complété avec succès", "ok");
+        setLastEvaluatedAt(new Date().toISOString());
+        showToast(force ? "Nouvelle analyse effectuée avec succès" : "Diagnostic IA de liaison complété avec succès", "ok");
       }
 
       if (onEvaluationComplete) {
@@ -138,9 +174,12 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
   const rejectionsAnalysis = evalResult?.evaluation?.rejections_analysis;
   const aiCriteriaMatrix = evalResult?.evaluation?.criteria_matrix;
   const aiRecommendations = evalResult?.evaluation?.recommendations;
-  const evaluatedAt = evalResult?.evaluated_at || link.lastEvaluatedAt;
+  const evaluatedAt = lastEvaluatedAt || evalResult?.evaluated_at || link.lastEvaluatedAt;
 
-  const statusKey = link.status || 'UNANALYZED';
+  let statusKey: string = link.status || 'UNANALYZED';
+  if (evalResult && typeof displayScore === 'number') {
+    statusKey = displayScore < 50 ? 'CRITICAL' : displayScore < 75 ? 'WARNING' : 'HEALTHY';
+  }
 
   return (
     <>
@@ -189,10 +228,17 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
                   {statusKey === 'CRITICAL' && 'Discordance de filtrage'}
                   {statusKey === 'UNANALYZED' && 'En attente d\'analyse'}
                 </h3>
+                {link.missionCutoffDate && (
+                  <div className="hero-timestamp">
+                    <Clock size={12} className="clock-icon" />
+                    <span>Périmètre : leads analysés depuis le {new Date(link.missionCutoffDate).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                )}
                 {evaluatedAt && (
-                  <span className="hero-timestamp">
-                    Analysé le {new Date(evaluatedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à {new Date(evaluatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  <div className="hero-timestamp">
+                    <Clock size={12} className="clock-icon" />
+                    <span>Dernière évaluation, enregistrée le {new Date(evaluatedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })} à {new Date(evaluatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
                 )}
               </div>
             </div>
@@ -207,82 +253,38 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
 
             {/* Action buttons */}
             <div className="hero-actions-row">
-              {evalResult ? (
-                <div className="apple-btn-group">
-                  <button
-                    className="apple-action-btn secondary"
-                    onClick={() => handleRunAiDiagnostic(false)}
-                    disabled={isEvaluating}
-                    title="Vérifie si de nouveaux leads ont été transférés"
-                  >
-                    {isEvaluating ? (
-                      <>
-                        <Loader2 size={13} className="spin-icon" />
-                        <span>Vérification...</span>
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw size={13} />
-                        <span>Actualiser</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    className="apple-action-btn primary"
-                    onClick={() => handleRunAiDiagnostic(true)}
-                    disabled={isEvaluating}
-                    title="Force une réanalyse IA complète"
-                  >
-                    {isEvaluating ? (
-                      <>
-                        <Loader2 size={13} className="spin-icon" />
-                        <span>Analyse...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Zap size={13} />
-                        <span>Forcer l&apos;analyse</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              ) : (
-                <button
-                  className="apple-action-btn primary full"
-                  onClick={() => handleRunAiDiagnostic(false)}
-                  disabled={isEvaluating}
-                >
-                  {isEvaluating ? (
-                    <>
-                      <Loader2 size={14} className="spin-icon" />
-                      <span>Analyse IA en cours...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Zap size={14} />
-                      <span>Lancer l&apos;analyse IA</span>
-                    </>
-                  )}
-                </button>
-              )}
+              <button
+                className="apple-action-btn primary full"
+                onClick={() => handleRunAiDiagnostic(false)}
+                disabled={isEvaluating}
+                title={evalResult ? "Vérifie les nouveaux leads et réévalue la liaison" : "Lance l'évaluation IA de liaison"}
+              >
+                {isEvaluating ? (
+                  <>
+                    <Loader2 size={14} className="spin-icon" />
+                    <span>Analyse en cours...</span>
+                  </>
+                ) : evalResult ? (
+                  <>
+                    <RefreshCw size={14} />
+                    <span>Actualiser l&apos;analyse</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={14} />
+                    <span>Lancer l&apos;analyse IA</span>
+                  </>
+                )}
+              </button>
             </div>
 
-            {/* Anti-waste Notice */}
+            {/* Informational Stale Notice (Read-only) */}
             {cachedNotice && (
-              <div className="apple-notice-card">
+              <div className="apple-notice-card info-only">
                 <div className="notice-content">
                   <ShieldCheck size={14} className="notice-icon" />
                   <span className="notice-text">{cachedNotice}</span>
                 </div>
-                <button
-                  type="button"
-                  className="notice-force-btn"
-                  onClick={() => handleRunAiDiagnostic(true)}
-                  disabled={isEvaluating}
-                >
-                  Forcer
-                </button>
               </div>
             )}
 
@@ -490,6 +492,49 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
           )}
 
         </div>
+
+        {/* Apple Cyber Confirm Dialog when no new leads were transferred */}
+        {showCachedModal && (
+          <div className="apple-dialog-overlay" onClick={() => setShowCachedModal(false)}>
+            <div className="apple-dialog-card" onClick={(e) => e.stopPropagation()}>
+              <div className="dialog-header">
+                <div className="dialog-icon-wrap">
+                  <Sparkles size={20} className="dialog-icon" />
+                </div>
+                <div className="dialog-header-text">
+                  <h3 className="dialog-title">Données déjà à jour</h3>
+                  <span className="dialog-subtitle">Aucun nouveau lead transféré</span>
+                </div>
+              </div>
+
+              <p className="dialog-desc">
+                Aucun nouveau lead n&apos;a été transféré entre ces deux agents depuis la dernière évaluation. Les métriques d&apos;alignement et constats actuels restent parfaitement valides.
+              </p>
+
+              <div className="dialog-actions-row">
+                <button
+                  type="button"
+                  className="dialog-btn secondary"
+                  onClick={() => setShowCachedModal(false)}
+                >
+                  Conserver les résultats
+                </button>
+                <button
+                  type="button"
+                  className="dialog-btn primary"
+                  onClick={() => {
+                    setShowCachedModal(false);
+                    handleRunAiDiagnostic(true);
+                  }}
+                  disabled={isEvaluating}
+                >
+                  <Zap size={13} />
+                  <span>Continuer quand même</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </aside>
     </>
   );

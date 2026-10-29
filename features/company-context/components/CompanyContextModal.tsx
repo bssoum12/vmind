@@ -134,7 +134,7 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
         website: hasWebsite ? websiteUrl.trim() : '',
         summary: hasWebsite ? aiSummary.trim() : manualDescription.trim(),
         additional_info: hasWebsite ? additionalInfo.trim() : '',
-        value_proposition: hasWebsite ? aiSummary.trim() : manualDescription.trim(),
+        value_proposition: '',
         raw_search_data: hasWebsite ? rawSearchData : { manual: true, submitted_at: new Date().toISOString() }
       };
 

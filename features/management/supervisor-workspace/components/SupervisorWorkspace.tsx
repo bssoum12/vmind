@@ -198,6 +198,35 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
     });
   }, []);
 
+  const handleNodeEvaluationUpdated = useCallback((updatedNode: SupervisorNode, fullEvalPayload: any) => {
+    setNodes(prevNodes => {
+      const nextNodes = prevNodes.map(n => {
+        if (n.id !== updatedNode.id) return n;
+
+        const evalObj = fullEvalPayload?.evaluation || fullEvalPayload;
+        const newScore = evalObj?.score ?? n.healthScore;
+        const newSummary = evalObj?.summary ?? n.summary;
+        let newStatus = n.status;
+        if (typeof newScore === 'number') {
+          if (newScore < 50) newStatus = 'CRITICAL';
+          else if (newScore < 75) newStatus = 'WARNING';
+          else newStatus = 'HEALTHY';
+        }
+
+        return {
+          ...n,
+          healthScore: newScore,
+          summary: newSummary,
+          status: newStatus,
+          evaluation: fullEvalPayload?.evaluation_data || fullEvalPayload,
+          lastEvaluatedAt: fullEvalPayload?.evaluated_at || fullEvalPayload?.created_at || new Date().toISOString(),
+        };
+      });
+      setFleetSummary(calculateSummary(nextNodes));
+      return nextNodes;
+    });
+  }, []);
+
   const handleSaveCompanyContext = (updated: any) => {
     setCompanyContext(updated);
   };
@@ -353,7 +382,9 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
       {selectedNode && (
         <NodeDiagnosticDrawer
           node={selectedNode}
+          supervisorId={agentId}
           onClose={handleClearSelection}
+          onEvaluationComplete={handleNodeEvaluationUpdated}
         />
       )}
 

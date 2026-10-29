@@ -108,6 +108,34 @@ export const SupervisorGraphCanvas: React.FC<SupervisorGraphCanvasProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeIdKey, linkIdKey]);
 
+  // Keep mutable ForceGraph2D node/link objects synchronized with the latest
+  // scores, statuses, and summaries from React state WITHOUT resetting their
+  // live D3 physics coordinates (x, y, vx, vy).
+  useEffect(() => {
+    graphData.nodes.forEach((gn: any) => {
+      const latest = nodes.find(n => n.id === gn.id);
+      if (latest) {
+        gn.healthScore = latest.healthScore;
+        gn.status = latest.status;
+        gn.summary = latest.summary;
+        gn.name = latest.name;
+        gn.evaluation = latest.evaluation;
+        gn.lastEvaluatedAt = latest.lastEvaluatedAt;
+      }
+    });
+
+    graphData.links.forEach((gl: any) => {
+      const latest = links.find(l => l.id === gl.id);
+      if (latest) {
+        gl.alignmentScore = latest.alignmentScore;
+        gl.status = latest.status;
+        gl.summary = latest.summary;
+        gl.evaluation = latest.evaluation;
+        gl.lastEvaluatedAt = latest.lastEvaluatedAt;
+      }
+    });
+  }, [nodes, links, graphData]);
+
   // Status colors helper
   const getStatusColor = useCallback((status: string) => {
     switch (status) {

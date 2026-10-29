@@ -21,6 +21,40 @@ export interface ParameterRecommendation {
   applied?: boolean;
 }
 
+export interface ProspectPitchAlignment {
+  score: number;
+  strengths: string[];
+  weaknesses: string[];
+}
+
+export interface ProspectCopywritingAnalysis {
+  subject_lines_quality: string;
+  personalization?: string;
+  cta_clarity: string;
+  average_length_assessment: string;
+}
+
+export interface ProspectPotentialPyramid {
+  eleve_count?: number;
+  moyen_count?: number;
+  faible_count?: number;
+  eleve_ratio: number;
+  moyen_ratio: number;
+  faible_ratio: number;
+  analysis: string;
+}
+
+export interface ProspectDeliveryHealth {
+  total_count: number;
+  sent_count: number;
+  failure_count: number;
+  draft_count: number;
+  auto_count?: number;
+  manual_count?: number;
+  failure_rate: number;
+  analysis?: string;
+}
+
 export interface SupervisorNode {
   id: string;
   name: string;
@@ -48,6 +82,8 @@ export interface SupervisorNode {
   findings: DiagnosticFinding[];
   recommendations: ParameterRecommendation[];
   missionUpdatedAt?: string | null;
+  evaluation?: any;
+  lastEvaluatedAt?: string | null;
   // Force graph coordinates
   x?: number;
   y?: number;

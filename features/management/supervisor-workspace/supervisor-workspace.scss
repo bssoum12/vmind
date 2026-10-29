@@ -2244,6 +2244,21 @@
             letter-spacing: 0.04em;
             text-transform: uppercase;
           }
+
+          .cached-badge {
+            display: inline-flex;
+            align-items: center;
+            margin-top: 6px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            color: #60A5FA;
+            background: rgba(96, 165, 250, 0.12);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+          }
         }
 
         .hero-status-block {
@@ -2367,6 +2382,13 @@
         background: rgba(0, 229, 200, 0.05);
         border: 1px solid rgba(0, 229, 200, 0.2);
         border-radius: 11px;
+
+        &.info-only {
+          justify-content: flex-start;
+          .notice-content {
+            width: 100%;
+          }
+        }
 
         .notice-content {
           display: flex;
@@ -2889,6 +2911,287 @@
       }
     }
   }
+
+  /* Apple Confirmation Modal Dialog */
+  .apple-dialog-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 90;
+    background: rgba(4, 11, 22, 0.78);
+    backdrop-filter: blur(14px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    animation: fadeIn 0.16s ease-out;
+
+    .apple-dialog-card {
+      width: 100%;
+      max-width: 440px;
+      background: linear-gradient(150deg, rgba(14, 30, 56, 0.98), rgba(6, 17, 31, 0.99));
+      border: 1px solid rgba(0, 229, 200, 0.25);
+      border-radius: 20px;
+      padding: 24px 26px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(0, 229, 200, 0.08);
+      animation: scaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+
+      .dialog-header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+
+        .dialog-icon-wrap {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          background: rgba(0, 229, 200, 0.1);
+          border: 1px solid rgba(0, 229, 200, 0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #00E5C8;
+          flex-shrink: 0;
+        }
+
+        .dialog-header-text {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          min-width: 0;
+
+          .dialog-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #F5F5F7;
+            margin: 0;
+            letter-spacing: -0.01em;
+          }
+
+          .dialog-subtitle {
+            font-size: 12px;
+            font-weight: 500;
+            color: #94A3B8;
+          }
+        }
+      }
+
+      .dialog-desc {
+        font-size: 13.5px;
+        line-height: 1.6;
+        color: #CBD5E1;
+        margin: 0;
+      }
+
+      .dialog-actions-row {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 4px;
+
+        .dialog-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          padding: 10px 16px;
+          border-radius: 10px;
+          font-size: 13px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.16s ease;
+          white-space: nowrap;
+
+          &.secondary {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #F5F5F7;
+
+            &:hover {
+              background: rgba(255, 255, 255, 0.1);
+              border-color: rgba(255, 255, 255, 0.2);
+            }
+
+            &:active {
+              transform: scale(0.98);
+            }
+          }
+
+          &.primary {
+            background: #00E5C8;
+            border: 1px solid #00E5C8;
+            color: #06111F;
+
+            &:hover {
+              background: #00FFDD;
+              border-color: #00FFDD;
+            }
+
+            &:active {
+              transform: scale(0.98);
+            }
+
+            &:disabled {
+              opacity: 0.6;
+              cursor: wait;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /* ── Prospect Node Diagnostic Widgets ────────────────────────────────── */
+  .pitch-score-pill {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+
+    &.healthy {
+      background: rgba(0, 229, 200, 0.14);
+      border: 1px solid rgba(0, 229, 200, 0.35);
+      color: #00E5C8;
+    }
+
+    &.warning {
+      background: rgba(245, 158, 11, 0.14);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #FBBF24;
+    }
+
+    &.critical {
+      background: rgba(255, 71, 87, 0.14);
+      border: 1px solid rgba(255, 71, 87, 0.35);
+      color: #FF4757;
+    }
+  }
+
+  .prospect-pitch-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+
+    .pitch-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+
+      .pitch-block-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      &.strengths .pitch-block-label {
+        color: #00E5C8;
+      }
+
+      &.weaknesses .pitch-block-label {
+        color: #FBBF24;
+      }
+
+      .pitch-list {
+        margin: 0;
+        padding-left: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #E2E8F0;
+
+        li::marker {
+          color: #64748B;
+        }
+      }
+    }
+  }
+
+  .pyramid-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+
+    .pyramid-bar-track {
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.06);
+      overflow: hidden;
+      display: flex;
+      gap: 2px;
+
+      .pyramid-segment {
+        height: 100%;
+        transition: width 0.35s ease;
+
+        &.high {
+          background: linear-gradient(90deg, #00E5C8, #00B8D9);
+        }
+
+        &.medium {
+          background: linear-gradient(90deg, #6366F1, #8B5CF6);
+        }
+
+        &.low {
+          background: #475569;
+        }
+      }
+    }
+
+    .pyramid-legend {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 12px;
+      color: #CBD5E1;
+
+      .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 500;
+
+        .dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+        }
+
+        &.high .dot { background: #00E5C8; }
+        &.medium .dot { background: #8B5CF6; }
+        &.low .dot { background: #64748B; }
+      }
+    }
+
+    .pyramid-analysis-text {
+      margin: 2px 0 0;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      font-size: 13px;
+      line-height: 1.55;
+      color: #CBD5E1;
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleUp {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @keyframes spin {
