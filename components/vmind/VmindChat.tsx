@@ -32,7 +32,8 @@ const CONSOLIDATED_TOOL_DISPLAY_NAMES: Record<string, string> = {
   get_recouvrement_clients: 'Recouvrement & Encaissements Clients',
   get_factures_vente: 'Facturation Vente',
   get_invoice_pdf: 'Téléchargement Facture PDF',
-  get_achats_fournisseurs: 'Achats & Factures Fournisseurs',
+  get_factures_achats: 'Factures d\'Achat',
+  get_balance_fournisseur: 'Balance Fournisseurs',
   get_commandes_achat: 'Commandes d\'Achat',
   get_kpi_dashboard: 'Tableau de Bord KPI',
 };
@@ -606,7 +607,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
         const controller = new AbortController();
         abortControllersRef.current[targetConvId] = controller;
-        let response = await sendVmindMessage(professionalMessage, targetConvId, effectiveAgentId, activeConnection?.client_id || clientId, controller.signal, activeConnection?.id, skillsToSend);
+        let response = await sendVmindMessage(professionalMessage, targetConvId, effectiveAgentId, activeConnection?.client_id || clientId, controller.signal, activeConnection?.id, skillsToSend, 'suggestion');
         delete abortControllersRef.current[targetConvId];
 
         if (activeConversationIdRef.current !== targetConvId) return;

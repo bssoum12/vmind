@@ -21,7 +21,7 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
 
   const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const agentData = kpisByAgent["vbuy"] || kpisByAgent["VBUY"] || {};
-  const n8nToolData = agentData.get_kpi_dashboard || agentData.get_achats_fournisseurs || agentData.factures_a_regler;
+  const n8nToolData = agentData.get_kpi_dashboard || agentData.get_factures_achats || agentData.get_achats_fournisseurs || agentData.factures_a_regler;
 
   const [horizon, setHorizon] = useState<'1d' | '1w' | '1m' | '3m' | '6m'>('1m');
   const [isCardHovered, setIsCardHovered] = useState<boolean>(false);
@@ -35,7 +35,7 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
   const handleHorizonSelect = (newHorizon: '1d' | '1w' | '1m' | '3m' | '6m') => {
     if (newHorizon === horizon) return;
     setHorizon(newHorizon);
-    fetchKpis('vbuy', true, 'get_achats_fournisseurs', newHorizon);
+    fetchKpis('vbuy', true, 'get_factures_achats',newHorizon);
   };
 
   const handleMouseEnterCard = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -167,7 +167,7 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ color: "#FF4757", fontSize: "9px", fontWeight: 800, letterSpacing: '0.5px' }}>VBUY</span>
           <button
-            onClick={() => fetchKpis('vbuy', true, 'get_achats_fournisseurs', horizon)}
+            onClick={() => fetchKpis('vbuy', true, 'get_factures_achats',horizon)}
             disabled={effectiveLoading}
             style={{
               background: 'rgba(255, 255, 255, 0.04)',
