@@ -4,9 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, GitFork, ArrowRight, CheckCircle2, XCircle, Sliders, AlertOctagon, 
   Sparkles, Loader2, AlertTriangle, ShieldCheck, Zap,
-  Building2, MapPin, Briefcase, Users, Check, RefreshCw, BarChart2, Clock
+  Building2, MapPin, Briefcase, Users, Check, RefreshCw, BarChart2, Clock, Layers
 } from 'lucide-react';
-import { SupervisorLink } from '../types/supervisor.types';
+import { SupervisorLink, ProspectPotentialPyramid } from '../types/supervisor.types';
 import { useToast } from '@/shared/contexts/ToastContext';
 
 interface EdgeDiagnosticDrawerProps {
@@ -81,6 +81,9 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
 
         setEvalResult(data);
         setLastEvaluatedAt(data.evaluated_at || null);
+        if (onEvaluationComplete && typeof data.evaluation?.sync_score === 'number' && data.evaluation.sync_score !== link.alignmentScore) {
+          onEvaluationComplete(link, data);
+        }
         if (data.stale) {
           setCachedNotice('La mission source, les leads transférés ou le contexte entreprise ont changé depuis cette évaluation. Les résultats ci-dessous peuvent être dépassés.');
         } else {
@@ -172,6 +175,9 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
   const displayScore = evalResult?.evaluation?.sync_score ?? link.alignmentScore;
   const displaySummary = evalResult?.evaluation?.summary ?? link.summary;
   const rejectionsAnalysis = evalResult?.evaluation?.rejections_analysis;
+  const qualificationCalibration: string | undefined = evalResult?.evaluation?.qualification_calibration;
+  const potentialPyramid: ProspectPotentialPyramid | null = evalResult?.evaluation?.potential_pyramid || null;
+  const avgQualificationScore: number | undefined = evalResult?.metrics?.avg_score;
   const aiCriteriaMatrix = evalResult?.evaluation?.criteria_matrix;
   const aiRecommendations = evalResult?.evaluation?.recommendations;
   const evaluatedAt = lastEvaluatedAt || evalResult?.evaluated_at || link.lastEvaluatedAt;
@@ -326,6 +332,12 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
                   <span className="metric-val muted">{link.throughput.leadsRejected}</span>
                   <span className="metric-lbl">Écartés</span>
                 </div>
+                {avgQualificationScore !== undefined && avgQualificationScore > 0 && (
+                  <div className="apple-metric-cell">
+                    <span className="metric-val">{avgQualificationScore}/100</span>
+                    <span className="metric-lbl">Score Moyen IA</span>
+                  </div>
+                )}
               </div>
 
               {link.throughput.leadsTransferred > 0 && (
@@ -334,6 +346,68 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
                     className="progress-fill"
                     style={{ width: `${Math.min(100, Math.max(0, link.throughput.conversionRate))}%` }}
                   />
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* 2b. Potential Pyramid & Qualification Calibration */}
+          {(potentialPyramid || qualificationCalibration) && (
+            <section className="apple-section prospect-pyramid-section">
+              <div className="apple-section-header">
+                <div className="section-title-wrap">
+                  <Layers size={14} className="section-icon" />
+                  <h4 className="apple-section-title">Pyramide de Potentiel &amp; Calibrage ICP</h4>
+                </div>
+              </div>
+
+              {potentialPyramid && (potentialPyramid.eleve_ratio + potentialPyramid.moyen_ratio + potentialPyramid.faible_ratio > 0) && (
+                <div className="apple-card pyramid-card">
+                  <div className="pyramid-bar-track">
+                    {potentialPyramid.eleve_ratio > 0 && (
+                      <div
+                        className="pyramid-segment high"
+                        style={{ width: `${potentialPyramid.eleve_ratio}%` }}
+                        title={`Potentiel Élevé : ${potentialPyramid.eleve_ratio}%`}
+                      />
+                    )}
+                    {potentialPyramid.moyen_ratio > 0 && (
+                      <div
+                        className="pyramid-segment medium"
+                        style={{ width: `${potentialPyramid.moyen_ratio}%` }}
+                        title={`Potentiel Moyen : ${potentialPyramid.moyen_ratio}%`}
+                      />
+                    )}
+                    {potentialPyramid.faible_ratio > 0 && (
+                      <div
+                        className="pyramid-segment low"
+                        style={{ width: `${potentialPyramid.faible_ratio}%` }}
+                        title={`Potentiel Faible : ${potentialPyramid.faible_ratio}%`}
+                      />
+                    )}
+                  </div>
+
+                  <div className="pyramid-legend">
+                    <span className="legend-item high">
+                      <span className="dot" /> Élevé ({potentialPyramid.eleve_ratio}%)
+                    </span>
+                    <span className="legend-item medium">
+                      <span className="dot" /> Moyen ({potentialPyramid.moyen_ratio}%)
+                    </span>
+                    <span className="legend-item low">
+                      <span className="dot" /> Faible ({potentialPyramid.faible_ratio}%)
+                    </span>
+                  </div>
+
+                  {potentialPyramid.analysis && (
+                    <p className="pyramid-analysis-text">{potentialPyramid.analysis}</p>
+                  )}
+                </div>
+              )}
+
+              {qualificationCalibration && (
+                <div className="apple-card readable-text" style={{ marginTop: potentialPyramid ? '10px' : 0 }}>
+                  <p>{qualificationCalibration}</p>
                 </div>
               )}
             </section>

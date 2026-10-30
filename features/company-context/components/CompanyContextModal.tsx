@@ -6,7 +6,8 @@ import {
   Globe,
   ArrowRight,
   ArrowLeft,
-  Check
+  Check,
+  PenLine
 } from 'lucide-react';
 import { CompanyContext, CompanyContextModalProps } from '../types/company-context.types';
 import { saveCompanyContext, researchCompanyWebsite } from '../api/companyContextApi';
@@ -17,7 +18,9 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
   isOpen = true,
   context,
   onClose,
-  onSaveContext
+  onSaveContext,
+  inline = false,
+  onBack,
 }) => {
   const { showToast } = useToast();
 
@@ -71,14 +74,10 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
 
   const isStep2Valid = useMemo(() => {
     if (hasWebsite) {
-      return (
-        aiSummary.trim().length > 0 ||
-        additionalInfo.trim().length > 0 ||
-        websiteUrl.trim().length > 0
-      );
+      return aiSummary.trim().length >= 20;
     }
     return manualCharCount >= 200;
-  }, [hasWebsite, aiSummary, additionalInfo, websiteUrl, manualCharCount]);
+  }, [hasWebsite, aiSummary, manualCharCount]);
 
   // Action: Launch AI Web Research
   const handleAnalyzeWebsite = async () => {
@@ -145,11 +144,13 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
       }
 
       setIsSaved(true);
-      showToast('Contexte enregistré', 'ok');
+      showToast('Contexte d\'entreprise enregistré avec succès', 'ok');
 
-      setTimeout(() => {
-        onClose();
-      }, 400);
+      if (!inline) {
+        setTimeout(() => {
+          onClose();
+        }, 400);
+      }
     } catch (err: any) {
       console.error('[CompanyContextModal] Save error:', err);
       showToast(err.message || 'Erreur lors de la sauvegarde du contexte', 'err');
@@ -160,10 +161,10 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="company-context-modal-backdrop" onClick={onClose}>
-      <div className="company-context-modal-box" onClick={e => e.stopPropagation()}>
-        {/* Header */}
+  const content = (
+    <div className={`company-context-modal-box ${inline ? 'cc-inline-box' : ''}`} onClick={e => e.stopPropagation()}>
+      {/* Header — displayed only when opened as a popup modal */}
+      {!inline && (
         <div className="cc-header">
           <div className="cc-header-left">
             <h2 className="cc-title">Contexte Entreprise</h2>
@@ -172,134 +173,153 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
             <X size={15} />
           </button>
         </div>
+      )}
 
-        {/* Minimal Stepper */}
+      {/* Stepper — displayed only when opened as a popup modal */}
+      {!inline && (
         <div className="cc-stepper-minimal">
           <div className={`cc-pill-step ${step === 1 ? 'active' : 'completed'}`} />
           <div className={`cc-pill-step ${step === 2 ? 'active' : ''}`} />
         </div>
+      )}
 
-        {/* Body */}
-        <div className="cc-body">
-          {step === 1 ? (
-            /* STEP 1: Website Input */
-            <div className="cc-pane">
-              <div className="cc-hero">
-                <h3 className="cc-hero-title">Avez-vous un site web ?</h3>
-                <p className="cc-hero-desc">
-                  Renseignez votre adresse pour générer automatiquement la synthèse de votre offre et de vos cibles.
-                </p>
+      {/* Body */}
+      <div className="cc-body">
+        {step === 1 ? (
+          /* STEP 1: Website Input */
+          <div className="cc-pane">
+            <div className="cc-hero">
+              <h3 className="cc-hero-title">Avez-vous un site web ?</h3>
+              <p className="cc-hero-desc">
+                Renseignez votre adresse pour générer automatiquement la synthèse de votre offre et orienter vos agents.
+              </p>
+            </div>
+
+            {!isResearching ? (
+              <div className="cc-field">
+                <div className="cc-field-top">
+                  <label>Site web de l&apos;entreprise</label>
+                </div>
+                <div className="cc-input-wrap">
+                  <Globe size={15} className="cc-input-icon" />
+                  <input
+                    type="url"
+                    value={websiteUrl}
+                    onChange={e => setWebsiteUrl(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAnalyzeWebsite();
+                      }
+                    }}
+                    placeholder="https://votre-entreprise.com"
+                    autoFocus
+                  />
+                </div>
               </div>
+            ) : (
+              /* Minimal Loader */
+              <div className="cc-loader-minimal">
+                <div className="cc-spinner-ring" />
+                <p className="cc-loader-label">Analyse en cours par l&apos;IA...</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          /* STEP 2: Synthesis & Information */
+          <div className="cc-pane">
+            {hasWebsite ? (
+              /* Path A: Website Analyzed */
+              <>
+                <div className="cc-hero">
+                  <h3 className="cc-hero-title">Synthèse de votre activité</h3>
+                  <p className="cc-hero-desc">
+                    Vérifiez ou complétez ces informations pour orienter les agents sous supervision.
+                  </p>
+                </div>
 
-              {!isResearching ? (
                 <div className="cc-field">
                   <div className="cc-field-top">
-                    <label>Site web</label>
+                    <label>Présentation & Offre</label>
                   </div>
-                  <div className="cc-input-wrap">
-                    <Globe size={15} className="cc-input-icon" />
-                    <input
-                      type="url"
-                      value={websiteUrl}
-                      onChange={e => setWebsiteUrl(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAnalyzeWebsite();
-                        }
-                      }}
-                      placeholder="https://votre-entreprise.com"
-                      autoFocus
-                    />
-                  </div>
+                  <textarea
+                    rows={10}
+                    value={aiSummary}
+                    onChange={e => setAiSummary(e.target.value)}
+                    placeholder="Offre, solutions clés, cibles et positionnement..."
+                    style={{ minHeight: '220px' }}
+                  />
                 </div>
-              ) : (
-                /* Minimal Loader */
-                <div className="cc-loader-minimal">
-                  <div className="cc-spinner-ring" />
-                  <p className="cc-loader-label">Analyse en cours...</p>
+
+                <div className="cc-field">
+                  <div className="cc-field-top">
+                    <label>Informations complémentaires (optionnel)</label>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={additionalInfo}
+                    onChange={e => setAdditionalInfo(e.target.value)}
+                    placeholder="Cibles prioritaires, contraintes ou précisions..."
+                    style={{ minHeight: '90px' }}
+                  />
                 </div>
-              )}
-            </div>
-          ) : (
-            /* STEP 2: Synthesis & Information */
-            <div className="cc-pane">
-              {hasWebsite ? (
-                /* Path A: Website Analyzed */
-                <>
-                  <div className="cc-hero">
-                    <h3 className="cc-hero-title">Synthèse de votre activité</h3>
-                    <p className="cc-hero-desc">
-                      Vérifiez ou complétez ces informations pour orienter vos agents.
-                    </p>
-                  </div>
+              </>
+            ) : (
+              /* Path B: Manual Entry (200 chars minimum) */
+              <>
+                <div className="cc-hero">
+                  <h3 className="cc-hero-title">Présentation de l&apos;entreprise</h3>
+                  <p className="cc-hero-desc">
+                    Décrivez vos solutions, vos clients cibles et vos points forts.
+                  </p>
+                </div>
 
-                  <div className="cc-field">
-                    <div className="cc-field-top">
-                      <label>Présentation & Offre</label>
-                    </div>
-                    <textarea
-                      rows={6}
-                      value={aiSummary}
-                      onChange={e => setAiSummary(e.target.value)}
-                      placeholder="Offre, solutions clés, cibles et positionnement..."
-                    />
+                <div className="cc-field">
+                  <div className="cc-field-top">
+                    <label>Description de l&apos;activité</label>
+                    <span className={`cc-counter ${manualCharCount >= 200 ? 'valid' : 'pending'}`}>
+                      {manualCharCount} / 200 caractères {manualCharCount >= 200 ? '✓' : ''}
+                    </span>
                   </div>
+                  <textarea
+                    rows={9}
+                    value={manualDescription}
+                    onChange={e => setManualDescription(e.target.value)}
+                    placeholder="Décrivez votre activité, ce que vous vendez, vos clients types et vos points forts..."
+                    autoFocus
+                    style={{ minHeight: '200px' }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
-                  <div className="cc-field">
-                    <div className="cc-field-top">
-                      <label>Informations complémentaires (optionnel)</label>
-                    </div>
-                    <textarea
-                      rows={3}
-                      value={additionalInfo}
-                      onChange={e => setAdditionalInfo(e.target.value)}
-                      placeholder="Cibles prioritaires, contraintes ou précisions..."
-                    />
-                  </div>
-                </>
-              ) : (
-                /* Path B: Manual Entry (200 chars minimum) */
-                <>
-                  <div className="cc-hero">
-                    <h3 className="cc-hero-title">Présentation de l'entreprise</h3>
-                    <p className="cc-hero-desc">
-                      Décrivez vos solutions, vos clients cibles et vos points forts.
-                    </p>
-                  </div>
-
-                  <div className="cc-field">
-                    <div className="cc-field-top">
-                      <label>Description de l'activité</label>
-                      <span className={`cc-counter ${manualCharCount >= 200 ? 'valid' : 'pending'}`}>
-                        {manualCharCount} / 200 caractères {manualCharCount >= 200 ? '✓' : ''}
-                      </span>
-                    </div>
-                    <textarea
-                      rows={7}
-                      value={manualDescription}
-                      onChange={e => setManualDescription(e.target.value)}
-                      placeholder="Décrivez votre activité, ce que vous vendez, vos clients types et vos points forts..."
-                      autoFocus
-                    />
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="cc-footer">
-          {step === 1 ? (
-            <>
+      {/* Footer */}
+      <div className="cc-footer">
+        {step === 1 ? (
+          <>
+            {inline && onBack ? (
               <button
                 type="button"
-                className="cc-btn cc-btn-ghost"
+                className="cc-btn cc-btn-secondary"
+                onClick={onBack}
+                disabled={isResearching}
+              >
+                <ArrowLeft size={13} />
+                <span>Retour aux paramètres</span>
+              </button>
+            ) : <div />}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                type="button"
+                className="cc-btn cc-btn-secondary"
                 onClick={handleSkipWebsite}
                 disabled={isResearching}
               >
-                Passer cette étape
+                <PenLine size={13} />
+                <span>Saisie manuelle sans site web</span>
               </button>
               <button
                 type="button"
@@ -316,39 +336,52 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
                   </>
                 )}
               </button>
-            </>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="cc-btn cc-btn-secondary"
-                onClick={() => setStep(1)}
-                disabled={isSaving}
-              >
-                <ArrowLeft size={13} />
-                <span>Retour</span>
-              </button>
-              <button
-                type="button"
-                className="cc-btn cc-btn-primary"
-                onClick={handleFinalSave}
-                disabled={!isStep2Valid || isSaving}
-              >
-                {isSaving ? (
-                  'Enregistrement...'
-                ) : isSaved ? (
-                  <>
-                    <Check size={13} />
-                    <span>Enregistré</span>
-                  </>
-                ) : (
-                  'Confirmer et Enregistrer'
-                )}
-              </button>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="cc-btn cc-btn-secondary"
+              onClick={() => setStep(1)}
+              disabled={isSaving}
+            >
+              <ArrowLeft size={13} />
+              <span>Changer d&apos;adresse</span>
+            </button>
+            <button
+              type="button"
+              className="cc-btn cc-btn-primary"
+              onClick={handleFinalSave}
+              disabled={!isStep2Valid || isSaving}
+            >
+              {isSaving ? (
+                'Enregistrement...'
+              ) : isSaved ? (
+                <>
+                  <Check size={13} />
+                  <span>Enregistré</span>
+                </>
+              ) : (
+                <>
+                  <span>{inline ? 'Enregistrer et Continuer' : 'Confirmer et Enregistrer'}</span>
+                  <ArrowRight size={13} />
+                </>
+              )}
+            </button>
+          </>
+        )}
       </div>
+    </div>
+  );
+
+  if (inline) {
+    return content;
+  }
+
+  return (
+    <div className="company-context-modal-backdrop" onClick={onClose}>
+      {content}
     </div>
   );
 };

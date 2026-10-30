@@ -28,8 +28,30 @@
 }
 
 .company-context-modal-box {
+  &.cc-inline-box {
+    max-width: 100%;
+    max-height: none;
+    animation: none;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 0;
+
+    .cc-body {
+      padding: 0 0 16px;
+    }
+
+    .cc-footer {
+      padding: 16px 0 0;
+      background: transparent;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  }
+
   width: 100%;
-  max-width: 580px;
+  max-width: 620px;
   max-height: 88vh;
   display: flex;
   flex-direction: column;
@@ -41,7 +63,7 @@
     inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
     0 24px 60px rgba(0, 0, 0, 0.6),
     0 4px 16px rgba(0, 0, 0, 0.3);
-  border-radius: 18px;
+  border-radius: 16px;
   overflow: hidden;
   animation: ccSpringScale 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -61,7 +83,7 @@
 // Header
 // -----------------------------------------------------------------------------
 .cc-header {
-  padding: 18px 24px 14px;
+  padding: 16px 20px 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   align-items: center;
@@ -70,7 +92,7 @@
   .cc-header-left {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 
     .cc-title {
       margin: 0;
@@ -110,7 +132,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 24px;
+  padding: 10px 20px;
   background: rgba(0, 0, 0, 0.15);
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 
@@ -136,7 +158,7 @@
 // Body
 // -----------------------------------------------------------------------------
 .cc-body {
-  padding: 24px;
+  padding: 20px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -164,22 +186,22 @@
 
     .cc-hero-title {
       margin: 0;
-      font-size: 17px;
-      font-weight: 600;
-      color: #f8fafc;
-      letter-spacing: -0.015em;
+      font-size: 18px;
+      font-weight: 650;
+      color: #ffffff;
+      letter-spacing: -0.01em;
     }
 
     .cc-hero-desc {
       margin: 0;
-      font-size: 13px;
+      font-size: 13.5px;
       color: #94a3b8;
       line-height: 1.45;
     }
   }
 }
 
-// Minimalist Form Fields
+// Form Fields
 .cc-field {
   display: flex;
   flex-direction: column;
@@ -191,16 +213,16 @@
     justify-content: space-between;
 
     label {
-      font-size: 12px;
-      font-weight: 500;
-      color: #cbd5e1;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #e2e8f0;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
     }
 
     .cc-counter {
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 500;
       letter-spacing: -0.01em;
       transition: all 0.18s ease-out;
@@ -231,24 +253,25 @@
 
     input {
       width: 100%;
-      padding: 12px 14px 12px 42px;
-      background: rgba(6, 14, 28, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      color: #f1f5f9;
-      font-size: 14px;
+      padding: 11px 14px 11px 40px;
+      background: rgba(6, 14, 28, 0.78);
+      border: 1.5px solid rgba(255, 255, 255, 0.1);
+      border-radius: 9px;
+      color: #f8fafc;
+      font-size: 13.5px;
       outline: none;
       caret-color: #00e5c8;
       transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 
       &::placeholder {
-        color: #475569;
+        color: #64748b;
+        font-size: 13px;
       }
 
       &:focus {
         border-color: rgba(0, 229, 200, 0.5);
         box-shadow: 0 0 0 3px rgba(0, 229, 200, 0.15);
-        background: rgba(7, 18, 36, 0.9);
+        background: rgba(7, 18, 36, 0.95);
 
         + .cc-input-icon,
         ~ .cc-input-icon {
@@ -261,12 +284,12 @@
   textarea {
     width: 100%;
     padding: 13px 15px;
-    background: rgba(6, 14, 28, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    color: #f1f5f9;
-    font-size: 13px;
-    line-height: 1.55;
+    background: rgba(6, 14, 28, 0.78);
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    border-radius: 9px;
+    color: #f8fafc;
+    font-size: 14px;
+    line-height: 1.58;
     font-family: inherit;
     outline: none;
     resize: vertical;
@@ -274,27 +297,28 @@
     transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 
     &::placeholder {
-      color: #475569;
+      color: #64748b;
+      font-size: 13px;
     }
 
     &:focus {
       border-color: rgba(0, 229, 200, 0.5);
       box-shadow: 0 0 0 3px rgba(0, 229, 200, 0.15);
-      background: rgba(7, 18, 36, 0.9);
+      background: rgba(7, 18, 36, 0.95);
     }
   }
 }
 
-// Minimalist AI Research Spinner
+// AI Research Spinner
 .cc-loader-minimal {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 38px 20px;
+  padding: 34px 20px;
   background: rgba(0, 229, 200, 0.02);
   border: 1px solid rgba(0, 229, 200, 0.15);
-  border-radius: 14px;
+  border-radius: 10px;
   gap: 12px;
 
   .cc-spinner-ring {
@@ -324,13 +348,13 @@
 // Footer & Action Buttons
 // -----------------------------------------------------------------------------
 .cc-footer {
-  padding: 14px 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 13px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(0, 0, 0, 0.18);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 
   .cc-btn {
     display: inline-flex;
@@ -338,9 +362,9 @@
     justify-content: center;
     gap: 7px;
     padding: 9px 18px;
-    border-radius: 10px;
+    border-radius: 8px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     border: none;
     outline: none;
@@ -357,22 +381,25 @@
     }
 
     &.cc-btn-ghost {
-      background: transparent;
-      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
 
       &:hover:not(:disabled) {
-        color: #f1f5f9;
-        background: rgba(255, 255, 255, 0.05);
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.09);
+        border-color: rgba(255, 255, 255, 0.2);
       }
     }
 
     &.cc-btn-secondary {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      color: #cbd5e1;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
 
       &:hover:not(:disabled) {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.09);
+        border-color: rgba(255, 255, 255, 0.2);
         color: #ffffff;
       }
     }
@@ -380,12 +407,12 @@
     &.cc-btn-primary {
       background: #00e5c8;
       color: #030914;
-      font-weight: 600;
+      font-weight: 700;
       box-shadow: 0 2px 10px rgba(0, 229, 200, 0.25);
 
       &:hover:not(:disabled) {
         background: #0df5d6;
-        box-shadow: 0 4px 16px rgba(0, 229, 200, 0.4);
+        box-shadow: 0 4px 16px rgba(0, 229, 200, 0.35);
       }
     }
   }

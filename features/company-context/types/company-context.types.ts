@@ -43,4 +43,6 @@ export interface CompanyContextModalProps {
   context?: CompanyContext | any;
   onClose: () => void;
   onSaveContext?: (updatedContext: any) => void | Promise<void>;
+  inline?: boolean;
+  onBack?: () => void;
 }

@@ -1,15 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   X, Activity, AlertTriangle, ArrowRight, Zap, Clock, BarChart2,
-  Loader2, ShieldCheck, RefreshCw, Sparkles, Mail, Target, CheckCircle2, Layers
+  Loader2, ShieldCheck, RefreshCw, Sparkles, Mail, Target, CheckCircle2,
+  ExternalLink
 } from 'lucide-react';
 import {
   SupervisorNode,
   ProspectPitchAlignment,
   ProspectCopywritingAnalysis,
-  ProspectPotentialPyramid,
   ProspectDeliveryHealth
 } from '../types/supervisor.types';
 import { useToast } from '@/shared/contexts/ToastContext';
@@ -27,6 +28,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
   onClose,
   onEvaluationComplete,
 }) => {
+  const router = useRouter();
   const { showToast } = useToast();
   const isSourcing = node.type === 'sourcing';
 
@@ -90,7 +92,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
           setCachedNotice(
             isSourcing
               ? 'La mission, les leads ou le contexte entreprise ont changé depuis cette évaluation. Les résultats ci-dessous peuvent être dépassés.'
-              : 'De nouveaux emails, qualifications ou changements de réglages ont été détectés depuis cette évaluation.'
+              : 'De nouveaux emails ou des changements de mission / contexte entreprise ont été détectés depuis cette évaluation.'
           );
         } else {
           setCachedNotice(null);
@@ -190,12 +192,9 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
     ? evalResult.evaluation.lead_quality_issues
     : [];
   const aiRecommendation: string | undefined = evalResult?.evaluation?.recommendations?.ajustement_sourcing;
-  const aiProspectAdjustment: string | undefined = evalResult?.evaluation?.recommendations?.ajustement_prospection;
   const aiCopywritingAdvice: string | undefined = evalResult?.evaluation?.recommendations?.conseil_copywriting;
   const pitchAlignment: ProspectPitchAlignment | null = evalResult?.evaluation?.pitch_alignment || null;
   const copywritingAnalysis: ProspectCopywritingAnalysis | null = evalResult?.evaluation?.copywriting_analysis || null;
-  const qualificationCalibration: string | undefined = evalResult?.evaluation?.qualification_calibration;
-  const potentialPyramid: ProspectPotentialPyramid | null = evalResult?.evaluation?.potential_pyramid || null;
   const deliveryHealth: ProspectDeliveryHealth | null = evalResult?.evaluation?.delivery_health || null;
   const evalMetrics = evalResult?.metrics;
 
@@ -282,9 +281,28 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
                 <span>{getStatusLabel(statusKey)}</span>
               </span>
             </div>
-            <button className="apple-close-btn" onClick={onClose} title="Fermer" aria-label="Fermer">
-              <X size={15} />
-            </button>
+            <div className="header-actions">
+              <button
+                type="button"
+                className="apple-action-btn-header"
+                onClick={() => {
+                  const targetBase = isSourcing
+                    ? `/sourcing-agent-workspace/${node.id}`
+                    : `/prospect-agent-workspace/${node.id}`;
+                  const returnUrl = supervisorId
+                    ? `/supervisor-agent-workspace/${encodeURIComponent(supervisorId)}`
+                    : '/supervisor-agent-workspace';
+                  router.push(`${targetBase}?from=${encodeURIComponent(returnUrl)}`);
+                }}
+                title="Accéder à l'espace de travail de cet agent"
+              >
+                <span>Espace de travail</span>
+                <ExternalLink size={13} />
+              </button>
+              <button className="apple-close-btn" onClick={onClose} title="Fermer" aria-label="Fermer">
+                <X size={15} />
+              </button>
+            </div>
           </div>
 
           <h2 className="drawer-agent-title" title={node.name}>
@@ -313,7 +331,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
                 {node.missionUpdatedAt && (
                   <div className="hero-timestamp">
                     <Clock size={12} className="clock-icon" />
-                    <span>Périmètre : {isSourcing ? 'leads analysés' : 'leads et emails'} depuis le {new Date(node.missionUpdatedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                    <span>Périmètre : {isSourcing ? 'leads analysés' : 'emails analysés'} depuis le {new Date(node.missionUpdatedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
                 )}
                 {lastEvaluatedAt && (
@@ -500,70 +518,8 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
             </section>
           )}
 
-          {/* 1e. PROSPECT: Potential Distribution Pyramid & Qualification Calibration */}
-          {!isSourcing && (potentialPyramid || qualificationCalibration) && (
-            <section className="apple-section prospect-pyramid-section">
-              <div className="apple-section-header">
-                <div className="section-title-wrap">
-                  <Layers size={14} className="section-icon" />
-                  <h4 className="apple-section-title">Pyramide de Potentiel &amp; Qualification</h4>
-                </div>
-              </div>
-
-              {potentialPyramid && (
-                <div className="apple-card pyramid-card">
-                  <div className="pyramid-bar-track">
-                    {potentialPyramid.eleve_ratio > 0 && (
-                      <div
-                        className="pyramid-segment high"
-                        style={{ width: `${potentialPyramid.eleve_ratio}%` }}
-                        title={`Potentiel Élevé : ${potentialPyramid.eleve_ratio}%`}
-                      />
-                    )}
-                    {potentialPyramid.moyen_ratio > 0 && (
-                      <div
-                        className="pyramid-segment medium"
-                        style={{ width: `${potentialPyramid.moyen_ratio}%` }}
-                        title={`Potentiel Moyen : ${potentialPyramid.moyen_ratio}%`}
-                      />
-                    )}
-                    {potentialPyramid.faible_ratio > 0 && (
-                      <div
-                        className="pyramid-segment low"
-                        style={{ width: `${potentialPyramid.faible_ratio}%` }}
-                        title={`Potentiel Faible : ${potentialPyramid.faible_ratio}%`}
-                      />
-                    )}
-                  </div>
-
-                  <div className="pyramid-legend">
-                    <span className="legend-item high">
-                      <span className="dot" /> Élevé ({potentialPyramid.eleve_ratio}%)
-                    </span>
-                    <span className="legend-item medium">
-                      <span className="dot" /> Moyen ({potentialPyramid.moyen_ratio}%)
-                    </span>
-                    <span className="legend-item low">
-                      <span className="dot" /> Faible ({potentialPyramid.faible_ratio}%)
-                    </span>
-                  </div>
-
-                  {potentialPyramid.analysis && (
-                    <p className="pyramid-analysis-text">{potentialPyramid.analysis}</p>
-                  )}
-                </div>
-              )}
-
-              {qualificationCalibration && (
-                <div className="apple-card readable-text" style={{ marginTop: potentialPyramid ? '10px' : 0 }}>
-                  <p>{qualificationCalibration}</p>
-                </div>
-              )}
-            </section>
-          )}
-
           {/* 2. Diagnostic Summary (static fallback — hidden once AI sections are shown above) */}
-          {!missionFit && !pitchAlignment && !qualificationCalibration && node.summary && (
+          {!missionFit && !pitchAlignment && !copywritingAnalysis && node.summary && (
             <section className="apple-section summary-section">
               <div className="apple-section-header">
                 <div className="section-title-wrap">
@@ -592,37 +548,46 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
             </div>
 
             <div className="apple-metrics-grid">
-              <div className="apple-metric-cell highlight">
-                <span className="metric-val">{evalMetrics?.leads_total ?? node.metrics.totalLeads ?? 0}</span>
-                <span className="metric-lbl">{node.type === 'sourcing' ? 'Leads Extraits' : 'Leads Traités'}</span>
-              </div>
+              {isSourcing ? (
+                <>
+                  <div className="apple-metric-cell highlight">
+                    <span className="metric-val">{evalMetrics?.leads_total ?? node.metrics.totalLeads ?? 0}</span>
+                    <span className="metric-lbl">Leads Extraits</span>
+                  </div>
 
-              {evalMetrics?.leads_in_sample !== undefined && (
-                <div className="apple-metric-cell">
-                  <span className="metric-val">{evalMetrics.leads_in_sample}</span>
-                  <span className="metric-lbl">Échantillon Analysé</span>
-                </div>
-              )}
+                  {evalMetrics?.leads_in_sample !== undefined && (
+                    <div className="apple-metric-cell">
+                      <span className="metric-val">{evalMetrics.leads_in_sample}</span>
+                      <span className="metric-lbl">Échantillon Analysé</span>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="apple-metric-cell highlight">
+                    <span className="metric-val">{deliveryHealth?.total_count ?? evalMetrics?.activity_total ?? node.metrics.emailsSent ?? 0}</span>
+                    <span className="metric-lbl">Emails Rédigés</span>
+                  </div>
 
-              {node.metrics.qualificationRate !== undefined && (
-                <div className={`apple-metric-cell ${node.metrics.qualificationRate < 50 ? 'warning' : 'healthy'}`}>
-                  <span className="metric-val">{node.metrics.qualificationRate}%</span>
-                  <span className="metric-lbl">Taux de Qualification</span>
-                </div>
-              )}
+                  <div className="apple-metric-cell">
+                    <span className="metric-val">{deliveryHealth?.sent_count ?? node.metrics.emailsSent ?? 0}</span>
+                    <span className="metric-lbl">Emails Envoyés</span>
+                  </div>
 
-              {(deliveryHealth?.sent_count !== undefined || node.metrics.emailsSent !== undefined) && (
-                <div className="apple-metric-cell">
-                  <span className="metric-val">{deliveryHealth?.sent_count ?? node.metrics.emailsSent}</span>
-                  <span className="metric-lbl">Emails Envoyés</span>
-                </div>
-              )}
+                  {deliveryHealth?.draft_count !== undefined && (
+                    <div className="apple-metric-cell">
+                      <span className="metric-val">{deliveryHealth.draft_count}</span>
+                      <span className="metric-lbl">Brouillons</span>
+                    </div>
+                  )}
 
-              {deliveryHealth?.failure_count !== undefined && deliveryHealth.failure_count > 0 && (
-                <div className="apple-metric-cell warning">
-                  <span className="metric-val">{deliveryHealth.failure_count}</span>
-                  <span className="metric-lbl">Envois en Échec ({deliveryHealth.failure_rate}%)</span>
-                </div>
+                  {deliveryHealth?.failure_count !== undefined && deliveryHealth.failure_count > 0 && (
+                    <div className="apple-metric-cell warning">
+                      <span className="metric-val">{deliveryHealth.failure_count}</span>
+                      <span className="metric-lbl">Envois en Échec ({deliveryHealth.failure_rate}%)</span>
+                    </div>
+                  )}
+                </>
               )}
 
               {node.metrics.replyRate !== undefined && (
@@ -688,18 +653,18 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
           )}
 
           {/* 5. Strategic Recommendations */}
-          {(aiRecommendation || aiProspectAdjustment || aiCopywritingAdvice || node.recommendations.length > 0) && (
+          {(aiRecommendation || aiCopywritingAdvice || node.recommendations.length > 0) && (
             <section className="apple-section recommendations-section">
               <div className="apple-section-header">
                 <div className="section-title-wrap">
                   <Zap size={14} className="section-icon" />
                   <h4 className="apple-section-title">
-                    Recommandations {(aiRecommendation || aiProspectAdjustment || aiCopywritingAdvice) ? '' : `(${node.recommendations.length})`}
+                    Recommandations {(aiRecommendation || aiCopywritingAdvice) ? '' : `(${node.recommendations.length})`}
                   </h4>
                 </div>
               </div>
 
-              {(aiRecommendation || aiProspectAdjustment || aiCopywritingAdvice) ? (
+              {(aiRecommendation || aiCopywritingAdvice) ? (
                 <div className="apple-recs-stack">
                   {aiRecommendation && (
                     <div className="apple-card rec-card sourcing">
@@ -708,16 +673,6 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
                         <span className="rec-tag sourcing">Sourcing</span>
                       </div>
                       <p className="rec-text">{aiRecommendation}</p>
-                    </div>
-                  )}
-
-                  {aiProspectAdjustment && (
-                    <div className="apple-card rec-card prospection">
-                      <div className="rec-header">
-                        <span className="rec-agent">Calibrage Qualification</span>
-                        <span className="rec-tag prospection">Critères &amp; Seuil</span>
-                      </div>
-                      <p className="rec-text">{aiProspectAdjustment}</p>
                     </div>
                   )}
 
@@ -774,7 +729,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
               <p className="dialog-desc">
                 {isSourcing
                   ? "La mission, le volume de leads et le contexte entreprise n'ont pas changé depuis la dernière évaluation. Les résultats affichés sont déjà consolidés et pertinents."
-                  : "Aucun nouvel email, aucune nouvelle qualification et aucun changement de réglages n'ont été enregistrés depuis la dernière analyse. Les résultats affichés sont déjà à jour."}
+                  : "Aucun nouvel email ni changement de mission ou de contexte entreprise n'ont été enregistrés depuis la dernière analyse. Les résultats affichés sont déjà à jour."}
               </p>
 
               <div className="dialog-actions-row">

@@ -2078,6 +2078,40 @@
         }
       }
 
+      .header-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+
+        .apple-action-btn-header {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 6px 13px;
+          border-radius: 999px;
+          font-size: 12px;
+          font-weight: 600;
+          background: rgba(0, 229, 200, 0.1);
+          color: #00E5C8;
+          border: 1px solid rgba(0, 229, 200, 0.3);
+          cursor: pointer;
+          transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+          white-space: nowrap;
+
+          &:hover {
+            background: rgba(0, 229, 200, 0.18);
+            border-color: rgba(0, 229, 200, 0.55);
+            color: #FFFFFF;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(0, 229, 200, 0.2);
+          }
+
+          &:active {
+            transform: scale(0.97);
+          }
+        }
+      }
+
       .apple-close-btn {
         width: 30px;
         height: 30px;
