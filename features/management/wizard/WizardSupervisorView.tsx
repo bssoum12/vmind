@@ -14,8 +14,70 @@ import {
   ArrowLeft,
   Zap,
   Globe,
-  AlertCircle
+  AlertCircle,
+  CalendarClock,
+  Mail
 } from 'lucide-react';
+
+export interface TriggerRule {
+  interval: string;
+  secondsBetween: number;
+  minutesBetween: number;
+  hoursBetween: number;
+  daysBetween: number;
+  weeksBetween: number;
+  monthsBetween: number;
+  triggerAtMinute: number;
+  triggerAtHour: string;
+  triggerOnWeekdays: string[];
+  triggerAtDayOfMonth: number;
+}
+
+const hourOptions = [
+  { value: 'Midnight', label: '00:00 (Minuit)' },
+  { value: '1am', label: '01:00 (1h du matin)' },
+  { value: '2am', label: '02:00 (2h du matin)' },
+  { value: '3am', label: '03:00 (3h du matin)' },
+  { value: '4am', label: '04:00 (4h du matin)' },
+  { value: '5am', label: '05:00 (5h du matin)' },
+  { value: '6am', label: '06:00 (06h du matin)' },
+  { value: '7am', label: '07:00 (07h du matin)' },
+  { value: '8am', label: '08:00 (08h du matin)' },
+  { value: '9am', label: '09:00 (09h du matin)' },
+  { value: '10am', label: '10:00 (10h du matin)' },
+  { value: '11am', label: '11:00 (11h du matin)' },
+  { value: '12pm', label: '12:00 (Midi)' },
+  { value: '1pm', label: '13:00 (13h)' },
+  { value: '2pm', label: '14:00 (14h)' },
+  { value: '3pm', label: '15:00 (15h)' },
+  { value: '4pm', label: '16:00 (16h)' },
+  { value: '5pm', label: '17:00 (17h)' },
+  { value: '6pm', label: '18:00 (18h)' },
+  { value: '7pm', label: '19:00 (19h)' },
+  { value: '8pm', label: '20:00 (20h)' },
+  { value: '9pm', label: '21:00 (21h)' },
+  { value: '10pm', label: '22:00 (22h)' },
+  { value: '11pm', label: '23:00 (23h)' }
+];
+
+const weekdayOptions = [
+  { value: 'Monday', label: 'Lun' },
+  { value: 'Tuesday', label: 'Mar' },
+  { value: 'Wednesday', label: 'Mer' },
+  { value: 'Thursday', label: 'Jeu' },
+  { value: 'Friday', label: 'Ven' },
+  { value: 'Saturday', label: 'Sam' },
+  { value: 'Sunday', label: 'Dim' }
+];
+
+const intervalOptions = [
+  { value: 'Days', label: 'Jours' },
+  { value: 'Weeks', label: 'Semaines' },
+  { value: 'Hours', label: 'Heures' },
+  { value: 'Minutes', label: 'Minutes' },
+  { value: 'Seconds', label: 'Secondes' },
+  { value: 'Months', label: 'Mois' }
+];
 
 interface WizardSupervisorViewProps {
   templateId: string;
@@ -56,10 +118,95 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
     return [];
   });
 
+  const [emailRecap, setEmailRecap] = useState<string>(() => {
+    return (agentToEdit?.email_recap || agentToEdit?.config?.email_recap || '');
+  });
+
+  const [triggerRules, setTriggerRules] = useState<TriggerRule[]>(() => {
+    if (Array.isArray(agentToEdit?.trigger_rules) && agentToEdit.trigger_rules.length > 0) {
+      return agentToEdit.trigger_rules;
+    }
+    return [
+      {
+        interval: 'Days',
+        secondsBetween: 30,
+        minutesBetween: 5,
+        hoursBetween: 1,
+        daysBetween: 1,
+        weeksBetween: 1,
+        monthsBetween: 1,
+        triggerAtMinute: 0,
+        triggerAtHour: '8am',
+        triggerOnWeekdays: ['Monday'],
+        triggerAtDayOfMonth: 1
+      }
+    ];
+  });
+
   const [nameError, setNameError] = useState<string | null>(null);
   const [companyContext, setCompanyContext] = useState<any>(() => {
     return agentToEdit?.company_context || agentToEdit?.config?.company_context || null;
   });
+
+  // Pre-fill user email from vmind_users
+  useEffect(() => {
+    if (!emailRecap) {
+      (async () => {
+        try {
+          const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+          const res = await fetch(`${baseUrl}/api/supervisor-agent/user-email`, { credentials: 'include' });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.email) {
+              setEmailRecap(data.email);
+            }
+          }
+        } catch (e) {
+          console.warn('Could not prefetch user email in supervisor wizard:', e);
+        }
+      })();
+    }
+  }, [emailRecap]);
+
+  const addTriggerRule = () => {
+    setTriggerRules(prev => [
+      ...prev,
+      {
+        interval: 'Days',
+        secondsBetween: 30,
+        minutesBetween: 5,
+        hoursBetween: 1,
+        daysBetween: 1,
+        weeksBetween: 1,
+        monthsBetween: 1,
+        triggerAtMinute: 0,
+        triggerAtHour: '8am',
+        triggerOnWeekdays: ['Monday'],
+        triggerAtDayOfMonth: 1
+      }
+    ]);
+  };
+
+  const removeTriggerRule = (index: number) => {
+    setTriggerRules(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const updateTriggerRuleAtIndex = (index: number, field: keyof TriggerRule, value: any) => {
+    setTriggerRules(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const toggleWeekdayAtIndex = (index: number, day: string) => {
+    const rule = triggerRules[index];
+    const currentDays = [...(rule.triggerOnWeekdays || [])];
+    const updatedDays = currentDays.includes(day)
+      ? currentDays.filter(d => d !== day)
+      : [...currentDays, day];
+    updateTriggerRuleAtIndex(index, 'triggerOnWeekdays', updatedDays);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -183,6 +330,8 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
         workflow_timezone: getBrowserTimezone(),
         run_mode: 'supervisor',
         company_context: companyContext || {},
+        email_recap: emailRecap.trim(),
+        trigger_rules: triggerRules,
       };
 
       const url = isEditMode
@@ -207,7 +356,15 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
       const publicUuid = data.agent_id || data.uuid || (isEditMode ? (agentToEdit.uuid || agentToEdit.agent_id) : '');
 
       if (actionType === 'run_now') {
-        showToast('Superviseur déployé avec succès. Ouverture de l’espace...', 'ok');
+        showToast('Superviseur déployé avec succès. Lancement de l’audit initial...', 'ok');
+        try {
+          await fetch(`${baseUrl}/api/supervisor-agent/run-now/${encodeURIComponent(publicUuid)}`, {
+            method: 'POST',
+            credentials: 'include'
+          });
+        } catch (e) {
+          console.warn('Initial audit notice:', e);
+        }
         router.push(`/supervisor-agent-workspace/${publicUuid}`);
       } else {
         showToast('Superviseur déployé avec succès dans vos agents.', 'ok');
@@ -314,8 +471,8 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
             {/* Step 2 */}
             <div
               className={`wstep ${step === 2 ? 'active' : step > 2 ? 'done' : ''}`}
-              onClick={() => step === 3 && setStep(2)}
-              style={{ cursor: step === 3 ? 'pointer' : 'default' }}
+              onClick={() => step > 2 && setStep(2)}
+              style={{ cursor: step > 2 ? 'pointer' : 'default' }}
             >
               <div className="wstep-inner">
                 <div className="wstep-num" style={{ width: '34px', height: '34px', fontSize: '13px', fontWeight: 700 }}>
@@ -338,10 +495,14 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
             </div>
 
             {/* Step 3 */}
-            <div className={`wstep ${step === 3 ? 'active' : ''}`}>
+            <div
+              className={`wstep ${step === 3 ? 'active' : step > 3 ? 'done' : ''}`}
+              onClick={() => step > 3 && setStep(3)}
+              style={{ cursor: step > 3 ? 'pointer' : 'default' }}
+            >
               <div className="wstep-inner">
                 <div className="wstep-num" style={{ width: '34px', height: '34px', fontSize: '13px', fontWeight: 700 }}>
-                  3
+                  {step > 3 ? <Check size={14} strokeWidth={3} /> : '3'}
                 </div>
                 <div
                   className="wstep-label"
@@ -351,7 +512,29 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
                     textTransform: 'none',
                     letterSpacing: '0',
                     marginTop: '4px',
-                    color: step === 3 ? '#00E5C8' : '#8FA3B8',
+                    color: step === 3 ? '#00E5C8' : (step > 3 ? '#00E5C8' : '#8FA3B8'),
+                  }}
+                >
+                  Planification & Notifications
+                </div>
+              </div>
+            </div>
+
+            {/* Step 4 */}
+            <div className={`wstep ${step === 4 ? 'active' : ''}`}>
+              <div className="wstep-inner">
+                <div className="wstep-num" style={{ width: '34px', height: '34px', fontSize: '13px', fontWeight: 700 }}>
+                  4
+                </div>
+                <div
+                  className="wstep-label"
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    letterSpacing: '0',
+                    marginTop: '4px',
+                    color: step === 4 ? '#00E5C8' : '#8FA3B8',
                   }}
                 >
                   Confirmation & Déploiement
@@ -503,8 +686,360 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
             </div>
           )}
 
-          {/* ── STEP 3: CONFIRMATION & DÉPLOIEMENT ── */}
+          {/* ── STEP 3: PLANIFICATION & NOTIFICATIONS ── */}
           {step === 3 && (
+            <div id="step3-planification" className="anim">
+              <div className="wcard">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <div className="wcard-title" style={{ margin: 0 }}>
+                    <span className="dot" style={{ backgroundColor: '#00E5C8' }}></span>
+                    Règles de Planification Automatique
+                  </div>
+                  <button
+                    type="button"
+                    onClick={addTriggerRule}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '6px',
+                      color: '#fff',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <span>+</span> Ajouter une règle
+                  </button>
+                </div>
+
+                {triggerRules.length === 0 ? (
+                  <div style={{ padding: '30px', textAlign: 'center', color: '#b2bec3', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                    Aucune règle de déclenchement définie. L&apos;agent ne s&apos;exécutera pas automatiquement.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                    {triggerRules.map((rule, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          padding: '20px',
+                          backgroundColor: 'rgba(0,0,0,0.25)',
+                          borderRadius: '8px',
+                          border: '1px solid rgba(255,255,255,0.07)',
+                          position: 'relative'
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                          <span style={{ fontSize: '12px', fontWeight: 'bold', color: 'rgba(255,255,255,0.7)' }}>
+                            ⚡ Règle d&apos;Intervalle #{index + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeTriggerRule(index)}
+                            style={{
+                              backgroundColor: 'transparent',
+                              border: 'none',
+                              color: '#ff7675',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              padding: '4px',
+                              opacity: 0.8,
+                              transition: 'opacity 0.2s'
+                            }}
+                            title="Supprimer la règle"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+
+                        <div className="form-row">
+                          <div className="form-group" style={{ flex: '1 1 100%' }}>
+                            <label className="form-label" style={{ fontWeight: 'bold' }}>Intervalle de Déclenchement</label>
+                            <select
+                              className="form-input"
+                              value={rule.interval}
+                              onChange={(e) => updateTriggerRuleAtIndex(index, 'interval', e.target.value)}
+                            >
+                              {intervalOptions.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* DYNAMIC SUBFIELDS BY RULE TYPE */}
+                        <div style={{ marginTop: '12px', padding: '12px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '4px' }}>
+
+                          {/* SECONDS */}
+                          {rule.interval === 'Seconds' && (
+                            <div className="form-group anim">
+                              <label className="form-label">Secondes entre les Déclenchements (1 - 59)</label>
+                              <input
+                                type="number"
+                                className="form-input"
+                                min="1"
+                                max="59"
+                                value={rule.secondsBetween}
+                                onChange={(e) => updateTriggerRuleAtIndex(index, 'secondsBetween', Number(e.target.value))}
+                              />
+                            </div>
+                          )}
+
+                          {/* MINUTES */}
+                          {rule.interval === 'Minutes' && (
+                            <div className="form-group anim">
+                              <label className="form-label">Minutes entre les Déclenchements (1 - 59)</label>
+                              <input
+                                type="number"
+                                className="form-input"
+                                min="1"
+                                max="59"
+                                value={rule.minutesBetween}
+                                onChange={(e) => updateTriggerRuleAtIndex(index, 'minutesBetween', Number(e.target.value))}
+                              />
+                            </div>
+                          )}
+
+                          {/* HOURS */}
+                          {rule.interval === 'Hours' && (
+                            <div className="form-row anim">
+                              <div className="form-group">
+                                <label className="form-label">Heures entre les Déclenchements (1 - 23)</label>
+                                <input
+                                  type="number"
+                                  className="form-input"
+                                  min="1"
+                                  max="23"
+                                  value={rule.hoursBetween}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'hoursBetween', Number(e.target.value))}
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">Minute d&apos;Exécution</label>
+                                <input
+                                  type="number"
+                                  className="form-input"
+                                  min="0"
+                                  max="59"
+                                  value={rule.triggerAtMinute}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtMinute', Number(e.target.value))}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* DAYS */}
+                          {rule.interval === 'Days' && (
+                            <div className="form-row anim">
+                              <div className="form-group">
+                                <label className="form-label">Jours entre les Déclenchements (1 - 31)</label>
+                                <input
+                                  type="number"
+                                  className="form-input"
+                                  min="1"
+                                  max="31"
+                                  value={rule.daysBetween}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'daysBetween', Number(e.target.value))}
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">Heure d&apos;Exécution</label>
+                                <select
+                                  className="form-input"
+                                  value={rule.triggerAtHour}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtHour', e.target.value)}
+                                >
+                                  {hourOptions.map(h => (
+                                    <option key={h.value} value={h.value}>{h.label}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="form-group">
+                                <label className="form-label">Minute d&apos;Exécution</label>
+                                <input
+                                  type="number"
+                                  className="form-input"
+                                  min="0"
+                                  max="59"
+                                  value={rule.triggerAtMinute}
+                                  onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtMinute', Number(e.target.value))}
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* WEEKS */}
+                          {rule.interval === 'Weeks' && (
+                            <div className="anim">
+                              <div className="form-row">
+                                <div className="form-group" style={{ flex: 1 }}>
+                                  <label className="form-label">Semaines entre les Déclenchements</label>
+                                  <input
+                                    type="number"
+                                    className="form-input"
+                                    min="1"
+                                    value={rule.weeksBetween}
+                                    onChange={(e) => updateTriggerRuleAtIndex(index, 'weeksBetween', Number(e.target.value))}
+                                  />
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                  <label className="form-label">Heure d&apos;Exécution</label>
+                                  <select
+                                    className="form-input"
+                                    value={rule.triggerAtHour}
+                                    onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtHour', e.target.value)}
+                                  >
+                                    {hourOptions.map(h => (
+                                      <option key={h.value} value={h.value}>{h.label}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="form-group" style={{ flex: 1 }}>
+                                  <label className="form-label">Minute d&apos;Exécution</label>
+                                  <input
+                                    type="number"
+                                    className="form-input"
+                                    min="0"
+                                    max="59"
+                                    value={rule.triggerAtMinute}
+                                    onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtMinute', Number(e.target.value))}
+                                  />
+                                </div>
+                              </div>
+                              <div
+                                className="form-group"
+                                style={{ marginTop: '10px' }}
+                              >
+                                <label className="form-label">Jours Autorisés de la Semaine</label>
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+                                  {weekdayOptions.map(day => {
+                                    const isSelected = (rule.triggerOnWeekdays || []).includes(day.value);
+                                    return (
+                                      <button
+                                        key={day.value}
+                                        type="button"
+                                        onClick={() => toggleWeekdayAtIndex(index, day.value)}
+                                        style={{
+                                          padding: '6px 12px',
+                                          borderRadius: '20px',
+                                          fontSize: '11px',
+                                          fontWeight: 'bold',
+                                          cursor: 'pointer',
+                                          backgroundColor: isSelected ? '#00e5c8' : 'rgba(255,255,255,0.06)',
+                                          color: isSelected ? 'white' : '#b2bec3',
+                                          border: isSelected ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                                          transition: 'all 0.2s ease'
+                                        }}
+                                      >
+                                        {day.label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* MONTHS */}
+                          {rule.interval === 'Months' && (
+                            <div className="anim">
+                              <div className="form-row">
+                                <div className="form-group">
+                                  <label className="form-label">Mois entre les Déclenchements</label>
+                                  <input
+                                    type="number"
+                                    className="form-input"
+                                    min="1"
+                                    value={rule.monthsBetween}
+                                    onChange={(e) => updateTriggerRuleAtIndex(index, 'monthsBetween', Number(e.target.value))}
+                                  />
+                                </div>
+                                <div className="form-group">
+                                  <label className="form-label">Jour du Mois (1 - 31)</label>
+                                  <input
+                                    type="number"
+                                    className="form-input"
+                                    min="1"
+                                    max="31"
+                                    value={rule.triggerAtDayOfMonth}
+                                    onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtDayOfMonth', Number(e.target.value))}
+                                  />
+                                  <div className="form-hint" style={{ fontSize: '9px', color: '#ff7675' }}>
+                                    Remarque: Si le mois n&apos;a pas ce jour, le déclenchement n&apos;aura pas lieu.
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="form-row" style={{ marginTop: '10px' }}>
+                                <div className="form-group">
+                                  <label className="form-label">Heure d&apos;Exécution</label>
+                                  <select
+                                    className="form-input"
+                                    value={rule.triggerAtHour}
+                                    onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtHour', e.target.value)}
+                                  >
+                                    {hourOptions.map(h => (
+                                      <option key={h.value} value={h.value}>{h.label}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="form-group">
+                                  <label className="form-label">Minute d&apos;Exécution</label>
+                                  <input
+                                    type="number"
+                                    className="form-input"
+                                    min="0"
+                                    max="59"
+                                    value={rule.triggerAtMinute}
+                                    onChange={(e) => updateTriggerRuleAtIndex(index, 'triggerAtMinute', Number(e.target.value))}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Email Récapitulatif Card */}
+              <div className="wcard" style={{ marginTop: '20px' }}>
+                <div className="wcard-title">
+                  <span className="dot" style={{ backgroundColor: '#00E5C8' }}></span>
+                  Email Récapitulatif
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Adresse email pour le bilan d&apos;audit</label>
+                  <input
+                    type="email"
+                    className="form-input"
+                    value={emailRecap}
+                    onChange={(e) => setEmailRecap(e.target.value)}
+                    placeholder="contact@entreprise.com"
+                  />
+                  <span className="form-hint">
+                    Adresse email sur laquelle vous recevrez le bilan consolidé des performances et de l&apos;alignement de votre flotte.
+                  </span>
+                </div>
+              </div>
+
+              {/* Bottom Navigation */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
+                <Button onClick={() => setStep(2)}>← Retour au Contexte</Button>
+                <Button variant="primary" onClick={() => setStep(4)}>Confirmation & Déploiement →</Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── STEP 4: CONFIRMATION & DÉPLOIEMENT ── */}
+          {step === 4 && (
             <div className="anim" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {/* Summary Card */}
               <div className="wcard" style={{ padding: '20px 24px', marginBottom: 0 }}>
@@ -555,6 +1090,39 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
                       </div>
                       <div style={{ fontSize: '14.5px', fontWeight: 700, color: '#00E5C8', marginTop: '3px' }}>
                         {supervisedAgentIds.length} agent(s) sous supervision
+                      </div>
+                    </div>
+
+                    <div style={{
+                      padding: '12px 16px',
+                      background: 'var(--navy4)',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ fontSize: '11px', color: '#8FA3B8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                        Fréquence d&apos;Audit
+                      </div>
+                      <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#FFFFFF', marginTop: '3px' }}>
+                        {triggerRules[0]?.interval === 'Hours' && `Toutes les ${triggerRules[0].hoursBetween} heure(s)`}
+                        {triggerRules[0]?.interval === 'Days' && `Tous les ${triggerRules[0].daysBetween} jour(s) à ${triggerRules[0].triggerAtHour || '08:00'}`}
+                        {triggerRules[0]?.interval === 'Weeks' && `Toutes les ${triggerRules[0].weeksBetween} semaine(s)`}
+                        {triggerRules[0]?.interval === 'Months' && `Tous les mois (jour ${triggerRules[0].triggerAtDayOfMonth})`}
+                        {triggerRules[0]?.interval === 'Seconds' && `Toutes les ${triggerRules[0].secondsBetween}s`}
+                        {triggerRules[0]?.interval === 'Minutes' && `Toutes les ${triggerRules[0].minutesBetween} min`}
+                      </div>
+                    </div>
+
+                    <div style={{
+                      padding: '12px 16px',
+                      background: 'var(--navy4)',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border)',
+                    }}>
+                      <div style={{ fontSize: '11px', color: '#8FA3B8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
+                        Email Bilan
+                      </div>
+                      <div style={{ fontSize: '13.5px', fontWeight: 700, color: '#00E5C8', marginTop: '3px', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                        {emailRecap || 'Non configuré'}
                       </div>
                     </div>
                   </div>
@@ -670,7 +1238,7 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  {/* Option 1: Déployer & Ouvrir */}
+                  {/* Option 1: Déployer & Lancer l'Audit */}
                   <button
                     type="button"
                     disabled={isDeploying || !hasValidCompanyContext}
@@ -704,10 +1272,10 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
                     </div>
                     <div>
                       <div style={{ fontSize: '14px', fontWeight: 700, color: '#FFFFFF' }}>
-                        {isDeploying ? 'Déploiement…' : 'Déployer & Ouvrir'}
+                        {isDeploying ? 'Déploiement…' : "Déployer & Lancer l'Audit"}
                       </div>
                       <div style={{ fontSize: '11.5px', color: '#8FA3B8', marginTop: '2px' }}>
-                        Enregistre et ouvre immédiatement le cockpit
+                        Enregistre, exécute l&apos;audit immédiat et envoie le rapport
                       </div>
                     </div>
                   </button>
@@ -749,7 +1317,7 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
                         {isDeploying ? 'Déploiement…' : 'Déployer Uniquement'}
                       </div>
                       <div style={{ fontSize: '11.5px', color: '#8FA3B8', marginTop: '2px' }}>
-                        Enregistre dans vos agents sans ouvrir
+                        Enregistre dans vos agents sans exécuter
                       </div>
                     </div>
                   </button>
@@ -758,9 +1326,9 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
 
               {/* Back Button */}
               <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                <Button onClick={() => setStep(2)} disabled={isDeploying} style={{ fontSize: '13px', padding: '10px 18px' }}>
+                <Button onClick={() => setStep(3)} disabled={isDeploying} style={{ fontSize: '13px', padding: '10px 18px' }}>
                   <ArrowLeft size={14} style={{ marginRight: 6 }} />
-                  Retour au Contexte Entreprise
+                  Retour à la Planification
                 </Button>
               </div>
             </div>

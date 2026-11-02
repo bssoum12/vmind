@@ -256,31 +256,31 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
 
         {/* Center: Fleet Status Capsule */}
         <div className="header-center-pill">
-          <div className="fleet-score-badge">
+          <div className="fleet-score-badge" title="Moyenne des scores d'alignement IA de vos agents par rapport à la stratégie d'entreprise">
             <span className="score-ring-dot" />
             <span className="score-text">{fleetSummary.overallScore}%</span>
-            <span className="score-sub">Santé Flotte</span>
+            <span className="score-sub">Conformité Globale</span>
           </div>
           <div className="capsule-divider" />
           <div className="fleet-status-chips">
-            <span className="status-chip healthy" title={`${healthyCount} agents conformes`}>
+            <span className="status-chip healthy" title={`${healthyCount} agent(s) avec ciblage et discours parfaitement alignés (≥ 75%)`}>
               <span className="chip-dot" />
-              <span>{healthyCount} Sain{healthyCount > 1 ? 's' : ''}</span>
+              <span>{healthyCount} Optimal{healthyCount > 1 ? 'aux' : ''}</span>
             </span>
             {warningCount > 0 && (
-              <span className="status-chip warning" title={`${warningCount} avertissements`}>
+              <span className="status-chip warning" title={`${warningCount} agent(s) avec légers écarts à surveiller (50-74%)`}>
                 <span className="chip-dot" />
-                <span>{warningCount} Alerte{warningCount > 1 ? 's' : ''}</span>
+                <span>{warningCount} À surveiller</span>
               </span>
             )}
             {criticalCount > 0 && (
-              <span className="status-chip critical" title={`${criticalCount} incohérences`}>
+              <span className="status-chip critical" title={`${criticalCount} agent(s) nécessitant un réajustement de mission (< 50%)`}>
                 <span className="chip-dot" />
-                <span>{criticalCount} Incohérence{criticalCount > 1 ? 's' : ''}</span>
+                <span>{criticalCount} À optimiser</span>
               </span>
             )}
             {unanalyzedCount > 0 && (
-              <span className="status-chip unanalyzed" title={`${unanalyzedCount} sans activité mesurée`}>
+              <span className="status-chip unanalyzed" title={`${unanalyzedCount} agent(s) sans activité mesurée pour le moment`}>
                 <span className="chip-dot" />
                 <span>{unanalyzedCount} En attente</span>
               </span>

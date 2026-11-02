@@ -499,7 +499,7 @@ export const SupervisorGraphCanvas: React.FC<SupervisorGraphCanvasProps> = ({
 
       // Health Score Micro-Pill below name
       if (node.status !== 'UNANALYZED') {
-        const scoreLabel = `${node.healthScore}%`;
+        const scoreLabel = `Score IA : ${node.healthScore}%`;
         ctx.font = 'bold 9.5px -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
         const scoreNumWidth = ctx.measureText(scoreLabel).width;
         const scorePillW = scoreNumWidth + 20;
@@ -507,7 +507,7 @@ export const SupervisorGraphCanvas: React.FC<SupervisorGraphCanvasProps> = ({
         const scorePillY = boxY + boxH + 4;
         const scorePillX = x - scorePillW / 2;
 
-        ctx.fillStyle = 'rgba(8, 20, 38, 0.8)';
+        ctx.fillStyle = 'rgba(8, 20, 38, 0.85)';
         drawRoundedCapsule(ctx, scorePillX, scorePillY, scorePillW, scorePillH, 8);
         ctx.fill();
 
@@ -593,17 +593,21 @@ export const SupervisorGraphCanvas: React.FC<SupervisorGraphCanvasProps> = ({
     ctx.fillStyle = isSelected ? '#00E5C8' : color;
     ctx.fill();
 
-    // 4. Alignment Score capsule floating above arrow
+    // 4. Alignment Score capsule floating on link (placed at 40% to avoid colliding with target node)
     if (link.status !== 'UNANALYZED' && link.alignmentScore !== undefined) {
-      const pillText = `${link.alignmentScore}% Alignement`;
+      const pillText = `Alignement : ${link.alignmentScore}%`;
       ctx.font = '600 10px -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
       const textWidth = ctx.measureText(pillText).width;
       const pillW = textWidth + 18;
       const pillH = 20;
-      const pillY = midY - 18;
-      const pillX = midX - pillW / 2;
 
-      ctx.fillStyle = 'rgba(6, 17, 31, 0.85)';
+      // Position along link vector at 40% from source to target
+      const pillCenterX = startX + (endX - startX) * 0.40;
+      const pillCenterY = startY + (endY - startY) * 0.40;
+      const pillY = pillCenterY - 14;
+      const pillX = pillCenterX - pillW / 2;
+
+      ctx.fillStyle = 'rgba(6, 17, 31, 0.9)';
       drawRoundedCapsule(ctx, pillX, pillY - pillH / 2, pillW, pillH, 10);
       ctx.fill();
 
@@ -682,17 +686,17 @@ export const SupervisorGraphCanvas: React.FC<SupervisorGraphCanvasProps> = ({
           <span>Prospection</span>
         </div>
         <div className="legend-sep" />
-        <div className="legend-chip">
+        <div className="legend-chip" title="Score IA ≥ 75%">
           <span className="dot healthy" />
-          <span>Sain</span>
+          <span>Optimal</span>
         </div>
-        <div className="legend-chip">
+        <div className="legend-chip" title="Score IA entre 50% et 74%">
           <span className="dot warning" />
-          <span>Alerte</span>
+          <span>À surveiller</span>
         </div>
-        <div className="legend-chip">
+        <div className="legend-chip" title="Score IA < 50%">
           <span className="dot critical" />
-          <span>Incohérence</span>
+          <span>À optimiser</span>
         </div>
       </div>
 
