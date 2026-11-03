@@ -40,6 +40,8 @@ export interface VmindAlert {
   action: string;
 }
 
+export type SkillUsed = { slug: string; version?: number; source?: string } | string;
+
 export type VmindN8nResponse = {
   ok: boolean;
   tool_used: VmindTool;
@@ -56,6 +58,7 @@ export type VmindN8nResponse = {
   alerts?: VmindAlert[];
   report_url?: string | null;
   report_filename?: string | null;
+  skills_used?: SkillUsed[];
 };
 
 export interface VmindMessage {
@@ -79,4 +82,5 @@ export interface VmindMessage {
   alerts?: VmindAlert[];
   report_url?: string | null;
   report_filename?: string | null;
+  skills_used?: SkillUsed[];
 }

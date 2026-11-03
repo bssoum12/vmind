@@ -94,9 +94,9 @@ const GENERIC_TEXTS = new Set([
 ]);
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
-  'compare_agency_performance_jan_apr': 'Analyse par agence',
-  'analyze_delay_by_client_type': 'Retards par type de client',
-  'generate_monthly_activity_report': 'Rapport mensuel',
+  'get_kpi_dashboard': 'Tableau de bord',
+  'get_dossiers': 'Dossiers',
+  'get_factures_vente': 'Factures',
 };
 
 const getToolDisplayName = (tool?: string | null) => {
@@ -167,6 +167,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
     alerts,
     report_url,
     report_filename,
+    skills_used,
   } = message;
 
   if (isThinking) {
@@ -248,7 +249,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', animation: 'fadeIn 0.5s' }}>
-      {(message.tool_used || message.source) && (
+      {(message.tool_used || message.source || (skills_used && skills_used.length > 0)) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
           {message.tool_used && (
             <span className="premium-badge">
@@ -261,6 +262,15 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
               {message.source}
             </span>
           )}
+          {skills_used && skills_used.map((skill, idx) => {
+            const slug = typeof skill === 'string' ? skill : skill.slug;
+            return (
+              <span key={`skill-${idx}-${slug}`} className="premium-badge" style={{ background: 'rgba(168, 85, 247, 0.15)', borderColor: 'rgba(168, 85, 247, 0.35)', color: '#c084fc' }}>
+                <span className="status-dot" style={{ display: 'inline-block', width: '6px', height: '6px', background: '#c084fc', borderRadius: '50%', boxShadow: '0 0 8px #c084fc' }}></span>
+                {`Compétence : ${slug}`}
+              </span>
+            );
+          })}
         </div>
       )}
       
@@ -274,7 +284,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
         <KpiRenderer kpis={kpis} />
       ) : null}
 
-      {message.tool_used === 'generate_monthly_activity_report' && (
+      {(Boolean(report_url) || message.tool_used?.includes('report')) && (
         <MonthlyReportResultRenderer
           alerts={alerts}
           reportUrl={report_url}

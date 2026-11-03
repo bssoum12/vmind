@@ -23,12 +23,14 @@ const MarketplaceView = dynamic(() => import('@/features/management/marketplace/
 const AgentsView = dynamic(() => import('@/features/management/agents/AgentsView').then(m => m.AgentsView), { ssr: false });
 const WizardRouter = dynamic(() => import('@/features/management/wizard/WizardRouter').then(m => m.WizardRouter), { ssr: false });
 const JournalView = dynamic(() => import('@/features/management/journal/JournalView').then(m => m.JournalView), { ssr: false });
+const UsersManagementView = dynamic(() => import('@/features/management/users/UsersManagementView').then(m => m.UsersManagementView), { ssr: false });
 const ReportsView = dynamic(() => import('@/features/management/reports/ReportsView').then(m => m.ReportsView), { ssr: false });
 const IntegrationsView = dynamic(() => import('@/features/management/integrations/IntegrationsView').then(m => m.IntegrationsView), { ssr: false });
 const ProfileView = dynamic(() => import('@/features/management/profile/ProfileView').then(m => m.ProfileView), { ssr: false });
 const PromptsConfigView = dynamic(() => import('@/features/management/prompts/PromptsConfigView').then(m => m.PromptsConfigView), { ssr: false });
 
 const ConnectorsHub = dynamic(() => import('@/features/connectors/ConnectorsHub').then(m => m.ConnectorsHub), { ssr: false });
+const SkillsHub = dynamic(() => import('@/features/skills/SkillsHub').then(m => m.SkillsHub), { ssr: false });
 /* ─────────────────────────────────────────────────────
    Accès Non Autorisé View (Premium VMIND Design)
 ───────────────────────────────────────────────────── */
@@ -108,7 +110,7 @@ function UnauthorizedView({ onBackToLogin, onBackToDashboard }: { onBackToLogin:
           fontSize: '14px', color: '#8FA3B8',
           lineHeight: 1.6, marginBottom: '32px'
         }}>
-          Vous ne disposez pas des privilèges nécessaires pour accéder à cette section. Veuillez contacter votre administrateur TraLIS si vous estimez qu'il s'agit d'une erreur.
+          Vous ne disposez pas des privilèges nécessaires pour accéder à cette section. Veuillez contacter votre administrateur VMIND si vous estimez qu'il s'agit d'une erreur.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -274,13 +276,13 @@ function HomeContent() {
     setTimeout(() => setInsertPrompt(undefined), 100);
   };
 
-  const [assistantView, setAssistantView] = useState<'chat' | 'connectors'>('chat');
+  const [assistantView, setAssistantView] = useState<'chat' | 'connectors' | 'skills'>('chat');
 
   useEffect(() => {
     const handleSwitchView = (e: Event) => {
       const customEvent = e as CustomEvent<string>;
-      if (customEvent.detail === 'connectors' || customEvent.detail === 'chat') {
-        setAssistantView(customEvent.detail as 'chat' | 'connectors');
+      if (customEvent.detail === 'connectors' || customEvent.detail === 'chat' || customEvent.detail === 'skills') {
+        setAssistantView(customEvent.detail as 'chat' | 'connectors' | 'skills');
       }
     };
     window.addEventListener('switch-assistant-view', handleSwitchView);
@@ -635,6 +637,10 @@ function HomeContent() {
             <ConnectorsHub />
           </div>
 
+          <div style={{ display: assistantView === 'skills' ? 'block' : 'none', flex: 1, height: '100%', minWidth: 0 }}>
+            <SkillsHub />
+          </div>
+
           <VoiceOverlay show={voiceShow} onClose={() => setVoiceShow(false)} />
           <GlobalMaxRemindersPopup />
         </main>
@@ -669,6 +675,7 @@ function HomeContent() {
           {(currentView === 'market' || currentView === 'marketplace') && (
             <MarketplaceView
               onDeploy={handleDeploy}
+              onNavigate={(view) => handleNavigate(view)}
               activeCategory={activeCategory}
               isAdmin={isAdmin}
               onSelectCategory={(cat) => {
@@ -690,6 +697,10 @@ function HomeContent() {
               }}
               onConfigure={(templateId, agent, step) => handleDeploy(templateId, agent, step)}
             />
+          )}
+
+          {currentView === 'users' && (
+            <UsersManagementView />
           )}
 
           {currentView === 'journal' && (

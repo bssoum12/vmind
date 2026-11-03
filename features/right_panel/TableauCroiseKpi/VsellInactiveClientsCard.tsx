@@ -25,7 +25,7 @@ export const VsellInactiveClientsCard: React.FC<VsellInactiveClientsCardProps> =
 
   // Read n8n context data
   const agentData = kpisByAgent["vsell"] || kpisByAgent["VSELL"] || {};
-  const toolData = agentData.get_clients_inactive_60_days || {};
+  const toolData = agentData.get_kpi_dashboard || agentData.get_tiers || agentData.inactive_clients || {};
   const clients: InactiveClientItem[] = toolData.ok && Array.isArray(toolData.data) 
     ? toolData.data 
     : (Array.isArray(agentData.inactive_clients) ? agentData.inactive_clients : []);

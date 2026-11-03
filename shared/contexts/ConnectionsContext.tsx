@@ -33,6 +33,10 @@ export function ConnectionsProvider({ children }: { children: React.ReactNode })
   const { showToast } = useToast();
 
   const refreshConnections = useCallback(async () => {
+    if (typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname.startsWith('/login') || window.location.pathname.startsWith('/reset-password'))) {
+      setLoading(false);
+      return;
+    }
     try {
       const [types, userConns] = await Promise.all([
         fetchErpTypes().catch(() => []),
@@ -72,11 +76,23 @@ export function ConnectionsProvider({ children }: { children: React.ReactNode })
       }
     };
 
+    const handleSessionUpdated = () => {
+      refreshConnections();
+    };
+
     window.addEventListener('message', handleAuthMessage);
-    return () => window.removeEventListener('message', handleAuthMessage);
+    window.addEventListener('mcp-session-updated', handleSessionUpdated);
+    return () => {
+      window.removeEventListener('message', handleAuthMessage);
+      window.removeEventListener('mcp-session-updated', handleSessionUpdated);
+    };
   }, [refreshConnections, showToast]);
 
   const selectActiveConnection = async (connectionId: number) => {
+    if (typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname.startsWith('/login') || window.location.pathname.startsWith('/reset-password'))) {
+      setLoading(false);
+      return;
+    }
     try {
       await activateConnection(connectionId);
       await refreshConnections();
@@ -87,6 +103,10 @@ export function ConnectionsProvider({ children }: { children: React.ReactNode })
   };
 
   const connectErp = async (connectorType: string, mcpUrl?: string) => {
+    if (typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname.startsWith('/login') || window.location.pathname.startsWith('/reset-password'))) {
+      setLoading(false);
+      return;
+    }
     try {
       const result = await startMcpConnection(connectorType, mcpUrl);
       if (result.authorization_url) {
@@ -113,6 +133,10 @@ export function ConnectionsProvider({ children }: { children: React.ReactNode })
   };
 
   const disconnect = async (connectionId: number) => {
+    if (typeof window !== 'undefined' && (window.location.pathname === '/login' || window.location.pathname.startsWith('/login') || window.location.pathname.startsWith('/reset-password'))) {
+      setLoading(false);
+      return;
+    }
     try {
       await disconnectConnection(connectionId);
       await refreshConnections();

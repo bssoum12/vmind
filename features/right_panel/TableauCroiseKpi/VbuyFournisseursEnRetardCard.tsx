@@ -20,7 +20,7 @@ export const VbuyFournisseursEnRetardCard: React.FC<VbuyFournisseursEnRetardCard
 
   const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const agentData = kpisByAgent["vbuy"] || kpisByAgent["VBUY"] || {};
-  const n8nToolData = agentData.get_vbuy_kpi_fournisseurs_en_retard_livraison;
+  const n8nToolData = agentData.get_kpi_dashboard || agentData.get_commandes_achat || agentData.fournisseurs_en_retard;
 
   const [expandedDetails, setExpandedDetails] = useState<boolean>(false);
   const [page, setPage] = useState<number>(1);
@@ -112,7 +112,7 @@ export const VbuyFournisseursEnRetardCard: React.FC<VbuyFournisseursEnRetardCard
             VBUY
           </span>
           <button
-            onClick={() => fetchKpis('vbuy', true, 'get_vbuy_kpi_fournisseurs_en_retard_livraison')}
+            onClick={() => fetchKpis('vbuy', true, 'get_commandes_achat')}
             disabled={effectiveLoading}
             style={{
               background: 'transparent',

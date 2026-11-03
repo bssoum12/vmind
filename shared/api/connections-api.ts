@@ -105,3 +105,26 @@ export async function disconnectConnection(connectionId: number): Promise<void> 
     throw new Error(err.error || `Erreur lors de la déconnexion (${res.status})`);
   }
 }
+
+export interface DiscoveredTool {
+  name: string;
+  description: string;
+  inputSchema?: {
+    type?: string;
+    properties?: Record<string, { type?: string; description?: string }>;
+    required?: string[];
+  };
+}
+
+/**
+ * Récupère dynamiquement les outils disponibles sur le serveur MCP connecté (standard MCP tools/list)
+ */
+export async function fetchConnectionTools(connectionId: number): Promise<DiscoveredTool[]> {
+  const res = await secureFetch(`${getBaseUrl()}/api/mcp-connections/${connectionId}/tools`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Impossible de récupérer les outils du connecteur (${res.status})`);
+  }
+  const data = await res.json();
+  return data.tools || [];
+}

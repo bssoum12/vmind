@@ -37,15 +37,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
         }
         return;
       }
-      const user = sessionDetail?.user || sessionDetail;
-      if (user) {
-        if (user.username) setUsername(user.username);
-        const roles = Array.isArray(user.roles) ? user.roles : [user.roles || ''];
-        setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)));
-        const agents = user.allowedAgents || user.allowed_agents || [];
-        if (Array.isArray(agents)) {
-          setAllowedAgents(agents);
-          setIsErpConnected(agents.length > 0);
+      if (sessionDetail && sessionDetail.connected === true) {
+        const user = sessionDetail.user || sessionDetail;
+        if (user) {
+          if (user.username) setUsername(user.username);
+          const roles = Array.isArray(user.roles) ? user.roles : [user.roles || ''];
+          setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)));
+          const agents = sessionDetail.allowedAgents || user.allowedAgents || user.allowed_agents || [];
+          if (Array.isArray(agents)) {
+            setAllowedAgents(agents);
+          }
+          setIsErpConnected(true);
           return;
         }
       }
@@ -96,6 +98,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
         {conversations.length > 0 && (
           <span className="nav-badge">{conversations.length}</span>
         )}
+      </div>
+
+      <div
+        className={`nav-item ${activeNav === 'skills' ? 'active' : ''}`}
+        onClick={() => {
+          setActiveNav('skills');
+          window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'skills' }));
+        }}
+      >
+        <div className="nav-icon">✨</div>
+        <span>Skills</span>
       </div>
 
       <div

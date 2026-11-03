@@ -16,7 +16,67 @@ export const GenericDetailRenderer: React.FC<GenericDetailRendererProps> = ({ da
     return <DocumentDetailRenderer details={data.header || data.invoice || data} />;
   }
 
-  // 2. Si c'est un tableau, on tente de le formater proprement
+  // 2. Format générique v2 : sections (Spec v2 Section 5.10b / 7.10)
+  if (Array.isArray(data.sections)) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {data.title && (
+          <h4 style={{ fontSize: '14px', fontWeight: 600, color: '#f3f4f6', margin: 0 }}>
+            {data.title}
+          </h4>
+        )}
+        {data.sections.map((section: any, idx: number) => (
+          <div
+            key={idx}
+            style={{
+              padding: '12px 14px',
+              backgroundColor: 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '8px',
+              border: '1px solid rgba(255, 255, 255, 0.08)'
+            }}
+          >
+            {section.title && (
+              <div
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: 'var(--cyan, #38bdf8)',
+                  textTransform: 'uppercase',
+                  marginBottom: '10px',
+                  letterSpacing: '0.05em'
+                }}
+              >
+                {section.title}
+              </div>
+            )}
+            {Array.isArray(section.fields) ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px 16px' }}>
+                {section.fields.map((field: any, fIdx: number) => {
+                  const label = field.label || field.name || '';
+                  const value = field.value !== undefined && field.value !== null ? String(field.value) : '-';
+                  const status = field.status;
+                  const statusColor =
+                    status === 'danger' ? '#f43f5e' :
+                    status === 'warning' ? '#f59e0b' :
+                    status === 'success' ? '#10b981' :
+                    '#f9fafb';
+
+                  return (
+                    <div key={fIdx} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ fontSize: '11px', color: '#9ca3af' }}>{label}</span>
+                      <span style={{ fontSize: '13px', color: statusColor, fontWeight: 500 }}>{value}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // 3. Si c'est un tableau, on tente de le formater proprement
   if (Array.isArray(data)) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -29,7 +89,7 @@ export const GenericDetailRenderer: React.FC<GenericDetailRendererProps> = ({ da
     );
   }
 
-  // 3. Si c'est un objet simple (clé-valeur), on l'affiche en liste structurée
+  // 4. Si c'est un objet simple (clé-valeur), on l'affiche en liste structurée
   const entries = Object.entries(data).filter(([k, v]) => 
     v !== null && 
     v !== undefined && 
@@ -49,6 +109,6 @@ export const GenericDetailRenderer: React.FC<GenericDetailRendererProps> = ({ da
     );
   }
 
-  // 4. Ne JAMAIS afficher les données brutes JSON dans l'interface
+  // 5. Ne JAMAIS afficher les données brutes JSON dans l'interface
   return null;
 };

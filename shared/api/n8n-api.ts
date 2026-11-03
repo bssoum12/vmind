@@ -34,7 +34,9 @@ export async function sendVmindMessage(
   agentId: string,
   clientId = "DEMO",
   signal?: AbortSignal,
-  connectionId?: number | string | null
+  connectionId?: number | string | null,
+  selectedSkills?: string[],
+  origin?: 'suggestion' | 'chat' | string
 ): Promise<VmindN8nResponse> {
   const sessionId = getVmindSessionId();
 
@@ -43,7 +45,7 @@ export async function sendVmindMessage(
   const proxyUrl = `${baseUrl}/api/n8n-proxy`;
 
   const agentCode = (agentId || "VFIN").toUpperCase();
-  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, connection_id: connectionId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode });
+  console.log("🚀 [n8n-api] PAYLOAD ENVOYÉ:", { message, client_id: clientId, connection_id: connectionId, vmind_session_id: sessionId, conversation_id: conversationId, agent_id: agentId, agent: agentCode, selected_skills: selectedSkills });
 
   try {
     const response = await fetch(proxyUrl, {
@@ -57,7 +59,10 @@ export async function sendVmindMessage(
         vmind_session_id: sessionId,
         conversation_id: conversationId,
         agent_id: agentId,
-        agent: agentCode
+        agent: agentCode,
+        origin: origin || 'chat',
+        timezone: typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Africa/Tunis',
+        ...(selectedSkills && selectedSkills.length > 0 ? { selected_skills: selectedSkills.slice(0, 3) } : {})
       }),
       signal
     });
@@ -131,7 +136,8 @@ export async function deployAgent(config: any, clientId = "DEMO"): Promise<any> 
   });
 
   if (!response.ok) {
-    throw new Error(`Erreur lors du déploiement via le scheduler Vmind: ${response.statusText}`);
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.message || errData.error || `Erreur lors du déploiement via le scheduler Vmind: ${response.statusText}`);
   }
 
   const text = await response.text();
@@ -346,7 +352,7 @@ export async function runAgentNow(agentName: string): Promise<any> {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Erreur lors du lancement de l'agent (${res.status})`);
+    throw new Error(err.message || err.error || `Erreur lors du lancement de l'agent (${res.status})`);
   }
   return res.json();
 }

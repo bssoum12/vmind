@@ -1,7 +1,8 @@
 "use client";
 
 import React from 'react';
-import { BarChart3, TrendingUp, DollarSign, ShoppingBag, Truck, Sparkles } from 'lucide-react';
+import { BarChart3, TrendingUp, DollarSign, ShoppingBag, Truck, Package, Sparkles } from 'lucide-react';
+import { AGENTS, AgentId } from '../../shared/constants/data';
 
 interface KpiEmptyStateProps {
   agentId: string;
@@ -18,40 +19,52 @@ interface SpecialistDetails {
 
 const SPECIALIST_INFO: Record<string, SpecialistDetails> = {
   VDATA: {
-    title: 'Données & Analytics',
+    title: AGENTS.VDATA.desc,
     subtitle: "Score qualité global, volume d'activité et taux de livraison TraLIS.",
     Icon: BarChart3,
-    color: '#00f0ff'
+    color: AGENTS.VDATA.color
   },
   VFIN: {
-    title: 'Finance & Trésorerie',
+    title: AGENTS.VFIN.desc,
     subtitle: 'Position de trésorerie nette, créances clients, factures et marge nette.',
     Icon: DollarSign,
-    color: '#00E5C8'
+    color: AGENTS.VFIN.color
   },
   VSELL: {
-    title: 'Commercial & Ventes',
+    title: AGENTS.VSELL.desc,
     subtitle: 'Pipeline des cotations, conversion de prospects et fidélisation clients.',
     Icon: TrendingUp,
-    color: '#3B82F6'
+    color: AGENTS.VSELL.color
   },
   VBUY: {
-    title: 'Achats & Fournisseurs',
-    subtitle: 'Factures d\'achat à régler, dépenses mensuelles et retards de livraison.',
+    title: AGENTS.VBUY.desc,
+    subtitle: "Factures d'achat à régler, dépenses mensuelles et retards de livraison.",
     Icon: ShoppingBag,
-    color: '#F59E0B'
+    color: AGENTS.VBUY.color
   },
   VMOVE: {
-    title: 'Logistique & Transit',
+    title: AGENTS.VMOVE.desc,
     subtitle: 'Suivi des flux actifs, dossiers en retard et livraisons transporteurs.',
     Icon: Truck,
-    color: '#10B981'
+    color: AGENTS.VMOVE.color
+  },
+  VSTOCK: {
+    title: AGENTS.VSTOCK.desc,
+    subtitle: 'Niveaux de stock, valorisation, taux de rotation et alertes de rupture TraLIS.',
+    Icon: Package,
+    color: AGENTS.VSTOCK.color
   }
 };
 
 export const KpiEmptyState: React.FC<KpiEmptyStateProps> = ({ agentId, onLaunch, isLoading = false }) => {
   const agentKey = (agentId || 'VDATA').toUpperCase();
-  const info = SPECIALIST_INFO[agentKey] || SPECIALIST_INFO['VDATA'];
+  const agentConfig = AGENTS[agentKey as Exclude<AgentId, 'VMIND'>];
+  const baseInfo = SPECIALIST_INFO[agentKey] || SPECIALIST_INFO['VDATA'];
+  const info: SpecialistDetails = {
+    ...baseInfo,
+    title: agentConfig?.desc || baseInfo.title,
+    color: agentConfig?.color || baseInfo.color,
+  };
 
   return (
     <div style={{
@@ -131,7 +144,7 @@ export const KpiEmptyState: React.FC<KpiEmptyStateProps> = ({ agentId, onLaunch,
         onClick={onLaunch}
         disabled={isLoading}
         style={{
-          background: isLoading ? 'rgba(0, 240, 255, 0.08)' : `linear-gradient(135deg, ${info.color} 0%, ${info.color}CC 100%)`,
+          background: isLoading ? `${info.color}15` : `linear-gradient(135deg, ${info.color} 0%, ${info.color}CC 100%)`,
           color: isLoading ? '#6A7E95' : '#021010',
           border: 'none',
           padding: '11px 22px',
