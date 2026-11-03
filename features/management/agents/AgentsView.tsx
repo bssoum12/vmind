@@ -756,7 +756,13 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "Échec de la mise en pause");
+          const fallbackByStatus: Record<number, string> = {
+            401: 'Authentification de session requise.',
+            403: 'Accès non autorisé à cet agent.',
+            404: 'Agent superviseur introuvable.',
+            502: "Impossible de suspendre la planification automatique. L'agent reste actif."
+          };
+          throw new Error(err.error || fallbackByStatus[res.status] || "Échec de la mise en pause");
         }
         showToast(`Superviseur "${agent.agent_name}" mis en pause.`);
       } else {
@@ -787,11 +793,23 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
             workflow_timezone: getBrowserTimezone()
           })
         });
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || "Échec de l'activation de l'autopilot");
+          const fallbackByStatus: Record<number, string> = {
+            400: 'Une seule règle de planification est supportée pour le moment.',
+            401: 'Authentification de session requise.',
+            403: 'Accès non autorisé à cet agent.',
+            404: 'Agent superviseur introuvable.',
+            502: "Impossible d'activer la planification automatique pour le moment.",
+            503: 'La planification automatique est momentanément indisponible.'
+          };
+          throw new Error(data.error || fallbackByStatus[res.status] || "Échec de l'activation de l'autopilot");
         }
-        showToast(`Autopilot activé pour "${agent.agent_name}" !`);
+        if (data.warning) {
+          showToast(`Autopilot activé avec avertissement : ${data.warning}`, 'ok');
+        } else {
+          showToast(`Autopilot activé pour "${agent.agent_name}" !`);
+        }
       } else {
         await resumeAgent(agent.agent_name, {
           ...(params || {}),
@@ -859,9 +877,20 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           method: 'POST',
           credentials: 'include'
         });
-        const data = await res.json();
+        if (res.status === 409) {
+          showToast('Un audit est déjà en cours pour ce superviseur.', 'err');
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(data.error || "Échec de l'audit de supervision");
+          const fallbackByStatus: Record<number, string> = {
+            401: 'Authentification de session requise.',
+            403: 'Accès non autorisé à ce superviseur.',
+            404: 'Superviseur commercial introuvable.',
+            409: 'Un audit est déjà en cours pour ce superviseur.',
+            502: "Le service de diagnostic est momentanément indisponible."
+          };
+          throw new Error(data.error || fallbackByStatus[res.status] || "Échec de l'audit de supervision");
         }
         showToast(data.message || `Audit terminé avec succès (Conformité: ${data.overallScore}%).`, 'ok');
         await refresh();

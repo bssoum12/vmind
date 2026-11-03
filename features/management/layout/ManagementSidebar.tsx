@@ -223,18 +223,44 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
 
       <div className="sidebar-footer">
         <div className="stats-row">
-          <span className="stats-label">Exécutions aujourd&apos;hui</span>
-          <span className="stats-val">{executionsToday !== null ? executionsToday : '…'}</span>
+          <span
+            className="stats-label"
+            style={{ fontFamily: "var(--font-body), 'Syne', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+          >
+            Exécutions aujourd&apos;hui
+          </span>
+          <span
+            className="stats-val"
+            style={{ fontFamily: "var(--font-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace" }}
+          >
+            {executionsToday !== null ? executionsToday : '…'}
+          </span>
         </div>
         <div className="stats-row">
-          <span className="stats-label">Agents actifs</span>
-          <span className="stats-val">
+          <span
+            className="stats-label"
+            style={{ fontFamily: "var(--font-body), 'Syne', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+          >
+            Agents actifs
+          </span>
+          <span
+            className="stats-val"
+            style={{ fontFamily: "var(--font-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace" }}
+          >
             {activeAgentsCount !== null ? activeAgentsCount : (agentCount !== null ? agentCount : '…')}
           </span>
         </div>
         <div className="stats-row">
-          <span className="stats-label">Taux de succès</span>
-          <span className="stats-val">
+          <span
+            className="stats-label"
+            style={{ fontFamily: "var(--font-body), 'Syne', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
+          >
+            Taux de succès
+          </span>
+          <span
+            className="stats-val"
+            style={{ fontFamily: "var(--font-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace" }}
+          >
             {executionsToday && executionsToday > 0 && successRate !== null ? `${successRate}%` : '-'}
           </span>
         </div>

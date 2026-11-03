@@ -124,7 +124,10 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
 
   const [triggerRules, setTriggerRules] = useState<TriggerRule[]>(() => {
     if (Array.isArray(agentToEdit?.trigger_rules) && agentToEdit.trigger_rules.length > 0) {
-      return agentToEdit.trigger_rules;
+      // M-8: only the first rule is ever used by the backend (/start reads
+      // triggerRules[0]), so a supervisor saved earlier with 2+ rules must
+      // not resurface the extras here — the wizard enforces a single rule.
+      return agentToEdit.trigger_rules.slice(0, 1);
     }
     return [
       {
@@ -698,7 +701,7 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
           {step === 3 && (
             <div id="step3-planification" className="anim">
               <div className="wcard">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <div className="wcard-title" style={{ margin: 0 }}>
                     <span className="dot" style={{ backgroundColor: '#00E5C8' }}></span>
                     Règles de Planification Automatique
@@ -706,6 +709,8 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
                   <button
                     type="button"
                     onClick={addTriggerRule}
+                    disabled={triggerRules.length >= 1}
+                    title={triggerRules.length >= 1 ? 'Une seule règle de planification est prise en charge pour le moment.' : undefined}
                     style={{
                       padding: '8px 16px',
                       backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -714,7 +719,8 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
                       color: '#fff',
                       fontSize: '12px',
                       fontWeight: 'bold',
-                      cursor: 'pointer',
+                      cursor: triggerRules.length >= 1 ? 'not-allowed' : 'pointer',
+                      opacity: triggerRules.length >= 1 ? 0.4 : 1,
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
@@ -724,6 +730,10 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
                     <span>+</span> Ajouter une règle
                   </button>
                 </div>
+
+                <p style={{ margin: '0 0 16px', fontSize: '11px', color: '#8a94a6' }}>
+                  Une seule règle de planification est prise en charge pour le moment.
+                </p>
 
                 {triggerRules.length === 0 ? (
                   <div style={{ padding: '30px', textAlign: 'center', color: '#b2bec3', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px dashed rgba(255,255,255,0.1)' }}>

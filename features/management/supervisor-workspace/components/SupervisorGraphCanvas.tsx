@@ -149,6 +149,18 @@ export const SupervisorGraphCanvas: React.FC<SupervisorGraphCanvasProps> = ({
   // ─── Force configuration ────────────────────────────────────────────────────
   const forcesConfigured = useRef(false);
 
+  // L-6: handleEngineTick's three auto-fit setTimeout calls below were never
+  // cleared on unmount. Track their handles so the cleanup effect can clear
+  // them if the component unmounts mid-animation.
+  const engineTickTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    return () => {
+      engineTickTimers.current.forEach(clearTimeout);
+      engineTickTimers.current = [];
+    };
+  }, []);
+
   const configureForces = useCallback((fg: any) => {
     if (!fg) return;
 
@@ -266,9 +278,9 @@ export const SupervisorGraphCanvas: React.FC<SupervisorGraphCanvasProps> = ({
       forcesConfigured.current = true;
       configureForces(fgRef.current);
       // Progressive auto-fit: immediate framing, settling transition, and final settle
-      setTimeout(() => autoFitGraph(300), 120);
-      setTimeout(() => autoFitGraph(500), 550);
-      setTimeout(() => autoFitGraph(400), 1100);
+      engineTickTimers.current.push(setTimeout(() => autoFitGraph(300), 120));
+      engineTickTimers.current.push(setTimeout(() => autoFitGraph(500), 550));
+      engineTickTimers.current.push(setTimeout(() => autoFitGraph(400), 1100));
     }
   }, [configureForces, autoFitGraph]);
 

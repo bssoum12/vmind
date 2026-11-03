@@ -125,8 +125,21 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
       });
 
       if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || 'Erreur lors du diagnostic IA');
+        let serverMsg: string | undefined;
+        try {
+          const errJson = await res.json();
+          serverMsg = errJson?.error;
+        } catch {
+          // Non-JSON error body (e.g. a raw 502 from a gateway)
+        }
+
+        const fallbackByStatus: Record<number, string> = {
+          403: "Vous n'êtes pas autorisé à évaluer cette liaison.",
+          404: 'Agents introuvables pour cette évaluation.',
+          502: 'Le service de diagnostic IA est momentanément indisponible. Réessayez plus tard.'
+        };
+
+        throw new Error(serverMsg || fallbackByStatus[res.status] || 'Erreur lors du diagnostic IA');
       }
 
       const data = await res.json();
