@@ -133,11 +133,25 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
         website: hasWebsite ? websiteUrl.trim() : '',
         summary: hasWebsite ? aiSummary.trim() : manualDescription.trim(),
         additional_info: hasWebsite ? additionalInfo.trim() : '',
-        value_proposition: '',
+        value_proposition: context?.value_proposition || (context as any)?.valueProposition || '',
+        target_customers: context?.target_customers || (context as any)?.targetCustomers || '',
+        competitors: context?.competitors || '',
         raw_search_data: hasWebsite ? rawSearchData : { manual: true, submitted_at: new Date().toISOString() }
       };
 
-      const savedData = await saveCompanyContext(payloadToSave);
+      // When inline in a wizard flow, if the user did not change any text, avoid a redundant save request
+      const isUnchanged = Boolean(
+        inline &&
+        context &&
+        (context.website || '').trim() === (payloadToSave.website || '').trim() &&
+        (context.summary || context.presentation || '').trim() === (payloadToSave.summary || '').trim() &&
+        (context.additional_info || context.additionalInfo || '').trim() === (payloadToSave.additional_info || '').trim()
+      );
+
+      let savedData = context;
+      if (!isUnchanged) {
+        savedData = await saveCompanyContext(payloadToSave);
+      }
 
       if (onSaveContext) {
         await onSaveContext(savedData);

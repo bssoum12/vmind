@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/shared/management/components/Button';
 import { useToast } from '@/shared/contexts/ToastContext';
@@ -148,25 +148,33 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
     return agentToEdit?.company_context || agentToEdit?.config?.company_context || null;
   });
 
-  // Pre-fill user email from vmind_users
+  const emailPrefetchedRef = useRef(false);
+
+  // Pre-fill user email from vmind_users ONLY once on initial mount if empty
   useEffect(() => {
-    if (!emailRecap) {
-      (async () => {
-        try {
-          const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-          const res = await fetch(`${baseUrl}/api/supervisor-agent/user-email`, { credentials: 'include' });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.email) {
-              setEmailRecap(data.email);
-            }
-          }
-        } catch (e) {
-          console.warn('Could not prefetch user email in supervisor wizard:', e);
-        }
-      })();
+    if (emailPrefetchedRef.current) return;
+    emailPrefetchedRef.current = true;
+
+    // If agent already has an email configured (e.g. edit mode), do not overwrite it
+    if (agentToEdit?.email_recap || agentToEdit?.config?.email_recap) {
+      return;
     }
-  }, [emailRecap]);
+
+    (async () => {
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+        const res = await fetch(`${baseUrl}/api/supervisor-agent/user-email`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.email) {
+            setEmailRecap((prev) => (prev ? prev : data.email));
+          }
+        }
+      } catch (e) {
+        console.warn('Could not prefetch user email in supervisor wizard:', e);
+      }
+    })();
+  }, []);
 
   const addTriggerRule = () => {
     setTriggerRules(prev => [
