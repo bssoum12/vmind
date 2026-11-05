@@ -589,20 +589,6 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
                   )}
                 </>
               )}
-
-              {node.metrics.replyRate !== undefined && (
-                <div className="apple-metric-cell">
-                  <span className="metric-val">{node.metrics.replyRate}%</span>
-                  <span className="metric-lbl">Taux de Réponse</span>
-                </div>
-              )}
-
-              {node.metrics.bounceRate !== undefined && (
-                <div className={`apple-metric-cell ${node.metrics.bounceRate > 5 ? 'warning' : ''}`}>
-                  <span className="metric-val">{node.metrics.bounceRate}%</span>
-                  <span className="metric-lbl">Taux de Rebond</span>
-                </div>
-              )}
             </div>
 
             {!isSourcing && deliveryHealth?.analysis && (

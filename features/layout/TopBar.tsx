@@ -227,7 +227,7 @@ export const TopBar: React.FC = () => {
               )}
 
               <span style={{ color: 'var(--border2)', margin: '0 6px' }}>|</span>
-              <span>{clock}</span>
+              <span style={{ fontFamily: "var(--font-mono, 'JetBrains Mono', Consolas, monospace)", fontVariantNumeric: 'tabular-nums', letterSpacing: '0.4px' }}>{clock}</span>
             </div>
           );
         })()}

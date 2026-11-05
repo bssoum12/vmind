@@ -2,18 +2,23 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Building2, RotateCw } from 'lucide-react';
+import { ArrowLeft, Building2, RotateCw, Share2, Filter, Clock } from 'lucide-react';
 import { SupervisorGraphCanvas } from './SupervisorGraphCanvas';
 import { NodeDiagnosticDrawer } from './NodeDiagnosticDrawer';
 import { EdgeDiagnosticDrawer } from './EdgeDiagnosticDrawer';
+import { SupervisorFunnelView } from './SupervisorFunnelView';
+import { SupervisorHistoryView } from './SupervisorHistoryView';
 import { CompanyContextModal } from '@/features/company-context';
 import {
   SupervisorNode,
   SupervisorLink,
   CompanyContext,
   FleetAuditSummary,
+  FleetFunnelData,
+  FleetHistoryData,
   DEFAULT_FLEET_SUMMARY,
-  DEFAULT_COMPANY_CONTEXT
+  DEFAULT_COMPANY_CONTEXT,
+  DEFAULT_FLEET_HISTORY_DATA
 } from '../types/supervisor.types';
 import { useToast } from '@/shared/contexts/ToastContext';
 import '../supervisor-workspace.scss';
@@ -31,12 +36,16 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
   const { showToast } = useToast();
 
   // State: start strictly with empty data so no fake nodes ever flash
+  const [activeTab, setActiveTab] = useState<'canvas' | 'funnel' | 'history'>('canvas');
   const [nodes, setNodes] = useState<SupervisorNode[]>([]);
   const [links, setLinks] = useState<SupervisorLink[]>([]);
+  const [funnelData, setFunnelData] = useState<FleetFunnelData | null>(null);
+  const [historyData, setHistoryData] = useState<FleetHistoryData>(DEFAULT_FLEET_HISTORY_DATA);
   const [fleetSummary, setFleetSummary] = useState<FleetAuditSummary>(DEFAULT_FLEET_SUMMARY);
   const [companyContext, setCompanyContext] = useState<CompanyContext>(DEFAULT_COMPANY_CONTEXT);
   const [displayName, setDisplayName] = useState<string>(initialAgentName || 'Superviseur Commercial');
   const [isLoadingFleet, setIsLoadingFleet] = useState<boolean>(true);
+  const [isRunningAudit, setIsRunningAudit] = useState<boolean>(false);
 
   const calculateSummary = (incomingNodes: SupervisorNode[]): FleetAuditSummary => {
     if (incomingNodes.length === 0) {
@@ -62,7 +71,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
       : 0;
 
     return {
-      lastAuditedAt: 'Synchronisé en direct',
+      lastAuditedAt: '',
       overallScore: avgScore,
       totalAgents: incomingNodes.length,
       healthyCount: healthy,
@@ -121,6 +130,32 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
         setLinks(incomingLinks);
         setFleetSummary(calculateSummary(incomingNodes));
       }
+
+      // 3. Fetch fleet conversion funnel (KBN-13)
+      try {
+        const funnelRes = await fetch(`${baseUrl}/api/supervisor/fleet-funnel/${encodeURIComponent(targetId)}`, {
+          credentials: 'include'
+        });
+        if (funnelRes.ok) {
+          const fData = await funnelRes.json();
+          setFunnelData(fData);
+        }
+      } catch (fErr) {
+        console.warn('[SupervisorWorkspace] Error loading fleet funnel:', fErr);
+      }
+
+      // 4. Fetch fleet audit history (KBN-16)
+      try {
+        const historyRes = await fetch(`${baseUrl}/api/supervisor/fleet-history/${encodeURIComponent(targetId)}`, {
+          credentials: 'include'
+        });
+        if (historyRes.ok) {
+          const hData = await historyRes.json();
+          setHistoryData(hData);
+        }
+      } catch (hErr) {
+        console.warn('[SupervisorWorkspace] Error loading fleet history:', hErr);
+      }
     } catch (err) {
       console.error('[SupervisorWorkspace] Error loading fleet graph:', err);
     } finally {
@@ -136,6 +171,29 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
   const handleRefresh = async () => {
     await fetchRealFleet();
     showToast('Données de la flotte actualisées', 'ok');
+  };
+
+  const handleRunAuditNow = async () => {
+    if (!agentId || isRunningAudit) return;
+    setIsRunningAudit(true);
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+      const res = await fetch(`${baseUrl}/api/supervisor-agent/run-now/${encodeURIComponent(agentId)}`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (res.ok) {
+        showToast('Audit flash terminé avec succès', 'ok');
+        await fetchRealFleet();
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        showToast(errJson.error || "Impossible d'exécuter l'audit flash", 'error');
+      }
+    } catch (e: any) {
+      showToast("Erreur de connexion lors de l'audit flash", 'error');
+    } finally {
+      setIsRunningAudit(false);
+    }
   };
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -247,14 +305,12 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
           <div className="agent-title-block">
             <div className="agent-badge-row">
               <span className="role-tag">Superviseur IA</span>
-              <span className="status-dot" />
-              <span className="last-audit">Synchronisé en direct</span>
             </div>
             <div className="agent-name">{displayName}</div>
           </div>
         </div>
 
-        {/* Center: Fleet Status Capsule */}
+        {/* Fleet Status Capsule */}
         <div className="header-center-pill">
           <div className="fleet-score-badge" title="Moyenne des scores d'alignement IA de vos agents par rapport à la stratégie d'entreprise">
             <span className="score-ring-dot" />
@@ -288,6 +344,37 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
           </div>
         </div>
 
+        {/* Tab Switcher: Réseau vs Entonnoir Global vs Historique des Audits (KBN-13) */}
+        <div className="header-tab-switcher">
+          <button
+            type="button"
+            className={`tab-btn ${activeTab === 'canvas' ? 'active' : ''}`}
+            onClick={() => setActiveTab('canvas')}
+            title="Afficher la cartographie réseau interactive des agents"
+          >
+            <Share2 size={13} />
+            <span>Réseau</span>
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeTab === 'funnel' ? 'active' : ''}`}
+            onClick={() => setActiveTab('funnel')}
+            title="Afficher l'entonnoir de conversion global de la flotte"
+          >
+            <Filter size={13} />
+            <span>Entonnoir Global</span>
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeTab === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('history')}
+            title="Afficher l'historique chronologique des audits et comparatifs d'alignement"
+          >
+            <Clock size={13} />
+            <span>Historique des Audits</span>
+          </button>
+        </div>
+
         <div className="header-right">
           <button
             className="header-btn btn-secondary"
@@ -310,73 +397,94 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
         </div>
       </header>
 
-      {/* 2. Interactive Graph Canvas Container */}
-      <div style={{ position: 'relative', flex: 1, minHeight: 0, width: '100%', height: '100%', overflow: 'hidden' }}>
-        <SupervisorGraphCanvas
-          nodes={nodes}
-          links={links}
-          selectedNodeId={selectedNodeId}
-          selectedLinkId={selectedLinkId}
-          onSelectNode={handleSelectNode}
-          onSelectLink={handleSelectLink}
-          onClearSelection={handleClearSelection}
-        />
+      {/* 2. Main Workspace View Container */}
+      {activeTab === 'canvas' ? (
+        <div style={{ position: 'relative', flex: 1, minHeight: 0, width: '100%', height: '100%', overflow: 'hidden' }}>
+          <SupervisorGraphCanvas
+            nodes={nodes}
+            links={links}
+            selectedNodeId={selectedNodeId}
+            selectedLinkId={selectedLinkId}
+            onSelectNode={handleSelectNode}
+            onSelectLink={handleSelectLink}
+            onClearSelection={handleClearSelection}
+          />
 
-        {/* Loading Spinner Overlay */}
-        {isLoadingFleet && nodes.length === 0 && (
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(6, 17, 31, 0.75)',
-            backdropFilter: 'blur(8px)',
-            zIndex: 15,
-            pointerEvents: 'none'
-          }}>
-            <div className="spinner-ring" style={{ width: 36, height: 36, marginBottom: 16 }} />
-            <span style={{ color: '#00E5C8', fontSize: 13, fontWeight: 600, letterSpacing: '0.04em' }}>
-              Chargement du cockpit de supervision…
-            </span>
-          </div>
-        )}
-
-        {/* Empty State Banner if 0 agents are attached */}
-        {!isLoadingFleet && nodes.length === 0 && (
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'rgba(6, 17, 31, 0.85)',
-            zIndex: 10,
-            padding: 32,
-            textAlign: 'center',
-            pointerEvents: 'none'
-          }}>
+          {/* Loading Spinner Overlay */}
+          {isLoadingFleet && nodes.length === 0 && (
             <div style={{
-              maxWidth: 440,
-              padding: '28px 32px',
-              borderRadius: 16,
-              background: 'rgba(10, 25, 47, 0.75)',
-              border: '1px solid rgba(0, 229, 200, 0.2)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)'
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(6, 17, 31, 0.75)',
+              backdropFilter: 'blur(8px)',
+              zIndex: 15,
+              pointerEvents: 'none'
             }}>
-              <div style={{ fontSize: 38, marginBottom: 12 }}>👁️</div>
-              <div style={{ color: '#F0F4F8', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
-                Aucun agent sous supervision
-              </div>
-              <div style={{ color: '#94A3B8', fontSize: 13, lineHeight: 1.6 }}>
-                Ce superviseur ne possède aucun agent de Sourcing ou de Prospection rattaché pour le moment.
+              <div className="spinner-ring" style={{ width: 36, height: 36, marginBottom: 16 }} />
+              <span style={{ color: '#00E5C8', fontSize: 13, fontWeight: 600, letterSpacing: '0.04em' }}>
+                Chargement du cockpit de supervision…
+              </span>
+            </div>
+          )}
+
+          {/* Empty State Banner if 0 agents are attached */}
+          {!isLoadingFleet && nodes.length === 0 && (
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(6, 17, 31, 0.85)',
+              zIndex: 10,
+              padding: 32,
+              textAlign: 'center',
+              pointerEvents: 'none'
+            }}>
+              <div style={{
+                maxWidth: 440,
+                padding: '28px 32px',
+                borderRadius: 16,
+                background: 'rgba(10, 25, 47, 0.75)',
+                border: '1px solid rgba(0, 229, 200, 0.2)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)'
+              }}>
+                <div style={{ fontSize: 38, marginBottom: 12 }}>👁️</div>
+                <div style={{ color: '#F0F4F8', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
+                  Aucun agent sous supervision
+                </div>
+                <div style={{ color: '#94A3B8', fontSize: 13, lineHeight: 1.6 }}>
+                  Ce superviseur ne possède aucun agent de Sourcing ou de Prospection rattaché pour le moment.
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      ) : activeTab === 'funnel' ? (
+        <div className="supervisor-funnel-tab-container">
+          <SupervisorFunnelView
+            funnelData={funnelData}
+            isLoading={isLoadingFleet}
+            onRefresh={handleRefresh}
+            onOpenContextModal={() => setIsContextModalOpen(true)}
+          />
+        </div>
+      ) : (
+        <div className="supervisor-history-tab-container">
+          <SupervisorHistoryView
+            historyData={historyData}
+            isLoading={isLoadingFleet}
+            onRefresh={handleRefresh}
+            onRunAuditNow={handleRunAuditNow}
+            isRunningAudit={isRunningAudit}
+          />
+        </div>
+      )}
 
       {/* 3. Sliding Diagnostic Drawers */}
       {selectedNode && (

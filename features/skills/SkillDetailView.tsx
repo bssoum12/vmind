@@ -754,7 +754,7 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
               padding: '12px 16px',
               margin: 0,
               fontSize: '12.5px',
-              fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+              fontFamily: "var(--font-mono, 'JetBrains Mono', Consolas, monospace)",
               color: '#38bdf8',
               overflowX: 'auto',
               lineHeight: '1.5',
@@ -998,7 +998,7 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
             key={pIdx}
             style={{
               fontSize: '12px',
-              fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+              fontFamily: "var(--font-mono, 'JetBrains Mono', Consolas, monospace)",
               padding: '2px 6px',
               borderRadius: '4px',
               background: isRef ? 'rgba(244, 63, 94, 0.12)' : 'rgba(255, 255, 255, 0.08)',
@@ -2838,7 +2838,7 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
                   <div
                     style={{
                       fontSize: '12.5px',
-                      fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                      fontFamily: "var(--font-mono, 'JetBrains Mono', Consolas, monospace)",
                       color: '#94a3b8',
                       display: 'flex',
                       alignItems: 'center',
@@ -2949,7 +2949,7 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
                         background: '#090f1d',
                         border: '1px solid rgba(255, 255, 255, 0.06)',
                         color: '#93c5fd',
-                        fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                        fontFamily: "var(--font-mono, 'JetBrains Mono', Consolas, monospace)",
                         fontSize: '12.5px',
                         lineHeight: '1.6',
                         whiteSpace: 'pre-wrap',
@@ -3345,7 +3345,7 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
                               key={t}
                               style={{
                                 fontSize: '11.5px',
-                                fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                                fontFamily: "var(--font-mono, 'JetBrains Mono', Consolas, monospace)",
                                 padding: '3px 8px',
                                 borderRadius: '6px',
                                 background: 'rgba(255, 255, 255, 0.04)',

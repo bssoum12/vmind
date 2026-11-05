@@ -174,3 +174,172 @@ export const DEFAULT_FLEET_SUMMARY: FleetAuditSummary = {
   topPriorities: []
 };
 
+export interface FleetFunnelStageMetric {
+  id: string;
+  label: string;
+  count: number;
+  pct: number;
+  subtext?: string;
+  color?: string;
+}
+
+export interface AgentPairFunnelRow {
+  sourceAgentId: number;
+  sourceUuid: string;
+  sourceName: string;
+  targetAgentId: number;
+  targetUuid: string;
+  targetName: string;
+  transferredCount: number;
+  qualifiedCount: number;
+  rejectedCount: number;
+  qualificationRate: number;
+  draftsCount: number;
+  emailsSentCount: number;
+  phonesRevealedCount: number;
+  phonesAvailableCount: number;
+  contactRate: number;
+}
+
+export interface FleetFunnelData {
+  supervisor: {
+    uuid: string;
+    name: string;
+    supervisedAgentCount: number;
+    sourcingCount: number;
+    prospectCount: number;
+  };
+  summary: {
+    totalSourced: number;
+    totalTransferred: number;
+    totalQualified: number;
+    totalRejected: number;
+    totalEvaluated: number;
+    totalDrafts: number;
+    totalEmailsSent: number;
+    emailErrors: number;
+    totalPhonesRevealed: number;
+    totalPhonesAvailable: number;
+    globalConversionRate: number;
+    qualificationRate: number;
+    contactRate: number;
+  };
+  stages: FleetFunnelStageMetric[];
+  agentPairs: AgentPairFunnelRow[];
+  lastCalculatedAt: string;
+}
+
+export const DEFAULT_FLEET_FUNNEL_DATA: FleetFunnelData = {
+  supervisor: {
+    uuid: '',
+    name: '',
+    supervisedAgentCount: 0,
+    sourcingCount: 0,
+    prospectCount: 0,
+  },
+  summary: {
+    totalSourced: 0,
+    totalTransferred: 0,
+    totalQualified: 0,
+    totalRejected: 0,
+    totalEvaluated: 0,
+    totalDrafts: 0,
+    totalEmailsSent: 0,
+    emailErrors: 0,
+    totalPhonesRevealed: 0,
+    totalPhonesAvailable: 0,
+    globalConversionRate: 0,
+    qualificationRate: 0,
+    contactRate: 0,
+  },
+  stages: [],
+  agentPairs: [],
+  lastCalculatedAt: '',
+};
+
+// ── KBN-16: Fleet Evaluation History & Audit Comparison Types ──
+export interface AuditNodeSnapshot {
+  agentUuid: string;
+  agentName: string;
+  agentRole: 'sourcing' | 'prospect';
+  score: number;
+  scoreDelta?: number | null;
+  status: 'HEALTHY' | 'WARNING' | 'CRITICAL';
+  summary: string;
+  leadsCount: number;
+}
+
+export interface AuditLinkSnapshot {
+  sourceUuid: string;
+  sourceName: string;
+  targetUuid: string;
+  targetName: string;
+  score: number;
+  scoreDelta?: number | null;
+  status: 'HEALTHY' | 'WARNING' | 'CRITICAL';
+  summary: string;
+  leadsCount: number;
+}
+
+export interface FleetAuditHistoryItem {
+  id: string | number;
+  timestamp: string;
+  triggerType: 'MANUAL' | 'AUTOPILOT';
+  status: 'SUCCESS' | 'FAIL';
+  overallScore: number | null;
+  scoreDelta?: number | null;
+  reportSent: boolean;
+  recipientEmail?: string | null;
+  summaryMessage: string;
+  errorMessage?: string | null;
+  nodeSnapshots: AuditNodeSnapshot[];
+  linkSnapshots: AuditLinkSnapshot[];
+  recommendations: string[];
+  healthyCount?: number;
+  warningCount?: number;
+  criticalCount?: number;
+}
+
+export interface AgentHistoricalPoint {
+  id: string | number;
+  score: number;
+  summary: string;
+  date: string;
+}
+
+export interface AgentHistoryTrack {
+  agentId: string;
+  agentUuid: string;
+  agentName: string;
+  role: 'sourcing' | 'prospect';
+  currentScore: number;
+  scoreDelta: number | null;
+  evaluationsCount: number;
+  history: AgentHistoricalPoint[];
+}
+
+export interface FleetHistoryData {
+  supervisor: {
+    id: string;
+    name: string;
+    supervisedAgentsCount: number;
+  };
+  totalAuditsCount: number;
+  latestScore: number | null;
+  audits: FleetAuditHistoryItem[];
+  agentHistories?: AgentHistoryTrack[];
+}
+
+export const DEFAULT_FLEET_HISTORY_DATA: FleetHistoryData = {
+  supervisor: {
+    id: '',
+    name: '',
+    supervisedAgentsCount: 0,
+  },
+  totalAuditsCount: 0,
+  latestScore: null,
+  audits: [],
+  agentHistories: [],
+};
+
+

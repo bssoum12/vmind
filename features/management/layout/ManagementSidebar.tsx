@@ -235,7 +235,7 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
           </span>
           <span
             className="stats-val"
-            style={{ fontFamily: "var(--font-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace" }}
+            style={{ fontFamily: "var(--font-mono, 'JetBrains Mono', Consolas, monospace)", fontVariantNumeric: "tabular-nums" }}
           >
             {executionsToday !== null ? executionsToday : '…'}
           </span>
@@ -249,7 +249,7 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
           </span>
           <span
             className="stats-val"
-            style={{ fontFamily: "var(--font-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace" }}
+            style={{ fontFamily: "var(--font-mono, 'JetBrains Mono', Consolas, monospace)", fontVariantNumeric: "tabular-nums" }}
           >
             {activeAgentsCount !== null ? activeAgentsCount : (agentCount !== null ? agentCount : '…')}
           </span>
@@ -263,7 +263,7 @@ export const ManagementSidebar: React.FC<SidebarProps> = ({ currentView, onNavig
           </span>
           <span
             className="stats-val"
-            style={{ fontFamily: "var(--font-mono), 'JetBrains Mono', Consolas, 'Courier New', monospace" }}
+            style={{ fontFamily: "var(--font-mono, 'JetBrains Mono', Consolas, monospace)", fontVariantNumeric: "tabular-nums" }}
           >
             {executionsToday && executionsToday > 0 && successRate !== null ? `${successRate}%` : '-'}
           </span>

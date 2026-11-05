@@ -18,8 +18,7 @@ export const syne = Syne({
 
 export const jetBrainsMono = JetBrains_Mono({
   subsets: ['latin'],
-  weight: ['400', '500'],
   variable: '--font-mono',
   display: 'swap',
-  fallback: ['Consolas', 'Courier New', 'monospace'],
+  fallback: ['Consolas', 'Segoe UI Mono', 'Menlo', 'Monaco', 'monospace'],
 });
