@@ -351,10 +351,10 @@ export const VbuyCommandesEnAttenteCard: React.FC<VbuyCommandesEnAttenteCardProp
                         padding: '1px 5px',
                         borderRadius: '4px'
                       }}>
-                        {sup.count_commandes} cmd.
+                        {sup.count_commandes ?? sup.nb_commandes ?? 0} cmd.
                       </span>
                       <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#F8FAFC' }}>
-                        <AnimatedNumber value={sup.total_tnd} formatter={formatNumberOnly} />
+                        <AnimatedNumber value={sup.total_tnd ?? sup.montant_en_attente_tnd ?? 0} formatter={formatNumberOnly} />
                       </span>
                     </div>
                   </div>

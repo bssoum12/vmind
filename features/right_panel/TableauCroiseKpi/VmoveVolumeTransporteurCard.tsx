@@ -28,6 +28,12 @@ const MONTHS_LIST = [
   { value: 12, label: "Décembre" }
 ];
 
+// VMOVE (skill vmove-kpis) : la période vient du sélecteur global Début / Fin du panneau.
+// Les listes Mois / Année locales ne filtraient pas les données : elles sont masquées (code conservé).
+const SHOW_LOCAL_MONTH_SELECTOR = false;
+const fmtDate = (d?: string) => { if (!d) return ""; const [y, m, j] = String(d).slice(0, 10).split("-"); return j ? `${j}/${m}/${y}` : String(d); };
+
+
 export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardProps> = ({
   activeAgentId,
   clientId = "DEMO",
@@ -100,14 +106,14 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
 
   const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const agentData = kpisByAgent["vmove"] || kpisByAgent["VMOVE"] || {};
-  const n8nToolData = agentData.get_kpi_dashboard || agentData.get_expeditions || agentData.volume_transporteur;
+  const n8nToolData = agentData.volume_transporteur; // bloc propre à la carte (skill vmove-kpis)
 
   const effectiveLoading = (loadingByAgent["vmove"] || loadingByAgent["VMOVE"]) && !n8nToolData;
   const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
   const payload = n8nToolData?.data || n8nToolData;
 
   const handleRefresh = () => {
-    fetchKpis('vmove', true, 'get_expeditions');
+    fetchKpis('vmove', true, 'volume_transporteur');
   };
 
   if (!isVisible) return null;
@@ -125,6 +131,9 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
 
   const rankingList: any[] = payload?.ranking || [];
   const detailsList: any[] = payload?.details || [];
+  const periodLabel = SHOW_LOCAL_MONTH_SELECTOR
+    ? `${selectedMonth > 0 ? MONTHS_LIST[selectedMonth]?.label : "Année"} ${selectedYear}`
+    : (summary.periode_debut ? `${fmtDate(summary.periode_debut)} → ${fmtDate(summary.periode_fin)}` : "");
 
   // Dynamic filtering of widget details based on carrier hover or click
   const activeCarrier = hoveredCarrier || (selectedCarrierFilter !== "ALL" ? selectedCarrierFilter : null);
@@ -230,11 +239,12 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
           }}
         >
           <RefreshCw size={11} className={effectiveLoading ? 'animate-spin' : ''} />
-          <span>{effectiveLoading ? "..." : "Actualiser"}</span>
+          {/* Icône seule : le texte « Actualiser » est dans l'infobulle (title) */}
         </button>
       </div>
 
       {/* 2. Premium Dropdown Controls (Month & Year) */}
+      {SHOW_LOCAL_MONTH_SELECTOR && (
       <div style={{
         display: 'flex',
         gap: '6px',
@@ -310,6 +320,7 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
           ))}
         </select>
       </div>
+      )}
 
       {/* 3. Primary Metric KPI Summary Banner (2 Cards) */}
       <div style={{
@@ -336,7 +347,7 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
             <AnimatedNumber value={totalClotures} />
           </div>
           <span style={{ fontSize: '8px', color: '#64748B', display: 'block', marginTop: '2px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {selectedMonth > 0 ? MONTHS_LIST[selectedMonth]?.label : "Année"} {selectedYear}
+            {periodLabel}
           </span>
         </div>
 
@@ -447,7 +458,7 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                         <span style={{ fontWeight: 800, color: '#00E5C8' }}>{item.count}</span>
-                        <span style={{ fontSize: '9px', color: '#64748B' }}>({item.pct}%)</span>
+                        <span style={{ fontSize: '9px', color: '#64748B' }}>({Number(item.pct ?? 0).toFixed(1)}%)</span>
                       </div>
                     </div>
 
@@ -604,7 +615,7 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
               </div>
               <div>
                 <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>Période</span>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#CBD5E1' }}>{selectedMonth > 0 ? MONTHS_LIST[selectedMonth]?.label : "Année"} {selectedYear}</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#CBD5E1' }}>{periodLabel}</span>
               </div>
             </div>
 

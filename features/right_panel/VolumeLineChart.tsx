@@ -25,7 +25,8 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
 
   // Read current active data from Context
   const agentData = kpisByAgent["vdata"] || kpisByAgent["VDATA"] || {};
-  const toolData = agentData.get_kpi_dashboard || agentData.get_dossiers || agentData.volume_evolution || agentData || {};
+  // Bloc du skill vdata-kpis (clé demandée par le bouton de la carte) ; anciennes clés gardées en repli
+  const toolData = agentData.get_dossier_volume_evolution || agentData.get_kpi_dashboard || agentData.get_dossiers || agentData.volume_evolution || agentData || {};
 
   const activeData: ChartDataPoint[] = toolData.chart?.data || [];
   const totalDossiersCurrent = activeData.reduce((acc, d) => acc + d.value, 0);
@@ -33,6 +34,7 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
   const effectiveLoading = (loadingByAgent["vdata"] || loadingByAgent["VDATA"]) && !toolData.ok;
   const error = !effectiveLoading && !toolData.ok && globalError ? globalError : "";
 
+  // Ancien appel direct au MCP (sans jeton) : conservé mais plus appelé. Le total N-1 vient du skill.
   const fetchPrevYearVolume = async () => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
@@ -67,14 +69,13 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
     }
   };
 
+  // Comparaison N-1 : fournie par le skill (details.total_dossiers_n1), même période un an plus tôt
+  const totalN1FromSkill = toolData?.details?.total_dossiers_n1;
   useEffect(() => {
-    if (activeAgentId === 'VDATA' && startDate && endDate) {
-      const timer = setTimeout(() => {
-        fetchPrevYearVolume();
-      }, 800);
-      return () => clearTimeout(timer);
-    }
-  }, [activeAgentId, startDate, endDate]);
+    if (activeAgentId !== 'VDATA') return;
+    if (startDate) setPrevYear(parseInt(startDate.substring(0, 4)) - 1);
+    setTotalDossiersPrev(typeof totalN1FromSkill === 'number' ? totalN1FromSkill : null);
+  }, [activeAgentId, startDate, totalN1FromSkill]);
 
   if (activeAgentId !== 'VDATA') return null;
 

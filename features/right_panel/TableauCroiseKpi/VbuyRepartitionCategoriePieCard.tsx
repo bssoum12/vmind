@@ -274,7 +274,7 @@ export const VbuyRepartitionCategoriePieCard: React.FC<VbuyRepartitionCategorieP
               <div style={{ fontSize: '9px', color: '#94A3B8' }}>
                 {hoveredCategory
                   ? `${hoveredCategory.count} facture(s) (${formatPercentage(hoveredCategory.percentage)})`
-                  : `${totalFacturesCount} facture(s) au total (${summary.nb_categories} catégories)`
+                  : `${totalFacturesCount} facture(s) au total (${(summary.nb_categories ?? categories.length)} catégories)`
                 }
               </div>
             </div>

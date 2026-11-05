@@ -34,7 +34,8 @@ export const VbuyFournisseursEnRetardCard: React.FC<VbuyFournisseursEnRetardCard
     nb_fournisseurs_en_retard: 0,
     nb_commandes_en_retard: 0,
     total_montant_retard_tnd: 0,
-    retard_moyen_jours: 0
+    retard_moyen_jours: 0,
+    mois: 'Période sélectionnée'
   };
 
   const topSuppliers = payload?.top_suppliers_en_retard || [];
@@ -94,7 +95,7 @@ export const VbuyFournisseursEnRetardCard: React.FC<VbuyFournisseursEnRetardCard
               FOURNISSEURS EN RETARD
             </div>
             <div style={{ fontSize: '9px', color: '#94A3B8', fontWeight: 500 }}>
-              Délai de livraison dépassé (Août 2023)
+              Délai de livraison dépassé ({summary.mois || 'Période sélectionnée'})
             </div>
           </div>
         </div>

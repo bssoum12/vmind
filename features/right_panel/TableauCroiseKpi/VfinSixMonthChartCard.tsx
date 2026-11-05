@@ -23,11 +23,18 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
 
   // Read current active data from Context
   const agentData = kpisByAgent["vfin"] || {};
-  const toolData = agentData.get_kpi_dashboard || agentData.revenue_trend || {};
+  const toolData = agentData.evolution_ca || {}; // bloc propre à la carte (skill vfin-kpis)
 
-  const data: TrendDataPoint[] = Array.isArray(toolData.data) 
-    ? toolData.data 
-    : (toolData.data?.data || []);
+  // Le skill renvoie deux séries mensuelles (CA et marge), un point par mois de la période : on les assemble mois par mois
+  const serieCa: any[] = toolData.serie_ca || [];
+  const serieMarge: any[] = toolData.serie_marge || [];
+  const data: TrendDataPoint[] = serieCa.map((p: any, i: number) => ({
+    annee: Number(String(p.periode || "").slice(0, 4)),
+    mois: Number(String(p.periode || "").slice(5, 7)),
+    label: p.label,
+    ca: Number(p.value) || 0,
+    marge: Number(serieMarge[i]?.value) || 0,
+  }));
 
   const loading = loadingByAgent["vfin"] && !toolData.ok;
   const error = !loading && !toolData.ok && globalError ? globalError : "";
@@ -133,7 +140,7 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
           alignItems: "center",
         }}
       >
-        <span>Évolution CA & Marge (6 mois)</span>
+        <span>Évolution CA & Marge</span>
       </div>
 
       {loading ? (
@@ -147,7 +154,7 @@ export const VfinSixMonthChartCard: React.FC<VfinSixMonthChartCardProps> = ({ ac
             {error}
           </span>
           <button
-            onClick={() => fetchKpis('vfin', true)}
+            onClick={() => fetchKpis('vfin', true, 'evolution_ca')}
             style={{
               background: "none",
               border: "none",

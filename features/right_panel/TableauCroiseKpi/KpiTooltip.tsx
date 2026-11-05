@@ -536,7 +536,8 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
           }
         />
 
-        {/* Card 3: Sous Dossiers */}
+        {/* Card 3: Sous Dossiers — masquée tant que le skill ne fournit pas « Total sous-dossiers » */}
+        {kpiSousTotal && (
         <KpiCard
           title="Sous Dossiers"
           value={Math.round(animatedSousTotalVal)}
@@ -563,8 +564,10 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
             </>
           }
         />
+        )}
 
-        {/* Card 4: Unités de Chargement */}
+        {/* Card 4: Unités de Chargement — masquée tant que le skill ne fournit pas « Unités de chargement » */}
+        {kpiUniteTotal && (
         <KpiCard
           title="Unités de chargement"
           value={Math.round(animatedUniteTotalVal)}
@@ -608,9 +611,11 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
             </div>
           }
         />
+        )}
       </div>
 
-      {/* Cyber-accented Export Excel Button */}
+      {/* Cyber-accented Export Excel Button — masqué tant que le skill ne fournit pas exportData */}
+      {exportData && (
       <button
         onClick={handleExportExcel}
         style={{
@@ -652,6 +657,7 @@ export const KpiTooltip: React.FC<KpiTooltipProps> = ({
         </svg>
         Exporter vers Excel
       </button>
+      )}
     </div>,
     document.body
   );

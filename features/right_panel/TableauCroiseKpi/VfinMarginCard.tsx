@@ -20,7 +20,7 @@ export const VfinMarginCard: React.FC<VfinMarginCardProps> = ({ activeAgentId })
 
   // Read current active data from Context
   const agentData = kpisByAgent["vfin"] || {};
-  const toolData = agentData.get_kpi_dashboard || agentData.margin || {};
+  const toolData = agentData.taux_marge || {}; // bloc propre à la carte (skill vfin-kpis)
 
   const kpis = toolData.ok && toolData.kpis ? toolData.kpis : [];
 
@@ -219,7 +219,7 @@ export const VfinMarginCard: React.FC<VfinMarginCardProps> = ({ activeAgentId })
               {error}
             </span>
             <button
-              onClick={() => fetchKpis('vfin', true)}
+              onClick={() => fetchKpis('vfin', true, 'taux_marge')}
               style={{
                 background: "none",
                 border: "none",
@@ -269,7 +269,7 @@ export const VfinMarginCard: React.FC<VfinMarginCardProps> = ({ activeAgentId })
                     gap: "4px",
                   }}
                 >
-                  <span>vs mois précédent :</span>
+                  <span>vs même période N-1 :</span>
                   <span style={{ color: tauxPrecedent !== null && tauxPrecedent < 0 ? "var(--red)" : "var(--white)", fontWeight: 600 }}>
                     {tauxPrecedent !== null ? ((tauxPrecedent * animProgress).toFixed(1)) : "0.0"}%
                   </span>
