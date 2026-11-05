@@ -11,17 +11,22 @@ const listeners = new Set<(payload: any) => void>();
 
 export function useProspectSocket(onDbUpdate?: (payload: any) => void) {
   const [socket, setSocket] = useState<Socket | null>(sharedSocket);
+  const callbackRef = useRef(onDbUpdate);
 
   useEffect(() => {
-    if (onDbUpdate) {
-      listeners.add(onDbUpdate);
-    }
-    return () => {
-      if (onDbUpdate) {
-        listeners.delete(onDbUpdate);
-      }
-    };
+    callbackRef.current = onDbUpdate;
   }, [onDbUpdate]);
+
+  useEffect(() => {
+    if (!onDbUpdate) return;
+    const handler = (payload: any) => {
+      callbackRef.current?.(payload);
+    };
+    listeners.add(handler);
+    return () => {
+      listeners.delete(handler);
+    };
+  }, []);
 
   useEffect(() => {
     subscribersCount++;

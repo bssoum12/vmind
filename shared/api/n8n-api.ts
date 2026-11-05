@@ -35,7 +35,8 @@ export async function sendVmindMessage(
   clientId = "DEMO",
   signal?: AbortSignal,
   connectionId?: number | string | null,
-  selectedSkills?: string[]
+  selectedSkills?: string[],
+  origin?: 'suggestion' | 'chat' | string
 ): Promise<VmindN8nResponse> {
   const sessionId = getVmindSessionId();
 
@@ -59,6 +60,8 @@ export async function sendVmindMessage(
         conversation_id: conversationId,
         agent_id: agentId,
         agent: agentCode,
+        origin: origin || 'chat',
+        timezone: typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'Africa/Tunis',
         ...(selectedSkills && selectedSkills.length > 0 ? { selected_skills: selectedSkills.slice(0, 3) } : {})
       }),
       signal

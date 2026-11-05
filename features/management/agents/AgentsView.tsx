@@ -11,6 +11,7 @@ import {
   getProspectAgentStats,
   qualifyManualProspects,
   triggerAIQualificationAllPending,
+  invalidateAgentsCache,
 } from '@/shared/api/n8n-api';
 import { useProspectSocket } from '../prospect-workspace/hooks/useProspectSocket';
 import { useRouter } from 'next/navigation';
@@ -23,6 +24,7 @@ import { ProspectAgentExecutionModal } from './components/ProspectAgentExecution
 import { SourcingAgentExecutionModal } from './components/SourcingAgentExecutionModal';
 import { ProspectAgentScheduleModal } from './components/ProspectAgentScheduleModal';
 import { SourcingAgentScheduleModal } from './components/SourcingAgentScheduleModal';
+import { SupervisorScheduleModal } from './components/SupervisorScheduleModal';
 import { DeleteAgentConfirmModal } from './components/DeleteAgentConfirmModal';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
 import { useToast } from '@/shared/contexts/ToastContext';
@@ -50,12 +52,13 @@ export interface LiveAgent {
   uuid?: string;
   config?: any;
   target_agent_ids?: (number | string)[];
+  supervised_agent_ids?: (number | string)[];
   is_executing?: boolean;
 }
 
 function deriveStatus(agent: LiveAgent): AgentStatus {
   if (agent.status === 'paused') return 'paused';
-  if (agent.schedule_id) return 'running';
+  if (agent.schedule_id || agent.status === 'running') return 'running';
   return 'stopped';
 }
 
@@ -70,10 +73,15 @@ function formatDate(ts?: number | string) {
     num = new Date(ts).getTime();
   }
   if (isNaN(num) || num <= 0) return '—';
-  return new Date(num).toLocaleString('fr-FR', {
+  const diffSec = Math.floor((Date.now() - num) / 1000);
+  const formatted = new Date(num).toLocaleString('fr-FR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });
+  if (diffSec >= 0 && diffSec < 60) {
+    return `${formatted} (À l'instant)`;
+  }
+  return formatted;
 }
 
 function parseHourString(rawHour: any): string {
@@ -673,12 +681,17 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   }, [selected]);
 
   useEffect(() => {
+    // Only fetch on initial mount. NO periodic polling interval to strictly prevent Redis Upstash cost accumulation.
     refresh();
-  }, []);
+  }, [refresh]);
 
   useProspectSocket((payload) => {
+    // Pure in-memory reactive update via WebSockets: updates status and timestamps locally with 0 Redis calls and 0 network requests.
+    // 1. Direct execution status broadcast from backend WebSocket
     if (typeof payload.is_executing === 'boolean' && (payload.agent_id || payload.uuid)) {
       const targetId = String(payload.uuid || payload.agent_id || '').toLowerCase();
+      const execTime = payload.last_executed || payload.timestamp || Date.now();
+
       setAgents((prev) => prev.map(a => {
         const aUuid = String(a.uuid || '').toLowerCase();
         const aAgentId = String(a.agent_id || '').toLowerCase();
@@ -689,19 +702,75 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           targetId === aAgentId ||
           targetId === aName
         ) {
-          return { ...a, is_executing: payload.is_executing };
+          return {
+            ...a,
+            is_executing: payload.is_executing,
+            lastExecuted: !payload.is_executing ? execTime : a.lastExecuted
+          };
         }
         return a;
       }));
+    }
+
+    // 2. Direct PostgreSQL trigger notification from prospect_agent_logs_execution
+    if (payload.table === 'prospect_agent_logs_execution' && payload.new) {
+      const targetId = String(payload.new.agent_id || '').toLowerCase();
+      const statusVal = (payload.new.status || payload.new.statut || '').toUpperCase();
+      const isFinished = statusVal === 'COMPLETED' || statusVal === 'SUCCESS' || statusVal === 'FAIL' || statusVal === 'ERROR' || statusVal === 'EXHAUSTED';
+      const isStarting = statusVal === 'IN_PROGRESS' || statusVal === 'EXECUTING';
+
+      if (isStarting || isFinished) {
+        const logTimestamp = payload.new.timestamp ? new Date(payload.new.timestamp).getTime() : Date.now();
+
+        setAgents((prev) => prev.map(a => {
+          const aUuid = String(a.uuid || '').toLowerCase();
+          const aAgentId = String(a.agent_id || '').toLowerCase();
+          const aName = String(a.agent_name || a.nom || '').toLowerCase();
+
+          if (
+            targetId === aUuid ||
+            targetId === aAgentId ||
+            targetId === aName
+          ) {
+            return {
+              ...a,
+              is_executing: isStarting,
+              lastExecuted: isFinished ? logTimestamp : a.lastExecuted
+            };
+          }
+          return a;
+        }));
+      }
     }
   });
 
   const handlePause = async (agent: LiveAgent) => {
     setActionLoading(agent.agent_name);
     try {
-      await pauseAgent(agent.agent_name);
-      showToast(`Agent "${agent.agent_name}" mis en pause.`);
-      await refresh();
+      if (agent.run_mode === 'supervisor') {
+        const publicId = agent.uuid || (agent as any).agent_id;
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+        const res = await fetch(`${baseUrl}/api/supervisor-agent/stop/${encodeURIComponent(publicId)}`, {
+          method: 'POST',
+          credentials: 'include'
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const fallbackByStatus: Record<number, string> = {
+            401: 'Authentification de session requise.',
+            403: 'Accès non autorisé à cet agent.',
+            404: 'Agent superviseur introuvable.',
+            502: "Impossible de suspendre la planification automatique. L'agent reste actif."
+          };
+          throw new Error(err.error || fallbackByStatus[res.status] || "Échec de la mise en pause");
+        }
+        showToast(`Superviseur "${agent.agent_name}" mis en pause.`);
+      } else {
+        await pauseAgent(agent.agent_name);
+        showToast(`Agent "${agent.agent_name}" mis en pause.`);
+      }
+      invalidateAgentsCache();
+      await refresh(true);
     } catch (e: any) {
       showToast(e.message, 'err');
     } finally {
@@ -712,12 +781,44 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const handleResume = async (agent: LiveAgent, params?: any) => {
     setActionLoading(agent.agent_name);
     try {
-      await resumeAgent(agent.agent_name, {
-        ...(params || {}),
-        workflow_timezone: getBrowserTimezone()
-      });
-      showToast(`Agent "${agent.agent_name}" relancé.`);
-      await refresh();
+      if (agent.run_mode === 'supervisor') {
+        const publicId = agent.uuid || (agent as any).agent_id;
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+        const res = await fetch(`${baseUrl}/api/supervisor-agent/start/${encodeURIComponent(publicId)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            ...(params || {}),
+            workflow_timezone: getBrowserTimezone()
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const fallbackByStatus: Record<number, string> = {
+            400: 'Une seule règle de planification est supportée pour le moment.',
+            401: 'Authentification de session requise.',
+            403: 'Accès non autorisé à cet agent.',
+            404: 'Agent superviseur introuvable.',
+            502: "Impossible d'activer la planification automatique pour le moment.",
+            503: 'La planification automatique est momentanément indisponible.'
+          };
+          throw new Error(data.error || fallbackByStatus[res.status] || "Échec de l'activation de l'autopilot");
+        }
+        if (data.warning) {
+          showToast(`Autopilot activé avec avertissement : ${data.warning}`, 'ok');
+        } else {
+          showToast(`Autopilot activé pour "${agent.agent_name}" !`);
+        }
+      } else {
+        await resumeAgent(agent.agent_name, {
+          ...(params || {}),
+          workflow_timezone: getBrowserTimezone()
+        });
+        showToast(`Agent "${agent.agent_name}" relancé.`);
+      }
+      invalidateAgentsCache();
+      await refresh(true);
     } catch (e: any) {
       showToast(e.message, 'err');
     } finally {
@@ -760,6 +861,44 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
         return;
       }
       setRunModalAgent(agent);
+      return;
+    }
+
+    if (agent.run_mode === 'supervisor') {
+      const publicId = agent.uuid || (agent as any).agent_id;
+      if (!publicId) {
+        showToast("Impossible de trouver l'identifiant du superviseur", 'err');
+        return;
+      }
+      setActionLoading(agent.agent_name);
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://localhost:3001";
+        const res = await fetch(`${baseUrl}/api/supervisor-agent/run-now/${encodeURIComponent(publicId)}`, {
+          method: 'POST',
+          credentials: 'include'
+        });
+        if (res.status === 409) {
+          showToast('Un audit est déjà en cours pour ce superviseur.', 'err');
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const fallbackByStatus: Record<number, string> = {
+            401: 'Authentification de session requise.',
+            403: 'Accès non autorisé à ce superviseur.',
+            404: 'Superviseur commercial introuvable.',
+            409: 'Un audit est déjà en cours pour ce superviseur.',
+            502: "Le service de diagnostic est momentanément indisponible."
+          };
+          throw new Error(data.error || fallbackByStatus[res.status] || "Échec de l'audit de supervision");
+        }
+        showToast(data.message || `Audit terminé avec succès (Conformité: ${data.overallScore}%).`, 'ok');
+        await refresh();
+      } catch (err: any) {
+        showToast(err.message || "Erreur lors de l'exécution de l'audit", 'err');
+      } finally {
+        setActionLoading(null);
+      }
       return;
     }
 
@@ -1112,10 +1251,32 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                                 fontSize: '11px',
                                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                               }}>
-                                {agent.run_mode || resolveAgentType(agent)}
+                                {agent.run_mode === 'supervisor' ? 'Superviseur IA' : (agent.run_mode || resolveAgentType(agent))}
                               </span>
                               {agent.run_mode === 'sourcing' && (
                                 <TargetAgentsBadge targets={getTargetAgentNames(agent)} />
+                              )}
+                              {agent.run_mode === 'supervisor' && (
+                                <span style={{
+                                  fontSize: '11px',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px',
+                                  background: 'rgba(157, 78, 221, 0.12)',
+                                  color: '#C77DFF',
+                                  border: '1px solid rgba(157, 78, 221, 0.3)',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  <span>👁️</span>
+                                  <span>
+                                    {(() => {
+                                      const raw = agent.supervised_agent_ids || agent.config?.supervised_agent_ids;
+                                      return Array.isArray(raw) ? `${raw.length} supervisé(s)` : 'Superviseur';
+                                    })()}
+                                  </span>
+                                </span>
                               )}
                             </div>
                           </div>
@@ -1174,9 +1335,10 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                       <td style={{
                         padding: '13px 18px',
                         fontSize: '12px',
-                        color: '#6F8195',
-                        fontWeight: 500,
+                        color: (agent.lastExecuted && (Date.now() - Number(agent.lastExecuted)) < 60000) ? '#00E5C8' : '#6F8195',
+                        fontWeight: (agent.lastExecuted && (Date.now() - Number(agent.lastExecuted)) < 60000) ? 600 : 500,
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                        transition: 'color 0.4s ease',
                         ...getTutorialRowCellStyle(3)
                       }}>
                         {formatDate(agent.lastExecuted)}
@@ -1220,7 +1382,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                               className="row-btn"
                               disabled={busy || agent.is_executing}
                               onClick={() => {
-                                if (agent.run_mode === 'prospection' || agent.run_mode === 'sourcing') {
+                                if (agent.run_mode === 'prospection' || agent.run_mode === 'sourcing' || agent.run_mode === 'supervisor') {
                                   setScheduleModalAgent(agent);
                                 } else {
                                   handleResume(agent);
@@ -1248,15 +1410,18 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                             ⚙️
                           </button>
 
-                          {/* Open Workspace (Prospect and Sourcing) - Tutorial Step 2 */}
-                          {(agent.run_mode === 'prospection' || agent.run_mode === 'sourcing') && (
+                          {/* Open Workspace (Prospect, Sourcing, Supervisor) - Tutorial Step 2 */}
+                          {(agent.run_mode === 'prospection' || agent.run_mode === 'sourcing' || agent.run_mode === 'supervisor') && (
                             <button
                               className="row-btn"
                               onClick={() => {
                                 setNavigatingTo(agent.agent_name);
-                                const route = agent.run_mode === 'sourcing'
-                                  ? `/sourcing-agent-workspace/${agent.uuid || (agent as any).agent_id}`
-                                  : `/prospect-agent-workspace/${agent.uuid || (agent as any).agent_id || 1}`;
+                                let route = `/prospect-agent-workspace/${agent.uuid || (agent as any).agent_id || 1}`;
+                                if (agent.run_mode === 'sourcing') {
+                                  route = `/sourcing-agent-workspace/${agent.uuid || (agent as any).agent_id}`;
+                                } else if (agent.run_mode === 'supervisor') {
+                                  route = `/supervisor-agent-workspace/${agent.uuid || (agent as any).agent_id}`;
+                                }
                                 router.push(route);
                               }}
                               title="Ouvrir l'espace de travail"
@@ -1551,6 +1716,21 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           }}
           onEditSchedule={() => {
             setScheduleModalAgent(null);
+          }}
+        />
+      )}
+      {scheduleModalAgent && scheduleModalAgent.run_mode === 'supervisor' && (
+        <SupervisorScheduleModal
+          agent={scheduleModalAgent}
+          onClose={() => setScheduleModalAgent(null)}
+          onToast={showToast}
+          onConfirm={async () => {
+            await handleResume(scheduleModalAgent);
+            setScheduleModalAgent(null);
+          }}
+          onEditSchedule={() => {
+            setScheduleModalAgent(null);
+            onConfigure('supervisor', scheduleModalAgent, 3);
           }}
         />
       )}

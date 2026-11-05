@@ -87,15 +87,16 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     connections: ['TraLIS', 'Odoo']
   },
   {
-    id: 'onboarding',
-    name: 'Onboarding Client',
-    description: 'Accueille les nouveaux clients, envoie les documents contractuels et suit les étapes d\'activation.',
-    category: 'Commercial · CRM',
-    icon: '🤝',
-    accent: '#FFB800',
-    iconBg: 'rgba(255,184,0,0.1)',
-    deployments: 156,
-    connections: ['CRM', 'Email']
+    id: 'supervisor',
+    name: 'Superviseur Commercial',
+    description: 'Supervise, audite et optimise en temps réel la cohérence et l\'alignement stratégique de toute votre flotte d\'agents commerciaux.',
+    category: 'Commercial · Supervision',
+    icon: '👁️',
+    accent: '#9D4EDD',
+    iconBg: 'rgba(157, 78, 221, 0.14)',
+    tag: 'new',
+    deployments: 8,
+    connections: ['Pipeline', 'Audit', 'IA']
   },
   {
     id: 'facturation',

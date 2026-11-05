@@ -302,6 +302,11 @@ export default function AgentWorkspacePage() {
         <div className="workspace-top-bar-left">
           <button
             onClick={() => {
+              const fromParam = searchParams.get('from');
+              if (fromParam) {
+                router.push(fromParam);
+                return;
+              }
               if (typeof window !== 'undefined') {
                 sessionStorage.setItem('vmind_current_view', 'agents');
                 sessionStorage.setItem('vmind_mode', 'MANAGEMENT');

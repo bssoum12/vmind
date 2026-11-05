@@ -1,0 +1,419 @@
+// =============================================================================
+// Standalone Company Context Modal Styles
+// Minimalist, Apple-Inspired Interface Design
+// Translucent materials, refined typography, and fluid micro-interactions
+// =============================================================================
+
+.company-context-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(4, 9, 20, 0.72);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: ccFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ccFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.company-context-modal-box {
+  &.cc-inline-box {
+    max-width: 100%;
+    max-height: none;
+    animation: none;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 0;
+
+    .cc-body {
+      padding: 0 0 16px;
+    }
+
+    .cc-footer {
+      padding: 16px 0 0;
+      background: transparent;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  }
+
+  width: 100%;
+  max-width: 620px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: rgba(11, 20, 36, 0.88);
+  backdrop-filter: blur(40px) saturate(190%);
+  -webkit-backdrop-filter: blur(40px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
+    0 24px 60px rgba(0, 0, 0, 0.6),
+    0 4px 16px rgba(0, 0, 0, 0.3);
+  border-radius: 16px;
+  overflow: hidden;
+  animation: ccSpringScale 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ccSpringScale {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Header
+// -----------------------------------------------------------------------------
+.cc-header {
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  .cc-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .cc-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: #f8fafc;
+      letter-spacing: -0.015em;
+    }
+  }
+
+  .cc-close-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    color: #94a3b8;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease-out;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+    }
+
+    &:active {
+      transform: scale(0.92);
+    }
+  }
+}
+
+// Minimalist Segmented Stepper
+.cc-stepper-minimal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background: rgba(0, 0, 0, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+
+  .cc-pill-step {
+    flex: 1;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+
+    &.active {
+      background: #00e5c8;
+      box-shadow: 0 0 10px rgba(0, 229, 200, 0.45);
+    }
+
+    &.completed {
+      background: rgba(0, 229, 200, 0.45);
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Body
+// -----------------------------------------------------------------------------
+.cc-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+
+  &::-webkit-scrollbar {
+    width: 5px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+  }
+}
+
+.cc-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: ccFadeIn 0.2s ease-out;
+
+  .cc-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .cc-hero-title {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 650;
+      color: #ffffff;
+      letter-spacing: -0.01em;
+    }
+
+    .cc-hero-desc {
+      margin: 0;
+      font-size: 13.5px;
+      color: #94a3b8;
+      line-height: 1.45;
+    }
+  }
+}
+
+// Form Fields
+.cc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+
+  .cc-field-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    label {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .cc-counter {
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      transition: all 0.18s ease-out;
+
+      &.pending {
+        color: #94a3b8;
+      }
+
+      &.valid {
+        color: #00e5c8;
+        font-weight: 600;
+      }
+    }
+  }
+
+  .cc-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+
+    .cc-input-icon {
+      position: absolute;
+      left: 14px;
+      color: #64748b;
+      pointer-events: none;
+      transition: color 0.15s ease;
+    }
+
+    input {
+      width: 100%;
+      padding: 11px 14px 11px 40px;
+      background: rgba(6, 14, 28, 0.78);
+      border: 1.5px solid rgba(255, 255, 255, 0.1);
+      border-radius: 9px;
+      color: #f8fafc;
+      font-size: 13.5px;
+      outline: none;
+      caret-color: #00e5c8;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+
+      &::placeholder {
+        color: #64748b;
+        font-size: 13px;
+      }
+
+      &:focus {
+        border-color: rgba(0, 229, 200, 0.5);
+        box-shadow: 0 0 0 3px rgba(0, 229, 200, 0.15);
+        background: rgba(7, 18, 36, 0.95);
+
+        + .cc-input-icon,
+        ~ .cc-input-icon {
+          color: #00e5c8;
+        }
+      }
+    }
+  }
+
+  textarea {
+    width: 100%;
+    padding: 13px 15px;
+    background: rgba(6, 14, 28, 0.78);
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    border-radius: 9px;
+    color: #f8fafc;
+    font-size: 14px;
+    line-height: 1.58;
+    font-family: inherit;
+    outline: none;
+    resize: vertical;
+    caret-color: #00e5c8;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+
+    &::placeholder {
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    &:focus {
+      border-color: rgba(0, 229, 200, 0.5);
+      box-shadow: 0 0 0 3px rgba(0, 229, 200, 0.15);
+      background: rgba(7, 18, 36, 0.95);
+    }
+  }
+}
+
+// AI Research Spinner
+.cc-loader-minimal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 34px 20px;
+  background: rgba(0, 229, 200, 0.02);
+  border: 1px solid rgba(0, 229, 200, 0.15);
+  border-radius: 10px;
+  gap: 12px;
+
+  .cc-spinner-ring {
+    width: 32px;
+    height: 32px;
+    border: 2px solid rgba(0, 229, 200, 0.15);
+    border-top-color: #00e5c8;
+    border-radius: 50%;
+    animation: ccSpin 0.8s linear infinite;
+  }
+
+  .cc-loader-label {
+    font-size: 13px;
+    color: #cbd5e1;
+    font-weight: 500;
+    margin: 0;
+  }
+}
+
+@keyframes ccSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Footer & Action Buttons
+// -----------------------------------------------------------------------------
+.cc-footer {
+  padding: 13px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  .cc-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    outline: none;
+    transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+
+    &:active:not(:disabled) {
+      transform: scale(0.97);
+    }
+
+    &:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    &.cc-btn-ghost {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+
+      &:hover:not(:disabled) {
+        color: #ffffff;
+        background: rgba(255, 255, 255, 0.09);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+    }
+
+    &.cc-btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #e2e8f0;
+
+      &:hover:not(:disabled) {
+        background: rgba(255, 255, 255, 0.09);
+        border-color: rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+      }
+    }
+
+    &.cc-btn-primary {
+      background: #00e5c8;
+      color: #030914;
+      font-weight: 700;
+      box-shadow: 0 2px 10px rgba(0, 229, 200, 0.25);
+
+      &:hover:not(:disabled) {
+        background: #0df5d6;
+        box-shadow: 0 4px 16px rgba(0, 229, 200, 0.35);
+      }
+    }
+  }
+}

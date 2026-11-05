@@ -21,7 +21,7 @@ export const VbuyAchatsDuMoisCard: React.FC<VbuyAchatsDuMoisCardProps> = ({
 
   const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const agentData = kpisByAgent["vbuy"] || kpisByAgent["VBUY"] || {};
-  const n8nToolData = agentData.get_kpi_dashboard || agentData.get_achats_fournisseurs || agentData.achats_du_mois;
+  const n8nToolData = agentData.get_kpi_dashboard || agentData.get_factures_achats || agentData.get_achats_fournisseurs || agentData.achats_du_mois;
 
   const [isCardHovered, setIsCardHovered] = useState<boolean>(false);
   const [cardCoords, setCardCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
@@ -136,7 +136,7 @@ export const VbuyAchatsDuMoisCard: React.FC<VbuyAchatsDuMoisCardProps> = ({
         </div>
 
         <button
-          onClick={() => fetchKpis('vbuy', true, 'get_achats_fournisseurs')}
+          onClick={() => fetchKpis('vbuy', true, 'get_factures_achats')}
           title="Rafraîchir KPI via n8n"
           disabled={effectiveLoading}
           style={{

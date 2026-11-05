@@ -210,6 +210,11 @@ export default function SourcingAgentWorkspacePage() {
           <button
             className="sourcing-back-btn"
             onClick={() => {
+              const fromParam = searchParams.get('from');
+              if (fromParam) {
+                router.push(fromParam);
+                return;
+              }
               if (typeof window !== 'undefined') {
                 sessionStorage.setItem('vmind_current_view', 'agents');
                 sessionStorage.setItem('vmind_mode', 'MANAGEMENT');

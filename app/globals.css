@@ -18,9 +18,9 @@
   --green: #00E676;
   --purple: #7B61FF;
   --blue: #2196F3;
-  --FT: var(--font-title);
-  --FB: var(--font-body);
-  --FM: var(--font-mono);
+  --FT: var(--font-title, 'Orbitron', system-ui, sans-serif);
+  --FB: var(--font-body, 'Syne', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  --FM: var(--font-mono, 'JetBrains Mono', Consolas, 'Courier New', monospace);
 }
 
 *,
@@ -51,7 +51,7 @@ body {
 }
 
 body {
-  font-family: var(--font-body);
+  font-family: var(--font-body, 'Syne', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
   color: var(--white);
   display: flex;
   flex-direction: column;
@@ -525,6 +525,7 @@ a,
   margin-top: auto;
   padding: 14px 16px;
   border-top: 1px solid var(--border);
+  font-family: var(--font-body, 'Syne', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
 }
 
 .stats-row {
@@ -534,6 +535,7 @@ a,
   padding: 8px 0;
   border-bottom: 1px solid rgba(0, 229, 200, 0.08);
   font-size: 12.5px;
+  font-family: var(--font-body, 'Syne', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
 }
 
 .stats-row:last-child {
@@ -542,15 +544,18 @@ a,
 
 .stats-label {
   color: var(--muted);
+  font-family: var(--font-body, 'Syne', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
   font-size: 12.5px;
   font-weight: 500;
+  letter-spacing: 0.2px;
 }
 
 .stats-val {
   color: var(--cyan);
-  font-family: var(--font-mono);
+  font-family: var(--font-mono, 'JetBrains Mono', Consolas, 'Courier New', monospace);
   font-weight: 700;
   font-size: 13px;
+  letter-spacing: 0.5px;
 }
 
 .erp-tag {
@@ -1427,29 +1432,6 @@ a,
 .shell {
   display: flex;
   height: calc(100vh - 52px);
-}
-
-/* ── SIDEBAR FOOTER (SHARED) ── */
-.stats-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 11px;
-}
-
-.stats-row:last-child {
-  border-bottom: none;
-}
-
-.stats-label {
-  color: var(--muted);
-}
-
-.stats-val {
-  color: var(--cyan);
-  font-family: var(--font-mono);
-  font-weight: 500;
 }
 
 /* ── PAGE HEADER ── */

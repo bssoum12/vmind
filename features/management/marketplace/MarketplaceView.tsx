@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/shared/management/components/Button';
 import { AdminConfigButton } from '@/shared/management/components/AdminConfigButton';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
@@ -23,7 +24,13 @@ const AGENT_PROMPT_KEYS: Record<string, string> = {
   sourcing: 'sourcing_execution_chat',
 };
 
+
+
 export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, onNavigate, activeCategory, onSelectCategory, onOpenPrompts, isAdmin: isAdminProp }) => {
+  const router = useRouter();
+
+
+
   const [isAdmin, setIsAdmin] = React.useState<boolean>(Boolean(isAdminProp));
   const { activeConnection } = useConnections();
   const [showErpRequiredModal, setShowErpRequiredModal] = React.useState(false);
@@ -85,7 +92,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, onNa
   }, []);
 
   const getDynamicDeployments = (agentId: string, baseDeployments: number) => {
-    return templateDeployments[agentId] || 0;
+    return templateDeployments[agentId] || (agentId === 'supervisor' ? (templateDeployments['onboarding'] || baseDeployments) : 0);
   };
 
   const handleDeployTarget = (templateId: string) => {
