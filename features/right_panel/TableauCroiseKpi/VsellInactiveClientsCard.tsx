@@ -25,10 +25,11 @@ export const VsellInactiveClientsCard: React.FC<VsellInactiveClientsCardProps> =
 
   // Read n8n context data
   const agentData = kpisByAgent["vsell"] || kpisByAgent["VSELL"] || {};
-  const toolData = agentData.get_kpi_dashboard || agentData.get_tiers || agentData.inactive_clients || {};
-  const clients: InactiveClientItem[] = toolData.ok && Array.isArray(toolData.data) 
-    ? toolData.data 
-    : (Array.isArray(agentData.inactive_clients) ? agentData.inactive_clients : []);
+  const toolData = agentData.clients_inactifs || {}; // bloc propre à la carte (skill vsell-kpis)
+  const fmtDate = (d?: string) => { if (!d) return ""; const [y, m, j] = String(d).slice(0, 10).split("-"); return j ? `${j}/${m}/${y}` : String(d); };
+  // Rang = position (5 plus gros CA historiques, triés par le skill) ; dernière opération au format JJ/MM/AAAA
+  const clients: InactiveClientItem[] = (toolData.ok && Array.isArray(toolData.data) ? toolData.data : [])
+    .map((c: any, i: number) => ({ ...c, rank: i + 1, lastOpDate: fmtDate(c.lastOpDate) }));
 
   const loading = loadingByAgent["vsell"] || loadingByAgent["VSELL"] || false;
   const error = !loading && clients.length === 0 && globalError ? globalError : null;

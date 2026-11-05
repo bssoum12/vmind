@@ -43,6 +43,12 @@ const MONTHS_LIST = [
   { value: 12, label: "Décembre" }
 ];
 
+// VMOVE (skill vmove-kpis) : la période vient du sélecteur global Début / Fin du panneau.
+// Les listes Mois / Année locales ne filtraient pas les données : elles sont masquées (code conservé).
+const SHOW_LOCAL_MONTH_SELECTOR = false;
+const fmtDate = (d?: string) => { if (!d) return ""; const [y, m, j] = String(d).slice(0, 10).split("-"); return j ? `${j}/${m}/${y}` : String(d); };
+
+
 export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> = ({
   activeAgentId,
   clientId = "DEMO",
@@ -119,14 +125,14 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
 
   const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const agentData = kpisByAgent["vmove"] || kpisByAgent["VMOVE"] || {};
-  const n8nToolData = agentData.get_kpi_dashboard || agentData.get_dossiers || agentData.dossiers_ouverts;
+  const n8nToolData = agentData.dossiers_ouverts; // bloc propre à la carte (skill vmove-kpis)
 
   const effectiveLoading = (loadingByAgent["vmove"] || loadingByAgent["VMOVE"]) && !n8nToolData;
   const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
   const payload = n8nToolData?.data || n8nToolData;
 
   const handleRefresh = () => {
-    fetchKpis('vmove', true, 'get_dossiers');
+    fetchKpis('vmove', true, 'dossiers_ouverts');
   };
 
   if (!isVisible) return null;
@@ -144,6 +150,9 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
   const rawBySens = payload?.by_sens || [];
   const rawBySensNature = payload?.by_sens_nature || [];
   const detailsList: any[] = payload?.details || [];
+  const periodLabel = SHOW_LOCAL_MONTH_SELECTOR
+    ? `${selectedMonth > 0 ? MONTHS_LIST[selectedMonth]?.label : "Année"} ${selectedYear}`
+    : (summary.periode_debut ? `${fmtDate(summary.periode_debut)} → ${fmtDate(summary.periode_fin)}` : "");
 
   // Helper to determine if a value represents missing/unassigned data (N/A, Non défini, null, empty)
   const isMissingOrNA = (val: any) => {
@@ -268,7 +277,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
           </div>
           <div style={{ minWidth: 0 }}>
             <h3 style={{ fontSize: '13px', fontWeight: 800, letterSpacing: '0.2px', margin: 0, color: '#F1F5F9', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Dossiers Ouverts du Mois
+              Dossiers Ouverts
             </h3>
             <p style={{ fontSize: '10px', color: '#94A3B8', margin: 0, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               Exploitation VMOVE • n8n KPI
@@ -298,11 +307,12 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
           }}
         >
           <RefreshCw size={11} className={effectiveLoading ? 'animate-spin' : ''} />
-          <span>{effectiveLoading ? "..." : "Actualiser"}</span>
+          {/* Icône seule : le texte « Actualiser » est dans l'infobulle (title) */}
         </button>
       </div>
 
       {/* 2. Premium Dropdown Controls (Month & Year) */}
+      {SHOW_LOCAL_MONTH_SELECTOR && (
       <div style={{
         display: 'flex',
         gap: '6px',
@@ -378,6 +388,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
           ))}
         </select>
       </div>
+      )}
 
       {/* 3. Primary Metric KPI Summary Banner */}
       <div style={{
@@ -404,7 +415,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
             <AnimatedNumber value={totalActifs} />
           </div>
           <span style={{ fontSize: '9px', color: '#64748B', display: 'block', marginTop: '2px', fontWeight: 500 }}>
-            {selectedMonth > 0 ? MONTHS_LIST[selectedMonth]?.label : "Année"} {selectedYear}
+            {periodLabel}
           </span>
         </div>
 
@@ -789,7 +800,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <span style={{ display: 'inline-block', width: '6px', height: '6px', background: '#38BDF8', borderRadius: '50%', boxShadow: '0 0 8px #38BDF8' }} />
-                <span style={{ color: '#38BDF8', fontWeight: 800 }}>DOSSIERS ACTIFS DU MOIS</span>
+                <span style={{ color: '#38BDF8', fontWeight: 800 }}>DOSSIERS ACTIFS DE LA PÉRIODE</span>
                 {activeHoverLabel && (
                   <span style={{
                     padding: '2px 6px',

@@ -26,13 +26,9 @@ export const VsellFidelisationChartCard: React.FC<VsellFidelisationChartCardProp
 
   // Read n8n context data
   const agentData = kpisByAgent["vsell"] || kpisByAgent["VSELL"] || {};
-  const toolData = agentData.get_fidelisation_rate_trend || {};
-  const data: TrendPoint[] = toolData.ok && Array.isArray(toolData.data) 
-    ? toolData.data 
-    : (Array.isArray(agentData.fidelisation_trend) ? agentData.fidelisation_trend : []);
-  const averageRate: number = typeof toolData.averageRate === 'number' 
-    ? toolData.averageRate 
-    : (typeof agentData.fidelisation_average === 'number' ? agentData.fidelisation_average : 0);
+  const toolData = agentData.fidelisation || {}; // bloc propre à la carte (skill vsell-kpis) : 6 points, du plus ancien au mois de référence
+  const data: TrendPoint[] = toolData.ok && Array.isArray(toolData.data) ? toolData.data : [];
+  const averageRate: number = typeof toolData.summary?.averageRate === 'number' ? toolData.summary.averageRate : 0;
 
   const loading = loadingByAgent["vsell"] || loadingByAgent["VSELL"] || false;
   const error = !loading && data.length === 0 && globalError ? globalError : null;

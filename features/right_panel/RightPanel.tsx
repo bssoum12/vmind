@@ -36,6 +36,39 @@ import { VmoveActiveFlowsMapCard } from './TableauCroiseKpi/VmoveActiveFlowsMapC
 import { KpiCacheProvider, useKpis } from '../../shared/contexts/KpiCacheContext';
 import { KpiEmptyState } from './KpiEmptyState';
 
+/**
+ * Visibilité des cartes KPI (02/11/2026).
+ * false = carte MASQUÉE mais conservée (composant, import et code intacts) : les vues/outils MCP
+ * actuels ne fournissent pas encore ses données. Repasser à true quand la vue vw_AI_* correspondante
+ * existera et que le skill de l'agent contiendra la recette (voir rapport VDATA).
+ */
+export const KPI_CARD_VISIBILITY = {
+  VDATA_SCORE_GLOBAL: false,          // mouvements planifiés (OMC) + score impayés
+  VDATA_TAUX_LIVRAISON: false,        // OMC_Mouvement_planifies / OMC_Mouvement
+  VDATA_ALERTES: false,               // Framework_Log + dossiers sans expédition
+  VDATA_DERNIER_RAPPORT: false,       // rapport PDF mensuel (hors KPI)
+  VDATA_PERFORMANCE_DOMAINES: false,  // dépend du score qualité global
+  VDATA_VOLUME_DOSSIERS: true,        // skill vdata-kpis : get_dossier_volume_evolution
+  VDATA_TABLEAU_CROISE: true,         // skill vdata-kpis : get_tableau_croise (dossiers actifs / clôturés)
+  VMOVE_BL_NON_FACTURES: false,       // croisement dossiers × factures : non disponible dans les vues
+  VMOVE_FLUX_ACTIFS: false,           // Framework_Pays / Framework_Ville : hors vues
+  VMOVE_DOSSIERS_OUVERTS: true,       // skill vmove-kpis : dossiers_ouverts
+  VMOVE_DOSSIERS_RETARD: true,        // skill vmove-kpis : dossiers_retard
+  VMOVE_VOLUME_TRANSPORTEUR: true,    // skill vmove-kpis : volume_transporteur
+  VFIN_CA_VALIDE: true,               // skill vfin-kpis : ca_valide
+  VFIN_IMPAYES: true,                 // skill vfin-kpis : impayes
+  VFIN_EVOLUTION_CA: true,            // skill vfin-kpis : evolution_ca
+  VFIN_TAUX_MARGE: true,              // skill vfin-kpis : taux_marge
+  VFIN_TOP_CLIENTS: true,             // skill vfin-kpis : top_clients
+  VFIN_TRESORERIE: false,             // Treasury_vwRealTransaction : hors vues
+  VSELL_TOP_CLIENTS: true,            // skill vsell-kpis : top_clients
+  VSELL_NOUVEAUX_CLIENTS: true,       // skill vsell-kpis : nouveaux_clients
+  VSELL_CLIENTS_INACTIFS: true,       // skill vsell-kpis : clients_inactifs
+  VSELL_CA_PAR_CLIENT: true,          // skill vsell-kpis : ca_par_client
+  VSELL_FIDELISATION: true,           // skill vsell-kpis : fidelisation
+  VSELL_PIPELINE: false,              // TRADE_Opportunite / TRADE_stepOpportunite : hors vues
+};
+
 interface RightPanelProps {
   logs: LogEntry[];
   onInsertPrompt: (text: string) => void;
@@ -379,8 +412,8 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
           )
         ) : (
           <>
-            {/* Global Date Picker for VDATA only */}
-            {activeAgentId === 'VDATA' && (
+            {/* Global Date Picker (VDATA, VBUY, VMOVE, VFIN, VSELL) */}
+            {(activeAgentId === 'VDATA' || activeAgentId === 'VBUY' || activeAgentId === 'VMOVE' || activeAgentId === 'VFIN' || activeAgentId === 'VSELL') && (
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                   <label style={{ fontSize: '9px', color: 'var(--muted)', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', marginBottom: '4px' }}>Début</label>
@@ -533,34 +566,34 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                   </div>
                 )}
 
-                <ScoreGlobalCard activeAgentId={activeAgentId} />
-                <VsellTopClientsCard activeAgentId={activeAgentId} />
-                <VsellNewClientsCard activeAgentId={activeAgentId} />
-                <VsellInactiveClientsCard activeAgentId={activeAgentId} />
-                <VsellRevenuClientBarChart activeAgentId={activeAgentId} />
-                <VsellFidelisationChartCard activeAgentId={activeAgentId} />
-                <VsellPipelineFunnelCard activeAgentId={activeAgentId} />
-                <VfinMonthlyRevenueCard activeAgentId={activeAgentId} />
-                <VfinOverdueCard activeAgentId={activeAgentId} />
-                <VfinSixMonthChartCard activeAgentId={activeAgentId} />
-                <VfinMarginCard activeAgentId={activeAgentId} />
-                <VfinTopClientsCard activeAgentId={activeAgentId} />
-                <VfinTresorerieCard activeAgentId={activeAgentId} />
+                {KPI_CARD_VISIBILITY.VDATA_SCORE_GLOBAL && <ScoreGlobalCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VSELL_TOP_CLIENTS && <VsellTopClientsCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VSELL_NOUVEAUX_CLIENTS && <VsellNewClientsCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VSELL_CLIENTS_INACTIFS && <VsellInactiveClientsCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VSELL_CA_PAR_CLIENT && <VsellRevenuClientBarChart activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VSELL_FIDELISATION && <VsellFidelisationChartCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VSELL_PIPELINE && <VsellPipelineFunnelCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VFIN_CA_VALIDE && <VfinMonthlyRevenueCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VFIN_IMPAYES && <VfinOverdueCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VFIN_EVOLUTION_CA && <VfinSixMonthChartCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VFIN_TAUX_MARGE && <VfinMarginCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VFIN_TOP_CLIENTS && <VfinTopClientsCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VFIN_TRESORERIE && <VfinTresorerieCard activeAgentId={activeAgentId} />}
                 <VbuyFacturesAReglerCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
                 <VbuyAchatsDuMoisCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
                 <VbuyFournisseursEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
                 <VbuyCommandesEnAttenteCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
                 <VbuyRepartitionCategoriePieCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-                <VmoveBlNonFacturesCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-                <VmoveActiveFlowsMapCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-                <VmoveDossiersOuvertsCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-                <VmoveDossiersEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-                <VmoveVolumeTransporteurCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />
-                <VolumeLineChart activeAgentId={activeAgentId} />
-                <DeliveryRateKpi activeAgentId={activeAgentId} /> 
-                <MultiIndicatorsCard activeAgentId={activeAgentId} />
-                <LatestReportCard activeAgentId={activeAgentId} />
-                <AlertsCard activeAgentId={activeAgentId} />
+                {KPI_CARD_VISIBILITY.VMOVE_BL_NON_FACTURES && <VmoveBlNonFacturesCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />}
+                {KPI_CARD_VISIBILITY.VMOVE_FLUX_ACTIFS && <VmoveActiveFlowsMapCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />}
+                {KPI_CARD_VISIBILITY.VMOVE_DOSSIERS_OUVERTS && <VmoveDossiersOuvertsCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />}
+                {KPI_CARD_VISIBILITY.VMOVE_DOSSIERS_RETARD && <VmoveDossiersEnRetardCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />}
+                {KPI_CARD_VISIBILITY.VMOVE_VOLUME_TRANSPORTEUR && <VmoveVolumeTransporteurCard activeAgentId={activeAgentId} onInsertPrompt={onInsertPrompt} />}
+                {KPI_CARD_VISIBILITY.VDATA_VOLUME_DOSSIERS && <VolumeLineChart activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VDATA_TAUX_LIVRAISON && <DeliveryRateKpi activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VDATA_TABLEAU_CROISE && <MultiIndicatorsCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VDATA_DERNIER_RAPPORT && <LatestReportCard activeAgentId={activeAgentId} />}
+                {KPI_CARD_VISIBILITY.VDATA_ALERTES && <AlertsCard activeAgentId={activeAgentId} />}
               </>
             )}
           </>
@@ -568,7 +601,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
       </div>
 
       {/* Performance par Domaine */}
-      {activeAgentId === 'VDATA' && isKpiAuthorized && (
+      {activeAgentId === 'VDATA' && isKpiAuthorized && KPI_CARD_VISIBILITY.VDATA_PERFORMANCE_DOMAINES && (
         <div className="rp-section" style={{ marginTop: '20px' }}>
           <div className="rp-title" style={{ marginBottom: '14px' }}>Performance par Domaine</div>
         

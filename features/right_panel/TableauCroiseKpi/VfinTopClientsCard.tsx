@@ -23,12 +23,13 @@ export const VfinTopClientsCard: React.FC<VfinTopClientsCardProps> = ({ activeAg
 
   // Read current active data from Context
   const agentData = kpisByAgent["vfin"] || {};
-  const toolData = agentData.get_kpi_dashboard || agentData.get_tiers || agentData.top_clients || {};
+  const toolData = agentData.top_clients || {}; // bloc propre à la carte (skill vfin-kpis)
 
-  const clients: ClientRevenue[] = Array.isArray(toolData.data) 
-    ? toolData.data 
-    : (toolData.data?.data || []);
-  const period = toolData.period || toolData.data?.period || "";
+  // Rang = position dans la liste (déjà triée par CA décroissant par le skill)
+  const clients: ClientRevenue[] = (Array.isArray(toolData.data) ? toolData.data : [])
+    .map((c: any, i: number) => ({ ...c, rank: i + 1 }));
+  const fmtDate = (d?: string) => { if (!d) return ""; const [y, m, j] = String(d).slice(0, 10).split("-"); return j ? `${j}/${m}/${y}` : String(d); };
+  const period = toolData.summary?.periode_debut ? `${fmtDate(toolData.summary.periode_debut)} → ${fmtDate(toolData.summary.periode_fin)}` : "";
 
   const loading = loadingByAgent["vfin"] && !toolData.ok;
   const error = !loading && !toolData.ok && globalError ? globalError : "";
@@ -130,7 +131,7 @@ export const VfinTopClientsCard: React.FC<VfinTopClientsCardProps> = ({ activeAg
             {error}
           </span>
           <button
-            onClick={() => fetchKpis('vfin', true)}
+            onClick={() => fetchKpis('vfin', true, 'top_clients')}
             style={{
               background: "none",
               border: "none",
@@ -148,7 +149,7 @@ export const VfinTopClientsCard: React.FC<VfinTopClientsCardProps> = ({ activeAg
         </div>
       ) : clients.length === 0 ? (
         <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)", padding: "4px 0" }}>
-          AUCUNE DONNÉE POUR CE MOIS
+          AUCUNE DONNÉE POUR CETTE PÉRIODE
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>

@@ -56,21 +56,30 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isConnectorConnected, setIsConnectorConnected] = useState<boolean>(false);
   const { activeConnection } = useConnections();
+  const lastActiveConnKeyRef = useRef<string>('');
+  const lastPassiveFetchKeyRef = useRef<string>('');
 
   useEffect(() => {
     if (activeConnection && activeConnection.status === 'connected') {
       setIsConnectorConnected(true);
-      setCurrentUser((prev: any) => ({
-        ...(prev || {}),
-        client_id: activeConnection.client_id || 'DEMO',
-        roles: prev?.roles || ['Administrator'],
-        allowedAgents: prev?.allowedAgents || ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE']
-      }));
-      setKpisByAgent({});
-      setLastUpdatedByAgent({});
+      const connKey = `${activeConnection.id}_${activeConnection.client_id || 'DEMO'}`;
+      if (lastActiveConnKeyRef.current !== connKey) {
+        lastActiveConnKeyRef.current = connKey;
+        setCurrentUser((prev: any) => ({
+          ...(prev || {}),
+          client_id: activeConnection.client_id || 'DEMO',
+          roles: prev?.roles || ['Administrator'],
+          allowedAgents: prev?.allowedAgents || ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE']
+        }));
+        setKpisByAgent({});
+        setLastUpdatedByAgent({});
+      }
     } else if (activeConnection && activeConnection.status !== 'connected') {
-      setIsConnectorConnected(false);
-      setKpisByAgent({});
+      if (lastActiveConnKeyRef.current !== 'disconnected') {
+        lastActiveConnKeyRef.current = 'disconnected';
+        setIsConnectorConnected(false);
+        setKpisByAgent({});
+      }
     }
   }, [activeConnection?.id, activeConnection?.status, activeConnection?.client_id]);
 
@@ -173,7 +182,8 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     if (force) {
       const lastRun = cooldowns[cooldownKey] || 0;
       const nowMs = Date.now();
-      const ONE_HOUR_MS = 60 * 60 * 1000; // 1 heure
+      const isDev = process.env.NODE_ENV === 'development';
+      const ONE_HOUR_MS = isDev ? 5 * 1000 : 60 * 60 * 1000; // 5s en dev, 1h en prod
       if (nowMs - lastRun < ONE_HOUR_MS) {
         const remainingMin = Math.ceil((ONE_HOUR_MS - (nowMs - lastRun)) / (60 * 1000));
         console.log(`[KPI CONTEXT] Cooldown actif pour ${cooldownKey} (reste ${remainingMin} min). Requête conservée pour économiser les tokens.`);
@@ -184,7 +194,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     }
 
     // Set loading state for this agent independently (never aborts other specialists)
-    setLoadingByAgent(prev => ({ ...prev, [agentKey]: true }));
+    if (force) { setLoadingByAgent(prev => ({ ...prev, [agentKey]: true })); }
     try {
       const clientId = currentUser?.client_id || 'LOCAL';
 
@@ -287,7 +297,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
         setError(msg);
       }
     } finally {
-      setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
+      if (force) { setLoadingByAgent(prev => ({ ...prev, [agentKey]: false })); }
     }
   };
 
@@ -306,24 +316,38 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     }
 
     // Interrogation de la base PostgreSQL en mode passif (force = false)
+    const fetchKey = `${lowerAgent}_${startDate}_${endDate}_${currentUser?.client_id || 'LOCAL'}`;
+    if (lastPassiveFetchKeyRef.current === fetchKey) return;
+    lastPassiveFetchKeyRef.current = fetchKey;
     fetchKpis(lowerAgent, false);
-  }, [startDate, endDate, activeAgentId, currentUser, isConnectorConnected]);
+  }, [startDate, endDate, activeAgentId, currentUser?.username, currentUser?.client_id, isConnectorConnected]);
 
   // Polling automatique si un calcul est en cours en tâche de fond pour l'agent actif
+  const currentAgentForPoll = (activeAgentId || 'VDATA').toLowerCase();
+  const isAgentInProgress = Boolean(kpisByAgent[currentAgentForPoll]?._inProgress);
+  const isAgentStored = Boolean(kpisByAgent[currentAgentForPoll]?._stored);
+
   useEffect(() => {
-    if (!isConnectorConnected) return;
-    const currentAgent = (activeAgentId || 'VDATA').toLowerCase();
-    const agentState = kpisByAgent[currentAgent];
+    if (!isConnectorConnected || !isAgentInProgress || isAgentStored) return;
 
-    if (agentState && agentState._inProgress && !agentState._stored) {
-      const pollTimer = setInterval(() => {
-        console.log(`[KPI CONTEXT] Polling backend for background completion of ${currentAgent}...`);
-        fetchKpis(currentAgent, false);
-      }, 4000);
+    let pollCount = 0;
+    const pollTimer = setInterval(() => {
+      pollCount++;
+      if (pollCount > 10) {
+        console.warn('[KPI CONTEXT] Max background polling reached for ' + currentAgentForPoll + '. Halting poll.');
+        clearInterval(pollTimer);
+        setKpisByAgent(prev => ({
+          ...prev,
+          [currentAgentForPoll]: { _stored: false, _inProgress: false }
+        }));
+        return;
+      }
+      console.log('[KPI CONTEXT] Polling backend (' + pollCount + '/10) for ' + currentAgentForPoll + '...');
+      fetchKpis(currentAgentForPoll, false);
+    }, 4000);
 
-      return () => clearInterval(pollTimer);
-    }
-  }, [activeAgentId, kpisByAgent, isConnectorConnected]);
+    return () => clearInterval(pollTimer);
+  }, [currentAgentForPoll, isConnectorConnected, isAgentInProgress, isAgentStored]);
 
   return (
     <KpiCacheContext.Provider
