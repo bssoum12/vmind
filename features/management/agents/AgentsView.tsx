@@ -401,7 +401,6 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const [agents, setAgents] = useState<LiveAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<LiveAgent | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null); // agent_name being actioned
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
 
@@ -668,17 +667,12 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           }
         }
       }
-      // Keep selected in sync
-      if (selected) {
-        const updated = data.find((a: LiveAgent) => a.agent_name === selected.agent_name);
-        setSelected(updated || null);
-      }
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [selected]);
+  }, []);
 
   useEffect(() => {
     // Only fetch on initial mount. NO periodic polling interval to strictly prevent Redis Upstash cost accumulation.
@@ -837,7 +831,6 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
     try {
       await deleteAgent(deleteModalAgent.agent_name);
       showToast(`Agent "${deleteModalAgent.agent_name}" supprimé avec succès.`);
-      if (selected?.agent_name === deleteModalAgent.agent_name) setSelected(null);
       setDeleteModalAgent(null);
       await refresh();
     } catch (e: any) {
@@ -1168,7 +1161,6 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                   const status = deriveStatus(agent);
                   const meta = statusMeta[status];
                   const busy = actionLoading === agent.agent_name;
-                  const isSelected = selected?.agent_name === agent.agent_name;
                   const isTutorialActive = tutorialStep > 0 && tutorialAgent?.agent_name === agent.agent_name;
 
                   const getTutorialRowCellStyle = (colIndex: number) => {
@@ -1195,15 +1187,9 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                         if (tutorialStep > 0) return;
                         startTutorial(agent);
                       }}
-                      onClick={() => {
-                        if (tutorialStep > 0) return;
-                        setSelected(isSelected ? null : agent);
-                      }}
                       style={{
-                        cursor: tutorialStep > 0 ? 'default' : 'pointer',
                         pointerEvents: tutorialStep > 0 ? 'none' : undefined,
-                        background: isTutorialActive && tutorialStep === 1 ? 'rgba(0, 229, 200, 0.12)' : isSelected ? 'rgba(0,229,160,0.08)' : 'rgba(5, 16, 30, 0.5)',
-                        borderLeft: !isTutorialActive && isSelected ? '3px solid #00E5C8' : 'none',
+                        background: isTutorialActive && tutorialStep === 1 ? 'rgba(0, 229, 200, 0.12)' : 'rgba(5, 16, 30, 0.5)',
                         borderBottom: isTutorialActive && tutorialStep === 1 ? 'none' : '1px solid rgba(255,255,255,0.04)',
                         transition: 'background 0.2s, border-color 0.2s',
                         position: isTutorialActive ? 'relative' : undefined,
@@ -1465,148 +1451,6 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
             </table>
           )}
         </div>
-
-        {/* ── Detail Panel ── */}
-        {selected && (
-          <div style={{
-            width: 340, flexShrink: 0,
-            background: 'var(--card-bg)',
-            border: '1px solid var(--border)',
-            borderRadius: 16,
-            padding: 24,
-            position: 'sticky', top: 0,
-            animation: 'fadeIn .2s ease',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>{selected.agent_name}</div>
-                <span className={`status-pill ${statusMeta[deriveStatus(selected)].pill}`}>
-                  {statusMeta[deriveStatus(selected)].label}
-                </span>
-              </div>
-              <button
-                onClick={() => setSelected(null)}
-                style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 18 }}
-              >✕</button>
-            </div>
-
-            {/* Info rows */}
-            {[
-              { label: '📋 Mode', value: selected.run_mode },
-              { label: '🌍 Timezone', value: selected.workflow_timezone },
-              { label: '⏰ Planification', value: getPlanificationSummary(selected) },
-              selected.run_mode === 'sourcing' && getTargetAgentNames(selected).length > 0 ? {
-                label: '🎯 Prospects Cibles',
-                value: getTargetAgentNames(selected).join(', ')
-              } : null,
-              { label: '🔑 Schedule ID', value: selected.schedule_id || 'Aucun (en pause)' },
-              { label: '🏷️ Session', value: selected.session_id },
-              { label: '🕓 Dernière exéc.', value: formatDate(selected.lastExecuted || undefined) },
-            ].filter(Boolean).map((row: any) => (
-              <div key={row.label} style={{
-                display: 'flex', justifyContent: 'space-between', gap: 8,
-                padding: '8px 0', borderBottom: '1px solid var(--border)',
-                fontSize: 12,
-              }}>
-                <span style={{ color: 'var(--muted)', flexShrink: 0 }}>{row.label}</span>
-                <span style={{
-                  color: 'var(--text)', textAlign: 'right', wordBreak: 'break-all',
-                  fontFamily: row.label.includes('ID') || row.label.includes('Session') ? 'monospace' : 'inherit',
-                  fontSize: row.label.includes('ID') || row.label.includes('Session') ? 10 : 12,
-                }}>{row.value}</span>
-              </div>
-            ))}
-
-            {/* recovery_config section */}
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: .5 }}>
-                Recovery Config
-              </div>
-              {selected.recovery_config && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {selected.recovery_config.tone && (
-                    <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--muted)' }}>Ton</span>
-                      <span style={{ textTransform: 'capitalize' }}>{selected.recovery_config.tone}</span>
-                    </div>
-                  )}
-                  {selected.recovery_config.thresholds && (
-                    <>
-                      <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: 'var(--muted)' }}>Montant min.</span>
-                        <span>{selected.recovery_config.thresholds.minimum_amount} {selected.recovery_config.thresholds.currency || 'TND'}</span>
-                      </div>
-                      <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: 'var(--muted)' }}>Max relances</span>
-                        <span>{selected.recovery_config.thresholds.max_reminders}</span>
-                      </div>
-                    </>
-                  )}
-                  {selected.recovery_config.channels && (
-                    <div style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: 'var(--muted)' }}>Canaux</span>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        {Object.entries(selected.recovery_config.channels)
-                          .filter(([, v]) => v === true)
-                          .map(([k]) => (
-                            <span key={k} style={{
-                              background: 'rgba(0,229,160,0.12)',
-                              color: '#00E5A0',
-                              padding: '2px 8px',
-                              borderRadius: 20,
-                              fontSize: 11,
-                              fontWeight: 600,
-                            }}>{k}</span>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Instructions */}
-            {selected.recovery_config?.instructions && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: .5 }}>
-                  Instructions
-                </div>
-                <div style={{
-                  fontSize: 11, color: 'var(--text)', lineHeight: 1.6,
-                  background: 'rgba(255,255,255,0.03)', borderRadius: 8,
-                  padding: '10px 12px', border: '1px solid var(--border)',
-                  maxHeight: 120, overflowY: 'auto',
-                }}>
-                  {selected.recovery_config.instructions}
-                </div>
-              </div>
-            )}
-
-            {/* Quick actions */}
-            <div style={{ marginTop: 20, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                className="btn"
-                style={{
-                  flex: 1,
-                  fontSize: 12,
-                  opacity: selected.is_executing ? 0.5 : 1,
-                  cursor: selected.is_executing ? 'not-allowed' : 'pointer'
-                }}
-                onClick={() => handleRunNow(selected)}
-                disabled={actionLoading === selected.agent_name || !!selected.is_executing}
-              >
-                {selected.is_executing ? '⚡ En cours...' : '▶ Exécuter maintenant'}
-              </button>
-              <button
-                className="row-btn"
-                style={{ fontSize: 12 }}
-                onClick={() => onConfigure(selected.run_mode || 'recouvrement', selected)}
-              >
-                ⚙️ Modifier config
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ── EXÉCUTION (AUTO MODE) MODAL ── */}

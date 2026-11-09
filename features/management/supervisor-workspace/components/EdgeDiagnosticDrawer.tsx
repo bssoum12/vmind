@@ -324,8 +324,11 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
                   <h4 className="apple-section-title">Transfert de leads</h4>
                 </div>
                 {link.missionCutoffDate && (
-                  <span className="apple-section-sub">
-                    Depuis le {new Date(link.missionCutoffDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                  <span
+                    className="apple-section-sub"
+                    title="Périmètre de la dernière mission active. Vos leads historiques restent préservés en base de données sans être altérés."
+                  >
+                    Dernière mission (depuis le {new Date(link.missionCutoffDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })})
                   </span>
                 )}
               </div>

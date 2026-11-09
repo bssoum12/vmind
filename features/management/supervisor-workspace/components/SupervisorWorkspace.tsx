@@ -2,13 +2,17 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Building2, RotateCw, Share2, Filter, Clock } from 'lucide-react';
+import { ArrowLeft, Building2, RotateCw, Share2, Filter, Clock, Sparkles } from 'lucide-react';
 import { SupervisorGraphCanvas } from './SupervisorGraphCanvas';
 import { NodeDiagnosticDrawer } from './NodeDiagnosticDrawer';
 import { EdgeDiagnosticDrawer } from './EdgeDiagnosticDrawer';
+import { SupervisorPipelineHUD } from './SupervisorPipelineHUD';
+import { PipelineBinomesDrawer } from './PipelineBinomesDrawer';
 import { SupervisorFunnelView } from './SupervisorFunnelView';
 import { SupervisorHistoryView } from './SupervisorHistoryView';
 import { CompanyContextModal } from '@/features/company-context';
+import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
+import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import {
   SupervisorNode,
   SupervisorLink,
@@ -36,7 +40,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
   const { showToast } = useToast();
 
   // State: start strictly with empty data so no fake nodes ever flash
-  const [activeTab, setActiveTab] = useState<'canvas' | 'funnel' | 'history'>('canvas');
+  const [activeTab, setActiveTab] = useState<'canvas' | 'history'>('canvas');
   const [nodes, setNodes] = useState<SupervisorNode[]>([]);
   const [links, setLinks] = useState<SupervisorLink[]>([]);
   const [funnelData, setFunnelData] = useState<FleetFunnelData | null>(null);
@@ -46,6 +50,146 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
   const [displayName, setDisplayName] = useState<string>(initialAgentName || 'Superviseur Commercial');
   const [isLoadingFleet, setIsLoadingFleet] = useState<boolean>(true);
   const [isRunningAudit, setIsRunningAudit] = useState<boolean>(false);
+  const [isBinomesDrawerOpen, setIsBinomesDrawerOpen] = useState<boolean>(false);
+
+  // ─── Onboarding Tutorial State (VMindGuide) ────────────────────────────────
+  const [tutorialStep, setTutorialStep] = useState<number>(0);
+
+  const startTutorial = () => {
+    setActiveTab('canvas');
+    setSelectedNodeId(null);
+    setSelectedLinkId(null);
+    setIsBinomesDrawerOpen(false);
+    setTutorialStep(1);
+  };
+
+  const nextTutorialStep = () => {
+    setTutorialStep((prev) => {
+      if (prev >= 9) {
+        if (agentId) {
+          try {
+            localStorage.setItem(`vmind_guide_supervisor_${agentId}`, 'completed');
+          } catch (_) {}
+        }
+        setActiveTab('canvas');
+        return 0;
+      }
+      const next = prev + 1;
+      if (next >= 1 && next <= 5) {
+        setActiveTab('canvas');
+      } else if (next >= 6 && next <= 8) {
+        setActiveTab('history');
+      } else if (next === 9) {
+        setActiveTab('canvas');
+      }
+      return next;
+    });
+  };
+
+  const dismissTutorial = () => {
+    if (agentId) {
+      try {
+        localStorage.setItem(`vmind_guide_supervisor_${agentId}`, 'completed');
+      } catch (_) {}
+    }
+    setTutorialStep(0);
+  };
+
+  // Auto-launch guide for first-time visitors
+  useEffect(() => {
+    if (!agentId) return;
+    try {
+      const seen = localStorage.getItem(`vmind_guide_supervisor_${agentId}`);
+      if (!seen) {
+        const timer = setTimeout(() => {
+          setTutorialStep(1);
+        }, 1200);
+        return () => clearTimeout(timer);
+      }
+    } catch (_) {}
+  }, [agentId]);
+
+  // Ambient Keyboard Navigation (Rule 38: Space/ArrowRight = Next, Escape = Exit)
+  useEffect(() => {
+    if (tutorialStep <= 0) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeTag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (activeTag === 'input' || activeTag === 'textarea' || (e.target as HTMLElement)?.isContentEditable) return;
+
+      if (e.key === ' ' || e.code === 'Space' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        nextTutorialStep();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        dismissTutorial();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tutorialStep]);
+
+  const getTutorialContent = () => {
+    switch (tutorialStep) {
+      case 1:
+        return {
+          title: "Conformité Globale de la Flotte",
+          mood: 'curious' as GuideMood,
+          message: "Bienvenue sur votre espace de supervision commerciale. Ce score consolidé mesure en temps réel l'alignement stratégique de l'ensemble de votre flotte (Sourcing & Prospection) par rapport à votre offre et votre cible idéale."
+        };
+      case 2:
+        return {
+          title: "Navigation & Vues Stratégiques",
+          mood: 'focused' as GuideMood,
+          message: "Basculez entre la Vue d'ensemble (cartographie réseau et pipeline commercial consolidé) et l'Historique (journal chronologique des audits, évolutions des scores et analyses de conformité au fil du temps)."
+        };
+      case 3:
+        return {
+          title: "Pipeline Commercial Consolidé",
+          mood: 'focused' as GuideMood,
+          message: "Visualisez la chaîne de valeur de votre flotte. 💡 Important : Ces métriques analysent exclusivement les prospects issus de la dernière mission active de chaque agent (échantillon plafonné). Vos leads historiques restent précieux et intacts en base : le superviseur isole cette session récente pour mesurer avec exactitude la qualité de vos instructions actuelles."
+        };
+      case 4:
+        return {
+          title: "Performances par Binôme",
+          mood: 'convinced' as GuideMood,
+          message: "Cliquez sur Performances Binômes pour inspecter les transferts 1-à-1 de la mission en cours. Vous y découvrirez les volumes de transfert, taux d'acceptation et rejets entre chaque agent de sourcing et son prospecteur cible."
+        };
+      case 5:
+        return {
+          title: "Cartographie Relationnelle 2D",
+          mood: 'curious' as GuideMood,
+          message: "Ce graphe élastique modélise vos flux de prospection. Cliquez sur un Agent pour inspecter ses forces et axes d'amélioration, ou sur un Lien élastique pour évaluer l'alignement du passage de relais."
+        };
+      case 6:
+        return {
+          title: "Courbe Temporelle & Filtre par Agent",
+          mood: 'curious' as GuideMood,
+          message: "Par défaut, ce graphique affiche la moyenne consolidée de votre flotte ('Flotte Consolidée'). 🎯 Filtrez par Agent : Cliquez sur ce sélecteur déroulant pour basculer de la flotte globale vers la trajectoire d'un agent précis (Sourcing ou Prospection) et analyser sa progression individuelle."
+        };
+      case 7:
+        return {
+          title: "Matrice Comparative des Agents",
+          mood: 'focused' as GuideMood,
+          message: "Comparez vos agents de sourcing et de prospection dans un tableau consolidé : score actuel, progression (delta), tendance récente sur mini-graphique et volume d'analyses. Cliquez sur 'Inspecter' pour charger immédiatement sa courbe."
+        };
+      case 8:
+        return {
+          title: "Journal des Sessions d'Audit",
+          mood: 'convinced' as GuideMood,
+          message: "Retrouvez chaque audit exécuté par le superviseur (programmé ou flash). Dépliez une session pour examiner l'alignement des binômes, les taux de transmission réels et les raisons de disqualification observées."
+        };
+      case 9:
+        return {
+          title: "Contexte Entreprise & Stratégie IA",
+          mood: 'convinced' as GuideMood,
+          message: "Définissez votre offre, votre cible idéale (ICP) et vos différenciateurs dans Contexte Entreprise. Le Superviseur IA s'appuie sur ce référentiel pour auditer vos agents, calibrer les liens et recommander des ajustements continus."
+        };
+      default:
+        return null;
+    }
+  };
 
   const calculateSummary = (incomingNodes: SupervisorNode[]): FleetAuditSummary => {
     if (incomingNodes.length === 0) {
@@ -210,11 +354,13 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
   }, [links, selectedLinkId]);
 
   const handleSelectNode = (node: SupervisorNode) => {
+    setIsBinomesDrawerOpen(false);
     setSelectedNodeId(node.id);
     setSelectedLinkId(null);
   };
 
   const handleSelectLink = (link: SupervisorLink) => {
+    setIsBinomesDrawerOpen(false);
     setSelectedLinkId(link.id);
     setSelectedNodeId(null);
   };
@@ -296,8 +442,29 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
 
   return (
     <div className="supervisor-workspace-container">
+      {/* 0. Dedicated Local Dark Tutorial Overlay (Strictly local, NO createPortal) */}
+      {tutorialStep > 0 && (
+        <div
+          onClick={nextTutorialStep}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(3, 8, 16, 0.82)',
+            zIndex: 10000,
+            cursor: 'pointer',
+          }}
+          title="Cliquez pour continuer ou appuyez sur Échap pour quitter"
+        />
+      )}
+
       {/* 1. Header */}
-      <header className="supervisor-header">
+      <header
+        className="supervisor-header"
+        style={{
+          position: 'relative',
+          zIndex: (tutorialStep === 1 || tutorialStep === 2 || tutorialStep === 9) ? 10001 : 20,
+        }}
+      >
         <div className="header-left">
           <button className="back-btn" onClick={() => router.push('/')} title="Retour à l'accueil">
             <ArrowLeft size={16} />
@@ -311,8 +478,33 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
         </div>
 
         {/* Fleet Status Capsule */}
-        <div className="header-center-pill">
-          <div className="fleet-score-badge" title="Moyenne des scores d'alignement IA de vos agents par rapport à la stratégie d'entreprise">
+        <div
+          className="header-center-pill"
+          style={
+            tutorialStep === 1
+              ? {
+                  position: 'relative',
+                  zIndex: 10003,
+                  boxShadow: '0 0 0 2px #00E5C8, 0 0 25px rgba(0, 229, 200, 0.65)',
+                  borderColor: '#00E5C8',
+                }
+              : undefined
+          }
+        >
+          {tutorialStep === 1 && (
+            <VMindGuideArrow
+              direction="up"
+              color="#00E5C8"
+              style={{
+                position: 'absolute',
+                bottom: '-46px',
+                left: '50%',
+                marginLeft: '-8px',
+                zIndex: 10004,
+              }}
+            />
+          )}
+          <div className="fleet-score-badge" title="Moyenne des scores d'alignement IA calculée sur la dernière mission active de chaque agent (échantillon représentatif)">
             <span className="score-ring-dot" />
             <span className="score-text">{fleetSummary.overallScore}%</span>
             <span className="score-sub">Conformité Globale</span>
@@ -344,25 +536,41 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
           </div>
         </div>
 
-        {/* Tab Switcher: Réseau vs Entonnoir Global vs Historique des Audits (KBN-13) */}
-        <div className="header-tab-switcher">
+        {/* Tab Switcher: Vue d'ensemble (Graphe + Pipeline) vs Historique (KBN-13) */}
+        <div
+          className="header-tab-switcher"
+          style={
+            tutorialStep === 2
+              ? {
+                  position: 'relative',
+                  zIndex: 10003,
+                  boxShadow: '0 0 0 2px #00E5C8, 0 0 25px rgba(0, 229, 200, 0.65)',
+                  borderColor: '#00E5C8',
+                }
+              : undefined
+          }
+        >
+          {tutorialStep === 2 && (
+            <VMindGuideArrow
+              direction="up"
+              color="#00E5C8"
+              style={{
+                position: 'absolute',
+                bottom: '-44px',
+                left: '50%',
+                marginLeft: '-8px',
+                zIndex: 10004,
+              }}
+            />
+          )}
           <button
             type="button"
             className={`tab-btn ${activeTab === 'canvas' ? 'active' : ''}`}
             onClick={() => setActiveTab('canvas')}
-            title="Afficher la cartographie réseau interactive des agents"
+            title="Vue d'ensemble : cartographie réseau et pipeline commercial"
           >
             <Share2 size={13} />
-            <span>Réseau</span>
-          </button>
-          <button
-            type="button"
-            className={`tab-btn ${activeTab === 'funnel' ? 'active' : ''}`}
-            onClick={() => setActiveTab('funnel')}
-            title="Afficher l'entonnoir de conversion global de la flotte"
-          >
-            <Filter size={13} />
-            <span>Entonnoir Global</span>
+            <span>Vue d'ensemble</span>
           </button>
           <button
             type="button"
@@ -371,19 +579,58 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
             title="Afficher l'historique chronologique des audits et comparatifs d'alignement"
           >
             <Clock size={13} />
-            <span>Historique des Audits</span>
+            <span>Historique</span>
           </button>
         </div>
 
         <div className="header-right">
+          {/* Guide IA Button to replay tutorial anytime */}
           <button
-            className="header-btn btn-secondary"
-            onClick={() => setIsContextModalOpen(true)}
-            title="Gérer les informations stratégiques de votre entreprise"
+            type="button"
+            className="header-btn btn-secondary guide-trigger-btn"
+            onClick={startTutorial}
+            title="Démarrer le guide interactif du Superviseur Commercial"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            <Building2 size={15} />
-            <span>Contexte Entreprise</span>
+            <Sparkles size={14} style={{ color: '#00E5C8' }} />
+            <span>Guide IA</span>
           </button>
+
+          <div style={{ position: 'relative' }}>
+            {tutorialStep === 9 && (
+              <VMindGuideArrow
+                direction="up"
+                color="#00E5C8"
+                style={{
+                  position: 'absolute',
+                  bottom: '-44px',
+                  left: '50%',
+                  marginLeft: '-8px',
+                  zIndex: 10004,
+                }}
+              />
+            )}
+            <button
+              className="header-btn btn-secondary"
+              onClick={() => setIsContextModalOpen(true)}
+              title="Gérer les informations stratégiques de votre entreprise"
+              style={
+                tutorialStep === 9
+                  ? {
+                      position: 'relative',
+                      zIndex: 10003,
+                      background: '#00E5C8',
+                      color: '#04101E',
+                      fontWeight: 700,
+                      boxShadow: '0 0 0 3px #00E5C8, 0 0 25px rgba(0, 229, 200, 0.75)',
+                    }
+                  : undefined
+              }
+            >
+              <Building2 size={15} />
+              <span>Contexte Entreprise</span>
+            </button>
+          </div>
 
           <button
             className="header-btn btn-primary"
@@ -399,80 +646,139 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
 
       {/* 2. Main Workspace View Container */}
       {activeTab === 'canvas' ? (
-        <div style={{ position: 'relative', flex: 1, minHeight: 0, width: '100%', height: '100%', overflow: 'hidden' }}>
-          <SupervisorGraphCanvas
-            nodes={nodes}
-            links={links}
-            selectedNodeId={selectedNodeId}
-            selectedLinkId={selectedLinkId}
-            onSelectNode={handleSelectNode}
-            onSelectLink={handleSelectLink}
-            onClearSelection={handleClearSelection}
-          />
-
-          {/* Loading Spinner Overlay */}
-          {isLoadingFleet && nodes.length === 0 && (
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(6, 17, 31, 0.75)',
-              backdropFilter: 'blur(8px)',
-              zIndex: 15,
-              pointerEvents: 'none'
-            }}>
-              <div className="spinner-ring" style={{ width: 36, height: 36, marginBottom: 16 }} />
-              <span style={{ color: '#00E5C8', fontSize: 13, fontWeight: 600, letterSpacing: '0.04em' }}>
-                Chargement du cockpit de supervision…
-              </span>
-            </div>
-          )}
-
-          {/* Empty State Banner if 0 agents are attached */}
-          {!isLoadingFleet && nodes.length === 0 && (
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(6, 17, 31, 0.85)',
-              zIndex: 10,
-              padding: 32,
-              textAlign: 'center',
-              pointerEvents: 'none'
-            }}>
-              <div style={{
-                maxWidth: 440,
-                padding: '28px 32px',
-                borderRadius: 16,
-                background: 'rgba(10, 25, 47, 0.75)',
-                border: '1px solid rgba(0, 229, 200, 0.2)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)'
-              }}>
-                <div style={{ fontSize: 38, marginBottom: 12 }}>👁️</div>
-                <div style={{ color: '#F0F4F8', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
-                  Aucun agent sous supervision
-                </div>
-                <div style={{ color: '#94A3B8', fontSize: 13, lineHeight: 1.6 }}>
-                  Ce superviseur ne possède aucun agent de Sourcing ou de Prospection rattaché pour le moment.
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : activeTab === 'funnel' ? (
-        <div className="supervisor-funnel-tab-container">
-          <SupervisorFunnelView
+        <div
+          className="supervisor-cockpit-viewport"
+          style={
+            tutorialStep >= 3 && tutorialStep <= 5
+              ? { overflow: 'visible' }
+              : undefined
+          }
+        >
+          {/* Top Integrated Pipeline HUD */}
+          <SupervisorPipelineHUD
             funnelData={funnelData}
             isLoading={isLoadingFleet}
-            onRefresh={handleRefresh}
-            onOpenContextModal={() => setIsContextModalOpen(true)}
+            tutorialStep={tutorialStep}
+            onOpenBinomes={() => {
+              setSelectedNodeId(null);
+              setSelectedLinkId(null);
+              setIsBinomesDrawerOpen(true);
+            }}
+            isBinomesOpen={isBinomesDrawerOpen}
           />
+
+          {/* 2D Force Graph Canvas Container */}
+          <div
+            className="supervisor-canvas-wrapper-box"
+            style={
+              tutorialStep === 5
+                ? {
+                    position: 'relative',
+                    zIndex: 10001,
+                    boxShadow: 'inset 0 0 0 2px #00E5C8, 0 0 30px rgba(0, 229, 200, 0.35)',
+                    borderRadius: '12px',
+                  }
+                : undefined
+            }
+          >
+            {tutorialStep === 5 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '18px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 10004,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '8px',
+                  pointerEvents: 'none',
+                }}
+              >
+                <VMindGuideArrow direction="down" color="#00E5C8" />
+                <span
+                  style={{
+                    background: 'rgba(6, 17, 31, 0.92)',
+                    border: '1px solid #00E5C8',
+                    color: '#00E5C8',
+                    fontSize: '11.5px',
+                    fontWeight: 700,
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    boxShadow: '0 0 15px rgba(0, 229, 200, 0.3)',
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  Matrice Relationnelle 2D & Handoffs Inter-Agents
+                </span>
+              </div>
+            )}
+            <SupervisorGraphCanvas
+              nodes={nodes}
+              links={links}
+              selectedNodeId={selectedNodeId}
+              selectedLinkId={selectedLinkId}
+              onSelectNode={handleSelectNode}
+              onSelectLink={handleSelectLink}
+              onClearSelection={handleClearSelection}
+            />
+
+            {/* Loading Spinner Overlay */}
+            {isLoadingFleet && nodes.length === 0 && (
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(6, 17, 31, 0.75)',
+                backdropFilter: 'blur(8px)',
+                zIndex: 15,
+                pointerEvents: 'none'
+              }}>
+                <div className="spinner-ring" style={{ width: 36, height: 36, marginBottom: 16 }} />
+                <span style={{ color: '#00E5C8', fontSize: 13, fontWeight: 600, letterSpacing: '0.04em' }}>
+                  Chargement de la vue d'ensemble…
+                </span>
+              </div>
+            )}
+
+            {/* Empty State Banner if 0 agents are attached */}
+            {!isLoadingFleet && nodes.length === 0 && (
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(6, 17, 31, 0.85)',
+                zIndex: 10,
+                padding: 32,
+                textAlign: 'center',
+                pointerEvents: 'none'
+              }}>
+                <div style={{
+                  maxWidth: 440,
+                  padding: '28px 32px',
+                  borderRadius: 16,
+                  background: 'rgba(10, 25, 47, 0.75)',
+                  border: '1px solid rgba(0, 229, 200, 0.2)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)'
+                }}>
+                  <div style={{ fontSize: 38, marginBottom: 12 }}>👁️</div>
+                  <div style={{ color: '#F0F4F8', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
+                    Aucun agent sous supervision
+                  </div>
+                  <div style={{ color: '#94A3B8', fontSize: 13, lineHeight: 1.6 }}>
+                    Ce superviseur ne possède aucun agent de Sourcing ou de Prospection rattaché pour le moment.
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="supervisor-history-tab-container">
@@ -482,6 +788,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
             onRefresh={handleRefresh}
             onRunAuditNow={handleRunAuditNow}
             isRunningAudit={isRunningAudit}
+            tutorialStep={tutorialStep}
           />
         </div>
       )}
@@ -505,6 +812,29 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
         />
       )}
 
+      {/* 3c. Pipeline Binômes Drawer */}
+      {isBinomesDrawerOpen && (
+        <PipelineBinomesDrawer
+          agentPairs={funnelData?.agentPairs || []}
+          summary={funnelData?.summary || {
+            totalSourced: 0,
+            totalTransferred: 0,
+            totalQualified: 0,
+            totalRejected: 0,
+            totalEvaluated: 0,
+            totalDrafts: 0,
+            totalEmailsSent: 0,
+            emailErrors: 0,
+            totalPhonesRevealed: 0,
+            totalPhonesAvailable: 0,
+            globalConversionRate: 0,
+            qualificationRate: 0,
+            contactRate: 0,
+          }}
+          onClose={() => setIsBinomesDrawerOpen(false)}
+        />
+      )}
+
       {/* 4. Company Context Modal (100% Real - Saved to PostgreSQL & Upstash Redis) */}
       {isContextModalOpen && (
         <CompanyContextModal
@@ -512,6 +842,80 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
           onClose={() => setIsContextModalOpen(false)}
           onSaveContext={handleSaveCompanyContext}
         />
+      )}
+
+      {/* 5. VMind Guide Floating AI Assistant Panel */}
+      {tutorialStep > 0 && (
+        <VMindGuide
+          isOpen={tutorialStep > 0}
+          title={getTutorialContent()?.title}
+          message={getTutorialContent()?.message || null}
+          mood={getTutorialContent()?.mood}
+          showBackdrop={false}
+          onClose={dismissTutorial}
+        >
+          <div
+            className="vmind-guide-actions"
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: '14px',
+              width: '100%',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '11px',
+                color: '#64748B',
+                fontFamily: 'monospace',
+                fontWeight: 600,
+              }}
+            >
+              Étape {tutorialStep} sur 9
+            </span>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={dismissTutorial}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
+                  color: '#94A3B8',
+                  padding: '5px 12px',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                Passer
+              </button>
+              <button
+                type="button"
+                className="vmind-guide-btn-primary"
+                onClick={nextTutorialStep}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 14px',
+                  borderRadius: '6px',
+                  background: '#00E5C8',
+                  color: '#06111F',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                <span>{tutorialStep < 9 ? 'Suivant' : 'Terminer'}</span>
+                <CyberIcon name="arrow-right" size={13} color="currentColor" />
+              </button>
+            </div>
+          </div>
+        </VMindGuide>
       )}
     </div>
   );

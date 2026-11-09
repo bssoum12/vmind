@@ -550,15 +550,21 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
             <div className="apple-metrics-grid">
               {isSourcing ? (
                 <>
-                  <div className="apple-metric-cell highlight">
+                  <div
+                    className="apple-metric-cell highlight"
+                    title="Total de leads extraits lors de la dernière mission active (l'historique cumulé reste préservé en base)"
+                  >
                     <span className="metric-val">{evalMetrics?.leads_total ?? node.metrics.totalLeads ?? 0}</span>
                     <span className="metric-lbl">Leads Extraits</span>
                   </div>
 
                   {evalMetrics?.leads_in_sample !== undefined && (
-                    <div className="apple-metric-cell">
+                    <div
+                      className="apple-metric-cell"
+                      title="Échantillon de leads récents analysés par l'IA du superviseur pour évaluer l'alignement stratégique"
+                    >
                       <span className="metric-val">{evalMetrics.leads_in_sample}</span>
-                      <span className="metric-lbl">Échantillon Analysé</span>
+                      <span className="metric-lbl">Échantillon Évalué</span>
                     </div>
                   )}
                 </>

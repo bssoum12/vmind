@@ -81,7 +81,7 @@ export const SupervisorFunnelView: React.FC<SupervisorFunnelViewProps> = ({
       {/* ── 1. Top Section Header ── */}
       <div className="funnel-view-header">
         <div className="header-text-block">
-          <h2 className="view-title">Entonnoir Global</h2>
+          <h2 className="view-title">Pipeline Commercial</h2>
           <p className="view-subtitle">
             Flux commercial direct consolidé entre les agents de sourcing et de prospection supervisés.
           </p>
@@ -150,7 +150,7 @@ export const SupervisorFunnelView: React.FC<SupervisorFunnelViewProps> = ({
             {/* Factual Bottom Strip (Real Numbers Only, No Fake Scores) */}
             <div className="funnel-facts-strip">
               <div className="fact-item">
-                <span className="fact-label">Taux d'Adéquation ICP</span>
+                <span className="fact-label">Taux de Qualification</span>
                 <span className="fact-value">{summary.qualificationRate}%</span>
                 <span className="fact-sub">
                   {summary.totalQualified} qualifiés / {summary.totalEvaluated || summary.totalTransferred} évalués
@@ -164,26 +164,6 @@ export const SupervisorFunnelView: React.FC<SupervisorFunnelViewProps> = ({
                   {summary.totalPhonesAvailable > 0
                     ? `sur ${summary.totalPhonesAvailable} numéros disponibles (${summary.totalSourced} contacts au total)`
                     : `aucun numéro disponible (${summary.totalSourced} contacts au total)`}
-                </span>
-              </div>
-
-              <div className="fact-item">
-                <span className="fact-label">Brouillons Rédigés par l'IA</span>
-                <span className="fact-value">{summary.totalDrafts}</span>
-                <span className="fact-sub">
-                  prêts pour relecture / envoi
-                </span>
-              </div>
-
-              <div className="fact-item">
-                <span className="fact-label">E-mails Envoyés</span>
-                <span className="fact-value">{summary.totalEmailsSent}</span>
-                <span className="fact-sub">
-                  {summary.totalEmailsSent === 0
-                    ? 'aucun e-mail envoyé'
-                    : summary.emailErrors > 0
-                    ? `${summary.emailErrors} échecs d'envoi`
-                    : 'expédiés aux contacts qualifiés'}
                 </span>
               </div>
             </div>
@@ -216,7 +196,7 @@ export const SupervisorFunnelView: React.FC<SupervisorFunnelViewProps> = ({
                   <th>Agent Sourcing</th>
                   <th>Agent Prospection</th>
                   <th className="th-num">Transférés</th>
-                  <th className="th-num">Qualifiés ICP</th>
+                  <th className="th-num">Prospects Qualifiés</th>
                   <th className="th-num">Mobiles Démasqués</th>
                   <th className="th-num">Brouillons IA</th>
                   <th className="th-num">Envoyés</th>

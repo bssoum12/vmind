@@ -35,6 +35,7 @@ import {
   Globe,
   Bot,
   Check,
+  Filter,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -54,6 +55,7 @@ import {
   AgentHistoryTrack,
   AgentHistoricalPoint,
 } from '../types/supervisor.types';
+import { VMindGuideArrow } from '@/shared/management/components/VMindGuide';
 
 interface SupervisorHistoryViewProps {
   historyData: FleetHistoryData;
@@ -61,6 +63,7 @@ interface SupervisorHistoryViewProps {
   onRefresh: () => void;
   onRunAuditNow?: () => void;
   isRunningAudit?: boolean;
+  tutorialStep?: number;
 }
 
 type TimeRangePreset = '7d' | '30d' | '90d' | 'all';
@@ -85,9 +88,25 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
   onRefresh,
   onRunAuditNow,
   isRunningAudit = false,
+  tutorialStep = 0,
 }) => {
   const audits = historyData?.audits || [];
   const agentHistories = historyData?.agentHistories || [];
+
+  // Tutorial Target Refs & Smooth Auto-Scroll
+  const chartCardRef = useRef<HTMLDivElement>(null);
+  const matrixCardRef = useRef<HTMLDivElement>(null);
+  const sessionsCardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (tutorialStep === 6 && chartCardRef.current) {
+      chartCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (tutorialStep === 7 && matrixCardRef.current) {
+      matrixCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else if (tutorialStep === 8 && sessionsCardRef.current) {
+      sessionsCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [tutorialStep]);
 
   // Track selection: 'fleet' or an agent's string uuid (Default: 'fleet')
   const [selectedTrack, setSelectedTrack] = useState<'fleet' | string>('fleet');
@@ -137,6 +156,36 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
       [id]: !prev[id],
     }));
   };
+
+  // Progressive DOM Slicing & Pagination (guarantees buttery 60 FPS even across thousands of audits)
+  const INITIAL_VISIBLE_COUNT = 15;
+  const [visibleCount, setVisibleCount] = useState<number>(INITIAL_VISIBLE_COUNT);
+  const [sessionStatusFilter, setSessionStatusFilter] = useState<'ALL' | 'SUCCESS' | 'FAIL'>('ALL');
+  const [sessionTriggerFilter, setSessionTriggerFilter] = useState<'ALL' | 'AUTOPILOT' | 'MANUAL'>('ALL');
+
+  // Filtered session list
+  const filteredAudits = useMemo(() => {
+    return audits.filter((audit) => {
+      if (sessionStatusFilter !== 'ALL' && audit.status !== sessionStatusFilter) return false;
+      if (sessionTriggerFilter !== 'ALL' && audit.triggerType !== sessionTriggerFilter) return false;
+      return true;
+    });
+  }, [audits, sessionStatusFilter, sessionTriggerFilter]);
+
+  // Dynamic filter counter statistics
+  const sessionStats = useMemo(() => {
+    const total = audits.length;
+    const success = audits.filter((a) => a.status === 'SUCCESS').length;
+    const fail = audits.filter((a) => a.status === 'FAIL').length;
+    const autopilot = audits.filter((a) => a.triggerType === 'AUTOPILOT').length;
+    const manual = audits.filter((a) => a.triggerType === 'MANUAL').length;
+    return { total, success, fail, autopilot, manual };
+  }, [audits]);
+
+  // Bounded visible slice for DOM rendering
+  const visibleAudits = useMemo(() => {
+    return filteredAudits.slice(0, visibleCount);
+  }, [filteredAudits, visibleCount]);
 
   // Date formatters
   const formatDateFull = (isoString: string) => {
@@ -497,7 +546,32 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
           </div>
         </div>
 
-        <div className="journal-empty-card">
+        <div
+          className="journal-empty-card"
+          style={
+            tutorialStep >= 6 && tutorialStep <= 8
+              ? {
+                  position: 'relative',
+                  zIndex: 10003,
+                  boxShadow: '0 0 0 2px #00E5C8, 0 0 35px rgba(0, 229, 200, 0.45)',
+                  borderRadius: '16px',
+                }
+              : undefined
+          }
+        >
+          {tutorialStep >= 6 && tutorialStep <= 8 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '-44px',
+                left: '50%',
+                marginLeft: '-8px',
+                zIndex: 10004,
+              }}
+            >
+              <VMindGuideArrow direction="down" color="#00E5C8" />
+            </div>
+          )}
           <Calendar size={28} className="empty-icon" />
           <h3 className="empty-title">Aucun audit enregistré</h3>
           <p className="empty-desc">
@@ -607,16 +681,62 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
       </div>
 
       {/* ── 3. Interactive Progression Chart Card ── */}
-      <div className="progression-chart-card">
+      <div
+        ref={chartCardRef}
+        className="progression-chart-card"
+        style={
+          tutorialStep === 6
+            ? {
+                position: 'relative',
+                zIndex: 10003,
+                boxShadow: '0 0 0 1px rgba(0, 229, 200, 0.35), 0 0 35px rgba(0, 229, 200, 0.25)',
+                borderRadius: '16px',
+              }
+            : undefined
+        }
+      >
         <div className="chart-card-top-bar">
           {/* Apple Pro Custom Glass Dropdown */}
-          <div className="track-dropdown-wrapper" ref={dropdownRef}>
+          <div
+            className="track-dropdown-wrapper"
+            ref={dropdownRef}
+            style={{ position: 'relative' }}
+          >
+            {tutorialStep === 6 && (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '-44px',
+                  left: '50%',
+                  marginLeft: '-8px',
+                  zIndex: 10006,
+                }}
+              >
+                <VMindGuideArrow direction="down" color="#00E5C8" />
+              </div>
+            )}
             <button
               type="button"
               className={`track-dropdown-trigger ${isDropdownOpen ? 'is-open' : ''}`}
               onClick={() => setIsDropdownOpen((prev) => !prev)}
               aria-haspopup="listbox"
               aria-expanded={isDropdownOpen}
+              title={
+                selectedTrack === 'fleet'
+                  ? "Affichage actuel : Flotte Consolidée (moyenne globale). Cliquez pour filtrer par agent spécifique."
+                  : `Affichage actuel : ${currentAgentName}. Cliquez pour basculer vers un autre agent ou revenir à la flotte globale.`
+              }
+              style={
+                tutorialStep === 6
+                  ? {
+                      position: 'relative',
+                      zIndex: 10005,
+                      boxShadow: '0 0 0 2px #00E5C8, 0 0 22px rgba(0, 229, 200, 0.75)',
+                      borderColor: '#00E5C8',
+                      background: 'rgba(6, 17, 31, 0.95)',
+                    }
+                  : undefined
+              }
             >
               <div className="trigger-left">
                 {selectedTrack === 'fleet' ? (
@@ -863,7 +983,33 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
       </div>
 
       {/* ── 4. Scalable Agents Performance Matrix (Scales for 3 to 50+ agents) ── */}
-      <div className="agents-matrix-card">
+      <div
+        ref={matrixCardRef}
+        className="agents-matrix-card"
+        style={
+          tutorialStep === 7
+            ? {
+                position: 'relative',
+                zIndex: 10003,
+                boxShadow: '0 0 0 2px #00E5C8, 0 0 35px rgba(0, 229, 200, 0.45)',
+                borderRadius: '16px',
+              }
+            : undefined
+        }
+      >
+        {tutorialStep === 7 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '-44px',
+              left: '50%',
+              marginLeft: '-8px',
+              zIndex: 10004,
+            }}
+          >
+            <VMindGuideArrow direction="down" color="#00E5C8" />
+          </div>
+        )}
         <div className="matrix-card-header">
           <div className="matrix-header-left">
             <Users size={16} className="section-icon" />
@@ -995,271 +1141,417 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
       </div>
 
       {/* ── 5. Chronological Audit Sessions Timeline ── */}
-      <div className="sessions-section-container">
+      <div
+        ref={sessionsCardRef}
+        className="sessions-section-container"
+        style={
+          tutorialStep === 8
+            ? {
+                position: 'relative',
+                zIndex: 10003,
+                boxShadow: '0 0 0 2px #00E5C8, 0 0 35px rgba(0, 229, 200, 0.45)',
+                borderRadius: '16px',
+              }
+            : undefined
+        }
+      >
+        {tutorialStep === 8 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '-44px',
+              left: '50%',
+              marginLeft: '-8px',
+              zIndex: 10004,
+            }}
+          >
+            <VMindGuideArrow direction="down" color="#00E5C8" />
+          </div>
+        )}
         <div className="sessions-section-header">
           <div className="left">
             <Calendar size={16} className="section-icon" />
             <h3 className="sessions-title">Journal des Sessions d'Audit</h3>
+            <span className="sessions-count font-mono">
+              {filteredAudits.length} session{filteredAudits.length > 1 ? 's' : ''}
+              {filteredAudits.length !== audits.length && ` (sur ${audits.length})`}
+            </span>
           </div>
-          <span className="sessions-count font-mono">{audits.length} sessions</span>
+
+          {/* Scalable Interactive Filter Group */}
+          <div className="sessions-filter-toolbar">
+            <div className="filter-pill-group">
+              <button
+                type="button"
+                className={`filter-pill-btn ${sessionStatusFilter === 'ALL' ? 'active' : ''}`}
+                onClick={() => setSessionStatusFilter('ALL')}
+              >
+                Tous ({sessionStats.total})
+              </button>
+              <button
+                type="button"
+                className={`filter-pill-btn is-success ${sessionStatusFilter === 'SUCCESS' ? 'active' : ''}`}
+                onClick={() => setSessionStatusFilter('SUCCESS')}
+              >
+                <span className="filter-dot dot-success" />
+                Succès ({sessionStats.success})
+              </button>
+              {sessionStats.fail > 0 && (
+                <button
+                  type="button"
+                  className={`filter-pill-btn is-fail ${sessionStatusFilter === 'FAIL' ? 'active' : ''}`}
+                  onClick={() => setSessionStatusFilter('FAIL')}
+                >
+                  <span className="filter-dot dot-fail" />
+                  Échecs ({sessionStats.fail})
+                </button>
+              )}
+            </div>
+
+            <div className="filter-pill-group">
+              <button
+                type="button"
+                className={`filter-pill-btn ${sessionTriggerFilter === 'ALL' ? 'active' : ''}`}
+                onClick={() => setSessionTriggerFilter('ALL')}
+              >
+                Tous types
+              </button>
+              <button
+                type="button"
+                className={`filter-pill-btn ${sessionTriggerFilter === 'AUTOPILOT' ? 'active' : ''}`}
+                onClick={() => setSessionTriggerFilter('AUTOPILOT')}
+              >
+                Autopilot ({sessionStats.autopilot})
+              </button>
+              <button
+                type="button"
+                className={`filter-pill-btn ${sessionTriggerFilter === 'MANUAL' ? 'active' : ''}`}
+                onClick={() => setSessionTriggerFilter('MANUAL')}
+              >
+                Flash ({sessionStats.manual})
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="timeline-container">
-          {audits.map((audit) => {
-            const isExpanded = Boolean(expandedIds[audit.id]);
-            const isSuccess = audit.status === 'SUCCESS';
-            const isAutopilot = audit.triggerType === 'AUTOPILOT';
-
-            return (
-              <div
-                key={String(audit.id)}
-                className={`audit-session-card ${isSuccess ? 'is-success' : 'is-fail'} ${
-                  isExpanded ? 'is-expanded' : ''
-                }`}
+          {filteredAudits.length === 0 ? (
+            <div className="empty-filtered-sessions">
+              <div className="empty-filter-icon">
+                <Filter size={18} />
+              </div>
+              <p className="empty-filter-title">Aucune session d'audit ne correspond à vos filtres</p>
+              <button
+                type="button"
+                className="reset-filters-btn"
+                onClick={() => {
+                  setSessionStatusFilter('ALL');
+                  setSessionTriggerFilter('ALL');
+                }}
               >
-                {/* Clickable Header Row */}
+                Réinitialiser les filtres
+              </button>
+            </div>
+          ) : (
+            visibleAudits.map((audit) => {
+              const isExpanded = Boolean(expandedIds[audit.id]);
+              const isSuccess = audit.status === 'SUCCESS';
+              const isAutopilot = audit.triggerType === 'AUTOPILOT';
+
+              return (
                 <div
-                  className="session-header-row"
-                  onClick={() => toggleExpand(audit.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      toggleExpand(audit.id);
-                    }
-                  }}
+                  key={String(audit.id)}
+                  className={`audit-session-card ${isSuccess ? 'is-success' : 'is-fail'} ${
+                    isExpanded ? 'is-expanded' : ''
+                  }`}
                 >
-                  <div className="session-left">
-                    <div className="status-indicator">
-                      {isSuccess ? (
-                        <CheckCircle2 size={18} className="icon-success" />
-                      ) : (
-                        <AlertTriangle size={18} className="icon-fail" />
-                      )}
-                    </div>
-
-                    <div className="session-meta">
-                      <span className="session-date">{formatDateFull(audit.timestamp)}</span>
-                      <span className="session-relative">({formatRelativeTime(audit.timestamp)})</span>
-                    </div>
-
-                    <span className={`trigger-badge ${isAutopilot ? 'autopilot' : 'manual'}`}>
-                      {isAutopilot ? 'Autopilot (Planifié)' : 'Flash'}
-                    </span>
-                  </div>
-
-                  <div className="session-right">
-                    {isSuccess ? (
-                      <div className="session-score-block">
-                        <span className="score-pill font-mono">{audit.overallScore}%</span>
-                        {audit.scoreDelta !== null &&
-                          audit.scoreDelta !== undefined &&
-                          audit.scoreDelta !== 0 && (
-                            <span
-                              className={`delta-tag font-mono ${audit.scoreDelta > 0 ? 'pos' : 'neg'}`}
-                            >
-                              {audit.scoreDelta > 0
-                                ? `+${audit.scoreDelta}%`
-                                : `${audit.scoreDelta}%`}
-                            </span>
-                          )}
+                  {/* Clickable Header Row */}
+                  <div
+                    className="session-header-row"
+                    onClick={() => toggleExpand(audit.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleExpand(audit.id);
+                      }
+                    }}
+                  >
+                    <div className="session-left">
+                      <div className="status-indicator">
+                        {isSuccess ? (
+                          <CheckCircle2 size={18} className="icon-success" />
+                        ) : (
+                          <AlertTriangle size={18} className="icon-fail" />
+                        )}
                       </div>
-                    ) : (
-                      <span className="fail-pill">Échec</span>
-                    )}
 
-                    {audit.nodeSnapshots && audit.nodeSnapshots.length > 0 && (
-                      <span className="nodes-count-tag">
-                        {audit.nodeSnapshots.length} agents audités
+                      <div className="session-meta">
+                        <span className="session-date">{formatDateFull(audit.timestamp)}</span>
+                        <span className="session-relative">({formatRelativeTime(audit.timestamp)})</span>
+                      </div>
+
+                      <span className={`trigger-badge ${isAutopilot ? 'autopilot' : 'manual'}`}>
+                        {isAutopilot ? 'Autopilot (Planifié)' : 'Flash'}
                       </span>
-                    )}
-
-                    <div
-                      className="chevron-toggle"
-                      aria-label={isExpanded ? 'Réduire' : 'Développer'}
-                    >
-                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
-                  </div>
-                </div>
 
-                {/* Expanded Session Snapshot */}
-                {isExpanded && (
-                  <div className="session-body-content">
-                    {isSuccess ? (
-                      <>
-                        {/* 1. Fleet Composition at Audit Time */}
-                        {audit.nodeSnapshots && audit.nodeSnapshots.length > 0 && (
-                          <div className="snapshot-section">
-                            <div className="section-title-row">
-                              <Users size={14} className="section-icon" />
-                              <h4>État des Agents lors de la Session</h4>
-                            </div>
-
-                            <div className="agents-grid">
-                              {audit.nodeSnapshots.map((node: AuditNodeSnapshot) => {
-                                const isSourcing = node.agentRole === 'sourcing';
-                                const scoreVal = node.score ?? 0;
-                                const isOptimal = scoreVal >= 75;
-                                const isWarning = scoreVal >= 50 && scoreVal < 75;
-
-                                return (
-                                  <div key={node.agentUuid} className="agent-snapshot-card">
-                                    <div className="agent-card-header">
-                                      <div className="agent-identity">
-                                        <span className="agent-name">{node.agentName}</span>
-                                        <span
-                                          className={`role-pill ${
-                                            isSourcing ? 'sourcing' : 'prospect'
-                                          }`}
-                                        >
-                                          {isSourcing ? 'Sourcing' : 'Prospection'}
-                                        </span>
-                                      </div>
-
-                                      <div className="agent-score-block">
-                                        <span className="agent-score font-mono">{scoreVal}%</span>
-                                        <span
-                                          className={`health-pill ${
-                                            isOptimal
-                                              ? 'optimal'
-                                              : isWarning
-                                              ? 'warning'
-                                              : 'critical'
-                                          }`}
-                                        >
-                                          {isOptimal
-                                            ? 'Optimal'
-                                            : isWarning
-                                            ? 'À surveiller'
-                                            : 'Critique'}
-                                        </span>
-                                      </div>
-                                    </div>
-
-                                    <div className="score-progress-bar">
-                                      <div
-                                        className="fill"
-                                        style={{
-                                          width: `${scoreVal}%`,
-                                          background: isOptimal
-                                            ? '#00E5C8'
-                                            : isWarning
-                                            ? '#FFA502'
-                                            : '#FF4757',
-                                        }}
-                                      />
-                                    </div>
-
-                                    {node.summary && (
-                                      <p className="agent-summary-text">{node.summary}</p>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 2. Pipeline Inter-Agent Links */}
-                        {audit.linkSnapshots && audit.linkSnapshots.length > 0 && (
-                          <div className="snapshot-section">
-                            <div className="section-title-row">
-                              <Layers size={14} className="section-icon" />
-                              <h4>Liaisons et Transferts Inter-Agents</h4>
-                            </div>
-
-                            <div className="links-grid">
-                              {audit.linkSnapshots.map(
-                                (link: AuditLinkSnapshot, lIdx: number) => (
-                                  <div key={lIdx} className="link-snapshot-card">
-                                    <div className="link-header">
-                                      <div className="link-pipeline-names">
-                                        <span className="src">{link.sourceName}</span>
-                                        <ArrowRight size={13} className="arrow-icon" />
-                                        <span className="tgt">{link.targetName}</span>
-                                      </div>
-                                      <span className="link-score-pill font-mono">
-                                        {link.score}% alignement
-                                      </span>
-                                    </div>
-
-                                    {link.summary && (
-                                      <p className="link-summary-text">{link.summary}</p>
-                                    )}
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* 3. Strategic Recommendations */}
-                        {audit.recommendations && audit.recommendations.length > 0 && (
-                          <div className="snapshot-section">
-                            <div className="section-title-row">
-                              <Sparkles size={14} className="section-icon text-cyan" />
-                              <h4>Recommandations Stratégiques</h4>
-                            </div>
-
-                            <ul className="recommendations-list">
-                              {audit.recommendations.map((rec, rIdx) => (
-                                <li key={rIdx} className="rec-item">
-                                  <span className="rec-bullet">•</span>
-                                  <span className="rec-text">{rec}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
-                        {/* 4. Email Digest Status */}
-                        {audit.reportSent && (
-                          <div className="audit-footer-row">
-                            <Mail size={13} className="mail-icon" />
-                            <span>Rapport de synthèse envoyé par e-mail</span>
-                            {audit.recipientEmail && (
-                              <span className="recipient-pill font-mono">
-                                à {audit.recipientEmail}
+                    <div className="session-right">
+                      {isSuccess ? (
+                        <div className="session-score-block">
+                          <span className="score-pill font-mono">{audit.overallScore}%</span>
+                          {audit.scoreDelta !== null &&
+                            audit.scoreDelta !== undefined &&
+                            audit.scoreDelta !== 0 && (
+                              <span
+                                className={`delta-tag font-mono ${audit.scoreDelta > 0 ? 'pos' : 'neg'}`}
+                              >
+                                {audit.scoreDelta > 0
+                                  ? `+${audit.scoreDelta}%`
+                                  : `${audit.scoreDelta}%`}
                               </span>
                             )}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      /* Failure Recovery Box */
-                      <div className="failure-diagnostic-box">
-                        <div className="failure-header">
-                          <AlertTriangle size={18} className="icon-fail" />
-                          <h5>L'audit programmé n'a pas pu être finalisé</h5>
                         </div>
-                        <p className="failure-message">
-                          {audit.errorMessage ||
-                            audit.summaryMessage ||
-                            "Une indisponibilité temporaire est survenue lors de l'exécution automatique."}
-                        </p>
-                        {onRunAuditNow && (
-                          <button
-                            className="retry-audit-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onRunAuditNow();
-                            }}
-                            disabled={isRunningAudit || isLoading}
-                          >
-                            <Zap size={13} />
-                            <span>Relancer l'audit manuellement</span>
-                          </button>
-                        )}
+                      ) : (
+                        <span className="fail-pill">Échec</span>
+                      )}
+
+                      {audit.nodeSnapshots && audit.nodeSnapshots.length > 0 && (
+                        <span className="nodes-count-tag">
+                          {audit.nodeSnapshots.length} agents audités
+                        </span>
+                      )}
+
+                      <div
+                        className="chevron-toggle"
+                        aria-label={isExpanded ? 'Réduire' : 'Développer'}
+                      >
+                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                       </div>
-                    )}
+                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
+
+                  {/* Expanded Session Snapshot */}
+                  {isExpanded && (
+                    <div className="session-body-content">
+                      {isSuccess ? (
+                        <>
+                          {/* 1. Fleet Composition at Audit Time */}
+                          {audit.nodeSnapshots && audit.nodeSnapshots.length > 0 && (
+                            <div className="snapshot-section">
+                              <div className="section-title-row">
+                                <Users size={14} className="section-icon" />
+                                <h4>État des Agents lors de la Session</h4>
+                              </div>
+
+                              <div className="agents-grid">
+                                {audit.nodeSnapshots.map((node: AuditNodeSnapshot) => {
+                                  const isSourcing = node.agentRole === 'sourcing';
+                                  const scoreVal = node.score ?? 0;
+                                  const isOptimal = scoreVal >= 75;
+                                  const isWarning = scoreVal >= 50 && scoreVal < 75;
+
+                                  return (
+                                    <div key={node.agentUuid} className="agent-snapshot-card">
+                                      <div className="agent-card-header">
+                                        <div className="agent-identity">
+                                          <span className="agent-name">{node.agentName}</span>
+                                          <span
+                                            className={`role-pill ${
+                                              isSourcing ? 'sourcing' : 'prospect'
+                                            }`}
+                                          >
+                                            {isSourcing ? 'Sourcing' : 'Prospection'}
+                                          </span>
+                                        </div>
+
+                                        <div className="agent-score-block">
+                                          <span className="agent-score font-mono">{scoreVal}%</span>
+                                          <span
+                                            className={`health-pill ${
+                                              isOptimal
+                                                ? 'optimal'
+                                                : isWarning
+                                                ? 'warning'
+                                                : 'critical'
+                                            }`}
+                                          >
+                                            {isOptimal
+                                              ? 'Optimal'
+                                              : isWarning
+                                              ? 'À surveiller'
+                                              : 'Critique'}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      <div className="score-progress-bar">
+                                        <div
+                                          className="fill"
+                                          style={{
+                                            width: `${scoreVal}%`,
+                                            background: isOptimal
+                                              ? '#00E5C8'
+                                              : isWarning
+                                              ? '#FFA502'
+                                              : '#FF4757',
+                                          }}
+                                        />
+                                      </div>
+
+                                      {node.summary && (
+                                        <p className="agent-summary-text">{node.summary}</p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 2. Pipeline Inter-Agent Links */}
+                          {audit.linkSnapshots && audit.linkSnapshots.length > 0 && (
+                            <div className="snapshot-section">
+                              <div className="section-title-row">
+                                <Layers size={14} className="section-icon" />
+                                <h4>Liaisons et Transferts Inter-Agents</h4>
+                              </div>
+
+                              <div className="links-grid">
+                                {audit.linkSnapshots.map(
+                                  (link: AuditLinkSnapshot, lIdx: number) => (
+                                    <div key={lIdx} className="link-snapshot-card">
+                                      <div className="link-header">
+                                        <div className="link-pipeline-names">
+                                          <span className="src">{link.sourceName}</span>
+                                          <ArrowRight size={13} className="arrow-icon" />
+                                          <span className="tgt">{link.targetName}</span>
+                                        </div>
+                                        <span className="link-score-pill font-mono">
+                                          {link.score}% alignement
+                                        </span>
+                                      </div>
+
+                                      {link.summary && (
+                                        <p className="link-summary-text">{link.summary}</p>
+                                      )}
+                                    </div>
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 3. Strategic Recommendations */}
+                          {audit.recommendations && audit.recommendations.length > 0 && (
+                            <div className="snapshot-section">
+                              <div className="section-title-row">
+                                <Sparkles size={14} className="section-icon text-cyan" />
+                                <h4>Recommandations Stratégiques</h4>
+                              </div>
+
+                              <ul className="recommendations-list">
+                                {audit.recommendations.map((rec, rIdx) => (
+                                  <li key={rIdx} className="rec-item">
+                                    <span className="rec-bullet">•</span>
+                                    <span className="rec-text">{rec}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* 4. Email Digest Status */}
+                          {audit.reportSent && (
+                            <div className="audit-footer-row">
+                              <Mail size={13} className="mail-icon" />
+                              <span>Rapport de synthèse envoyé par e-mail</span>
+                              {audit.recipientEmail && (
+                                <span className="recipient-pill font-mono">
+                                  à {audit.recipientEmail}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        /* Failure Recovery Box */
+                        <div className="failure-diagnostic-box">
+                          <div className="failure-header">
+                            <AlertTriangle size={18} className="icon-fail" />
+                            <h5>L'audit programmé n'a pas pu être finalisé</h5>
+                          </div>
+                          <p className="failure-message">
+                            {audit.errorMessage ||
+                              audit.summaryMessage ||
+                              "Une indisponibilité temporaire est survenue lors de l'exécution automatique."}
+                          </p>
+                          {onRunAuditNow && (
+                            <button
+                              type="button"
+                              className="retry-audit-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRunAuditNow();
+                              }}
+                              disabled={isRunningAudit || isLoading}
+                            >
+                              <Zap size={13} />
+                              <span>Relancer l'audit manuellement</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
+
+        {/* ── Scalable Progressive Pagination Controller ── */}
+        {filteredAudits.length > INITIAL_VISIBLE_COUNT && (
+          <div className="sessions-pagination-controller">
+            <div className="pagination-count-label">
+              Affichage de <span className="count-num font-mono">{visibleAudits.length}</span> sur{' '}
+              <span className="count-num font-mono">{filteredAudits.length}</span> sessions
+            </div>
+
+            <div className="pagination-button-group">
+              {visibleCount < filteredAudits.length && (
+                <button
+                  type="button"
+                  className="pagination-btn load-more-btn"
+                  onClick={() => setVisibleCount((prev) => Math.min(prev + 15, filteredAudits.length))}
+                >
+                  Afficher 15 sessions de plus
+                </button>
+              )}
+
+              {visibleCount < filteredAudits.length && filteredAudits.length - visibleCount <= 60 && (
+                <button
+                  type="button"
+                  className="pagination-btn show-all-btn"
+                  onClick={() => setVisibleCount(filteredAudits.length)}
+                >
+                  Tout afficher ({filteredAudits.length})
+                </button>
+              )}
+
+              {visibleCount > INITIAL_VISIBLE_COUNT && (
+                <button
+                  type="button"
+                  className="pagination-btn collapse-btn"
+                  onClick={() => setVisibleCount(INITIAL_VISIBLE_COUNT)}
+                >
+                  Réduire aux 15 plus récentes
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
