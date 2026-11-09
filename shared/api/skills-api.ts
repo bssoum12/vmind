@@ -18,6 +18,7 @@ export interface InstalledSkillItem {
   kind: SkillKind;
   scope: SkillScope;
   erp_type: string | null;
+  erp_types?: string[];
   tenant_key: string | null;
   owner_user_id: number | null;
   mapped_tools: string[];
@@ -42,6 +43,7 @@ export interface DiscoverSkillItem {
   slug: string;
   scope: 'GLOBAL' | 'ERP';
   erp_type: string | null;
+  erp_types?: string[];
   title: string;
   description: string;
   category: SkillCategory;
@@ -82,7 +84,7 @@ export interface SkillWritePayload {
   category: SkillCategory;
   kind: SkillKind;
   scope: SkillScope;
-  erp_type?: string | null;
+  erp_types?: string[];
   tenant_key?: string | null;
   body_md: string;
   references_json?: Record<string, string>;

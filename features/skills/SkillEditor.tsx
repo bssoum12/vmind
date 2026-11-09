@@ -8,7 +8,7 @@ import {
   Trash2,
   History,
   FileText,
-  Wrench,
+  Pencil,
   RotateCcw,
   AlertCircle,
   ChevronDown,
@@ -29,6 +29,25 @@ import {
   fetchAvailableTenantsForAdmin,
 } from '@/shared/api/skills-api';
 import { useToast } from '@/shared/contexts/ToastContext';
+import { SkillErpSelector } from './SkillErpSelector';
+import { SkillGuidedFields } from './SkillGuidedFields';
+import { SkillHelpStrip } from './SkillHelpStrip';
+import {
+  EXPERT_MODE_STORAGE_KEY,
+  NEW_SKILL_BODY_TEMPLATE,
+  GUIDED_SECTIONS,
+  type CustomBody,
+  type SectionValues,
+  assembleCustomBody,
+  composeBody,
+  composeDescription,
+  convertSections,
+  fitsGuidedForm,
+  loadGuidedBody,
+  parseDescription,
+  slugifyTitle,
+  usesFreeDescription,
+} from './skill-guided-form';
 import './skills-premium.css';
 
 interface SkillEditorProps {
@@ -38,6 +57,7 @@ interface SkillEditorProps {
   initialSkill?: SkillDetail | null;
   mode: 'create' | 'edit' | 'customize';
   isAdmin: boolean;
+  accountName: string;
   activeConnectionId?: number | null;
   activeErpType?: string | null;
   activeClientId?: string | null;
@@ -55,6 +75,22 @@ const CATEGORIES: Array<{ value: SkillCategory; label: string }> = [
 
 const MAX_REFERENCE_FILES = Number(process.env.NEXT_PUBLIC_MAX_REFERENCE_FILES) || 15;
 
+function readStoredExpertMode(accountName: string): boolean {
+  try {
+    return window.localStorage.getItem(`${EXPERT_MODE_STORAGE_KEY}.${accountName}`) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function storeExpertMode(accountName: string, value: boolean) {
+  try {
+    window.localStorage.setItem(`${EXPERT_MODE_STORAGE_KEY}.${accountName}`, String(value));
+  } catch {
+    // The choice simply isn't remembered
+  }
+}
+
 export const SkillEditor: React.FC<SkillEditorProps> = ({
   isOpen,
   onClose,
@@ -62,6 +98,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
   initialSkill,
   mode,
   isAdmin,
+  accountName,
   activeConnectionId,
   activeErpType,
   activeClientId,
@@ -74,10 +111,18 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
   const [category, setCategory] = useState<SkillCategory>('productivite');
   const [kind, setKind] = useState<SkillKind>('style');
   const [scope, setScope] = useState<SkillScope>('USER');
-  const [erpType, setErpType] = useState<string>(activeErpType || 'tralis');
+  const [erpTypes, setErpTypes] = useState<string[]>([]);
   const [tenantKey, setTenantKey] = useState<string>(activeClientId || 'DEMO');
   const [description, setDescription] = useState('');
   const [bodyMd, setBodyMd] = useState('');
+  const [expertMode, setExpertMode] = useState(false);
+  const [quand, setQuand] = useState('');
+  const [pasPour, setPasPour] = useState('');
+  const [sectionValues, setSectionValues] = useState<SectionValues>({});
+  const [customBody, setCustomBody] = useState<CustomBody | null>(null);
+  const [freeDescription, setFreeDescription] = useState(false);
+  const [activeSection, setActiveSection] = useState(GUIDED_SECTIONS.style[0].key);
+  const [helpField, setHelpField] = useState<string | null>(null);
   const [referencesJson, setReferencesJson] = useState<Record<string, string>>({});
   const [newRefName, setNewRefName] = useState('');
   const [selectedRefKey, setSelectedRefKey] = useState<string | null>(null);
@@ -104,6 +149,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     setActiveTab('general');
     setToolsDropdownOpen(false);
     setToolSearchQuery('');
+    setHelpField(null);
 
     if (initialSkill) {
       setSlug(initialSkill.slug);
@@ -118,10 +164,20 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
         setScope(!isAdmin ? 'USER' : initialSkill.scope || 'USER');
       }
 
-      setErpType(initialSkill.erp_type || activeErpType || 'tralis');
+      setErpTypes(initialSkill.erp_types?.length ? initialSkill.erp_types : initialSkill.erp_type ? [initialSkill.erp_type] : []);
       setTenantKey(initialSkill.tenant_key || activeClientId || 'DEMO');
       setDescription(initialSkill.description || '');
       setBodyMd(initialSkill.body_md || '');
+      const initialKind: SkillKind = !isAdmin ? 'style' : initialSkill.kind || 'style';
+      const sentences = parseDescription(initialSkill.description || '');
+      setQuand(sentences?.quand ?? '');
+      setPasPour(sentences?.pasPour ?? '');
+      setFreeDescription(usesFreeDescription(initialSkill.description || ''));
+      const guided = loadGuidedBody(initialKind, initialSkill.title, initialSkill.body_md || '');
+      setSectionValues(guided.values);
+      setCustomBody(guided.custom);
+      setActiveSection(guided.custom?.sections[0]?.key ?? GUIDED_SECTIONS[initialKind][0].key);
+      setExpertMode(!fitsGuidedForm(initialSkill.references_json) || readStoredExpertMode(accountName));
       const refs = initialSkill.references_json || {};
       setReferencesJson({ ...refs });
       const refKeys = Object.keys(refs);
@@ -135,16 +191,24 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
       setCategory('productivite');
       setKind('style');
       setScope('USER');
-      setErpType(activeErpType || 'tralis');
+      setErpTypes([]);
       setTenantKey(activeClientId || 'DEMO');
       setDescription('');
-      setBodyMd('# Objectif\n\nDécrivez ici la procédure ou le format attendu...\n');
+      setQuand('');
+      setPasPour('');
+      setSectionValues({});
+      setCustomBody(null);
+      setFreeDescription(false);
+      setActiveSection(GUIDED_SECTIONS.style[0].key);
+      const startsExpert = readStoredExpertMode(accountName);
+      setExpertMode(startsExpert);
+      setBodyMd(startsExpert ? NEW_SKILL_BODY_TEMPLATE : '');
       setReferencesJson({});
       setSelectedRefKey(null);
       setMappedTools([]);
       setVersionComment('');
     }
-  }, [isOpen, initialSkill, mode, isAdmin, activeErpType, activeClientId]);
+  }, [isOpen, initialSkill, mode, isAdmin, accountName, activeErpType, activeClientId]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -154,9 +218,6 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
       .then((res) => {
         if (cancelled) return;
         setIsErpConnected(res.connected || Boolean(activeConnectionId));
-        if (res.erpType && !initialSkill?.erp_type) {
-          setErpType(res.erpType);
-        }
         if (res.clientId && !initialSkill?.tenant_key) {
           setTenantKey(res.clientId);
         }
@@ -175,7 +236,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, activeConnectionId, isAdmin, initialSkill?.erp_type, initialSkill?.tenant_key]);
+  }, [isOpen, activeConnectionId, isAdmin, initialSkill?.tenant_key]);
 
   useEffect(() => {
     if (!isOpen || activeTab !== 'history' || !initialSkill?.id) return;
@@ -188,11 +249,79 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
 
   if (!isOpen) return null;
 
-  const descChars = description.trim().length;
-  const descWords = description.trim() ? description.trim().split(/\s+/).length : 0;
-  const hasForbiddenAngles = description.includes('<') || description.includes('>');
-  const bodyLines = bodyMd.split(/\r?\n/).length;
-  const bodyChars = bodyMd.length;
+  const effectiveDescription = expertMode || freeDescription ? description : composeDescription(quand, pasPour);
+  const descChars = effectiveDescription.trim().length;
+  const descWords = effectiveDescription.trim() ? effectiveDescription.trim().split(/\s+/).length : 0;
+  const hasForbiddenAngles = effectiveDescription.includes('<') || effectiveDescription.includes('>');
+  const effectiveKind: SkillKind = !isAdmin ? 'style' : kind;
+  const effectiveBody = expertMode
+    ? bodyMd
+    : customBody
+      ? assembleCustomBody(customBody)
+      : composeBody(effectiveKind, title, sectionValues);
+  const guidedTabs = customBody ? customBody.sections : GUIDED_SECTIONS[effectiveKind];
+  const guidedValues = customBody
+    ? Object.fromEntries(customBody.sections.map((s) => [s.key, s.text]))
+    : sectionValues;
+  const sectionHelpKey = customBody ? 'sectionLibre' : activeSection;
+  const bodyLines = effectiveBody.split(/\r?\n/).length;
+  const bodyChars = effectiveBody.length;
+  // With the sentences, problems are explained on save instead of silently disabling the button
+  const saveDisabled =
+    saving || (expertMode && (descChars < 20 || descChars > 1024 || hasForbiddenAngles || bodyLines > 500));
+  const canUseGuidedForm = fitsGuidedForm(referencesJson);
+
+  const handleExpertToggle = () => {
+    if (expertMode) {
+      if (!canUseGuidedForm) return;
+      const sentences = parseDescription(description);
+      setQuand(sentences?.quand ?? '');
+      setPasPour(sentences?.pasPour ?? '');
+      setFreeDescription(usesFreeDescription(description));
+      const guided = loadGuidedBody(effectiveKind, title, bodyMd);
+      setSectionValues(guided.values);
+      setCustomBody(guided.custom);
+      setActiveSection(guided.custom?.sections[0]?.key ?? GUIDED_SECTIONS[effectiveKind][0].key);
+      if (activeTab === 'references') setActiveTab('general');
+    } else {
+      setDescription(effectiveDescription);
+      setBodyMd(effectiveBody || NEW_SKILL_BODY_TEMPLATE);
+    }
+    setExpertMode(!expertMode);
+    setErrorMsg(null);
+    storeExpertMode(accountName, !expertMode);
+  };
+
+  const handleKindChange = (nextKind: SkillKind) => {
+    if (!customBody) {
+      setSectionValues((prev) => convertSections(kind, nextKind, prev));
+      setActiveSection(GUIDED_SECTIONS[nextKind][0].key);
+    }
+    setKind(nextKind);
+  };
+
+  const handleSectionChange = (key: string, value: string) => {
+    if (customBody) {
+      setCustomBody({
+        ...customBody,
+        sections: customBody.sections.map((s) => (s.key === key ? { ...s, text: value } : s)),
+      });
+    } else {
+      setSectionValues((prev) => ({ ...prev, [key]: value }));
+    }
+  };
+
+  const handleScopeChange = (nextScope: SkillScope) => {
+    setScope(nextScope);
+    if (nextScope === 'ERP' && erpTypes.length === 0 && activeErpType) {
+      setErpTypes([activeErpType.toLowerCase()]);
+    }
+  };
+
+  const handleFieldFocus = (e: React.FocusEvent<HTMLFormElement>) => {
+    const field = (e.target as HTMLElement).closest<HTMLElement>('[data-help]')?.dataset.help;
+    if (field) setHelpField(field);
+  };
 
   const toggleToolSelection = (toolName: string) => {
     setMappedTools((prev) => {
@@ -246,19 +375,61 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
       setErrorMsg('Un commentaire de version est obligatoire pour les portées partagées (TENANT, ERP, GLOBAL).');
       return;
     }
+    if (scope === 'ERP' && erpTypes.length === 0) {
+      setErrorMsg('Choisissez au moins un ERP pour cette compétence.');
+      return;
+    }
+    if (!expertMode) {
+      const missingSection = customBody
+        ? undefined
+        : GUIDED_SECTIONS[effectiveKind].find((s) => s.required && !sectionValues[s.key]?.trim());
+      if (missingSection) {
+        setActiveSection(missingSection.key);
+        setHelpField(missingSection.key);
+        setErrorMsg(`Remplissez « ${missingSection.title} » : l’assistant en a besoin pour appliquer cette compétence.`);
+        return;
+      }
+      if (!effectiveBody.trim()) {
+        setErrorMsg('Remplissez au moins une section de « Ce que l’assistant doit faire ».');
+        return;
+      }
+      const descriptionLabel = freeDescription ? '« Description »' : '« Quand on demande » et « Pas pour »';
+      if (descChars < 20) {
+        setErrorMsg(`Précisez davantage ${descriptionLabel} pour que l’assistant sache quand utiliser cette compétence.`);
+        return;
+      }
+      if (descChars > 1024) {
+        setErrorMsg(`${descriptionLabel} : ce texte est trop long, raccourcissez-le.`);
+        return;
+      }
+      if (hasForbiddenAngles) {
+        setErrorMsg(`Retirez les caractères < et > de ${descriptionLabel}.`);
+        return;
+      }
+      if (bodyLines > 500 || bodyChars > 20000) {
+        setErrorMsg('Les sections de « Ce que l’assistant doit faire » sont trop longues : raccourcissez le texte.');
+        return;
+      }
+    }
+
+    const finalSlug = !expertMode && mode === 'create' ? slugifyTitle(title) : slug.trim().toLowerCase();
+    if (!finalSlug) {
+      setErrorMsg('Le nom court doit contenir au moins une lettre ou un chiffre.');
+      return;
+    }
 
     try {
       setSaving(true);
       const payload = {
-        slug: slug.trim().toLowerCase(),
+        slug: finalSlug,
         title: title.trim(),
-        description: description.trim(),
+        description: effectiveDescription.trim(),
         category,
         kind: !isAdmin ? ('style' as SkillKind) : kind,
         scope: !isAdmin ? ('USER' as SkillScope) : scope,
-        erp_type: scope === 'ERP' || scope === 'TENANT' ? erpType.trim().toLowerCase() : null,
+        erp_types: erpTypes,
         tenant_key: scope === 'TENANT' ? tenantKey.trim().toUpperCase() : null,
-        body_md: bodyMd,
+        body_md: effectiveBody,
         references_json: referencesJson,
         mapped_tools: finalTools,
         comment: versionComment.trim() || undefined,
@@ -354,7 +525,9 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
             <p style={{ fontSize: '12px', color: '#8FA3B8', margin: '4px 0 0 0' }}>
               {mode === 'customize'
                 ? 'Crée une copie personnelle isolée sans modifier la compétence par défaut.'
-                : 'Format standardisé SKILL.md (niveau 1 : index, niveau 2 : instructions, niveau 3 : références).'}
+                : expertMode
+                  ? 'Format standardisé SKILL.md (niveau 1 : index, niveau 2 : instructions, niveau 3 : références).'
+                  : "Décrivez quand et comment l'assistant doit agir."}
             </p>
           </div>
           <button
@@ -377,6 +550,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
         <div
           style={{
             display: 'flex',
+            alignItems: 'center',
             gap: '8px',
             padding: '10px 24px',
             borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -400,28 +574,30 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
               color: activeTab === 'general' ? '#00E5C8' : '#94a3b8',
             }}
           >
-            <Wrench size={14} /> Instructions & Outils
+            <Pencil size={14} /> Instructions
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('references')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '6px 14px',
-              borderRadius: '8px',
-              fontSize: '12px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              border: activeTab === 'references' ? '1px solid #00E5C8' : '1px solid transparent',
-              background: activeTab === 'references' ? 'rgba(0, 229, 200, 0.12)' : 'transparent',
-              color: activeTab === 'references' ? '#00E5C8' : '#94a3b8',
-            }}
-          >
-            <FileText size={14} /> Références ({Object.keys(referencesJson).length}/{MAX_REFERENCE_FILES})
-          </button>
+          {expertMode && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('references')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: activeTab === 'references' ? '1px solid #00E5C8' : '1px solid transparent',
+                background: activeTab === 'references' ? 'rgba(0, 229, 200, 0.12)' : 'transparent',
+                color: activeTab === 'references' ? '#00E5C8' : '#94a3b8',
+              }}
+            >
+              <FileText size={14} /> Références ({Object.keys(referencesJson).length}/{MAX_REFERENCE_FILES})
+            </button>
+          )}
 
           {initialSkill?.id && mode !== 'create' && (
             <button
@@ -444,12 +620,72 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
               <History size={14} /> Historique (v{initialSkill.version})
             </button>
           )}
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={expertMode}
+            disabled={expertMode && !canUseGuidedForm}
+            onClick={handleExpertToggle}
+            style={{
+              marginLeft: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '4px 6px',
+              background: 'transparent',
+              border: 'none',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: expertMode ? '#00E5C8' : '#94a3b8',
+              cursor: expertMode && !canUseGuidedForm ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Mode expert
+            <span
+              aria-hidden="true"
+              style={{
+                position: 'relative',
+                width: '30px',
+                height: '16px',
+                borderRadius: '8px',
+                background: expertMode ? 'rgba(0, 229, 200, 0.45)' : 'rgba(255,255,255,0.14)',
+              }}
+            >
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '2px',
+                  left: expertMode ? '16px' : '2px',
+                  width: '12px',
+                  height: '12px',
+                  borderRadius: '50%',
+                  background: expertMode ? '#00E5C8' : '#cbd5e1',
+                  transition: 'left 0.15s ease',
+                }}
+              />
+            </span>
+          </button>
         </div>
+
+        {expertMode && !canUseGuidedForm && (
+          <div
+            style={{
+              padding: '8px 24px',
+              fontSize: '12px',
+              color: '#8FA3B8',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+            }}
+          >
+            Cette compétence contient des fichiers de référence : elle se modifie en mode expert.
+          </div>
+        )}
 
         {/* Body */}
         <form
           id="skill-editor-form"
           onSubmit={handleSave}
+          onFocus={handleFieldFocus}
           style={{
             flex: 1,
             minHeight: 0,
@@ -481,6 +717,30 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
 
           {activeTab === 'general' && (
             <>
+              {!expertMode && (
+                <SkillGuidedFields
+                  tabs={guidedTabs}
+                  helpKey={sectionHelpKey}
+                  freeDescription={freeDescription}
+                  description={description}
+                  quand={quand}
+                  pasPour={pasPour}
+                  sections={guidedValues}
+                  activeSection={activeSection}
+                  title={title}
+                  onDescriptionChange={setDescription}
+                  onQuandChange={setQuand}
+                  onPasPourChange={setPasPour}
+                  onSectionChange={handleSectionChange}
+                  onActiveSectionChange={(key) => {
+                    setActiveSection(key);
+                    setHelpField(customBody ? 'sectionLibre' : key);
+                  }}
+                  onTitleChange={setTitle}
+                />
+              )}
+
+              {expertMode && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
@@ -529,10 +789,11 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                   />
                 </div>
               </div>
+              )}
 
               {/* Category, Kind, Scope */}
-              <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 1fr 1fr' : '1fr 1fr', gap: '14px' }}>
-                <div>
+              <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 1fr 1fr' : expertMode ? '1fr 1fr' : '1fr', gap: '14px' }}>
+                <div data-help="categorie">
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
                     Catégorie
                   </label>
@@ -557,14 +818,15 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                   </select>
                 </div>
 
-                <div>
+                {(expertMode || isAdmin) && (
+                <div data-help="type">
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
                     Type de compétence
                   </label>
                   <select
                     value={!isAdmin ? 'style' : kind}
                     disabled={!isAdmin}
-                    onChange={(e) => setKind(e.target.value as SkillKind)}
+                    onChange={(e) => handleKindChange(e.target.value as SkillKind)}
                     style={{
                       width: '100%',
                       padding: '9px 12px',
@@ -579,15 +841,16 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                     {isAdmin && <option value="method">Méthode Métier / ERP (Administrateur uniquement)</option>}
                   </select>
                 </div>
+                )}
 
                 {isAdmin && (
-                  <div>
+                  <div data-help="portee">
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
                       Portée
                     </label>
                     <select
                       value={scope}
-                      onChange={(e) => setScope(e.target.value as SkillScope)}
+                      onChange={(e) => handleScopeChange(e.target.value as SkillScope)}
                       style={{
                         width: '100%',
                         padding: '9px 12px',
@@ -611,59 +874,40 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                 )}
               </div>
 
-              {/* Admin extra selectors for TENANT / ERP */}
-              {isAdmin && (scope === 'TENANT' || scope === 'ERP') && (
-                <div style={{ display: 'grid', gridTemplateColumns: scope === 'TENANT' ? '1fr 1fr' : '1fr', gap: '14px', marginBottom: '16px' }}>
-                  {scope === 'TENANT' && (
-                    <div>
-                      <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
-                        Organisation active *
-                      </label>
-                      <input
-                        type="text"
-                        value={tenantKey}
-                        onChange={(e) => setTenantKey(e.target.value.toUpperCase())}
-                        style={{
-                          width: '100%',
-                          padding: '9px 12px',
-                          borderRadius: '8px',
-                          background: 'rgba(255,255,255,0.04)',
-                          border: '1px solid rgba(0, 229, 200, 0.35)',
-                          color: '#fff',
-                          fontSize: '13px',
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
-                      Système ERP cible *
-                    </label>
-                    <select
-                      value={erpType.toLowerCase()}
-                      onChange={(e) => setErpType(e.target.value.toLowerCase())}
-                      style={{
-                        width: '100%',
-                        padding: '9px 12px',
-                        borderRadius: '8px',
-                        background: '#111c30',
-                        border: '1px solid rgba(0, 229, 200, 0.35)',
-                        color: '#fff',
-                        fontSize: '13px',
-                      }}
-                    >
-                      <option value="tralis">TraLIS ERP</option>
-                      <option value="sage">Sage (100 / Cloud)</option>
-                      <option value="odoo">Odoo ERP</option>
-                      <option value="sap">SAP</option>
-                      <option value="cegid">Cegid</option>
-                      <option value="generic">ERP Standard (MCP)</option>
-                    </select>
-                  </div>
+              {/* Admin extra selector for TENANT */}
+              {isAdmin && scope === 'TENANT' && (
+                <div data-help="organisation">
+                  <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
+                    Organisation active *
+                  </label>
+                  <input
+                    type="text"
+                    value={tenantKey}
+                    onChange={(e) => setTenantKey(e.target.value.toUpperCase())}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: '8px',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(0, 229, 200, 0.35)',
+                      color: '#fff',
+                      fontSize: '13px',
+                    }}
+                  />
                 </div>
               )}
 
+              <SkillErpSelector
+                isOpen={isOpen}
+                isAdmin={isAdmin}
+                activeErpType={activeErpType}
+                selected={erpTypes}
+                onChange={setErpTypes}
+                requireErp={scope === 'ERP'}
+              />
+
+              {expertMode && (
+              <>
               {/* Description with counters */}
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
@@ -735,12 +979,14 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                   }}
                 />
               </div>
+              </>
+              )}
 
               {/* Version comment input for shared scopes */}
               {scope !== 'USER' && (
-                <div>
+                <div data-help="commentaire">
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
-                    Commentaire de version *
+                    {expertMode ? 'Commentaire de version *' : 'Ce qui a changé *'}
                   </label>
                   <input
                     type="text"
@@ -1077,6 +1323,8 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
           )}
         </form>
 
+        {!expertMode && activeTab === 'general' && <SkillHelpStrip fieldKey={helpField} />}
+
         {/* Sticky Luxury Modal Footer — firmly anchored, zero dead space */}
         <div
           style={{
@@ -1104,7 +1352,11 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
             />
             <span>
               {mode === 'create'
-                ? `Nouveau skill personnel (${slug ? `/${slug}` : 'invoquable via /'})`
+                ? !expertMode
+                  ? scope === 'USER'
+                    ? 'Nouvelle compétence personnelle'
+                    : 'Nouvelle compétence partagée'
+                  : `Nouveau skill personnel (${slug ? `/${slug}` : 'invoquable via /'})`
                 : mode === 'customize'
                 ? 'Copie personnelle isolée prioritaire sur la version globale'
                 : `Incrémente automatiquement vers la version v${(initialSkill?.version || 1) + 1}`}
@@ -1143,7 +1395,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
               <button
                 type="submit"
                 form="skill-editor-form"
-                disabled={saving || descChars < 20 || descChars > 1024 || hasForbiddenAngles || bodyLines > 500}
+                disabled={saveDisabled}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -1157,10 +1409,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                   fontWeight: 800,
                   cursor: saving ? 'wait' : 'pointer',
                   boxShadow: '0 8px 24px -6px rgba(0, 229, 200, 0.75)',
-                  opacity:
-                    saving || descChars < 20 || descChars > 1024 || hasForbiddenAngles || bodyLines > 500
-                      ? 0.5
-                      : 1,
+                  opacity: saveDisabled ? 0.5 : 1,
                   transition: 'all 0.18s ease',
                 }}
               >
