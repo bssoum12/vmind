@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Building2, RotateCw, Share2, Filter, Clock, Sparkles } from 'lucide-react';
+import { ArrowLeft, Building2, RotateCw, Share2, Filter, Clock, Sparkles, Flame } from 'lucide-react';
 import { SupervisorGraphCanvas } from './SupervisorGraphCanvas';
 import { NodeDiagnosticDrawer } from './NodeDiagnosticDrawer';
 import { EdgeDiagnosticDrawer } from './EdgeDiagnosticDrawer';
 import { SupervisorPipelineHUD } from './SupervisorPipelineHUD';
 import { PipelineBinomesDrawer } from './PipelineBinomesDrawer';
+import { SupervisorHotLeadsView } from './SupervisorHotLeadsView';
 import { SupervisorFunnelView } from './SupervisorFunnelView';
 import { SupervisorHistoryView } from './SupervisorHistoryView';
 import { CompanyContextModal } from '@/features/company-context';
@@ -20,11 +21,14 @@ import {
   FleetAuditSummary,
   FleetFunnelData,
   FleetHistoryData,
+  FleetAlertsData,
   DEFAULT_FLEET_SUMMARY,
   DEFAULT_COMPANY_CONTEXT,
-  DEFAULT_FLEET_HISTORY_DATA
+  DEFAULT_FLEET_HISTORY_DATA,
+  DEFAULT_FLEET_ALERTS_DATA
 } from '../types/supervisor.types';
 import { useToast } from '@/shared/contexts/ToastContext';
+import { useProspectSocket } from '@/features/management/prospect-workspace/hooks/useProspectSocket';
 import '../supervisor-workspace.scss';
 
 interface SupervisorWorkspaceProps {
@@ -40,7 +44,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
   const { showToast } = useToast();
 
   // State: start strictly with empty data so no fake nodes ever flash
-  const [activeTab, setActiveTab] = useState<'canvas' | 'history'>('canvas');
+  const [activeTab, setActiveTab] = useState<'canvas' | 'alerts' | 'history'>('canvas');
   const [nodes, setNodes] = useState<SupervisorNode[]>([]);
   const [links, setLinks] = useState<SupervisorLink[]>([]);
   const [funnelData, setFunnelData] = useState<FleetFunnelData | null>(null);
@@ -51,6 +55,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
   const [isLoadingFleet, setIsLoadingFleet] = useState<boolean>(true);
   const [isRunningAudit, setIsRunningAudit] = useState<boolean>(false);
   const [isBinomesDrawerOpen, setIsBinomesDrawerOpen] = useState<boolean>(false);
+  const [alertsData, setAlertsData] = useState<FleetAlertsData>(DEFAULT_FLEET_ALERTS_DATA);
 
   // ─── Onboarding Tutorial State (VMindGuide) ────────────────────────────────
   const [tutorialStep, setTutorialStep] = useState<number>(0);
@@ -248,6 +253,9 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
             }
             if (matched) {
               setDisplayName(matched.agent_name || matched.nom || initialAgentName);
+              if (matched.is_executing) {
+                setIsRunningAudit(true);
+              }
             }
           }
         }
@@ -300,6 +308,19 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
       } catch (hErr) {
         console.warn('[SupervisorWorkspace] Error loading fleet history:', hErr);
       }
+
+      // 5. Fetch operational alerts & unattended hot leads (KBN-15)
+      try {
+        const alertsRes = await fetch(`${baseUrl}/api/supervisor/fleet-alerts/${encodeURIComponent(targetId)}`, {
+          credentials: 'include'
+        });
+        if (alertsRes.ok) {
+          const aData = await alertsRes.json();
+          setAlertsData(aData);
+        }
+      } catch (aErr) {
+        console.warn('[SupervisorWorkspace] Error loading fleet alerts:', aErr);
+      }
     } catch (err) {
       console.error('[SupervisorWorkspace] Error loading fleet graph:', err);
     } finally {
@@ -312,6 +333,76 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
     fetchRealFleet();
   }, [fetchRealFleet]);
 
+  // Targeted lightweight refresh: only refreshes alerts & funnel without reloading graph & history
+  const refreshAlertsAndFunnel = useCallback(async () => {
+    const targetId = agentId || 'default';
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+    try {
+      const [alertsRes, funnelRes] = await Promise.allSettled([
+        fetch(`${baseUrl}/api/supervisor/fleet-alerts/${encodeURIComponent(targetId)}`, { credentials: 'include' }),
+        fetch(`${baseUrl}/api/supervisor/fleet-funnel/${encodeURIComponent(targetId)}`, { credentials: 'include' })
+      ]);
+
+      if (alertsRes.status === 'fulfilled' && alertsRes.value.ok) {
+        const aData = await alertsRes.value.json();
+        setAlertsData(aData);
+      }
+      if (funnelRes.status === 'fulfilled' && funnelRes.value.ok) {
+        const fData = await funnelRes.value.json();
+        setFunnelData(fData);
+      }
+    } catch (err) {
+      console.warn('[SupervisorWorkspace] Silent alerts refresh error:', err);
+    }
+  }, [agentId]);
+
+  const debounceRefreshTimer = useRef<NodeJS.Timeout | null>(null);
+  useProspectSocket((payload) => {
+    if (typeof payload.is_executing === 'boolean' && (payload.agent_id || payload.uuid)) {
+      const targetId = String(payload.uuid || payload.agent_id || '').toLowerCase();
+      const currentParamId = String(agentId || '').toLowerCase();
+      const currentName = String(displayName || '').toLowerCase();
+
+      if (targetId === currentParamId || targetId === currentName) {
+        setIsRunningAudit(payload.is_executing);
+        if (!payload.is_executing) {
+          if (debounceRefreshTimer.current) clearTimeout(debounceRefreshTimer.current);
+          debounceRefreshTimer.current = setTimeout(() => {
+            fetchRealFleet();
+            showToast('Audit flash terminé avec succès', 'ok');
+          }, 600);
+        }
+      }
+    }
+
+    // Realtime notification when qualifications, emails, or leads update:
+    // 1. Scoped to this fleet (discards events belonging to other agents)
+    // 2. Uses targeted lightweight refresh (only alerts & funnel, not the whole fleet)
+    // 3. Trailing-edge debounce (1200ms) absorbs bursts into 1 single request
+    if (
+      payload.table === 'prospect_agent_qualifications' ||
+      payload.table === 'prospect_agent_emails_envoyes' ||
+      payload.table === 'prospect_agent_leads'
+    ) {
+      const eventAgentId = String(payload.new?.agent_id || payload.old?.agent_id || payload.new?.uuid || '').toLowerCase();
+      if (eventAgentId && nodes.length > 0) {
+        const isBelongingToFleet = nodes.some(n => 
+          String(n.id).toLowerCase() === eventAgentId || 
+          n.name?.toLowerCase() === eventAgentId ||
+          (n.agent_id && String(n.agent_id) === eventAgentId)
+        );
+        if (!isBelongingToFleet) {
+          return;
+        }
+      }
+
+      if (debounceRefreshTimer.current) clearTimeout(debounceRefreshTimer.current);
+      debounceRefreshTimer.current = setTimeout(() => {
+        refreshAlertsAndFunnel();
+      }, 1200);
+    }
+  });
+
   const handleRefresh = async () => {
     await fetchRealFleet();
     showToast('Données de la flotte actualisées', 'ok');
@@ -322,20 +413,23 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
     setIsRunningAudit(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
-      const res = await fetch(`${baseUrl}/api/supervisor-agent/run-now/${encodeURIComponent(agentId)}`, {
+      const res = await fetch(`${baseUrl}/api/supervisor-agent/run-now/${encodeURIComponent(agentId)}?async=true`, {
         method: 'POST',
-        credentials: 'include'
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ async: true }),
       });
       if (res.ok) {
-        showToast('Audit flash terminé avec succès', 'ok');
-        await fetchRealFleet();
+        showToast('Audit flash lancé en arrière-plan', 'ok');
       } else {
         const errJson = await res.json().catch(() => ({}));
         showToast(errJson.error || "Impossible d'exécuter l'audit flash", 'error');
+        setIsRunningAudit(false);
       }
     } catch (e: any) {
       showToast("Erreur de connexion lors de l'audit flash", 'error');
-    } finally {
       setIsRunningAudit(false);
     }
   };
@@ -536,7 +630,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
           </div>
         </div>
 
-        {/* Tab Switcher: Vue d'ensemble (Graphe + Pipeline) vs Historique (KBN-13) */}
+        {/* Tab Switcher: Vue d'ensemble (Graphe + Pipeline) vs Hot Leads vs Historique */}
         <div
           className="header-tab-switcher"
           style={
@@ -571,6 +665,23 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
           >
             <Share2 size={13} />
             <span>Vue d'ensemble</span>
+          </button>
+          <button
+            type="button"
+            className={`tab-btn ${activeTab === 'alerts' ? 'active' : ''}`}
+            onClick={() => {
+              setSelectedNodeId(null);
+              setSelectedLinkId(null);
+              setIsBinomesDrawerOpen(false);
+              setActiveTab('alerts');
+            }}
+            title="Hot Leads qualifiés non contactés depuis plus de 48h, regroupés par agent de prospection"
+          >
+            <Flame size={13} className={alertsData.unattendedHotLeadsCount > 0 ? 'text-coral' : ''} />
+            <span>Hot Leads</span>
+            {alertsData.unattendedHotLeadsCount > 0 && (
+              <span className="tab-counter-badge">{alertsData.unattendedHotLeadsCount}</span>
+            )}
           </button>
           <button
             type="button"
@@ -635,11 +746,11 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
           <button
             className="header-btn btn-primary"
             onClick={handleRefresh}
-            disabled={isLoadingFleet}
-            title="Actualiser les données de la flotte en direct"
+            disabled={isLoadingFleet || isRunningAudit}
+            title={isRunningAudit ? "Un audit est en cours d'exécution..." : "Actualiser les données de la flotte en direct"}
           >
-            <RotateCw size={15} className={isLoadingFleet ? 'spin-icon' : ''} />
-            <span>{isLoadingFleet ? 'Actualisation...' : 'Actualiser'}</span>
+            <RotateCw size={15} className={(isLoadingFleet || isRunningAudit) ? 'spin-icon' : ''} />
+            <span>{isRunningAudit ? 'Audit en cours…' : (isLoadingFleet ? 'Actualisation...' : 'Actualiser')}</span>
           </button>
         </div>
       </header>
@@ -779,6 +890,14 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
               </div>
             )}
           </div>
+        </div>
+      ) : activeTab === 'alerts' ? (
+        <div className="supervisor-alerts-tab-container">
+          <SupervisorHotLeadsView
+            alertsData={alertsData}
+            onRefresh={refreshAlertsAndFunnel}
+            isLoading={isLoadingFleet}
+          />
         </div>
       ) : (
         <div className="supervisor-history-tab-container">

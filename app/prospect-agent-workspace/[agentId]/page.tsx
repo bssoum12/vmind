@@ -24,13 +24,19 @@ export default function AgentWorkspacePage() {
   const searchParams = useSearchParams();
 
   const [activeTab, setActiveTab] = useState('dashboard');
+  const initialLeadHandled = useRef<string | null>(null);
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['dashboard', 'leads', 'campaigns', 'logs'].includes(tabParam)) {
-      setActiveTab(tabParam);
+    if (tabParam) {
+      if (tabParam === 'campaigns') {
+        setActiveTab('outbox');
+      } else if (['dashboard', 'leads', 'outbox', 'logs'].includes(tabParam)) {
+        setActiveTab(tabParam);
+      }
     }
   }, [searchParams]);
+
 
   const [leads, setLeads] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -38,6 +44,19 @@ export default function AgentWorkspacePage() {
 
   const [selectedLead, setSelectedLead] = useState<any | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    const leadIdParam = searchParams.get('leadId') || searchParams.get('lead');
+    if (leadIdParam && leads.length > 0 && initialLeadHandled.current !== leadIdParam) {
+      const targetLead = leads.find((l: any) => String(l.id) === String(leadIdParam));
+      if (targetLead) {
+        setSelectedLead(targetLead);
+        setIsDrawerOpen(true);
+        setActiveTab('leads');
+        initialLeadHandled.current = leadIdParam;
+      }
+    }
+  }, [searchParams, leads]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [agentName, setAgentName] = useState<string>('Chargement...');

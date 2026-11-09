@@ -369,10 +369,18 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
       if (actionType === 'run_now') {
         showToast('Superviseur déployé avec succès. Lancement de l’audit initial...', 'ok');
         try {
-          await fetch(`${baseUrl}/api/supervisor-agent/run-now/${encodeURIComponent(publicUuid)}`, {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4000);
+          await fetch(`${baseUrl}/api/supervisor-agent/run-now/${encodeURIComponent(publicUuid)}?async=true`, {
             method: 'POST',
-            credentials: 'include'
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            credentials: 'include',
+            body: JSON.stringify({ async: true }),
+            signal: controller.signal,
           });
+          clearTimeout(timeoutId);
         } catch (e) {
           console.warn('Initial audit notice:', e);
         }

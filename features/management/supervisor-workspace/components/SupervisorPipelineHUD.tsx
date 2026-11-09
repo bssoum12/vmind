@@ -10,7 +10,6 @@ import {
   ChevronRight,
   Phone,
   BarChart3,
-  CheckCircle2,
   Info,
 } from 'lucide-react';
 import { FleetFunnelData } from '../types/supervisor.types';
@@ -22,6 +21,8 @@ interface SupervisorPipelineHUDProps {
   onOpenBinomes: () => void;
   isBinomesOpen?: boolean;
   tutorialStep?: number;
+  onOpenAlerts?: () => void;
+  unattendedHotLeadsCount?: number;
 }
 
 export const SupervisorPipelineHUD: React.FC<SupervisorPipelineHUDProps> = ({
@@ -49,9 +50,6 @@ export const SupervisorPipelineHUD: React.FC<SupervisorPipelineHUDProps> = ({
 
   const agentPairs = funnelData?.agentPairs || [];
 
-  // When 0 leads exist across the entire fleet
-  const isEmpty = summary.totalSourced === 0 && !isLoading;
-
   return (
     <div
       className="supervisor-pipeline-hud"
@@ -72,7 +70,7 @@ export const SupervisorPipelineHUD: React.FC<SupervisorPipelineHUDProps> = ({
                 position: 'relative',
                 zIndex: 10003,
                 boxShadow: '0 0 0 2px #00E5C8, 0 0 25px rgba(0, 229, 200, 0.65)',
-                borderRadius: '10px',
+                borderRadius: '8px',
                 padding: '4px 6px',
                 background: 'rgba(6, 17, 31, 0.98)',
               }
@@ -93,12 +91,11 @@ export const SupervisorPipelineHUD: React.FC<SupervisorPipelineHUDProps> = ({
           />
         )}
 
-        {/* Scope Pill: Dernière Mission Active */}
+        {/* Scope indicator: Dernière Mission Active */}
         <div
-          className="hud-mission-scope-pill"
-          title="Périmètre d'analyse : Seuls les prospects générés lors de la dernière mission active de chaque agent sont évalués ici (échantillon représentatif plafonné). Vos leads historiques restent préservés en base de données sans être altérés."
+          className="hud-mission-scope"
+          title="Périmètre d'analyse : Seuls les prospects générés lors de la dernière mission active de chaque agent sont évalués ici. Vos leads historiques restent préservés en base de données sans être altérés."
         >
-          <span className="scope-dot" />
           <span className="scope-text">Mission active</span>
           <Info size={11} className="scope-info-icon" />
         </div>
@@ -140,13 +137,13 @@ export const SupervisorPipelineHUD: React.FC<SupervisorPipelineHUDProps> = ({
             <ShieldCheck size={14} />
           </div>
           <div className="step-info">
-            <div className="step-label-row">
-              <span className="step-label">Qualifiés</span>
+            <span className="step-label">Qualifiés</span>
+            <span className="step-val">
+              {summary.totalQualified.toLocaleString()}
               {summary.qualificationRate > 0 && (
-                <span className="step-rate-badge">{summary.qualificationRate}%</span>
+                <span className="step-val-sub"> ({summary.qualificationRate}%)</span>
               )}
-            </div>
-            <span className="step-val">{summary.totalQualified.toLocaleString()}</span>
+            </span>
           </div>
         </div>
 
@@ -184,31 +181,26 @@ export const SupervisorPipelineHUD: React.FC<SupervisorPipelineHUDProps> = ({
       <div className="hud-kpis-and-action">
         {/* Taux de Qualification */}
         <div
-          className="hud-kpi-chip"
+          className="hud-stat-cell"
           title={`${summary.totalQualified} qualifiés sur ${summary.totalEvaluated || summary.totalTransferred} analysés`}
         >
-          <span className="kpi-chip-dot" />
-          <div className="kpi-chip-content">
-            <span className="kpi-chip-label">Taux de Qualification</span>
-            <span className="kpi-chip-val">{summary.qualificationRate}%</span>
-          </div>
+          <span className="stat-label">Taux Qualif.</span>
+          <span className="stat-val">{summary.qualificationRate}%</span>
         </div>
 
         {/* Mobiles Démasqués */}
         <div
-          className="hud-kpi-chip"
+          className="hud-stat-cell"
           title={`${summary.totalPhonesRevealed} numéros de téléphone mobile démasqués sur ${summary.totalPhonesAvailable} disponibles`}
         >
-          <Phone size={13} className="kpi-icon-phone" />
-          <div className="kpi-chip-content">
-            <span className="kpi-chip-label">Mobiles Démasqués</span>
-            <span className="kpi-chip-val">
-              {summary.totalPhonesRevealed}
-              {summary.totalPhonesAvailable > 0 && (
-                <span className="kpi-sub-total"> / {summary.totalPhonesAvailable}</span>
-              )}
-            </span>
-          </div>
+          <Phone size={12} className="stat-icon-phone" />
+          <span className="stat-label">Mobiles</span>
+          <span className="stat-val">
+            {summary.totalPhonesRevealed}
+            {summary.totalPhonesAvailable > 0 && (
+              <span className="stat-sub"> / {summary.totalPhonesAvailable}</span>
+            )}
+          </span>
         </div>
 
         {/* Binôme Drawer Action */}
@@ -244,32 +236,16 @@ export const SupervisorPipelineHUD: React.FC<SupervisorPipelineHUDProps> = ({
                     background: '#00E5C8',
                     color: '#04101E',
                     fontWeight: 700,
-                    boxShadow: '0 0 0 3px #00E5C8, 0 0 25px rgba(0, 229, 200, 0.75)',
+                    boxShadow: '0 0 0 2px #00E5C8, 0 0 25px rgba(0, 229, 200, 0.75)',
                   }
                 : undefined
             }
           >
-            <BarChart3 size={14} />
-            <span>Performances Binômes</span>
-            {agentPairs.length > 0 && (
-              <span
-                className="binomes-count-pill"
-                style={
-                  tutorialStep === 4
-                    ? {
-                        background: '#04101E',
-                        color: '#00E5C8',
-                      }
-                    : undefined
-                }
-              >
-                {agentPairs.length}
-              </span>
-            )}
+            <BarChart3 size={13} />
+            <span>Binômes {agentPairs.length > 0 ? `(${agentPairs.length})` : ''}</span>
           </button>
         </div>
       </div>
     </div>
   );
 };
-

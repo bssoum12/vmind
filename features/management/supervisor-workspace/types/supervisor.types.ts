@@ -58,6 +58,7 @@ export interface ProspectDeliveryHealth {
 export interface SupervisorNode {
   id: string;
   name: string;
+  agent_id?: number;
   type: AgentType;
   status: HealthStatus;
   healthScore: number; // 0 - 100
@@ -223,6 +224,7 @@ export interface FleetFunnelData {
     globalConversionRate: number;
     qualificationRate: number;
     contactRate: number;
+    unattendedHotLeadsCount?: number;
   };
   stages: FleetFunnelStageMetric[];
   agentPairs: AgentPairFunnelRow[];
@@ -340,6 +342,76 @@ export const DEFAULT_FLEET_HISTORY_DATA: FleetHistoryData = {
   latestScore: null,
   audits: [],
   agentHistories: [],
+};
+
+// ── KBN-15: Standalone Priority Operational Alerts & Unattended Hot Leads Types ──
+export interface HotLeadAlertItem {
+  leadId: number;
+  nom: string;
+  prenom: string;
+  email: string;
+  entreprise: string | null;
+  poste: string | null;
+  secteur: string | null;
+  pays: string | null;
+  mobile: string | null;
+  score: number;
+  potentiel: string;
+  raison: string | null;
+  agentId: number;
+  agentUuid: string;
+  agentName: string;
+  dateQualification: string;
+  lastOutreach: string | null;
+  emailsSent: number;
+  draftsCount: number;
+  hoursUnattended: number;
+  urgency: 'CRITICAL' | 'WARNING';
+  contactStatus: 'NEVER_CONTACTED' | 'DRAFT_READY';
+}
+
+export interface DeliverySpikeAlert {
+  isSpike: boolean;
+  errorRate: number;
+  totalSent24h: number;
+  totalErrors24h: number;
+  threshold: number;
+}
+
+export interface FleetAlertsData {
+  supervisorId: string;
+  supervisorName: string;
+  unattendedHotLeadsCount: number;
+  criticalCount: number;
+  warningCount: number;
+  neverContactedCount: number;
+  draftReadyCount?: number;
+  followupOverdueCount?: number;
+  hotLeads: HotLeadAlertItem[];
+  deliverySpike: DeliverySpikeAlert;
+  totalAlertsCount: number;
+  lastCheckedAt: string;
+}
+
+export const DEFAULT_FLEET_ALERTS_DATA: FleetAlertsData = {
+  supervisorId: '',
+  supervisorName: '',
+  unattendedHotLeadsCount: 0,
+  criticalCount: 0,
+  warningCount: 0,
+  neverContactedCount: 0,
+  draftReadyCount: 0,
+  followupOverdueCount: 0,
+  hotLeads: [],
+  deliverySpike: {
+    isSpike: false,
+    errorRate: 0,
+    totalSent24h: 0,
+    totalErrors24h: 0,
+    threshold: 5
+  },
+  totalAlertsCount: 0,
+  lastCheckedAt: '',
 };
 
 

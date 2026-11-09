@@ -36,15 +36,16 @@ $$\text{Sourcing Agent (Leads)} \xrightarrow[\text{Handoff Alignment}]{\text{Edg
 
 ## 📊 2. High-Level Kanban Board
 
-| 🟢 DONE (In Production) | 🟡 NEXT UP (Phase 1.5 - Existing Data) | 🔵 PENDING (Phase 2 - Internal Specs) | 🔴 BLOCKED (Phase 3 - External APIs) |
+| 🟢 DONE (In Production) | 🟡 NEXT UP (Phase 1.5 - Complete) | 🔵 PENDING (Phase 2 - Internal Specs) | 🔴 BLOCKED (Phase 3 - External APIs) |
 | :--- | :--- | :--- | :--- |
-| • 2D Elastic Force Graph Canvas | • Standalone Priority Alerts Feed | • LLM Scoring Drift Detection Over Time | • Closed Revenue & Margins (**ERP TraLIS/Sage**) |
+| • 2D Elastic Force Graph Canvas | *(Phase 1.5 terminée à 100%)* | • LLM Scoring Drift Detection Over Time | • Closed Revenue & Margins (**ERP TraLIS/Sage**) |
 | • Unit Node Diagnostic Drawers | | • Email Subject Line & Sequence Fatigue | • Booked Meetings & Show-up Rates (**Calendar**) |
 | • 1-to-1 Link Handoff Engine | | • Human Quality Control & Sampling Loop | • Call Tracking & Audio AI (**VoIP Aircall/Twilio**) |
 | • Actionable Recommendation Engine | | • Automated Weekly Standup Summary | • Domain Reputation & DNS (**Postmaster API**) |
 | • Dedicated Global Funnel Tab | | • Dynamic ICP Threshold Auto-Tuning | • Automated A/B Split-Testing (**n8n Engine**) |
 | • CRM Data Health & Completeness | | | • Executive Conversational Chatbot (**SQL RAG**) |
 | • Fleet Audit History & Diff Log | | | |
+| • Hot Leads & Fleet Alerts Engine | | | |
 | • Flash Fleet Audit ("▶ Run Now") | | | |
 | • Autopilot Lifecycle ("▶ Start") | | | |
 | • Anti-Waste Token Protection | | | |
@@ -74,6 +75,7 @@ $$\text{Sourcing Agent (Leads)} \xrightarrow[\text{Handoff Alignment}]{\text{Edg
 | **KBN-12** | **Identity-Aware Corporate NAT Support** | Express `trust proxy` configuration and Cloudflare `CF-Connecting-IP` resolution. Authenticated user-level keys (`user_${id}`) prevent corporate Wi-Fi lockouts across office networks. | [`src/rateLimiter.ts`](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/VMIND%20DEVOPS/VMIND%20AI/src/rateLimiter.ts), [`src/server-http.ts`](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/VMIND%20DEVOPS/VMIND%20AI/src/server-http.ts) |
 | **KBN-13** | **Unified Overview & Condensed Pipeline HUD** | Unified overview workspace merging the 2D interactive force canvas with a sleek Apple-style frosted glass Pipeline HUD (`Sourcés ➔ Transférés ➔ Prospects Qualifiés ➔ Brouillons Prêts ➔ E-mails Envoyés`), zero-jargon French metrics (Taux de Qualification, Mobiles Démasqués), sliding binôme performance drawer, and simplified 2-tab navigation (`Vue d'ensemble` & `Historique`). | `GET /api/supervisor/fleet-funnel/:id`, [`SupervisorPipelineHUD.tsx`](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/Mcp-Server-IA-Front/features/management/supervisor-workspace/components/SupervisorPipelineHUD.tsx), [`PipelineBinomesDrawer.tsx`](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/Mcp-Server-IA-Front/features/management/supervisor-workspace/components/PipelineBinomesDrawer.tsx), [`SupervisorWorkspace.tsx`](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/Mcp-Server-IA-Front/features/management/supervisor-workspace/components/SupervisorWorkspace.tsx) |
 | **KBN-14** | **Aggregate CRM Data Health & Completeness** | Integrated directly into the Global Pipeline Funnel tab. Audits database hygiene, deliverability rate (sent vs bounce errors), phone enrichment rate (unmasked mobile phones), profile completeness (Email, Company, Job Title, Sector), distinct account coverage, and multi-threading company detection without extra tab switching. | `GET /api/supervisor/fleet-funnel/:id`, [`SupervisorFunnelView.tsx`](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/Mcp-Server-IA-Front/features/management/supervisor-workspace/components/SupervisorFunnelView.tsx) |
+| **KBN-15** | **Priority Operational Alerts Feed & Hot Leads (>48h)** | Real-time friction detection engine monitoring fleet hot leads (`score >= 85` or `potentiel = 'Eleve'/'Élevé'`, `est_qualifie = true`) unattended for $>48\text{h}$ (never contacted vs overdue follow-up) with critical $72\text{h}+$ urgency tiers, and rolling 24h email bounce/failure rate spike detection ($>5\%$). Features live header flame beacon with pulsing badge counter, Pipeline HUD integration, interactive Cyber Obsidian sliding drawer with filters/search, one-click email copying, direct mailto, and deep-linking to agent workspaces. Real-time updates via Socket.io (`useProspectSocket`). | `GET /api/supervisor/fleet-alerts/:id`, [`SupervisorAlertsDrawer.tsx`](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/Mcp-Server-IA-Front/features/management/supervisor-workspace/components/SupervisorAlertsDrawer.tsx), [`SupervisorPipelineHUD.tsx`](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/Mcp-Server-IA-Front/features/management/supervisor-workspace/components/SupervisorPipelineHUD.tsx), [`SupervisorWorkspace.tsx`](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/Mcp-Server-IA-Front/features/management/supervisor-workspace/components/SupervisorWorkspace.tsx), [`fleet.ts`](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/VMIND%20DEVOPS/VMIND%20AI/src/supervisor-agent/routes/fleet.ts) |
 | **KBN-16** | **Fleet Evaluation History & Audit Comparison Log View** | Dedicated workspace tab rendering chronological timeline of all audit sessions (Flash & Autopilot), score evolution differentials ($W$ vs $W-1$), unit agent alignment history, 1-to-1 link throughput evolution, and concrete recommendations history. Includes high-performance **Scalability & DOM Virtualization Architecture** (SQL window functions separating light trends from heavy snapshots for recent 50 runs, 60 FPS downsampling chart, progressive 15-session batch slicing, segmented filters, and Apple Pro pagination). See [SUPERVISOR_FLEET_HISTORY_SCALABILITY.md](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/Mcp-Server-IA-Front/documentation/SUPERVISOR_FLEET_HISTORY_SCALABILITY.md). | `GET /api/supervisor/fleet-history/:id`, [`SupervisorHistoryView.tsx`](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/Mcp-Server-IA-Front/features/management/supervisor-workspace/components/SupervisorHistoryView.tsx), [`fleet.ts`](file:///c:/Users/hamza/OneDrive/Bureau/Vmind-front/VMIND%20DEVOPS/VMIND%20AI/src/supervisor-agent/routes/fleet.ts) |
 
 ---
@@ -81,13 +83,9 @@ $$\text{Sourcing Agent (Leads)} \xrightarrow[\text{Handoff Alignment}]{\text{Edg
 ## 🟡 4. Column 2: NEXT UP (Phase 1.5 - Existing VMIND Data)
 
 > [!NOTE]
-> These features leverage data **already stored** in PostgreSQL `vmind_memory` (`prospect_agent_leads`, `prospect_agent_qualifications`, `prospect_agent_emails_envoyes`, `prospect_agent_logs_execution`). No third-party integrations are required.
+> All core Phase 1.5 capabilities utilizing existing PostgreSQL data (KBN-13 Pipeline HUD & Binômes Drawer, KBN-14 CRM Health, KBN-15 Hot Leads & Alerts Engine, KBN-16 Scalable Fleet History) have been successfully implemented, tested, and shipped to production.
 
-### KBN-15: Standalone Priority Operational Alerts Feed
-- **Objective**: Real-time ticker/alert panel surfacing critical friction points:
-  - **Unattended Hot Leads**: Alerts when a lead with `potentiel = 'Eleve'` or `score >= 85` has received no sales outreach for > 48 hours.
-  - **Delivery Failure Spikes**: Alerts if email bounce or delivery error rate exceeds 5% in a rolling 24-hour window.
-- **Target Location**: Header capsule dropdown or sliding alert drawer in `SupervisorWorkspace.tsx`.
+*(All Phase 1.5 deliverables complete. Proceeding to Phase 2).*
 
 ---
 
@@ -185,5 +183,5 @@ The Supervisor Agent relies on **4 specialized n8n workflows** declared in `.env
 
 ## 🎯 8. Strategic Recommendation for Next Sprint
 
-1. **Implement KBN-13 (Dedicated Global Funnel Tab)** inside `SupervisorWorkspace.tsx`: This provides executive managers with an instant visual representation of top-to-bottom pipeline conversions using existing database data.
-2. **Implement KBN-15 (Priority Operational Alerts Feed)**: Provide a live badge in the workspace header notifying managers of any hot leads left untouched for > 48 hours or sudden email bounce spikes.
+1. **Phase 1.5 Completion**: KBN-13 (Condensed Pipeline HUD & Binômes Drawer), KBN-14 (Integrated CRM Health), KBN-15 (Priority Alerts & Hot Leads >48h Detection), and KBN-16 (Scalable Fleet History & Comparison Log) have all been completed and deployed.
+2. **Phase 2 Implementation Target**: **KBN-20 (LLM Scoring Drift Detection Over Time)** & **KBN-21 (Sequence Repetition & Email Subject Line Fatigue)** to provide proactive model monitoring and outreach effectiveness diagnostics.
