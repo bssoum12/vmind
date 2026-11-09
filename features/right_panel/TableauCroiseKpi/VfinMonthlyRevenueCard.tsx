@@ -16,8 +16,9 @@ export const VfinMonthlyRevenueCard: React.FC<VfinMonthlyRevenueCardProps> = ({ 
   // Read current active data from Context
   const agentData = kpisByAgent["vfin"] || {};
   
-  const revToolData = agentData.get_kpi_dashboard || agentData.revenue || agentData.factures || agentData;
-  const compToolData = agentData.compare_revenue || agentData.comparison || {};
+  // Bloc propre à la carte (skill vfin-kpis) : CA, marge, taux et comparaison N-1 dans la même liste « kpis »
+  const revToolData = agentData.ca_valide || {};
+  const compToolData = revToolData;
 
   const revKpis = revToolData.ok && revToolData.kpis ? revToolData.kpis : [];
   const compKpis = compToolData.ok && compToolData.kpis ? compToolData.kpis : [];
@@ -34,7 +35,7 @@ export const VfinMonthlyRevenueCard: React.FC<VfinMonthlyRevenueCardProps> = ({ 
   const evoKpi = compKpis.find((k: any) => k.label.includes("Évolution"));
 
   // Fallback to compare_monthly_margin details if compare_monthly_revenue is missing
-  const marginToolData = agentData.margin || {};
+  const marginToolData = agentData.taux_marge || {};
   const marginDetails = marginToolData.data?.details || marginToolData.details || {};
 
   let caPrecedent = prevCaKpi ? prevCaKpi.value : null;
@@ -133,7 +134,7 @@ export const VfinMonthlyRevenueCard: React.FC<VfinMonthlyRevenueCardProps> = ({ 
           alignItems: "center",
         }}
       >
-        <span>CA Mois (TND)</span>
+        <span>CA période (TND)</span>
       </div>
 
       {loading ? (
@@ -158,7 +159,7 @@ export const VfinMonthlyRevenueCard: React.FC<VfinMonthlyRevenueCardProps> = ({ 
             {error}
           </span>
           <button
-            onClick={() => fetchKpis('vfin', true)}
+            onClick={() => fetchKpis('vfin', true, 'ca_valide')}
             style={{
               background: "none",
               border: "none",
@@ -208,7 +209,7 @@ export const VfinMonthlyRevenueCard: React.FC<VfinMonthlyRevenueCardProps> = ({ 
                   gap: "4px",
                 }}
               >
-                <span>vs mois précédent :</span>
+                <span>vs même période N-1 :</span>
                 <span style={{ color: "var(--white)", fontWeight: 600 }}>
                   {fmt((caPrecedent || 0) * animProgress)} TND
                 </span>

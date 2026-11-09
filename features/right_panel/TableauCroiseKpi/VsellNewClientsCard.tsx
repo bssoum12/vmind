@@ -23,11 +23,12 @@ export const VsellNewClientsCard: React.FC<VsellNewClientsCardProps> = ({ active
 
   // Read n8n context data
   const agentData = kpisByAgent["vsell"] || kpisByAgent["VSELL"] || {};
-  const toolData = agentData.get_kpi_dashboard || agentData.get_tiers || agentData.new_clients || {};
-  const clients: NewClientItem[] = toolData.ok && Array.isArray(toolData.data) 
-    ? toolData.data 
-    : (Array.isArray(agentData.new_clients) ? agentData.new_clients : []);
-  const period: string = toolData.period || agentData.period || "";
+  const toolData = agentData.nouveaux_clients || {}; // bloc propre à la carte (skill vsell-kpis)
+  const fmtDate = (d?: string) => { if (!d) return ""; const [y, m, j] = String(d).slice(0, 10).split("-"); return j ? `${j}/${m}/${y}` : String(d); };
+  // Rang = position (tri par CA décroissant par le skill) ; date de première opération au format JJ/MM/AAAA
+  const clients: NewClientItem[] = (toolData.ok && Array.isArray(toolData.data) ? toolData.data : [])
+    .map((c: any, i: number) => ({ ...c, rank: i + 1, firstOpDate: fmtDate(c.firstOpDate) }));
+  const period: string = toolData.summary?.periode_debut ? `${fmtDate(toolData.summary.periode_debut)} → ${fmtDate(toolData.summary.periode_fin)}` : "";
 
   const loading = loadingByAgent["vsell"] || loadingByAgent["VSELL"] || false;
   const error = !loading && clients.length === 0 && globalError ? globalError : null;
@@ -114,7 +115,7 @@ export const VsellNewClientsCard: React.FC<VsellNewClientsCardProps> = ({ active
           alignItems: "center",
         }}
       >
-        <span>Nouveaux Clients — Mois</span>
+        <span>Nouveaux Clients — Période</span>
         <span style={{ color: themeColor, fontSize: "8px", fontWeight: 700 }}>VSELL</span>
       </div>
 
@@ -148,7 +149,7 @@ export const VsellNewClientsCard: React.FC<VsellNewClientsCardProps> = ({ active
         </div>
       ) : clients.length === 0 ? (
         <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--muted)", padding: "4px 0" }}>
-          AUCUN NOUVEAU CLIENT CE MOIS
+          AUCUN NOUVEAU CLIENT SUR LA PÉRIODE
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -217,13 +218,13 @@ export const VsellNewClientsCard: React.FC<VsellNewClientsCardProps> = ({ active
                 </div>
               </div>
 
-              {/* Client Metric (CA total généré sur le mois) */}
+              {/* Client Metric (CA total généré sur la période) */}
               <div style={{ display: "flex", flexDirection: "column", flexShrink: 0, alignItems: "flex-end" }}>
                 <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--white)", fontFamily: "var(--font-mono)" }}>
                   {fmt(c.caTotalMois * animProgress)} <span style={{ fontSize: "8px", fontWeight: 500, color: "var(--muted)" }}>TND</span>
                 </span>
                 <span style={{ fontSize: "7.5px", color: "var(--muted)", fontFamily: "var(--font-mono)", marginTop: "1px" }}>
-                  CA du mois
+                  CA de la période
                 </span>
               </div>
             </div>

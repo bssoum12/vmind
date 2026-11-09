@@ -29,7 +29,7 @@ export const VfinOverdueCard: React.FC<VfinOverdueCardProps> = ({ activeAgentId 
 
   // Read current active data from Context
   const agentData = kpisByAgent["vfin"] || {};
-  const toolData = agentData.get_overdue_balance || {};
+  const toolData = agentData.impayes || {}; // bloc propre à la carte (skill vfin-kpis)
 
   const kpis = toolData.ok && toolData.kpis ? toolData.kpis : [];
   const intervals: UnpaidInterval[] = toolData.intervals || toolData.data?.intervals || [];
@@ -38,7 +38,7 @@ export const VfinOverdueCard: React.FC<VfinOverdueCardProps> = ({ activeAgentId 
   const clientsKpi = kpis.find((k: any) => k.label.toLowerCase().includes("client"));
 
   const totalImpayes = totalKpi ? totalKpi.value : 0;
-  const totalFormatted = totalKpi ? totalKpi.display : "0,00";
+  const totalFormatted = totalKpi ? (totalKpi.display ?? Number(totalKpi.value || 0).toLocaleString("fr-TN", { minimumFractionDigits: 3, maximumFractionDigits: 3 })) : "0,00";
   const nbClients = clientsKpi ? clientsKpi.value : 0;
 
   const loading = loadingByAgent["vfin"] && !toolData.ok;
@@ -177,7 +177,7 @@ export const VfinOverdueCard: React.FC<VfinOverdueCardProps> = ({ activeAgentId 
             {error}
           </span>
           <button
-            onClick={() => fetchKpis('vfin', true)}
+            onClick={() => fetchKpis('vfin', true, 'impayes')}
             style={{
               background: "none",
               border: "none",
@@ -316,7 +316,7 @@ export const VfinOverdueCard: React.FC<VfinOverdueCardProps> = ({ activeAgentId 
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
                     <span style={{ color: "var(--white)", fontWeight: 600 }}>
-                      {seg.amountFormatted}
+                      {seg.amountFormatted ?? fmt(seg.amount || 0)}
                     </span>
                   </div>
                 </div>

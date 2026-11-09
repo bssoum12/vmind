@@ -43,6 +43,12 @@ const MONTHS_LIST = [
   { value: 12, label: "Décembre" }
 ];
 
+// VMOVE (skill vmove-kpis) : la période vient du sélecteur global Début / Fin du panneau.
+// Les listes Mois / Année locales ne filtraient pas les données : elles sont masquées (code conservé).
+const SHOW_LOCAL_MONTH_SELECTOR = false;
+const fmtDate = (d?: string) => { if (!d) return ""; const [y, m, j] = String(d).slice(0, 10).split("-"); return j ? `${j}/${m}/${y}` : String(d); };
+
+
 export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps> = ({
   activeAgentId,
   clientId = "DEMO",
@@ -119,14 +125,14 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
 
   const { kpisByAgent, loadingByAgent, fetchKpis, error: globalError } = useKpis();
   const agentData = kpisByAgent["vmove"] || kpisByAgent["VMOVE"] || {};
-  const n8nToolData = agentData.get_kpi_dashboard || agentData.get_dossiers || agentData.dossiers_retard;
+  const n8nToolData = agentData.dossiers_retard; // bloc propre à la carte (skill vmove-kpis)
 
   const effectiveLoading = (loadingByAgent["vmove"] || loadingByAgent["VMOVE"]) && !n8nToolData;
   const error = !effectiveLoading && !n8nToolData && globalError ? globalError : "";
   const payload = n8nToolData?.data || n8nToolData;
 
   const handleRefresh = () => {
-    fetchKpis('vmove', true, 'get_dossiers');
+    fetchKpis('vmove', true, 'dossiers_retard');
   };
 
   if (!isVisible) return null;
@@ -143,6 +149,9 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
   const rawBySens = payload?.by_sens || [];
   const rawByNature = payload?.by_nature || [];
   const detailsList: any[] = payload?.details || [];
+  const periodLabel = SHOW_LOCAL_MONTH_SELECTOR
+    ? `${selectedMonth > 0 ? MONTHS_LIST[selectedMonth]?.label : "Année"} ${selectedYear}`
+    : (summary.periode_debut ? `${fmtDate(summary.periode_debut)} → ${fmtDate(summary.periode_fin)}` : "");
 
   // Helper to determine if a value represents missing/unassigned data
   const isMissingOrNA = (val: any) => {
@@ -276,11 +285,12 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
           }}
         >
           <RefreshCw size={11} className={effectiveLoading ? 'animate-spin' : ''} />
-          <span>{effectiveLoading ? "..." : "Actualiser"}</span>
+          {/* Icône seule : le texte « Actualiser » est dans l'infobulle (title) */}
         </button>
       </div>
 
       {/* 2. Premium Dropdown Controls (Month & Year) */}
+      {SHOW_LOCAL_MONTH_SELECTOR && (
       <div style={{
         display: 'flex',
         gap: '6px',
@@ -356,6 +366,7 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
           ))}
         </select>
       </div>
+      )}
 
       {/* 3. Primary Metric KPI Summary Banner (3-Card Layout) */}
       <div style={{
@@ -382,7 +393,7 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
             <AnimatedNumber value={totalRetard} />
           </div>
           <span style={{ fontSize: '8px', color: '#64748B', display: 'block', marginTop: '2px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {selectedMonth > 0 ? MONTHS_LIST[selectedMonth]?.label : "Année"} {selectedYear}
+            {periodLabel}
           </span>
         </div>
 
@@ -401,7 +412,7 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
             </span>
           </div>
           <div style={{ fontSize: '18px', fontWeight: 900, color: '#34D399', lineHeight: 1.1, letterSpacing: '-0.5px' }}>
-            {summary.taux_ponctualite_pct ?? 100}%
+            {(summary.total_dossiers_evalues ?? 0) > 0 ? `${summary.taux_ponctualite_pct ?? 0}%` : '—'}
           </div>
           <span style={{ fontSize: '8px', color: '#34D399', display: 'block', marginTop: '2px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {summary.total_dossiers_a_temps ?? 0} / {summary.total_dossiers_evalues ?? 0} à l'heure
@@ -423,7 +434,7 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
             </span>
           </div>
           <div style={{ fontSize: '13px', fontWeight: 800, color: '#F1F5F9', lineHeight: 1.2 }}>
-            +{summary.avg_retard_jours} <span style={{ fontSize: '9px', color: '#94A3B8', fontWeight: 600 }}>j.</span>
+            +{Number(summary.avg_retard_jours ?? 0).toFixed(1)} <span style={{ fontSize: '9px', color: '#94A3B8', fontWeight: 600 }}>j.</span>
           </div>
           <div style={{ fontSize: '9px', color: '#FBBF24', fontWeight: 700, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             Max: +{summary.max_retard_jours} j.
@@ -833,11 +844,11 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
               </div>
               <div>
                 <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>Ponctualité</span>
-                <span style={{ fontSize: '15px', fontWeight: 800, color: '#34D399' }}>{summary.taux_ponctualite_pct ?? 100}%</span>
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#34D399' }}>{(summary.total_dossiers_evalues ?? 0) > 0 ? `${summary.taux_ponctualite_pct ?? 0}%` : '—'}</span>
               </div>
               <div>
                 <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>Retard Moyen</span>
-                <span style={{ fontSize: '15px', fontWeight: 800, color: '#FBBF24' }}>+{summary.avg_retard_jours} j.</span>
+                <span style={{ fontSize: '15px', fontWeight: 800, color: '#FBBF24' }}>+{Number(summary.avg_retard_jours ?? 0).toFixed(1)} j.</span>
               </div>
               <div>
                 <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>Retard Max</span>
@@ -845,7 +856,7 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
               </div>
               <div>
                 <span style={{ fontSize: '9px', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>Période</span>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#CBD5E1' }}>{selectedMonth > 0 ? MONTHS_LIST[selectedMonth]?.label : "Année"} {selectedYear}</span>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#CBD5E1' }}>{periodLabel}</span>
               </div>
             </div>
 
