@@ -10,14 +10,46 @@ import { broadcastMcpSessionUpdate } from '@/shared/utils/sessionBroadcast';
 import { useConnections } from '@/shared/contexts/ConnectionsContext';
 
 export interface McpSession {
+  // The VMIND user: the only identity used for names and permissions
   user: {
     username: string;
     client_id: string;
     roles: string[];
     allowedAgents: string[];
   };
+  // The ERP login of the connection, shown only as connection information
+  erp: {
+    username: string;
+    roles: string[];
+  };
   tools: string[];
   allTools?: any[];
+}
+
+const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
+const ADMIN_ROLES = ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'];
+
+const toRoleList = (raw: unknown): string[] =>
+  Array.isArray(raw) ? raw.filter((r): r is string => typeof r === 'string') : typeof raw === 'string' && raw ? [raw] : [];
+
+function buildMcpSession(status: any, vmindUser: any): McpSession {
+  const roles = toRoleList(vmindUser?.roles ?? vmindUser?.role);
+  const isAdmin = roles.some((r) => ADMIN_ROLES.includes(r));
+  const receivedAgents: string[] = Array.isArray(status.allowedAgents) ? status.allowedAgents : [];
+  return {
+    user: {
+      username: vmindUser?.username || '',
+      client_id: status.client_id || 'DEMO',
+      roles,
+      allowedAgents: receivedAgents.length > 0 ? receivedAgents : isAdmin ? ALL_AGENTS : [],
+    },
+    erp: {
+      username: status.erp_username || '',
+      roles: toRoleList(status.roles),
+    },
+    tools: status.tools || [],
+    allTools: status.allTools || [],
+  };
 }
 
 export const ConnectorsHub: React.FC = () => {
@@ -44,28 +76,15 @@ export const ConnectorsHub: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         if (data.ok && data.connected) {
-          const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
-          const receivedRoles: string[] = data.roles || ['Administrator'];
-          const isAdmin = receivedRoles.some((r: string) =>
-            ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
-          );
-          const receivedAgents: string[] = data.allowedAgents || [];
-          const resolvedAgents = receivedAgents.length > 0 ? receivedAgents : (isAdmin ? ALL_AGENTS : []);
-
-          const sessionObj: McpSession = {
-            user: {
-              username: data.erp_username || '',
-              client_id: data.client_id || 'DEMO',
-              roles: receivedRoles,
-              allowedAgents: resolvedAgents
-            },
-            tools: data.tools || [],
-            allTools: data.allTools || []
-          };
+          const meRes = await fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' }).catch(() => null);
+          const me = meRes?.ok ? await meRes.json() : null;
+          const sessionObj = buildMcpSession(data, me?.user);
 
           setTralisSession(sessionObj);
           setTralisStatus('connected');
-          broadcastMcpSessionUpdate({ ...sessionObj, ...data, connected: true });
+          // The ERP roles stay out of the broadcast: listeners must only see the VMIND user's roles
+          const { roles: _erpRoles, ...statusWithoutErpRoles } = data;
+          broadcastMcpSessionUpdate({ ...statusWithoutErpRoles, ...sessionObj, connected: true });
           return;
         }
       }
@@ -99,26 +118,15 @@ export const ConnectorsHub: React.FC = () => {
       const customEvent = e as CustomEvent;
       const detail = customEvent.detail;
       if (detail && detail.connected === true) {
-        if (!detail.tools || detail.tools.length === 0 || !detail.allTools || detail.allTools.length === 0) {
+        // A broadcast from this hub carries the VMIND user and the ERP login: use it as it is,
+        // even with an empty tool list (TraLIS quota reached), so it never triggers a new status call
+        if (!detail.user || !detail.erp) {
           initTralisMcp();
           return;
         }
-
-        const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
-        const receivedRoles: string[] = detail.user?.roles || detail.roles || ['Administrator'];
-        const isAdmin = receivedRoles.some((r: string) =>
-          ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)
-        );
-        const receivedAgents: string[] = detail.user?.allowedAgents || detail.allowedAgents || [];
-        const resolvedAgents = receivedAgents.length > 0 ? receivedAgents : (isAdmin ? ALL_AGENTS : []);
-
         setTralisSession({
-          user: {
-            username: detail.user?.username || detail.erp_username || '',
-            client_id: detail.user?.client_id || detail.client_id || 'DEMO',
-            roles: receivedRoles,
-            allowedAgents: resolvedAgents
-          },
+          user: detail.user,
+          erp: detail.erp,
           tools: detail.tools || [],
           allTools: detail.allTools || []
         });
@@ -133,11 +141,12 @@ export const ConnectorsHub: React.FC = () => {
     return () => window.removeEventListener('mcp-session-updated', handleSync);
   }, [initTralisMcp]);
 
-  const handleTralisMcpConnected = (_token: string, _data: any) => {
+  const handleTralisMcpConnected = useCallback((_token: string, _data: any) => {
     initTralisMcp();
-  };
+  }, [initTralisMcp]);
 
-  const handleTralisMcpDisconnected = async () => {
+  // Stable entre les rendus pour ne pas relancer la découverte des outils du panneau
+  const handleTralisMcpDisconnected = useCallback(async () => {
     try {
       await fetch(`${baseUrl}/api/connectors/tralis/disconnect`, {
         method: 'POST',
@@ -155,7 +164,7 @@ export const ConnectorsHub: React.FC = () => {
     setTralisSession(null);
     setTralisStatus('idle');
     broadcastMcpSessionUpdate(null);
-  };
+  }, [baseUrl]);
 
   return (
     <div className="connectors-hub-wrap">

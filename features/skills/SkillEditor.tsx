@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Save,
@@ -13,6 +13,7 @@ import {
   AlertCircle,
   ChevronDown,
   Check,
+  BookOpen,
 } from 'lucide-react';
 import {
   SkillCategory,
@@ -21,6 +22,9 @@ import {
   SkillDetail,
   SkillToolOption,
   SkillVersionItem,
+  SkillIssue,
+  SkillSaveError,
+  checkSkill,
   createSkill,
   updateSkill,
   fetchSkillToolOptions,
@@ -32,6 +36,8 @@ import { useToast } from '@/shared/contexts/ToastContext';
 import { SkillErpSelector } from './SkillErpSelector';
 import { SkillGuidedFields } from './SkillGuidedFields';
 import { SkillHelpStrip } from './SkillHelpStrip';
+import { SkillChecksPanel, SkillChecksSummary, issueKey, issueTarget, issuesForHelpKey } from './SkillChecks';
+import { SkillGuidePanel, guideSectionFor, type GuideSectionId } from './SkillGuide';
 import {
   EXPERT_MODE_STORAGE_KEY,
   NEW_SKILL_BODY_TEMPLATE,
@@ -143,6 +149,28 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Checks: the same backend rules as saving, run while typing
+  const [checkIssues, setCheckIssues] = useState<SkillIssue[]>([]);
+  const [checking, setChecking] = useState(false);
+  const [checkUnavailable, setCheckUnavailable] = useState(false);
+  const [checksPanelOpen, setChecksPanelOpen] = useState(false);
+  // The guide shares the place of the checks panel: null when closed, else the section to show
+  const [guide, setGuide] = useState<{ section: GuideSectionId | null } | null>(null);
+  const [dismissedWarnings, setDismissedWarnings] = useState<string[]>([]);
+  const checkRunRef = useRef(0);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const dismissedStorageKey = `vmind.skills.editor.dismissed.${accountName}`;
+
+  // Only one of the checks panel and the guide is shown at a time
+  useEffect(() => {
+    if (checksPanelOpen) setGuide(null);
+  }, [checksPanelOpen]);
+
+  const openGuide = (section: GuideSectionId | null) => {
+    setChecksPanelOpen(false);
+    setGuide({ section });
+  };
+
   useEffect(() => {
     if (!isOpen) return;
     setErrorMsg(null);
@@ -150,6 +178,16 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     setToolsDropdownOpen(false);
     setToolSearchQuery('');
     setHelpField(null);
+    setCheckIssues([]);
+    setCheckUnavailable(false);
+    setChecksPanelOpen(false);
+    setGuide(null);
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(dismissedStorageKey) || '[]');
+      setDismissedWarnings(Array.isArray(stored) ? stored : []);
+    } catch {
+      setDismissedWarnings([]);
+    }
 
     if (initialSkill) {
       setSlug(initialSkill.slug);
@@ -247,8 +285,6 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
       .finally(() => setLoadingVersions(false));
   }, [isOpen, activeTab, initialSkill?.id]);
 
-  if (!isOpen) return null;
-
   const effectiveDescription = expertMode || freeDescription ? description : composeDescription(quand, pasPour);
   const descChars = effectiveDescription.trim().length;
   const descWords = effectiveDescription.trim() ? effectiveDescription.trim().split(/\s+/).length : 0;
@@ -266,10 +302,89 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
   const sectionHelpKey = customBody ? 'sectionLibre' : activeSection;
   const bodyLines = effectiveBody.split(/\r?\n/).length;
   const bodyChars = effectiveBody.length;
-  // With the sentences, problems are explained on save instead of silently disabling the button
-  const saveDisabled =
-    saving || (expertMode && (descChars < 20 || descChars > 1024 || hasForbiddenAngles || bodyLines > 500));
+  // Problems are explained by the checks instead of silently disabling the button
+  const saveDisabled = saving;
   const canUseGuidedForm = fitsGuidedForm(referencesJson);
+
+  const finalSlug = !expertMode && mode === 'create' ? slugifyTitle(title) : slug.trim().toLowerCase();
+  const buildPayload = () => ({
+    slug: finalSlug,
+    title: title.trim(),
+    description: effectiveDescription.trim(),
+    category,
+    kind: !isAdmin ? ('style' as SkillKind) : kind,
+    scope: !isAdmin ? ('USER' as SkillScope) : scope,
+    erp_types: erpTypes,
+    tenant_key: scope === 'TENANT' ? tenantKey.trim().toUpperCase() : null,
+    body_md: effectiveBody,
+    references_json: referencesJson,
+    mapped_tools: scope === 'GLOBAL' || !isErpConnected ? [] : mappedTools,
+    comment: versionComment.trim() || undefined,
+  });
+  const checkPayload = () => ({
+    ...buildPayload(),
+    comment: undefined,
+    skill_id: mode !== 'create' ? initialSkill?.id ?? null : null,
+  });
+  const checkPayloadJson = JSON.stringify(checkPayload());
+
+  // A warning marked « C'est voulu » stays hidden for this skill and this account only
+  const dismissKeyOf = (issue: SkillIssue) => `${finalSlug}|${issueKey(issue)}`;
+  const isDismissed = (issue: SkillIssue) => issue.level === 'warning' && dismissedWarnings.includes(dismissKeyOf(issue));
+  const visibleIssues = checkIssues.filter((issue) => !isDismissed(issue));
+  const dismissedCount = checkIssues.length - visibleIssues.length;
+  const blockingIssues = visibleIssues.filter((issue) => issue.level === 'blocking');
+
+  const storeDismissed = (next: string[]) => {
+    setDismissedWarnings(next);
+    try {
+      window.localStorage.setItem(dismissedStorageKey, JSON.stringify(next));
+    } catch {
+      // The choice simply isn't remembered
+    }
+  };
+  const handleDismissIssue = (issue: SkillIssue) => storeDismissed([...dismissedWarnings, dismissKeyOf(issue)]);
+  const handleRestoreDismissed = () =>
+    storeDismissed(dismissedWarnings.filter((key) => !key.startsWith(`${finalSlug}|`)));
+
+  useEffect(() => {
+    if (!isOpen || activeTab === 'history') return;
+    const runId = ++checkRunRef.current;
+    setChecking(true);
+    const timer = setTimeout(async () => {
+      try {
+        const issues = await checkSkill(JSON.parse(checkPayloadJson), activeConnectionId);
+        if (runId !== checkRunRef.current) return;
+        setCheckIssues(issues);
+        setCheckUnavailable(false);
+      } catch {
+        if (runId === checkRunRef.current) setCheckUnavailable(true);
+      } finally {
+        if (runId === checkRunRef.current) setChecking(false);
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [isOpen, activeTab, checkPayloadJson, activeConnectionId]);
+
+  // Outline each field concerned by a problem: red when blocking, amber for a warning
+  useEffect(() => {
+    const modal = modalRef.current;
+    if (!modal) return;
+    const levelByTarget = new Map<string, 'blocking' | 'warning'>();
+    for (const issue of visibleIssues) {
+      if (issue.level === 'info') continue;
+      const target = issueTarget(issue);
+      if (issue.level === 'blocking' || !levelByTarget.has(target)) levelByTarget.set(target, issue.level);
+    }
+    modal.querySelectorAll<HTMLElement>('[data-check]').forEach((element) => {
+      const levels = (element.dataset.check || '').split(' ').map((target) => levelByTarget.get(target));
+      const level = levels.includes('blocking') ? 'blocking' : levels.find(Boolean);
+      if (level) element.dataset.issue = level;
+      else delete element.dataset.issue;
+    });
+  });
+
+  if (!isOpen) return null;
 
   const handleExpertToggle = () => {
     if (expertMode) {
@@ -380,6 +495,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
       return;
     }
     if (!expertMode) {
+      // The standard sections are a form choice, so this rule stays in the editor
       const missingSection = customBody
         ? undefined
         : GUIDED_SECTIONS[effectiveKind].find((s) => s.required && !sectionValues[s.key]?.trim());
@@ -389,51 +505,25 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
         setErrorMsg(`Remplissez « ${missingSection.title} » : l’assistant en a besoin pour appliquer cette compétence.`);
         return;
       }
-      if (!effectiveBody.trim()) {
-        setErrorMsg('Remplissez au moins une section de « Ce que l’assistant doit faire ».');
-        return;
-      }
-      const descriptionLabel = freeDescription ? '« Description »' : '« Quand on demande » et « Pas pour »';
-      if (descChars < 20) {
-        setErrorMsg(`Précisez davantage ${descriptionLabel} pour que l’assistant sache quand utiliser cette compétence.`);
-        return;
-      }
-      if (descChars > 1024) {
-        setErrorMsg(`${descriptionLabel} : ce texte est trop long, raccourcissez-le.`);
-        return;
-      }
-      if (hasForbiddenAngles) {
-        setErrorMsg(`Retirez les caractères < et > de ${descriptionLabel}.`);
-        return;
-      }
-      if (bodyLines > 500 || bodyChars > 20000) {
-        setErrorMsg('Les sections de « Ce que l’assistant doit faire » sont trop longues : raccourcissez le texte.');
-        return;
-      }
-    }
-
-    const finalSlug = !expertMode && mode === 'create' ? slugifyTitle(title) : slug.trim().toLowerCase();
-    if (!finalSlug) {
-      setErrorMsg('Le nom court doit contenir au moins une lettre ou un chiffre.');
-      return;
     }
 
     try {
       setSaving(true);
-      const payload = {
-        slug: finalSlug,
-        title: title.trim(),
-        description: effectiveDescription.trim(),
-        category,
-        kind: !isAdmin ? ('style' as SkillKind) : kind,
-        scope: !isAdmin ? ('USER' as SkillScope) : scope,
-        erp_types: erpTypes,
-        tenant_key: scope === 'TENANT' ? tenantKey.trim().toUpperCase() : null,
-        body_md: effectiveBody,
-        references_json: referencesJson,
-        mapped_tools: finalTools,
-        comment: versionComment.trim() || undefined,
-      };
+      const payload = { ...buildPayload(), mapped_tools: finalTools };
+
+      // Same rules as the backend save: check first so every blocking problem is explained at once
+      try {
+        const issues = await checkSkill(checkPayload(), activeConnectionId);
+        setCheckIssues(issues);
+        setCheckUnavailable(false);
+        if (issues.some((issue) => issue.level === 'blocking')) {
+          setChecksPanelOpen(true);
+          setErrorMsg('Corrigez les points bloquants avant d’enregistrer : ils sont détaillés dans la liste.');
+          return;
+        }
+      } catch {
+        // The save itself still applies the rules
+      }
 
       if (mode === 'create' || !initialSkill) {
         await createSkill(payload);
@@ -451,6 +541,10 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
       await onSaved();
       onClose();
     } catch (err: any) {
+      if (err instanceof SkillSaveError && err.issues.length > 0) {
+        setCheckIssues((prev) => [...err.issues, ...prev.filter((p) => !err.issues.some((i) => issueKey(i) === issueKey(p)))]);
+        setChecksPanelOpen(true);
+      }
       setErrorMsg(err.message || 'Erreur lors de la sauvegarde.');
     } finally {
       setSaving(false);
@@ -488,8 +582,10 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
       onClick={onClose}
     >
       <div
+        ref={modalRef}
         onClick={(e) => e.stopPropagation()}
         style={{
+          position: 'relative',
           width: '100%',
           maxWidth: '920px',
           height: 'auto',
@@ -580,6 +676,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
           {expertMode && (
             <button
               type="button"
+              data-check="references"
               onClick={() => setActiveTab('references')}
               style={{
                 display: 'flex',
@@ -623,12 +720,32 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
 
           <button
             type="button"
+            onClick={() => (guide ? setGuide(null) : openGuide(null))}
+            aria-expanded={!!guide}
+            style={{
+              marginLeft: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 6px',
+              background: 'transparent',
+              border: 'none',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: guide ? '#00E5C8' : '#94a3b8',
+              cursor: 'pointer',
+            }}
+          >
+            <BookOpen size={14} /> Guide
+          </button>
+
+          <button
+            type="button"
             role="switch"
             aria-checked={expertMode}
             disabled={expertMode && !canUseGuidedForm}
             onClick={handleExpertToggle}
             style={{
-              marginLeft: 'auto',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -742,7 +859,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
 
               {expertMode && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div>
+                <div data-check="slug">
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
                     Identifiant (`/nom-avec-tirets` en minuscules) *
                   </label>
@@ -766,7 +883,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                   />
                 </div>
 
-                <div>
+                <div data-check="title">
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
                     Titre de la Compétence *
                   </label>
@@ -793,7 +910,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
 
               {/* Category, Kind, Scope */}
               <div style={{ display: 'grid', gridTemplateColumns: isAdmin ? '1fr 1fr 1fr' : expertMode ? '1fr 1fr' : '1fr', gap: '14px' }}>
-                <div data-help="categorie">
+                <div data-help="categorie" data-check="category">
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
                     Catégorie
                   </label>
@@ -819,7 +936,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                 </div>
 
                 {(expertMode || isAdmin) && (
-                <div data-help="type">
+                <div data-help="type" data-check="kind">
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
                     Type de compétence
                   </label>
@@ -844,7 +961,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                 )}
 
                 {isAdmin && (
-                  <div data-help="portee">
+                  <div data-help="portee" data-check="scope">
                     <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
                       Portée
                     </label>
@@ -876,7 +993,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
 
               {/* Admin extra selector for TENANT */}
               {isAdmin && scope === 'TENANT' && (
-                <div data-help="organisation">
+                <div data-help="organisation" data-check="tenant_key">
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
                     Organisation active *
                   </label>
@@ -909,7 +1026,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
               {expertMode && (
               <>
               {/* Description with counters */}
-              <div>
+              <div data-check="description exclusion">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                   <label style={{ fontSize: '11px', fontWeight: 600, color: '#00E5C8' }}>
                     Description & Mots-clés de déclenchement *
@@ -946,7 +1063,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
               </div>
 
               {/* Markdown Body with line counter */}
-              <div>
+              <div data-check="body_md">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                   <label style={{ fontSize: '11px', fontWeight: 600, color: '#00E5C8' }}>
                     Instructions Markdown (`SKILL.md`) *
@@ -1323,7 +1440,26 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
           )}
         </form>
 
-        {!expertMode && activeTab === 'general' && <SkillHelpStrip fieldKey={helpField} />}
+        {!expertMode && activeTab === 'general' && (
+          <SkillHelpStrip
+            fieldKey={helpField}
+            issues={issuesForHelpKey(visibleIssues, helpField, guidedTabs.map((t) => t.key))}
+          />
+        )}
+
+        {checksPanelOpen && (
+          <SkillChecksPanel
+            issues={visibleIssues}
+            dismissedCount={dismissedCount}
+            unavailable={checkUnavailable}
+            onDismiss={handleDismissIssue}
+            onRestoreDismissed={handleRestoreDismissed}
+            onLearnMore={(issue) => openGuide(guideSectionFor(issue))}
+            onClose={() => setChecksPanelOpen(false)}
+          />
+        )}
+
+        {guide && <SkillGuidePanel section={guide.section} onClose={() => setGuide(null)} />}
 
         {/* Sticky Luxury Modal Footer — firmly anchored, zero dead space */}
         <div
@@ -1365,6 +1501,14 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
 
           {/* Right actions */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {activeTab !== 'history' && (
+              <SkillChecksSummary
+                issues={visibleIssues}
+                checking={checking}
+                unavailable={checkUnavailable}
+                onOpen={() => setChecksPanelOpen((open) => !open)}
+              />
+            )}
             <button
               type="button"
               onClick={onClose}

@@ -63,7 +63,7 @@ export const SkillGuidedFields: React.FC<SkillGuidedFieldsProps> = ({
 }) => (
   <>
     {freeDescription ? (
-      <div data-help="description">
+      <div data-help="description" data-check="description exclusion">
         <label htmlFor="skill-description" style={labelStyle}>
           Description *
         </label>
@@ -78,7 +78,7 @@ export const SkillGuidedFields: React.FC<SkillGuidedFieldsProps> = ({
       </div>
     ) : (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px' }}>
-        <div data-help="quand">
+        <div data-help="quand" data-check="description">
           <label htmlFor="skill-quand" style={labelStyle}>
             Quand on demande *
           </label>
@@ -92,7 +92,7 @@ export const SkillGuidedFields: React.FC<SkillGuidedFieldsProps> = ({
           />
         </div>
 
-        <div data-help="pasPour">
+        <div data-help="pasPour" data-check="exclusion">
           <label htmlFor="skill-pas-pour" style={labelStyle}>
             Pas pour
           </label>
@@ -107,7 +107,7 @@ export const SkillGuidedFields: React.FC<SkillGuidedFieldsProps> = ({
       </div>
     )}
 
-    <div data-help={helpKey}>
+    <div data-help={helpKey} data-check="body_md">
       <div style={labelStyle}>Ce que l&apos;assistant doit faire</div>
       <div role="tablist" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
         {tabs.map((section) => {
@@ -150,7 +150,7 @@ export const SkillGuidedFields: React.FC<SkillGuidedFieldsProps> = ({
       />
     </div>
 
-    <div data-help="nom">
+    <div data-help="nom" data-check="title slug">
       <label htmlFor="skill-nom" style={labelStyle}>
         Nom court *
       </label>

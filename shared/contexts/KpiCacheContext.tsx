@@ -63,7 +63,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
       setCurrentUser((prev: any) => ({
         ...(prev || {}),
         client_id: activeConnection.client_id || 'DEMO',
-        roles: prev?.roles || ['Administrator'],
+        roles: prev?.roles || [],
         allowedAgents: prev?.allowedAgents || ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE']
       }));
       setKpisByAgent({});
@@ -86,13 +86,16 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
           const data = await res.json();
           if (data.ok && data.connected) {
             setIsConnectorConnected(true);
-            const user = data.user || {
-              username: data.erp_username || '',
+            // Roles come from the VMIND user, never from the ERP login of the connection
+            const meRes = await fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' }).catch(() => null);
+            const me = meRes?.ok ? await meRes.json() : null;
+            const rawRoles = me?.user?.roles ?? me?.user?.role;
+            setCurrentUser({
+              username: me?.user?.username || '',
               client_id: data.client_id || 'LOCAL',
-              roles: data.roles || ['Administrator'],
-              allowedAgents: data.allowedAgents || ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE']
-            };
-            setCurrentUser(user);
+              roles: Array.isArray(rawRoles) ? rawRoles : rawRoles ? [rawRoles] : [],
+              allowedAgents: Array.isArray(data.allowedAgents) ? data.allowedAgents : []
+            });
           } else {
             setIsConnectorConnected(false);
 

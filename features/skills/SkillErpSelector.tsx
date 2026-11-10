@@ -81,7 +81,7 @@ export const SkillErpSelector: React.FC<SkillErpSelectorProps> = ({
   );
 
   return (
-    <div data-help="erp">
+    <div data-help="erp" data-check="erp_types">
       <div style={{ fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
         Cette compétence s&apos;applique à
       </div>

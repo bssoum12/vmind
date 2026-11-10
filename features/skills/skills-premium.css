@@ -1196,3 +1196,29 @@ textarea.sk-control { resize: vertical; line-height: 1.6; font-family: ui-monosp
   .sk-dropzone-icon,
   .sk-skeleton { animation: none !important; }
 }
+
+/* Skill checks: fields concerned by a problem, from the `data-issue` set on their container */
+[data-check][data-issue="blocking"] :is(input, textarea, select) {
+  border-color: #f87171 !important;
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.35);
+}
+[data-check][data-issue="warning"] :is(input, textarea, select) {
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.3);
+}
+[data-check="erp_types"][data-issue],
+button[data-check][data-issue] {
+  outline: 1px dashed currentColor;
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+[data-check="erp_types"][data-issue="blocking"],
+button[data-check][data-issue="blocking"] { color: #f87171; }
+[data-check="erp_types"][data-issue="warning"],
+button[data-check][data-issue="warning"] { color: #fbbf24; }
+
+@keyframes skill-check-spin { to { transform: rotate(360deg); } }
+.skill-check-spin { animation: skill-check-spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .skill-check-spin { animation: none; }
+}

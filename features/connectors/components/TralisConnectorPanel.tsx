@@ -310,6 +310,17 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
     return () => window.removeEventListener('message', handleAuthMessage);
   }, []);
 
+  const [rateLimitedSeconds, setRateLimitedSeconds] = useState<number | null>(null);
+  // Vrai dès que l'ERP a répondu à la découverte des outils, pour distinguer « aucun outil » du chargement
+  const [toolsLoaded, setToolsLoaded] = useState(false);
+  const [toolsRetryTick, setToolsRetryTick] = useState(0);
+  const transientRetryDoneRef = React.useRef(false);
+  const onDisconnectedRef = React.useRef(onDisconnected);
+  onDisconnectedRef.current = onDisconnected;
+  // Les outils ne sont redemandés que si la connexion active change, pas à chaque rafraîchissement de la liste
+  const connectedToolsId =
+    connections.find(c => c.connector_type === 'tralis' && c.status === 'connected')?.id ?? null;
+
   useEffect(() => {
     /*
 
@@ -318,12 +329,21 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
 
     */
 
+    if (status !== 'connected' || !connectedToolsId) return;
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
     const fetchDynamicTools = async () => {
-      const conn = connections.find(c => c.connector_type === 'tralis' && c.status === 'connected');
-      if (conn?.id) {
+      if (connectedToolsId) {
         try {
           const { fetchConnectionTools } = await import('@/shared/api/connections-api');
-          const discovered = await fetchConnectionTools(conn.id);
+          const discovered = await fetchConnectionTools(connectedToolsId);
+          if (cancelled) return;
+          setRateLimitedSeconds(null);
+          setToolsLoaded(true);
+          if (Array.isArray(discovered) && discovered.length === 0) {
+            setServerTools([]);
+          }
           if (Array.isArray(discovered) && discovered.length > 0) {
             const mapped: ToolMeta[] = discovered.map(t => {
               const nameLower = t.name.toLowerCase();
@@ -346,21 +366,37 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
             });
             setServerTools(mapped);
           }
-        } catch (err) {
-          console.warn('[TralisConnectorPanel] Session MCP perdue ou inaccessible. Déconnexion automatique...');
-          setServerTools([]);
-          if (onDisconnected) {
-            onDisconnected();
-            if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { connected: false } }));
+        } catch (err: any) {
+          if (cancelled) return;
+          if (err?.status === 401) {
+            // Session TraLIS réellement invalide : déconnexion
+            console.warn('[TralisConnectorPanel] Session MCP expirée ou invalide. Déconnexion...');
+            setServerTools([]);
+            if (onDisconnectedRef.current) {
+              onDisconnectedRef.current();
+              if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('mcp-session-updated', { detail: { connected: false } }));
+            }
+          } else if (err?.status === 429) {
+            // Quota atteint : la connexion est conservée, aucune requête jusqu'à la fin de l'attente
+            const waitSec = Number(err.retryAfterSec) > 0 ? Number(err.retryAfterSec) : 60;
+            console.warn(`[TralisConnectorPanel] Quota ERP atteint, nouvel essai dans ${waitSec} s.`);
+            setRateLimitedSeconds(waitSec);
+            retryTimer = setTimeout(() => setToolsRetryTick((t) => t + 1), waitSec * 1000);
+          } else if (!transientRetryDoneRef.current) {
+            // Autre erreur (réseau, 502) : connexion conservée, un seul nouvel essai
+            transientRetryDoneRef.current = true;
+            retryTimer = setTimeout(() => setToolsRetryTick((t) => t + 1), 15000);
           }
         }
       }
     };
 
-    if (status === 'connected') {
-      fetchDynamicTools();
-    }
-  }, [status, connections, onDisconnected]);
+    fetchDynamicTools();
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [status, connectedToolsId, toolsRetryTick]);
 
   const baseUrl = process.env.NEXT_PUBLIC_API_URL ;
 
@@ -506,6 +542,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
 
   // Convenience aliases
   const userInfo           = session?.user ?? null;
+  const erpInfo            = session?.erp ?? null;
   const authorizedToolNames = new Set<string>(
     serverTools.length > 0
       ? serverTools.map(t => t.name)
@@ -573,7 +610,17 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
               {status === 'connected' && (
                 <span style={{ color: '#00E5C8', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <CheckCircle2 size={13} />
-                  Connecté — {userInfo?.username}&nbsp;·&nbsp;Tenant&nbsp;{userInfo?.client_id || 'DEMO'}
+                  Connecté — {erpInfo?.username}&nbsp;·&nbsp;Tenant&nbsp;{userInfo?.client_id || 'DEMO'}
+                </span>
+              )}
+              {status === 'connected' && toolsLoaded && !rateLimitedSeconds && serverTools.length === 0 && (
+                <span style={{ color: '#ffc107', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <AlertTriangle size={13} /> Aucun outil disponible pour ce compte ERP. Vérifiez ses droits ou reconnectez-vous.
+                </span>
+              )}
+              {status === 'connected' && rateLimitedSeconds && (
+                <span style={{ color: '#ffc107', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <AlertTriangle size={13} /> Trop de requêtes vers l&apos;ERP, réessai dans {rateLimitedSeconds} s
                 </span>
               )}
               {status === 'error' && (
@@ -665,13 +712,11 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
             borderRadius: '12px', marginBottom: '28px',
           }}>
             {[
-              { label: 'Compte', value: userInfo.username },
+              { label: 'Compte', value: erpInfo?.username || '—' },
               { label: 'Tenant', value: userInfo.client_id || 'DEMO' },
-              { 
-                label: 'Rôles TraLIS', 
-                value: Array.isArray(userInfo.roles) 
-                  ? userInfo.roles.join(', ') 
-                  : (typeof userInfo.roles === 'string' ? userInfo.roles : '—') 
+              {
+                label: 'Rôles TraLIS',
+                value: erpInfo?.roles.length ? erpInfo.roles.join(', ') : '—'
               },
               { 
                 label: 'Agents autorisés', 
