@@ -53,7 +53,10 @@ export const TableRenderer: React.FC<TableRendererProps> = ({ table }) => {
               >
                 {columns.map((col, colIdx) => {
                   const value = findValue(row, col, colIdx);
-                  const isNumber = !isNaN(Number(value)) && value !== '';
+                  // Plain numbers, and numbers formatted by the agent ("32 386", "4 821 795,320").
+                  const isNumber =
+                    (typeof value === 'number') ||
+                    (typeof value === 'string' && /^-?\d{1,3}([\s  ]?\d{3})*([.,]\d+)?$/.test(value.trim()));
                   return (
                     <td 
                       key={colIdx} 

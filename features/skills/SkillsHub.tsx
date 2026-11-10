@@ -93,6 +93,7 @@ export const SkillsHub: React.FC = () => {
 
   const [tab, setTab] = useState<'installed' | 'discover'>('installed');
   const [scopeFilter, setScopeFilter] = useState<'all' | 'mine' | 'shared'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
 
@@ -100,6 +101,7 @@ export const SkillsHub: React.FC = () => {
   const [loadingDiscover, setLoadingDiscover] = useState(false);
 
   const [isAdmin, setIsAdmin] = useState(false);
+  const [accountName, setAccountName] = useState('');
 
   // Modal state
   const [editorOpen, setEditorOpen] = useState(false);
@@ -126,6 +128,7 @@ export const SkillsHub: React.FC = () => {
       .then((data) => {
         if (data?.user) {
           setIsAdmin(isVmindAdmin(data.user));
+          setAccountName(data.user.username || '');
         }
       })
       .catch(() => {});
@@ -365,6 +368,8 @@ Décrivez ici les instructions spécifiques pour ce skill...
   const filteredInstalled = installedSkills.filter((s) => {
     if (scopeFilter === 'mine' && s.scope !== 'USER') return false;
     if (scopeFilter === 'shared' && s.scope === 'USER') return false;
+    if (statusFilter === 'active' && !s.enabled) return false;
+    if (statusFilter === 'inactive' && s.enabled) return false;
     if (categoryFilter !== 'all' && s.category !== categoryFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
@@ -428,6 +433,7 @@ Décrivez ici les instructions spécifiques pour ce skill...
           initialSkill={editingSkill}
           mode={editorMode}
           isAdmin={isAdmin}
+          accountName={accountName}
           activeConnectionId={activeConnection?.id ?? null}
           activeErpType={activeConnection?.connector_type ?? null}
           activeClientId={activeConnection?.client_id ?? null}
@@ -1070,6 +1076,71 @@ Décrivez ici les instructions spécifiques pour ce skill...
                       }}
                     >
                       <span>{opt.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Status Filters (Installed only) */}
+            {tab === 'installed' && (
+              <div
+                className="sk-chips"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px',
+                  borderRadius: '12px',
+                  background: 'rgba(8, 14, 26, 0.75)',
+                  border: '1px solid rgba(148, 163, 184, 0.14)',
+                }}
+              >
+                {[
+                  { id: 'all', label: 'Tous', count: installedSkills.length, color: '#00E5C8', rgb: '0, 229, 200' },
+                  { id: 'active', label: 'Actifs', count: installedSkills.filter((s) => s.enabled).length, color: '#00E5C8', rgb: '0, 229, 200' },
+                  { id: 'inactive', label: 'Inactifs', count: installedSkills.filter((s) => !s.enabled).length, color: '#cbd5e1', rgb: '148, 163, 184' },
+                ].map((opt) => {
+                  const isActive = statusFilter === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setStatusFilter(opt.id as any)}
+                      className={`sk-chip ${isActive ? 'is-active' : ''}`}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        height: '32px',
+                        padding: '0 13px',
+                        borderRadius: '8px',
+                        border: isActive ? `1px solid rgba(${opt.rgb}, 0.5)` : '1px solid transparent',
+                        background: isActive ? `linear-gradient(135deg, rgba(${opt.rgb}, 0.2) 0%, rgba(${opt.rgb}, 0.08) 100%)` : 'transparent',
+                        color: isActive ? opt.color : '#94a3b8',
+                        fontSize: '12px',
+                        fontWeight: isActive ? 700 : 500,
+                        cursor: 'pointer',
+                        boxShadow: isActive ? `0 0 14px rgba(${opt.rgb}, 0.3)` : 'none',
+                        transition: 'all 0.18s cubic-bezier(0.22, 1, 0.36, 1)',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                          e.currentTarget.style.color = '#ffffff';
+                          e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.28)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = '#94a3b8';
+                          e.currentTarget.style.borderColor = 'transparent';
+                        }
+                      }}
+                    >
+                      <span>{opt.label}</span>
+                      <span style={{ fontSize: '10.5px', opacity: 0.75 }}>({opt.count})</span>
                     </button>
                   );
                 })}
@@ -2722,6 +2793,7 @@ Décrivez ici les instructions spécifiques pour ce skill...
         initialSkill={editingSkill}
         mode={editorMode}
         isAdmin={isAdmin}
+        accountName={accountName}
         activeConnectionId={activeConnection?.id ?? null}
         activeErpType={activeConnection?.connector_type ?? null}
         activeClientId={activeConnection?.client_id ?? null}

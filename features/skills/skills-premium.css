@@ -613,11 +613,28 @@
 
 .sk-card.is-disabled {
   opacity: 0.55;
-  filter: saturate(0.6);
+  background:
+    radial-gradient(420px circle at var(--mx) var(--my), rgba(148, 163, 184, 0.08), transparent 45%),
+    linear-gradient(165deg, rgba(17, 26, 46, 0.94) 0%, rgba(8, 13, 25, 0.98) 100%);
+}
+.sk-card.is-disabled::before {
+  background: linear-gradient(135deg, #64748b, #94a3b8, #64748b);
 }
 .sk-card.is-disabled:hover {
-  opacity: 0.9;
-  filter: none;
+  opacity: 0.85;
+  border-color: rgba(148, 163, 184, 0.4);
+  box-shadow: 0 20px 45px -15px rgba(148, 163, 184, 0.18), 0 0 0 1px rgba(148, 163, 184, 0.15);
+}
+.sk-card.is-disabled:hover::before {
+  opacity: 0.35;
+}
+.sk-card.is-disabled:hover .sk-card-title { color: #e2e8f0 !important; }
+/* Grey the faces, not the card: a filter on the card would flatten the 3D flip. */
+.sk-card.is-disabled .sk-cartridge-front,
+.sk-card.is-disabled .sk-cartridge-back,
+.sk-card.is-disabled .sk-badge,
+.sk-card.is-disabled .sk-card-footer {
+  filter: grayscale(1);
 }
 .sk-card-has-menu { z-index: 20; }
 @keyframes sk-rise {
@@ -1178,4 +1195,30 @@ textarea.sk-control { resize: vertical; line-height: 1.6; font-family: ui-monosp
   .sk-title-accent,
   .sk-dropzone-icon,
   .sk-skeleton { animation: none !important; }
+}
+
+/* Skill checks: fields concerned by a problem, from the `data-issue` set on their container */
+[data-check][data-issue="blocking"] :is(input, textarea, select) {
+  border-color: #f87171 !important;
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.35);
+}
+[data-check][data-issue="warning"] :is(input, textarea, select) {
+  border-color: #fbbf24 !important;
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.3);
+}
+[data-check="erp_types"][data-issue],
+button[data-check][data-issue] {
+  outline: 1px dashed currentColor;
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+[data-check="erp_types"][data-issue="blocking"],
+button[data-check][data-issue="blocking"] { color: #f87171; }
+[data-check="erp_types"][data-issue="warning"],
+button[data-check][data-issue="warning"] { color: #fbbf24; }
+
+@keyframes skill-check-spin { to { transform: rotate(360deg); } }
+.skill-check-spin { animation: skill-check-spin 1s linear infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .skill-check-spin { animation: none; }
 }

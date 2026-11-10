@@ -12,6 +12,27 @@ interface StandardResponseRendererProps {
   onAgentClick?: (agentId: string) => void;
 }
 
+// Renders **bold** spans; a bold span alone on its line is a section title (e.g. **Constat**).
+const renderBold = (segment: string, keyBase: string): React.ReactNode[] => {
+  const parts = segment.split(/(\*\*[^*\n]+\*\*)/g);
+  return parts.map((part, i) => {
+    const m = /^\*\*([^*\n]+)\*\*$/.exec(part);
+    if (!m) return part;
+    const before = parts[i - 1] ?? '';
+    const after = parts[i + 1] ?? '';
+    const isTitle = (before === '' || before.endsWith('\n')) && (after === '' || after.startsWith('\n'));
+    return isTitle ? (
+      <strong key={`${keyBase}-${i}`} style={{ color: '#5eead4', fontSize: '15px', fontWeight: 700, letterSpacing: '0.01em' }}>
+        {m[1]}
+      </strong>
+    ) : (
+      <strong key={`${keyBase}-${i}`} style={{ color: '#ffffff', fontWeight: 700 }}>
+        {m[1]}
+      </strong>
+    );
+  });
+};
+
 const renderTextWithAgentLinks = (text?: string, onAgentClick?: (agentId: string) => void) => {
   if (!text) return null;
 
@@ -27,7 +48,7 @@ const renderTextWithAgentLinks = (text?: string, onAgentClick?: (agentId: string
 
     // Push text before match
     if (matchIndex > lastIndex) {
-      elements.push(text.slice(lastIndex, matchIndex));
+      elements.push(...renderBold(text.slice(lastIndex, matchIndex), `t-${lastIndex}`));
     }
 
     const agentKey = agentId.toUpperCase() as keyof typeof AGENTS;
@@ -82,10 +103,10 @@ const renderTextWithAgentLinks = (text?: string, onAgentClick?: (agentId: string
   }
 
   if (lastIndex < text.length) {
-    elements.push(text.slice(lastIndex));
+    elements.push(...renderBold(text.slice(lastIndex), `t-${lastIndex}`));
   }
 
-  return elements.length > 0 ? elements : text;
+  return elements;
 };
 
 const GENERIC_TEXTS = new Set([
@@ -192,7 +213,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
         <div className="font-bold flex items-center gap-2 mb-2">
           <span className="text-rose-500">!</span> {title || 'Erreur Systeme'}
         </div>
-        <div className="text-sm opacity-90 leading-relaxed">{renderTextWithAgentLinks(text, onAgentClick) || 'Une erreur inconnue est survenue.'}</div>
+        <div className="text-sm opacity-90 leading-relaxed" style={{ whiteSpace: 'pre-wrap' }}>{renderTextWithAgentLinks(text, onAgentClick) || 'Une erreur inconnue est survenue.'}</div>
         {error && (
           <div className="mt-2 pt-2 border-t border-rose-500/10 text-[10px] opacity-60 font-mono break-all">
             Code: {typeof error === 'object' ? JSON.stringify(error) : String(error)}
@@ -242,7 +263,9 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
   const hasChart = Boolean(chart && hasChartData(chart.data));
   const hasDetails = hasMeaningfulDetails(details);
   const isGenericText = Boolean(text && GENERIC_TEXTS.has(normalizeText(text) || ''));
-  const shouldShowText = Boolean(text && (!isGenericText || (!hasKpis && !hasTable && !hasChart && !hasDetails)));
+  // A clarification shows its text only once, in its own highlighted block below.
+  const shouldShowText = response_type !== 'clarification' &&
+    Boolean(text && (!isGenericText || (!hasKpis && !hasTable && !hasChart && !hasDetails)));
   const shouldShowDetails = Boolean(
     hasDetails && (response_type === 'detail' || response_type === 'full')
   );
@@ -307,7 +330,7 @@ export const StandardResponseRenderer: React.FC<StandardResponseRendererProps> =
       )}
 
       {response_type === 'clarification' && (
-        <div style={{ marginTop: '8px', padding: '12px', backgroundColor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '4px', color: '#fde68a', fontSize: '12px', fontStyle: 'italic' }}>
+        <div style={{ marginTop: '8px', padding: '12px', backgroundColor: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '4px', color: '#fde68a', fontSize: '12px', fontStyle: 'italic', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
           {renderTextWithAgentLinks(text, onAgentClick)}
         </div>
       )}
