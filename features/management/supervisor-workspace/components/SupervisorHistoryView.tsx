@@ -92,6 +92,10 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
 }) => {
   const audits = historyData?.audits || [];
   const agentHistories = historyData?.agentHistories || [];
+  const rawOptimalThreshold = historyData?.optimalThreshold ?? 75;
+  const showOptimalLine = rawOptimalThreshold > 0;
+  const optimalThreshold = rawOptimalThreshold > 0 ? rawOptimalThreshold : 75;
+  const criticalThreshold = Math.min(50, Math.max(1, optimalThreshold - 1));
 
   // Tutorial Target Refs & Smooth Auto-Scroll
   const chartCardRef = useRef<HTMLDivElement>(null);
@@ -456,7 +460,7 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
       >
         {lastPoints.map((pt, idx) => {
           const height = Math.max(4, Math.round((pt.score / 100) * 16));
-          const color = pt.score >= 75 ? '#00E5C8' : pt.score >= 50 ? '#FFA502' : '#FF4757';
+          const color = pt.score >= optimalThreshold ? '#00E5C8' : pt.score >= criticalThreshold ? '#FFA502' : '#FF4757';
           return (
             <div
               key={idx}
@@ -474,8 +478,8 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
     if (!active || !payload || !payload.length) return null;
     const pt = payload[0].payload as ChartPointItem;
     const scoreVal = pt.score;
-    const isOptimal = scoreVal >= 75;
-    const isWarning = scoreVal >= 50 && scoreVal < 75;
+    const isOptimal = scoreVal >= optimalThreshold;
+    const isWarning = scoreVal >= criticalThreshold && scoreVal < optimalThreshold;
 
     return (
       <div className="chart-apple-tooltip">
@@ -675,7 +679,7 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
           <span className="summary-label">Agents Supervisés</span>
           <span className="summary-value font-mono">{agentHistories.length}</span>
           <span className="summary-sub">
-            {agentHistories.filter((a) => a.currentScore >= 75).length} alignés
+            {agentHistories.filter((a) => a.currentScore >= optimalThreshold).length} alignés
           </span>
         </div>
       </div>
@@ -941,17 +945,19 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
                   tickFormatter={(v) => `${v}%`}
                 />
                 <Tooltip content={<CustomChartTooltip />} />
-                <ReferenceLine
-                  y={75}
-                  stroke="rgba(0, 229, 200, 0.3)"
-                  strokeDasharray="4 4"
-                  label={{
-                    value: 'Seuil optimal (75%)',
-                    fill: '#00E5C8',
-                    fontSize: 10,
-                    position: 'insideTopRight',
-                  }}
-                />
+                {showOptimalLine && (
+                  <ReferenceLine
+                    y={optimalThreshold}
+                    stroke="rgba(0, 229, 200, 0.3)"
+                    strokeDasharray="4 4"
+                    label={{
+                      value: `Seuil optimal (${optimalThreshold}%)`,
+                      fill: '#00E5C8',
+                      fontSize: 10,
+                      position: 'insideTopRight',
+                    }}
+                  />
+                )}
                 <Area
                   type="monotone"
                   dataKey="score"
@@ -1053,8 +1059,8 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
                 const isSelected = selectedTrack === agent.agentUuid;
                 const isSourcing = agent.role === 'sourcing';
                 const score = agent.currentScore;
-                const isOptimal = score >= 75;
-                const isWarning = score >= 50 && score < 75;
+                const isOptimal = score >= optimalThreshold;
+                const isWarning = score >= criticalThreshold && score < optimalThreshold;
 
                 return (
                   <tr
@@ -1349,8 +1355,8 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
                                 {audit.nodeSnapshots.map((node: AuditNodeSnapshot) => {
                                   const isSourcing = node.agentRole === 'sourcing';
                                   const scoreVal = node.score ?? 0;
-                                  const isOptimal = scoreVal >= 75;
-                                  const isWarning = scoreVal >= 50 && scoreVal < 75;
+                                  const isOptimal = scoreVal >= optimalThreshold;
+                                  const isWarning = scoreVal >= criticalThreshold && scoreVal < optimalThreshold;
 
                                   return (
                                     <div key={node.agentUuid} className="agent-snapshot-card">

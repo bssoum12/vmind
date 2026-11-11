@@ -219,11 +219,17 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
     updateTriggerRuleAtIndex(index, 'triggerOnWeekdays', updatedDays);
   };
 
+  // Only fetch saved company context from DB when modifying an existing supervisor agent.
+  // Brand-new supervisor agents start blank in Step 2 (with an option to import from another supervisor).
   useEffect(() => {
+    if (!isEditMode) return;
+    const editUuid = agentToEdit?.uuid || agentToEdit?.agent_id;
+    if (!editUuid) return;
+
     let cancelled = false;
     (async () => {
       try {
-        const existing = await getCompanyContext();
+        const existing = await getCompanyContext(String(editUuid));
         if (!cancelled && existing) {
           setCompanyContext((prev: any) => prev || existing);
         }
@@ -234,7 +240,7 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isEditMode, agentToEdit]);
 
   const [isCheckingName, setIsCheckingName] = useState<boolean>(false);
 
@@ -693,6 +699,7 @@ export const WizardSupervisorView: React.FC<WizardSupervisorViewProps> = ({
 
                 <CompanyContextModal
                   inline={true}
+                  agentId={isEditMode ? String(agentToEdit?.uuid || agentToEdit?.agent_id || '') : undefined}
                   context={companyContext}
                   onClose={() => {}}
                   onBack={() => setStep(1)}

@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import {
   X, Activity, AlertTriangle, ArrowRight, Zap, Clock, BarChart2,
   Loader2, ShieldCheck, RefreshCw, Sparkles, Mail, Target, CheckCircle2,
-  ExternalLink
+  ExternalLink, Copy, Check
 } from 'lucide-react';
 import {
   SupervisorNode,
   ProspectPitchAlignment,
   ProspectCopywritingAnalysis,
-  ProspectDeliveryHealth
+  ProspectDeliveryHealth,
+  HotLeadAlertItem
 } from '../types/supervisor.types';
 import { useToast } from '@/shared/contexts/ToastContext';
 
@@ -20,6 +21,7 @@ interface NodeDiagnosticDrawerProps {
   supervisorId?: string;
   onClose: () => void;
   onEvaluationComplete?: (node: SupervisorNode, data: any) => void;
+  unattendedLeads?: HotLeadAlertItem[];
 }
 
 export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
@@ -27,6 +29,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
   supervisorId,
   onClose,
   onEvaluationComplete,
+  unattendedLeads = [],
 }) => {
   const router = useRouter();
   const { showToast } = useToast();
@@ -49,6 +52,33 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
   const [evalError, setEvalError] = useState<string | null>(null);
   const [lastEvaluatedAt, setLastEvaluatedAt] = useState<string | null>(node.lastEvaluatedAt || null);
   const [showCachedModal, setShowCachedModal] = useState<boolean>(false);
+  const [activeDrawerTab, setActiveDrawerTab] = useState<'diagnostic' | 'leads'>('diagnostic');
+  const [copiedLeadId, setCopiedLeadId] = useState<number | null>(null);
+
+  const formatUnattendedDelay = (hours: number): string => {
+    if (!hours || hours < 48) {
+      return `${hours || 0}h`;
+    }
+    const days = Math.floor(hours / 24);
+    return `${days} jour${days > 1 ? 's' : ''}`;
+  };
+
+  const handleCopyEmail = (email: string, leadId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!email) return;
+    navigator.clipboard.writeText(email);
+    setCopiedLeadId(leadId);
+    showToast(`E-mail copié : ${email}`, 'ok');
+    setTimeout(() => setCopiedLeadId(null), 1800);
+  };
+
+  const handleOpenLeadWorkspace = (lead: HotLeadAlertItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const targetUuid = lead.agentUuid || node.id;
+    if (!targetUuid || !lead.leadId) return;
+    const currentPath = typeof window !== 'undefined' ? (window.location.pathname + (window.location.search || '')) : '';
+    router.push(`/prospect-agent-workspace/${targetUuid}?tab=leads&leadId=${lead.leadId}&from=${encodeURIComponent(currentPath)}`);
+  };
 
   // Spec §4.1 (supersedes old §10): on open, fetch the last stored evaluation
   // read-only — no n8n call, no LLM cost — and show it immediately. The
@@ -75,8 +105,9 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
     (async () => {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+        const supParam = supervisorId ? `&supervisor_agent_uuid=${encodeURIComponent(supervisorId)}` : '';
         const res = await fetch(
-          `${baseUrl}/api/supervisor/node-evaluation/latest?agent_uuid=${encodeURIComponent(node.id)}`,
+          `${baseUrl}/api/supervisor/node-evaluation/latest?agent_uuid=${encodeURIComponent(node.id)}${supParam}`,
           { credentials: 'include' }
         );
         if (!res.ok || cancelled) return;
@@ -312,8 +343,122 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
 
         {/* Drawer Scrollable Content */}
         <div className="drawer-content apple-drawer-content">
-          {/* 1. Hero Health Score Card */}
-          <section className={`apple-hero-card ${statusKey.toLowerCase()}`}>
+          {/* Subtabs Switcher (Only for Prospect Agents) */}
+          {!isSourcing && (
+            <div className="drawer-subtabs-bar">
+              <button
+                type="button"
+                className={`drawer-subtab-btn ${activeDrawerTab === 'diagnostic' ? 'active' : ''}`}
+                onClick={() => setActiveDrawerTab('diagnostic')}
+              >
+                <Activity size={13} />
+                <span>Diagnostic IA</span>
+              </button>
+              <button
+                type="button"
+                className={`drawer-subtab-btn ${activeDrawerTab === 'leads' ? 'active' : ''}`}
+                onClick={() => setActiveDrawerTab('leads')}
+              >
+                <Clock size={13} />
+                <span>Leads en Attente</span>
+                {unattendedLeads.length > 0 && (
+                  <span className="drawer-subtab-badge">{unattendedLeads.length}</span>
+                )}
+              </button>
+            </div>
+          )}
+
+          {activeDrawerTab === 'leads' && !isSourcing ? (
+            <div className="drawer-unattended-leads-pane">
+              <div className="pane-header-info">
+                <span className="pane-kicker">Périmètre mission active</span>
+                <span className="pane-subtitle">
+                  {unattendedLeads.length > 0
+                    ? `${unattendedLeads.length} prospect${unattendedLeads.length > 1 ? 's' : ''} qualifié${unattendedLeads.length > 1 ? 's' : ''} en attente de premier contact depuis plus de 48h`
+                    : 'Tous les prospects qualifiés de la mission en cours ont été contactés'}
+                </span>
+              </div>
+
+              {unattendedLeads.length === 0 ? (
+                <div className="drawer-leads-empty-state">
+                  <CheckCircle2 size={32} className="empty-icon-ok" />
+                  <div className="empty-title">Aucun lead en attente</div>
+                  <p className="empty-desc">
+                    Tous les prospects qualifiés de la dernière mission active ont été contactés dans les délais impartis.
+                  </p>
+                </div>
+              ) : (
+                <div className="mini-table-card">
+                  <table className="mini-leads-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: '56%' }}>PROSPECT</th>
+                        <th style={{ width: '18%' }}>INACTIVITÉ</th>
+                        <th style={{ width: '26%', textAlign: 'right' }}>ACTION</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {unattendedLeads.map((lead) => {
+                        const fullName = `${lead.prenom || ''} ${lead.nom || ''}`.trim() || 'Prospect sans nom';
+                        return (
+                          <tr key={lead.leadId}>
+                            {/* Prospect: Name, Company & Email with Copy */}
+                            <td className="col-lead-info">
+                              <div className="lead-identity">
+                                <span className="lead-name" title={fullName}>{fullName}</span>
+                                {lead.entreprise && (
+                                  <span className="lead-company" title={lead.entreprise}>{lead.entreprise}</span>
+                                )}
+                                {lead.email && (
+                                  <div
+                                    className="email-copy-wrap"
+                                    onClick={(e) => handleCopyEmail(lead.email, lead.leadId, e)}
+                                    title="Cliquer pour copier l'e-mail"
+                                  >
+                                    <span className="email-text">{lead.email}</span>
+                                    <button type="button" className="inline-copy-btn" aria-label="Copier l'email">
+                                      {copiedLeadId === lead.leadId ? (
+                                        <Check size={12} className="text-emerald" />
+                                      ) : (
+                                        <Copy size={12} />
+                                      )}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Inactivity Delay in days */}
+                            <td className="col-lead-delay">
+                              <span className={`delay-text ${lead.urgency === 'CRITICAL' ? 'critical' : 'warning'}`}>
+                                {formatUnattendedDelay(lead.hoursUnattended)}
+                              </span>
+                            </td>
+
+                            {/* Action to open in agent workspace */}
+                            <td className="col-lead-action" style={{ textAlign: 'right' }}>
+                              <button
+                                type="button"
+                                className="row-action-btn"
+                                onClick={(e) => handleOpenLeadWorkspace(lead, e)}
+                                title="Ouvrir ce lead dans l'espace de prospection"
+                              >
+                                <span>Ouvrir</span>
+                                <ExternalLink size={12} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* 1. Hero Health Score Card */}
+              <section className={`apple-hero-card ${statusKey.toLowerCase()}`}>
             <div className="hero-score-row">
               <div className="hero-score-block">
                 <span className={`score-number ${statusKey.toLowerCase()}`}>
@@ -496,7 +641,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
                 {copywritingAnalysis.cta_clarity && (
                   <div className="apple-finding-card info">
                     <div className="finding-top-row">
-                      <span className="finding-title">Appel à l&apos;Action (CTA)</span>
+                      <span className="finding-title">Invitation à Échanger</span>
                       <span className="finding-severity-badge info">Conversion</span>
                     </div>
                     <p className="finding-desc">{copywritingAnalysis.cta_clarity}</p>
@@ -701,6 +846,8 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
                 </div>
               )}
             </section>
+          )}
+            </>
           )}
         </div>
 

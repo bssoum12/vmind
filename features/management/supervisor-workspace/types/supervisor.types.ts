@@ -326,6 +326,7 @@ export interface FleetHistoryData {
     name: string;
     supervisedAgentsCount: number;
   };
+  optimalThreshold?: number;
   totalAuditsCount: number;
   latestScore: number | null;
   audits: FleetAuditHistoryItem[];
@@ -338,6 +339,7 @@ export const DEFAULT_FLEET_HISTORY_DATA: FleetHistoryData = {
     name: '',
     supervisedAgentsCount: 0,
   },
+  optimalThreshold: 75,
   totalAuditsCount: 0,
   latestScore: null,
   audits: [],

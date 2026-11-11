@@ -1,98 +1,140 @@
 /**
  * @file companyContextApi.ts
- * @description Standalone API client for Company Context operations.
- * Communicates with the VMIND backend service.
+ * @description API client functions for the per-agent Company Context feature.
  */
 
-import { CompanyContext, CompanyResearchResult } from '../types/company-context.types';
+import {
+  CompanyContext,
+  CompanyResearchResult,
+  CompanyResearchResponse,
+  CompanyContextSaveResponse,
+  SavedSupervisorContextItem,
+} from '../types/company-context.types';
 
 const getBaseUrl = (): string => {
   return process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 };
 
 /**
- * Fetch the current user's global company context.
+ * Fetches the saved company context for a specific supervisor agent (`agentUuid`).
  */
-export async function getCompanyContext(): Promise<CompanyContext | null> {
-  const baseUrl = getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/company-context`, {
-    method: 'GET',
-    credentials: 'include',
-    headers: {
-      'Accept': 'application/json'
-    }
-  });
-
-  if (!res.ok) {
-    if (res.status === 404) return null;
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Impossible de récupérer le contexte entreprise');
+export async function getCompanyContext(agentUuid?: string): Promise<CompanyContext | null> {
+  if (!agentUuid || !agentUuid.trim()) {
+    return null;
   }
 
-  const json = await res.json();
-  return json.data || null;
+  try {
+    const res = await fetch(
+      `${getBaseUrl()}/api/company-context?agent_uuid=${encodeURIComponent(agentUuid.trim())}`,
+      {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!res.ok) {
+      return null;
+    }
+
+    const json = await res.json();
+    if (json && json.success && json.data) {
+      return json.data as CompanyContext;
+    }
+    return null;
+  } catch (err) {
+    console.warn('[CompanyContextApi] Error fetching company context:', err);
+    return null;
+  }
 }
 
 /**
- * Persist or update the company context.
- * Only called when the user explicitly clicks "Confirmer et Enregistrer".
+ * Fetches all saved company contexts from the user's deployed supervisor agents
+ * (used by the Wizard's "Importer depuis un autre superviseur" selector).
+ */
+export async function listSavedCompanyContexts(): Promise<SavedSupervisorContextItem[]> {
+  try {
+    const res = await fetch(`${getBaseUrl()}/api/company-context/list`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!res.ok) {
+      return [];
+    }
+
+    const json = await res.json();
+    if (json && json.success && Array.isArray(json.data)) {
+      return json.data as SavedSupervisorContextItem[];
+    }
+    return [];
+  } catch (err) {
+    console.warn('[CompanyContextApi] Error listing saved company contexts:', err);
+    return [];
+  }
+}
+
+/**
+ * Saves or updates the company context for a specific deployed supervisor agent (`agentUuid`).
  */
 export async function saveCompanyContext(
-  context: Partial<CompanyContext>
+  context: Partial<CompanyContext>,
+  agentUuid?: string
 ): Promise<CompanyContext> {
-  const baseUrl = getBaseUrl();
+  const targetUuid = (agentUuid || context.agent_uuid || '').trim();
+  if (!targetUuid) {
+    throw new Error("Identifiant de l'agent superviseur requis pour enregistrer le contexte.");
+  }
 
-  const res = await fetch(`${baseUrl}/api/company-context`, {
+  const res = await fetch(`${getBaseUrl()}/api/company-context`, {
     method: 'PUT',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json'
     },
     body: JSON.stringify({
-      website: context.website || '',
-      summary: context.summary || '',
-      additional_info: context.additional_info || '',
-      value_proposition: context.value_proposition || context.valueProposition || '',
-      target_customers: context.target_customers || context.targetCustomers || '',
-      competitors: context.competitors || '',
-      raw_search_data: context.raw_search_data || {}
-    })
+      ...context,
+      agent_uuid: targetUuid,
+    }),
   });
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Erreur lors de la sauvegarde du contexte entreprise');
-  }
+  const json: CompanyContextSaveResponse = await res.json().catch(() => ({
+    success: false,
+    error: 'Erreur de communication avec le serveur',
+  }));
 
-  const json = await res.json();
+  if (!res.ok || !json.success || !json.data) {
+    throw new Error(json.error || 'Échec de la sauvegarde du contexte entreprise');
+  }
 
   return json.data;
 }
 
 /**
- * Trigger web search & AI synthesis on a company URL.
+ * Triggers the AI web search & synthesis for a given company URL.
  */
 export async function researchCompanyWebsite(url: string): Promise<CompanyResearchResult> {
-  const baseUrl = getBaseUrl();
-  const res = await fetch(`${baseUrl}/api/company-context/research`, {
+  const res = await fetch(`${getBaseUrl()}/api/company-context/research`, {
     method: 'POST',
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json'
     },
-    body: JSON.stringify({ url })
+    body: JSON.stringify({ url }),
   });
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || 'Échec de l\'analyse du site web');
-  }
+  const json: CompanyResearchResponse = await res.json().catch(() => ({
+    success: false,
+    error: "Le service d'analyse est momentanément indisponible",
+  }));
 
-  const json = await res.json();
-  if (!json.success || !json.data) {
-    throw new Error(json.error || 'Résultat d\'analyse indisponible');
+  if (!res.ok || !json.success || !json.data) {
+    throw new Error(json.error || "Impossible d'analyser ce site web");
   }
 
   return json.data;
