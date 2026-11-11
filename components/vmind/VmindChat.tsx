@@ -142,8 +142,6 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   const [savedDraftSlugByMsgId, setSavedDraftSlugByMsgId] = useState<Record<string, string>>({});
   const [draftErrorByMsgId, setDraftErrorByMsgId] = useState<Record<string, string>>({});
   const [isErpConnected, setIsErpConnected] = useState<boolean>(false);
-  const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const handleSaveDraftedSkill = async (msgId: string, draftedMd: string) => {
@@ -196,12 +194,6 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       const user = sessionDetail.user || sessionDetail;
       if (user) {
         setCurrentUser(user);
-        const roles = Array.isArray(user.roles) ? user.roles : (user.roles ? [user.roles] : []);
-        setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
-        const agents = sessionDetail.allowedAgents || user.allowedAgents;
-        if (Array.isArray(agents)) {
-          setAllowedAgents(agents);
-        }
       }
       setIsErpConnected(true);
       return;
@@ -209,11 +201,8 @@ export const VmindChat: React.FC<VmindChatProps> = ({
 
     if (sessionDetail === null || sessionDetail?.connected === false) {
       setIsErpConnected(false);
-      setAllowedAgents([]);
       if (sessionDetail?.user) {
         setCurrentUser(sessionDetail.user);
-        const roles = Array.isArray(sessionDetail.user.roles) ? sessionDetail.user.roles : (sessionDetail.user.roles ? [sessionDetail.user.roles] : []);
-        setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
       }
       return;
     }
@@ -224,8 +213,6 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       .then(data => {
         if (data?.user) {
           setCurrentUser(data.user);
-          const roles = Array.isArray(data.user.roles) ? data.user.roles : (data.user.roles ? [data.user.roles] : []);
-          setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r)));
         }
       })
       .catch(() => {});
@@ -237,7 +224,6 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     return () => window.removeEventListener('mcp-session-updated', checkPermissions);
   }, []);
 
-  const isAgentAllowed = isErpConnected && (isAdmin || allowedAgents.includes(activeAgentId));
 
   // Ref toujours synchrone → garantit la valeur EXACTE de l'agent au moment du clic
   const activeAgentIdRef = useRef<string>(activeAgentId);
@@ -1009,7 +995,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
             color: 'rgba(160,180,210,0.6)',
             fontWeight: 500,
           }}>
-            {currentAgentData ? currentAgentData.desc : 'Orchestration intelligente via Webhook'}
+            {currentAgentData ? currentAgentData.desc : 'Orchestration intelligente'}
           </span>
 
           {/* Mode pill */}
@@ -1029,8 +1015,8 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         </div>
 
 
-        {/* Suggestions Zone (visible only when ERP connected & agent allowed) */}
-        {isAgentAllowed && (
+        {/* Suggestions Zone (visible only when ERP connected) */}
+        {isErpConnected && (
           <>
             {activeAgentId === 'VDATA' && (
               <div className="suggestions-row mt-1 flex gap-2" style={{ overflowX: 'auto', flexWrap: 'nowrap', width: '100%', paddingTop: '8px', paddingBottom: '8px', scrollbarWidth: 'none' }}>

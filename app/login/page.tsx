@@ -642,7 +642,6 @@ export default function LoginPage() {
     localStorage.removeItem('vmind_mcp_token');
     localStorage.removeItem('vmind_connector_status');
     localStorage.removeItem('vmind_client_id');
-    localStorage.removeItem('vmind_allowed_agents');
 
     // Vérification de session via cookie HttpOnly — redirection si déjà connecté.
     // AbortController : évite le double appel de React 18 StrictMode en développement.
@@ -714,7 +713,6 @@ export default function LoginPage() {
       // La session est désormais enregistrée en base de données et transportée via cookie HttpOnly
       localStorage.removeItem('vmind_session');
       // Nettoyage systématique pour éviter tout stockage redondant dans localStorage
-      localStorage.removeItem('vmind_allowed_agents');
       localStorage.removeItem('vmind_client_id');
       localStorage.removeItem('vmind_connector_status');
       localStorage.removeItem('vmind_mcp_token');

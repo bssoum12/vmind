@@ -155,6 +155,75 @@
 }
 
 // -----------------------------------------------------------------------------
+// Recently Analyzed Websites Chips (Step 1)
+// -----------------------------------------------------------------------------
+.cc-recent-sites {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: -4px;
+
+  .cc-recent-sites-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #94a3b8;
+    letter-spacing: 0.01em;
+
+    .cc-recent-icon {
+      color: #00e5c8;
+      opacity: 0.85;
+    }
+  }
+
+  .cc-recent-sites-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .cc-recent-site-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    background: rgba(0, 229, 200, 0.06);
+    border: 1px solid rgba(0, 229, 200, 0.22);
+    color: #e2e8f0;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+
+    .cc-chip-globe {
+      color: #00e5c8;
+      flex-shrink: 0;
+    }
+
+    .cc-chip-domain {
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &:hover {
+      background: rgba(0, 229, 200, 0.14);
+      border-color: rgba(0, 229, 200, 0.5);
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    &:active {
+      transform: scale(0.97);
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Body
 // -----------------------------------------------------------------------------
 .cc-body {
@@ -184,6 +253,22 @@
     flex-direction: column;
     gap: 4px;
 
+    &.cc-hero-split {
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+
+      .cc-hero-text {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        flex: 1;
+        min-width: 240px;
+      }
+    }
+
     .cc-hero-title {
       margin: 0;
       font-size: 18px;
@@ -197,6 +282,39 @@
       font-size: 13.5px;
       color: #94a3b8;
       line-height: 1.45;
+    }
+
+    .cc-url-switch-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 13px;
+      border-radius: 8px;
+      background: rgba(0, 229, 200, 0.08);
+      border: 1px solid rgba(0, 229, 200, 0.28);
+      color: #00e5c8;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+
+      .cc-url-icon {
+        color: #00e5c8;
+        flex-shrink: 0;
+      }
+
+      &:hover:not(:disabled) {
+        background: rgba(0, 229, 200, 0.16);
+        border-color: rgba(0, 229, 200, 0.55);
+        color: #ffffff;
+        transform: translateY(-1px);
+      }
+
+      &:active:not(:disabled) {
+        transform: scale(0.97);
+      }
     }
   }
 }
@@ -219,6 +337,16 @@
       display: flex;
       align-items: center;
       gap: 6px;
+    }
+
+    .cc-source-domain {
+      font-size: 11.5px;
+      font-weight: 500;
+      color: #64748b;
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .cc-counter {

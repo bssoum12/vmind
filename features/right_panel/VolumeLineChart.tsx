@@ -175,7 +175,7 @@ export const VolumeLineChart: React.FC<VolumeLineChartProps> = ({ activeAgentId 
 
         <button
           onClick={() => fetchKpis('vdata', true, 'get_dossier_volume_evolution')}
-          title="Rafraîchir KPI via n8n"
+          title="Rafraîchir les indicateurs"
           disabled={effectiveLoading}
           style={{
             background: 'transparent',

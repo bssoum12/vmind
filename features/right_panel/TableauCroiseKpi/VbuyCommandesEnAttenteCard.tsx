@@ -122,7 +122,7 @@ export const VbuyCommandesEnAttenteCard: React.FC<VbuyCommandesEnAttenteCardProp
               display: 'flex',
               alignItems: 'center'
             }}
-            title="Rafraîchir les données via n8n"
+            title="Rafraîchir les données"
           >
             <RefreshCw size={13} style={{ animation: effectiveLoading ? 'spin 1s linear infinite' : 'none' }} />
           </button>

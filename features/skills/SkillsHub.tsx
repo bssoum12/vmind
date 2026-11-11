@@ -254,6 +254,12 @@ export const SkillsHub: React.FC = () => {
     return true;
   };
 
+  // An import that replaces one of your skills asks what changed, for its history
+  const importAskingComment = (payload: Parameters<typeof importSkillMd>[0]) =>
+    importSkillMd(payload, () =>
+      window.prompt('Ce skill existe déjà et sera remplacé. Qu’est-ce qui a changé ? (visible dans l’historique)')
+    );
+
   const handleExecuteFileImport = async (fileToImport?: File) => {
     const targetFile = fileToImport || selectedFile;
     if (!targetFile) {
@@ -274,10 +280,10 @@ export const SkillsHub: React.FC = () => {
           binary += String.fromCharCode(bytes[i]);
         }
         const zipBase64 = btoa(binary);
-        imported = await importSkillMd({ zipBase64, scope: 'USER' });
+        imported = await importAskingComment({ zipBase64, scope: 'USER' });
       } else {
         const content = await targetFile.text();
-        imported = await importSkillMd({ content, scope: 'USER' });
+        imported = await importAskingComment({ content, scope: 'USER' });
       }
       await refreshSkills();
       setImportModalOpen(false);
@@ -303,7 +309,7 @@ export const SkillsHub: React.FC = () => {
 
     try {
       setImporting(true);
-      const imported = await importSkillMd({
+      const imported = await importAskingComment({
         url: importUrl.trim(),
         scope: 'USER',
       });
@@ -330,7 +336,7 @@ export const SkillsHub: React.FC = () => {
 
     try {
       setImporting(true);
-      const imported = await importSkillMd({
+      const imported = await importAskingComment({
         content: importMarkdownText.trim(),
         scope: 'USER',
       });

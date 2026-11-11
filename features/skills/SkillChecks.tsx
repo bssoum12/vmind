@@ -4,7 +4,8 @@ import React from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle2, Info, Loader2, X } from 'lucide-react';
 import type { SkillIssue } from '@/shared/api/skills-api';
 
-export const issueKey = (issue: SkillIssue) => `${issue.code}:${issue.term || ''}`;
+export const issueKey = (issue: SkillIssue) =>
+  `${issue.code}:${issue.term || ''}${issue.path && issue.path !== issue.term ? `@${issue.path}` : ''}`;
 
 // Which parts of the form each issue concerns: matched against the `data-check` attribute of the fields
 export const issueTarget = (issue: SkillIssue) => (issue.code === 'no_exclusion' ? 'exclusion' : issue.field);
@@ -20,6 +21,9 @@ export const HELP_KEY_TARGETS: Record<string, string[]> = {
   type: ['kind'],
   portee: ['scope'],
   organisation: ['tenant_key'],
+  referenceName: ['references'],
+  referenceDoc: ['references'],
+  referenceSubSkill: ['references'],
 };
 
 export const issuesForHelpKey = (issues: SkillIssue[], helpKey: string | null, sectionKeys: string[]): SkillIssue[] => {
@@ -101,10 +105,11 @@ interface SkillChecksPanelProps {
   onDismiss: (issue: SkillIssue) => void;
   onRestoreDismissed: () => void;
   onLearnMore: (issue: SkillIssue) => void;
+  onOpenIssue: (issue: SkillIssue) => void;
   onClose: () => void;
 }
 
-/** The full list of problems, each with why it matters and how to fix it. */
+/** The full list of problems, each with why it matters and how to fix it. Clicking a problem opens its place. */
 export const SkillChecksPanel: React.FC<SkillChecksPanelProps> = ({
   issues,
   dismissedCount,
@@ -112,6 +117,7 @@ export const SkillChecksPanel: React.FC<SkillChecksPanelProps> = ({
   onDismiss,
   onRestoreDismissed,
   onLearnMore,
+  onOpenIssue,
   onClose,
 }) => {
   const ordered = [...issues].sort(
@@ -173,10 +179,27 @@ export const SkillChecksPanel: React.FC<SkillChecksPanelProps> = ({
                 lineHeight: 1.5,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: style.color, fontWeight: 700 }}>
+              <button
+                type="button"
+                onClick={() => onOpenIssue(issue)}
+                title="Aller à l'endroit concerné"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: style.color,
+                  fontWeight: 700,
+                  fontSize: 'inherit',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                }}
+              >
                 {style.icon}
                 <span>{issue.title}</span>
-              </div>
+              </button>
               <div style={{ color: '#cbd5e1' }}>
                 <span style={{ color: '#8FA3B8' }}>Pourquoi : </span>
                 {issue.why}

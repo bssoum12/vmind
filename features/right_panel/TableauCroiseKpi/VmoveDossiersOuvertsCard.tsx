@@ -288,7 +288,7 @@ export const VmoveDossiersOuvertsCard: React.FC<VmoveDossiersOuvertsCardProps> =
         <button
           onClick={handleRefresh}
           disabled={effectiveLoading}
-          title="Rafraîchir les données via n8n"
+          title="Rafraîchir les données"
           style={{
             background: 'rgba(56, 189, 248, 0.08)',
             border: '1px solid rgba(56, 189, 248, 0.25)',

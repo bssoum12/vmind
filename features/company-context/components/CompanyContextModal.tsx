@@ -7,15 +7,32 @@ import {
   ArrowRight,
   ArrowLeft,
   Check,
-  PenLine
+  PenLine,
+  Clock
 } from 'lucide-react';
-import { CompanyContext, CompanyContextModalProps } from '../types/company-context.types';
-import { saveCompanyContext, researchCompanyWebsite } from '../api/companyContextApi';
+import {
+  CompanyContext,
+  CompanyContextModalProps,
+  SavedSupervisorContextItem
+} from '../types/company-context.types';
+import {
+  saveCompanyContext,
+  researchCompanyWebsite,
+  listSavedCompanyContexts
+} from '../api/companyContextApi';
 import { useToast } from '@/shared/contexts/ToastContext';
 import '../company-context.scss';
 
+const formatCleanDomain = (url: string): string => {
+  return (url || '')
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/+$/, '');
+};
+
 export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
   isOpen = true,
+  agentId,
   context,
   onClose,
   onSaveContext,
@@ -35,37 +52,97 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
   const [manualDescription, setManualDescription] = useState<string>('');
   const [rawSearchData, setRawSearchData] = useState<any>(context?.raw_search_data || {});
 
+  // Recently analyzed websites (deduplicated by domain, no agent names)
+  const [recentWebsites, setRecentWebsites] = useState<SavedSupervisorContextItem[]>([]);
+
   // Async states
   const [isResearching, setIsResearching] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isSaved, setIsSaved] = useState<boolean>(false);
 
-  // Initialize from existing context
+  // Load recently analyzed websites from user's saved contexts
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const items = await listSavedCompanyContexts();
+        if (cancelled) return;
+
+        // Deduplicate strictly by normalized website domain (only keep entries that have a website URL)
+        const seenDomains = new Set<string>();
+        const uniqueWebsites: SavedSupervisorContextItem[] = [];
+
+        for (const item of items) {
+          const clean = formatCleanDomain(item.website || '').toLowerCase();
+          if (!clean || seenDomains.has(clean)) continue;
+          seenDomains.add(clean);
+          uniqueWebsites.push(item);
+        }
+
+        setRecentWebsites(uniqueWebsites.slice(0, 6));
+      } catch {
+        // Non-blocking
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [agentId]);
+
+  // Initialize from existing context (when editing an existing supervisor or reopening Step 2 in Wizard)
   useEffect(() => {
     if (context) {
-      if (context.website) {
-        setWebsiteUrl(context.website);
+      const incomingWebsite = (context.website || '').trim();
+      const incomingSummary = (context.summary || context.presentation || '').trim();
+      const incomingAdditional = (context.additional_info || context.additionalInfo || '').trim();
+
+      if (incomingWebsite) {
+        setWebsiteUrl(incomingWebsite);
         setHasWebsite(true);
       }
-      if (context.summary) {
-        setAiSummary(context.summary);
+      if (incomingSummary) {
+        setAiSummary(incomingSummary);
       }
-      if (context.additional_info) {
-        setAdditionalInfo(context.additional_info);
+      if (incomingAdditional) {
+        setAdditionalInfo(incomingAdditional);
       }
       if (context.raw_search_data) {
         setRawSearchData(context.raw_search_data);
       }
-      if (!context.website && context.summary) {
-        setManualDescription(context.summary);
+      if (!incomingWebsite && incomingSummary) {
+        setManualDescription(incomingSummary);
         setHasWebsite(false);
       }
       // If a summary is already present, open directly to Step 2
-      if (context.summary && context.summary.trim().length > 0) {
+      if (incomingSummary.length > 0) {
         setStep(2);
       }
+    } else {
+      setWebsiteUrl('');
+      setAiSummary('');
+      setAdditionalInfo('');
+      setManualDescription('');
+      setRawSearchData({});
+      setHasWebsite(true);
+      setStep(1);
     }
   }, [context]);
+
+  // Handle selecting a recently analyzed website
+  const handleSelectRecentWebsite = (item: SavedSupervisorContextItem) => {
+    const importedWebsite = (item.website || '').trim();
+    const importedSummary = (item.summary || '').trim();
+    const importedAdditional = (item.additional_info || '').trim();
+    const cleanDomain = formatCleanDomain(importedWebsite);
+
+    setWebsiteUrl(importedWebsite);
+    setAiSummary(importedSummary);
+    setAdditionalInfo(importedAdditional);
+    setRawSearchData(item.raw_search_data || {});
+    setHasWebsite(true);
+    setStep(2);
+    showToast(`Synthèse chargée depuis ${cleanDomain}`, 'ok');
+  };
 
   // Validation: minimum 200 characters required when no website is provided
   const manualCharCount = useMemo(() => {
@@ -83,7 +160,7 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
   const handleAnalyzeWebsite = async () => {
     const trimmed = websiteUrl.trim();
     if (!trimmed) {
-      showToast('Veuillez saisir l\'adresse de votre site web', 'err');
+      showToast("Veuillez saisir l'adresse de votre site web", 'err');
       return;
     }
 
@@ -109,7 +186,10 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
       }
     } catch (err: any) {
       console.warn('[CompanyContextModal] Web research warning:', err);
-      showToast(err.message || 'Échec de l\'analyse du site. Vérifiez l\'adresse ou saisissez vos informations manuellement.', 'err');
+      showToast(
+        err.message || "Échec de l'analyse du site. Vérifiez l'adresse ou saisissez vos informations manuellement.",
+        'err'
+      );
     } finally {
       setIsResearching(false);
     }
@@ -136,35 +216,34 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
         value_proposition: context?.value_proposition || (context as any)?.valueProposition || '',
         target_customers: context?.target_customers || (context as any)?.targetCustomers || '',
         competitors: context?.competitors || '',
-        raw_search_data: hasWebsite ? rawSearchData : { manual: true, submitted_at: new Date().toISOString() }
+        raw_search_data: hasWebsite ? rawSearchData : { manual: true, submitted_at: new Date().toISOString() },
       };
 
-      // When inline in a wizard flow, if the user did not change any text, avoid a redundant save request
-      const isUnchanged = Boolean(
-        inline &&
-        context &&
-        (context.website || '').trim() === (payloadToSave.website || '').trim() &&
-        (context.summary || context.presentation || '').trim() === (payloadToSave.summary || '').trim() &&
-        (context.additional_info || context.additionalInfo || '').trim() === (payloadToSave.additional_info || '').trim()
-      );
-
-      let savedData = context;
-      if (!isUnchanged) {
-        savedData = await saveCompanyContext(payloadToSave);
+      // In Wizard (inline) mode, do NOT write to the database before the agent is deployed!
+      // Instead, pass the validated context up to WizardSupervisorView so it is saved atomically on Deploy (Step 4).
+      if (inline) {
+        if (onSaveContext) {
+          await onSaveContext(payloadToSave);
+        }
+        setIsSaved(true);
+        showToast('Contexte validé pour ce superviseur', 'ok');
+        return;
       }
+
+      // In Workspace modal mode (for an already-deployed supervisor agent), persist directly to DB & Redis by agentId
+      const targetUuid = (agentId || context?.agent_uuid || '').trim();
+      const savedData = await saveCompanyContext(payloadToSave, targetUuid);
 
       if (onSaveContext) {
         await onSaveContext(savedData);
       }
 
       setIsSaved(true);
-      showToast('Contexte d\'entreprise enregistré avec succès', 'ok');
+      showToast("Contexte d'entreprise enregistré avec succès", 'ok');
 
-      if (!inline) {
-        setTimeout(() => {
-          onClose();
-        }, 400);
-      }
+      setTimeout(() => {
+        onClose();
+      }, 400);
     } catch (err: any) {
       console.error('[CompanyContextModal] Save error:', err);
       showToast(err.message || 'Erreur lors de la sauvegarde du contexte', 'err');
@@ -210,27 +289,56 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
             </div>
 
             {!isResearching ? (
-              <div className="cc-field">
-                <div className="cc-field-top">
-                  <label>Site web de l&apos;entreprise</label>
+              <>
+                <div className="cc-field">
+                  <div className="cc-field-top">
+                    <label>Site web de l&apos;entreprise</label>
+                  </div>
+                  <div className="cc-input-wrap">
+                    <Globe size={15} className="cc-input-icon" />
+                    <input
+                      type="url"
+                      value={websiteUrl}
+                      onChange={e => setWebsiteUrl(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAnalyzeWebsite();
+                        }
+                      }}
+                      placeholder="https://votre-entreprise.com"
+                      autoFocus
+                    />
+                  </div>
                 </div>
-                <div className="cc-input-wrap">
-                  <Globe size={15} className="cc-input-icon" />
-                  <input
-                    type="url"
-                    value={websiteUrl}
-                    onChange={e => setWebsiteUrl(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAnalyzeWebsite();
-                      }
-                    }}
-                    placeholder="https://votre-entreprise.com"
-                    autoFocus
-                  />
-                </div>
-              </div>
+
+                {/* Recently Analyzed Websites (shown by domain URL only, zero agent names) */}
+                {recentWebsites.length > 0 && (
+                  <div className="cc-recent-sites">
+                    <div className="cc-recent-sites-label">
+                      <Clock size={12} className="cc-recent-icon" />
+                      <span>Sites récemment analysés</span>
+                    </div>
+                    <div className="cc-recent-sites-list">
+                      {recentWebsites.map((item) => {
+                        const cleanDomain = formatCleanDomain(item.website);
+                        return (
+                          <button
+                            key={cleanDomain}
+                            type="button"
+                            className="cc-recent-site-chip"
+                            onClick={() => handleSelectRecentWebsite(item)}
+                            title={`Charger la synthèse de ${cleanDomain}`}
+                          >
+                            <Globe size={12} className="cc-chip-globe" />
+                            <span className="cc-chip-domain">{cleanDomain}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               /* Minimal Loader */
               <div className="cc-loader-minimal">
@@ -245,16 +353,33 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
             {hasWebsite ? (
               /* Path A: Website Analyzed */
               <>
-                <div className="cc-hero">
-                  <h3 className="cc-hero-title">Synthèse de votre activité</h3>
-                  <p className="cc-hero-desc">
-                    Vérifiez ou complétez ces informations pour orienter les agents sous supervision.
-                  </p>
+                <div className="cc-hero cc-hero-split">
+                  <div className="cc-hero-text">
+                    <h3 className="cc-hero-title">Synthèse de votre activité</h3>
+                    <p className="cc-hero-desc">
+                      Vérifiez ou complétez ces informations pour orienter les agents sous supervision.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="cc-url-switch-btn"
+                    onClick={() => setStep(1)}
+                    disabled={isSaving}
+                    title={websiteUrl ? `Site actuel : ${websiteUrl} — Cliquez pour analyser une autre URL` : 'Analyser un autre site web'}
+                  >
+                    <Globe size={13} className="cc-url-icon" />
+                    <span>Analyser un autre site web</span>
+                  </button>
                 </div>
 
                 <div className="cc-field">
                   <div className="cc-field-top">
                     <label>Présentation & Offre</label>
+                    {websiteUrl && (
+                      <span className="cc-source-domain" title={websiteUrl}>
+                        Source : {formatCleanDomain(websiteUrl)}
+                      </span>
+                    )}
                   </div>
                   <textarea
                     rows={10}
@@ -281,11 +406,23 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
             ) : (
               /* Path B: Manual Entry (200 chars minimum) */
               <>
-                <div className="cc-hero">
-                  <h3 className="cc-hero-title">Présentation de l&apos;entreprise</h3>
-                  <p className="cc-hero-desc">
-                    Décrivez vos solutions, vos clients cibles et vos points forts.
-                  </p>
+                <div className="cc-hero cc-hero-split">
+                  <div className="cc-hero-text">
+                    <h3 className="cc-hero-title">Présentation de l&apos;entreprise</h3>
+                    <p className="cc-hero-desc">
+                      Décrivez vos solutions, vos clients cibles et vos points forts.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="cc-url-switch-btn"
+                    onClick={() => setStep(1)}
+                    disabled={isSaving}
+                    title="Générer automatiquement la synthèse à partir d'un site web"
+                  >
+                    <Globe size={13} className="cc-url-icon" />
+                    <span>Générer depuis un site web</span>
+                  </button>
                 </div>
 
                 <div className="cc-field">
@@ -314,7 +451,17 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
       <div className="cc-footer">
         {step === 1 ? (
           <>
-            {inline && onBack ? (
+            {isStep2Valid ? (
+              <button
+                type="button"
+                className="cc-btn cc-btn-secondary"
+                onClick={() => setStep(2)}
+                disabled={isResearching}
+              >
+                <ArrowLeft size={13} />
+                <span>Retour à la synthèse</span>
+              </button>
+            ) : inline && onBack ? (
               <button
                 type="button"
                 className="cc-btn cc-btn-secondary"
@@ -322,7 +469,7 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
                 disabled={isResearching}
               >
                 <ArrowLeft size={13} />
-                <span>Retour aux paramètres</span>
+                <span>Étape précédente</span>
               </button>
             ) : <div />}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -354,15 +501,17 @@ export const CompanyContextModal: React.FC<CompanyContextModalProps> = ({
           </>
         ) : (
           <>
-            <button
-              type="button"
-              className="cc-btn cc-btn-secondary"
-              onClick={() => setStep(1)}
-              disabled={isSaving}
-            >
-              <ArrowLeft size={13} />
-              <span>Changer d&apos;adresse</span>
-            </button>
+            {inline && onBack ? (
+              <button
+                type="button"
+                className="cc-btn cc-btn-secondary"
+                onClick={onBack}
+                disabled={isSaving}
+              >
+                <ArrowLeft size={13} />
+                <span>Étape précédente</span>
+              </button>
+            ) : <div />}
             <button
               type="button"
               className="cc-btn cc-btn-primary"

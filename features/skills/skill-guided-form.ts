@@ -1,7 +1,6 @@
-import type { SkillKind } from '@/shared/api/skills-api';
+import type { SkillCitations, SkillKind, SkillLimits } from '@/shared/api/skills-api';
 
 export const EXPERT_MODE_STORAGE_KEY = 'vmind.skills.editor.expertMode';
-export const NEW_SKILL_BODY_TEMPLATE = '# Objectif\n\nDécrivez ici la procédure ou le format attendu...\n';
 
 const DESCRIPTION_PATTERN = /^Quand on demande ([\s\S]+?)\.(?: Pas pour ([\s\S]+)\.)?$/;
 
@@ -19,13 +18,13 @@ export function parseDescription(description: string): { quand: string; pasPour:
   return match ? { quand: match[1], pasPour: match[2] ?? '' } : null;
 }
 
-export function slugifyTitle(title: string): string {
+export function slugifyTitle(title: string, maxLength?: number): string {
   return title
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .slice(0, 64)
+    .slice(0, maxLength)
     .replace(/^-+|-+$/g, '');
 }
 
@@ -69,9 +68,10 @@ export function composeBody(kind: SkillKind, title: string, values: SectionValue
  * Reads Markdown back into the sections, or returns null if the sections can't show it exactly.
  * The body must come back identical, so no text gets rewritten or lost.
  */
-export function parseBody(kind: SkillKind, title: string, body: string): SectionValues | null {
+export function parseBody(kind: SkillKind, title: string, body: string, starterBody?: string): SectionValues | null {
   const normalized = body.replace(/\r\n/g, '\n').trim();
-  if (!normalized || normalized === NEW_SKILL_BODY_TEMPLATE.trim()) return {};
+  // The untouched starting text of the expert mode counts as empty
+  if (!normalized || (starterBody && normalized === starterBody.trim())) return {};
 
   const values: SectionValues = {};
   for (const part of normalized.split(/^## /m).slice(1)) {
@@ -157,8 +157,13 @@ export function assembleCustomBody(custom: CustomBody): string {
  * Reads a skill's body for the simple mode: the standard sections when it matches them exactly,
  * otherwise tabs built from the skill's own headings.
  */
-export function loadGuidedBody(kind: SkillKind, title: string, body: string): { values: SectionValues; custom: CustomBody | null } {
-  const values = parseBody(kind, title, body);
+export function loadGuidedBody(
+  kind: SkillKind,
+  title: string,
+  body: string,
+  starterBody?: string
+): { values: SectionValues; custom: CustomBody | null } {
+  const values = parseBody(kind, title, body, starterBody);
   return values ? { values, custom: null } : { values: {}, custom: splitCustomBody(body) };
 }
 
@@ -279,4 +284,158 @@ export const FIELD_HELP: Record<string, FieldHelp> = {
     good: 'Délai de relance passé à 60 jours',
     avoid: 'Mise à jour',
   },
+  referenceName: {
+    what: "Un nom simple crée une documentation, reçue par l'assistant avec les instructions. Un nom en dossier/SKILL.md crée une sous-compétence que l'assistant trouve seule.",
+    good: 'regles/relances.md · codes/statuts-factures.md · relances-clients/SKILL.md',
+    avoid: 'Mes règles.md (espaces, accents) · notes (sans .md)',
+  },
+  referenceDoc: {
+    what: 'Une documentation : du texte simple et des tableaux Markdown, un seul sujet par fichier. Citez-la dans les instructions.',
+    good: '| Type de client | Délai de relance | puis une ligne par type',
+    avoid: 'Répéter la méthode déjà écrite dans les instructions.',
+  },
+  referenceSubSkill: {
+    what: "Une sous-compétence : l'en-tête name et description décide quand l'assistant l'ouvre ; elle ne reçoit que son propre texte.",
+    good: 'description: Quand on demande les relances à envoyer. Pas pour la liste des factures.',
+    avoid: "Laisser la description d'exemple ou citer un autre fichier de référence.",
+  },
 };
+
+// A reference file named folder/SKILL.md is a sub-skill; any other .md file is a documentation file
+const SUB_SKILL_FILE = /(?:^|\/)([^/]+)\/skill\.md$/i;
+export const REFERENCE_NAME_PATTERN = /^(?:[a-z0-9_-]+\/)*(?:SKILL|[a-z0-9._-]+)\.md$/;
+// The folder of a SKILL.md becomes a skill name: same rule as skill short names
+const SUB_SKILL_FOLDER_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export type ReferenceKind = 'documentation' | 'subSkill';
+
+/** What the name field keeps while typing: lower case, no accents, spaces as dashes, only allowed characters. */
+export function sanitizeReferenceInput(raw: string): string {
+  return raw
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9._/-]/g, '')
+    .replace(/\/{2,}/g, '/')
+    .replace(/^\//, '')
+    .replace(/(^|\/)skill\.md$/, '$1SKILL.md');
+}
+
+/** The file name as it will be saved: ending with .md, SKILL.md keeping its standard upper case. */
+export function normalizeReferenceName(raw: string): string {
+  const clean = sanitizeReferenceInput(raw.trim());
+  if (!clean) return '';
+  const withExtension = clean.endsWith('.md') ? clean : `${clean}.md`;
+  return withExtension.replace(/(^|\/)skill\.md$/i, '$1SKILL.md');
+}
+
+export function referenceKind(fileName: string): ReferenceKind {
+  return SUB_SKILL_FILE.test(fileName) ? 'subSkill' : 'documentation';
+}
+
+/** Why a typed name cannot be used yet; null when it can. `incomplete` means the user is still typing a folder. */
+export function referenceNameProblem(raw: string, maxSlugLength?: number): { incomplete: boolean; text: string } | null {
+  const typed = raw.trim();
+  if (!typed) return null;
+  if (typed.endsWith('/') || /\/\.md$/.test(normalizeReferenceName(typed))) {
+    return { incomplete: true, text: 'Ajoutez le nom du fichier après le dossier.' };
+  }
+  const fileName = normalizeReferenceName(typed);
+  if (!REFERENCE_NAME_PATTERN.test(fileName) || fileName.includes('..')) {
+    return { incomplete: false, text: 'Nom invalide : lettres minuscules, chiffres, tirets (-), tirets bas (_) et points, dossiers séparés par /.' };
+  }
+  if (fileName === 'SKILL.md') {
+    return { incomplete: false, text: 'Un SKILL.md doit être rangé dans un dossier, par exemple relances-clients/SKILL.md.' };
+  }
+  const folder = fileName.match(SUB_SKILL_FILE)?.[1];
+  if (folder && (!SUB_SKILL_FOLDER_PATTERN.test(folder) || (maxSlugLength !== undefined && folder.length > maxSlugLength))) {
+    return {
+      incomplete: false,
+      text: `Le dossier d'un SKILL.md devient le nom de la sous-compétence : lettres minuscules, chiffres et tirets seulement${
+        maxSlugLength ? `, ${maxSlugLength} caractères au maximum` : ''
+      }.`,
+    };
+  }
+  return null;
+}
+
+/** What a valid name will create, shown under the field. */
+export function describeReferenceKind(fileName: string): string {
+  return referenceKind(fileName) === 'subSkill'
+    ? `Sous-compétence « ${fileName} » : une compétence à part, avec son propre en-tête (name, description). Elle ne reçoit que son propre texte.`
+    : `Documentation « ${fileName} » : citez ce fichier dans les instructions et dites quand l'utiliser.`;
+}
+
+function subSkillHeaderName(content: string): string | undefined {
+  const header = content.replace(/\r\n/g, '\n').match(/^---\n([\s\S]*?)\n---/)?.[1];
+  const name = header?.match(/^name:\s*["']?(.+?)["']?\s*$/m)?.[1];
+  return name?.trim() || undefined;
+}
+
+/**
+ * The name a reference file is known by, unique within a skill whatever its folder:
+ * a document's file name without .md, a sub-skill's header name or else its folder (same rule as the backend).
+ */
+export function referenceShortName(fileName: string, content: string): string {
+  const folder = fileName.match(SUB_SKILL_FILE)?.[1];
+  if (folder) return (subSkillHeaderName(content) || folder).toLowerCase();
+  return (fileName.split('/').pop() || fileName).replace(/\.md$/i, '').toLowerCase();
+}
+
+/** The other file already using the same short name, if any. */
+export function findShortNameConflict(
+  fileName: string,
+  content: string,
+  references: Record<string, string>,
+  ignoreKey?: string | null
+): string | null {
+  const shortName = referenceShortName(fileName, content);
+  return (
+    Object.keys(references).find(
+      (key) => key !== ignoreKey && referenceShortName(key, references[key]) === shortName
+    ) ?? null
+  );
+}
+
+/** The content of a renamed file: a sub-skill whose header name followed its folder keeps following it. */
+export function renamedReferenceContent(oldName: string, newName: string, content: string): string {
+  const oldFolder = oldName.match(SUB_SKILL_FILE)?.[1];
+  const newFolder = newName.match(SUB_SKILL_FILE)?.[1];
+  if (!oldFolder || !newFolder || subSkillHeaderName(content)?.toLowerCase() !== oldFolder.toLowerCase()) return content;
+  return content.replace(/^(---\r?\n[\s\S]*?^name:\s*["']?)[^"'\r\n]+/m, `$1${newFolder}`);
+}
+
+/** The places citing a file, as the backend found them (see SkillCitations), in words for the user. */
+export function citationPlaces(fileName: string, citations: SkillCitations): string[] {
+  const places = (citations[fileName] || []).map((c) => c.place);
+  return places
+    .filter((place, index) => places.indexOf(place) === index)
+    .map((place) => (place === 'body' ? 'les instructions' : place));
+}
+
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Replaces, in one place, the exact citations the backend found for a renamed file. Each keeps its form:
+ * a bare file name stays bare, a path gets the new path (with the `references/` prefix kept when it had one).
+ */
+export function replaceCitations(text: string, place: string, oldName: string, newName: string, citations: SkillCitations): string {
+  const newBase = newName.split('/').pop() || newName;
+  let result = text;
+  for (const { token } of (citations[oldName] || []).filter((c) => c.place === place)) {
+    const replacement = !token.includes('/') ? newBase : /^references\//i.test(token) ? `references/${newName}` : newName;
+    result = result.replace(new RegExp(`(?<![\\w./-])${escapeRegex(token)}(?![\\w-])`, 'g'), replacement);
+  }
+  return result;
+}
+
+/** The first content of a new reference file, from the backend's starting texts; a bare skeleton without them. */
+export function referenceStarter(fileName: string, starters?: SkillLimits['starters'] | null): string {
+  if (referenceKind(fileName) === 'subSkill') {
+    const folder = fileName.match(SUB_SKILL_FILE)?.[1] ?? 'sous-competence';
+    return starters ? starters.subSkill.split('{name}').join(folder) : `---\nname: ${folder}\ndescription: \n---\n`;
+  }
+  const baseName = fileName.split('/').pop()?.replace(/\.md$/, '') ?? fileName;
+  return starters ? starters.document.split('{name}').join(baseName) : `# ${baseName}\n`;
+}

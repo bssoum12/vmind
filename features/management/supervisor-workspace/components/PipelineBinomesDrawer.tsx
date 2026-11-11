@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   Send,
   Phone,
+  AlertTriangle,
 } from 'lucide-react';
 import { AgentPairFunnelRow, FleetFunnelData } from '../types/supervisor.types';
 
@@ -17,12 +18,14 @@ interface PipelineBinomesDrawerProps {
   agentPairs: AgentPairFunnelRow[];
   summary: FleetFunnelData['summary'];
   onClose: () => void;
+  hasError?: boolean;
 }
 
 export const PipelineBinomesDrawer: React.FC<PipelineBinomesDrawerProps> = ({
   agentPairs,
   summary,
   onClose,
+  hasError = false,
 }) => {
   // Close drawer on Escape key press
   useEffect(() => {
@@ -48,6 +51,7 @@ export const PipelineBinomesDrawer: React.FC<PipelineBinomesDrawerProps> = ({
       <aside
         className="diagnostic-drawer edge-drawer apple-style pipeline-binomes-drawer"
         role="dialog"
+        aria-modal="true"
         aria-label="Performance par binôme d'agents"
       >
         {/* Header */}
@@ -134,7 +138,17 @@ export const PipelineBinomesDrawer: React.FC<PipelineBinomesDrawerProps> = ({
           </div>
 
           {/* Clean High-Density Pro Table */}
-          {agentPairs.length === 0 ? (
+          {hasError ? (
+            <div className="binome-pro-empty error" style={{ borderColor: 'rgba(255, 71, 87, 0.3)' }}>
+              <AlertTriangle size={18} style={{ color: '#FF4757', flexShrink: 0 }} />
+              <div className="empty-text">
+                <span className="empty-title" style={{ color: '#F0F4F8' }}>Erreur de chargement</span>
+                <span className="empty-desc" style={{ color: '#94A3B8' }}>
+                  Impossible de charger les binômes. Veuillez vérifier votre connexion ou actualiser les données.
+                </span>
+              </div>
+            </div>
+          ) : agentPairs.length === 0 ? (
             <div className="binome-pro-empty">
               <Info size={16} className="empty-icon" />
               <div className="empty-text">

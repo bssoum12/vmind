@@ -18,15 +18,6 @@ import { useToast } from '@/shared/contexts/ToastContext';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
-const ALL_AVAILABLE_AGENTS = [
-  { code: 'VDATA', name: 'Analyste Données', icon: '📊', color: '#00E5C8' },
-  { code: 'VFIN', name: 'Contrôleur Financier', icon: '💰', color: '#10B981' },
-  { code: 'VSELL', name: 'Commercial & Ventes', icon: '📈', color: '#6366F1' },
-  { code: 'VSTOCK', name: 'Gestion Stocks', icon: '📦', color: '#F59E0B' },
-  { code: 'VBUY', name: 'Achats & Fournisseurs', icon: '🛒', color: '#EC4899' },
-  { code: 'VMOVE', name: 'Logistique & Transport', icon: '🚚', color: '#8B5CF6' }
-];
-
 interface ManagedUser {
   id: number;
   username: string;
@@ -36,7 +27,6 @@ interface ManagedUser {
   phoneNumber: string;
   status: string;
   role: string;
-  allowedAgents: string[];
   defaultClientId: string;
   connectorType: string;
   isOnline: boolean;
@@ -545,7 +535,6 @@ export const UsersManagementView: React.FC = () => {
               <tr style={{ background: 'rgba(6, 17, 31, 0.9)', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
                 <th style={{ padding: '14px 18px', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', fontSize: '10px' }}>Utilisateur</th>
                 <th style={{ padding: '14px 18px', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', fontSize: '10px' }}>Rôle & Tenant</th>
-                <th style={{ padding: '14px 18px', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', fontSize: '10px' }}>Agents Autorisés</th>
                 <th style={{ padding: '14px 18px', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', fontSize: '10px' }}>Statut & Présence</th>
                 <th style={{ padding: '14px 18px', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', fontSize: '10px' }}>Dernière Activité</th>
               </tr>
@@ -553,14 +542,14 @@ export const UsersManagementView: React.FC = () => {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
+                  <td colSpan={4} style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
                     <RefreshCw size={24} className="spin" style={{ margin: '0 auto 10px auto', display: 'block', color: '#00E5C8' }} />
                     Chargement des utilisateurs...
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
+                  <td colSpan={4} style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>
                     Aucun utilisateur trouvé avec ces critères de recherche.
                   </td>
                 </tr>
@@ -648,36 +637,6 @@ export const UsersManagementView: React.FC = () => {
                           <span style={{ fontSize: '11px', color: '#64748B' }}>
                             Client: <strong style={{ color: '#94A3B8' }}>{user.defaultClientId}</strong>
                           </span>
-                        </div>
-                      </td>
-
-                      {/* Agents Autorisés */}
-                      <td style={{ padding: '14px 18px' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '240px' }}>
-                          {user.allowedAgents && user.allowedAgents.length > 0 ? (
-                            user.allowedAgents.map((ag) => {
-                              const meta = ALL_AVAILABLE_AGENTS.find(a => a.code === ag);
-                              return (
-                                <span
-                                  key={ag}
-                                  title={meta?.name || ag}
-                                  style={{
-                                    fontSize: '9.5px',
-                                    fontWeight: 700,
-                                    padding: '1px 6px',
-                                    borderRadius: '3px',
-                                    background: 'rgba(15, 32, 53, 0.9)',
-                                    color: meta?.color || '#00E5C8',
-                                    border: `1px solid ${meta?.color ? `${meta.color}40` : 'rgba(0, 229, 200, 0.2)'}`
-                                  }}
-                                >
-                                  {ag}
-                                </span>
-                              );
-                            })
-                          ) : (
-                            <span style={{ fontSize: '11px', color: '#64748B', fontStyle: 'italic' }}>Aucun agent</span>
-                          )}
                         </div>
                       </td>
 

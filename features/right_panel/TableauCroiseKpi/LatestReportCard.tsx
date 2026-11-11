@@ -87,7 +87,7 @@ export const LatestReportCard: React.FC<LatestReportCardProps> = ({ activeAgentI
 
         <button
           onClick={() => fetchKpis('vdata', true, 'get_latest_report')}
-          title="Rafraîchir KPI via n8n"
+          title="Rafraîchir les indicateurs"
           disabled={effectiveLoading}
           style={{
             background: 'transparent',

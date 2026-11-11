@@ -72,8 +72,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
         setCurrentUser((prev: any) => ({
           ...(prev || {}),
           client_id: activeConnection.client_id || 'DEMO',
-          roles: prev?.roles || [],
-          allowedAgents: prev?.allowedAgents || ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE']
+          roles: prev?.roles || []
         }));
         setKpisByAgent({});
         setLastUpdatedByAgent({});
@@ -113,8 +112,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
             setCurrentUser({
               username: me?.user?.username || '',
               client_id: data.client_id || 'LOCAL',
-              roles: Array.isArray(rawRoles) ? rawRoles : rawRoles ? [rawRoles] : [],
-              allowedAgents: Array.isArray(data.allowedAgents) ? data.allowedAgents : []
+              roles: Array.isArray(rawRoles) ? rawRoles : rawRoles ? [rawRoles] : []
             });
           } else {
             setIsConnectorConnected(false);
@@ -165,16 +163,6 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   const clearError = () => setError(null);
   const clearNotice = () => setNotice(null);
 
-  // Helper to check if user has ERP connected and agent is allowed
-  const isAgentKpiAllowed = (agentId: string) => {
-    if (!currentUser) return false;
-    const roles = Array.isArray(currentUser.roles) ? currentUser.roles : [currentUser.roles || ''];
-    if (roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r))) return true;
-    if (Array.isArray(currentUser.allowedAgents)) {
-      return currentUser.allowedAgents.includes(agentId.toUpperCase());
-    }
-    return false;
-  };
 
   const fetchKpis = async (agentId: string, force = false, targetTool?: string, horizon?: string) => {
     if (!currentUser) return;
@@ -185,12 +173,6 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
     if (!isConnectorConnected) {
       console.log(`[KPI CONTEXT] Connecteur ERP déconnecté — requête KPI évitée.`);
-      setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
-      return;
-    }
-
-    if (!isAgentKpiAllowed(allowedAgentUpper)) {
-      console.log(`[KPI CONTEXT] KPIs not allowed for agent ${allowedAgentUpper} (ERP not connected or agent not authorized)`);
       setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
       return;
     }
@@ -333,11 +315,6 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     const currentAgent = activeAgentId || 'VDATA';
     const lowerAgent = currentAgent.toLowerCase();
     if (lowerAgent !== 'vdata' && lowerAgent !== 'vfin' && lowerAgent !== 'vsell' && lowerAgent !== 'vbuy' && lowerAgent !== 'vmove') return;
-
-    if (!isAgentKpiAllowed(currentAgent)) {
-      setLoadingByAgent(prev => ({ ...prev, [lowerAgent]: false }));
-      return;
-    }
 
     // Interrogation de la base PostgreSQL en mode passif (force = false)
     const fetchKey = `${lowerAgent}_${startDate}_${endDate}_${currentUser?.client_id || 'LOCAL'}`;

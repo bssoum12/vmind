@@ -34,7 +34,6 @@ interface UserInfo {
   username: string;
   client_id: string;
   roles: string[];
-  allowedAgents: string[];
 }
 
 type AuthLevel = 'always' | 'approval' | 'denied';
@@ -727,16 +726,10 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
           }}>
             {[
               { label: 'Compte', value: erpInfo?.username || '—' },
-              { label: 'Tenant', value: userInfo.client_id || 'DEMO' },
+              { label: 'Instance', value: userInfo.client_id || 'DEMO' },
               {
                 label: 'Rôles TraLIS',
                 value: erpInfo?.roles.length ? erpInfo.roles.join(', ') : '—'
-              },
-              { 
-                label: 'Agents autorisés', 
-                value: Array.isArray(userInfo.allowedAgents) 
-                  ? userInfo.allowedAgents.join(', ') 
-                  : '—' 
               },
             ].map(({ label, value }) => (
               <div key={label}>

@@ -170,7 +170,7 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
 
                 <button
                     onClick={() => fetchKpis('vdata', true, 'get_tableau_croise')}
-                    title="Rafraîchir KPI via n8n"
+                    title="Rafraîchir les indicateurs"
                     disabled={effectiveLoading}
                     style={{
                         background: 'transparent',

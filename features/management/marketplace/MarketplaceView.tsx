@@ -22,6 +22,7 @@ interface MarketplaceViewProps {
 const AGENT_PROMPT_KEYS: Record<string, string> = {
   prospection: 'prospect_onboarding_chat',
   sourcing: 'sourcing_execution_chat',
+  supervisor: 'supervisor_audit_config',
 };
 
 

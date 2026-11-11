@@ -228,7 +228,7 @@ export const ScoreGlobalCard: React.FC<Props> = ({ activeAgentId }) => {
 
         <button
           onClick={() => fetchKpis('vdata', true, 'get_score_global_vdata_kpi')}
-          title="Rafraîchir KPI via n8n"
+          title="Rafraîchir les indicateurs"
           disabled={effectiveLoading}
           style={{
             background: 'transparent',

@@ -14,6 +14,7 @@ interface SkillGuidedFieldsProps {
   sections: SectionValues;
   activeSection: string;
   title: string;
+  maxTitleLength?: number;
   onDescriptionChange: (value: string) => void;
   onQuandChange: (value: string) => void;
   onPasPourChange: (value: string) => void;
@@ -54,6 +55,7 @@ export const SkillGuidedFields: React.FC<SkillGuidedFieldsProps> = ({
   sections,
   activeSection,
   title,
+  maxTitleLength,
   onDescriptionChange,
   onQuandChange,
   onPasPourChange,
@@ -160,7 +162,7 @@ export const SkillGuidedFields: React.FC<SkillGuidedFieldsProps> = ({
         value={title}
         onChange={(e) => onTitleChange(e.target.value)}
         required
-        maxLength={200}
+        maxLength={maxTitleLength}
         style={inputStyle}
       />
     </div>

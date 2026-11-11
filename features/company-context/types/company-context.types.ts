@@ -1,14 +1,17 @@
 /**
  * @file company-context.types.ts
- * @description Standalone Type definitions for the Company Context feature.
+ * @description Standalone Type definitions for the per-agent Company Context feature.
  */
 
 export interface CompanyContext {
   id?: number | string;
   user_id?: number;
+  agent_uuid?: string;
   website: string;
   summary?: string;
+  presentation?: string;
   additional_info?: string;
+  additionalInfo?: string;
   value_proposition?: string;
   valueProposition?: string;
   target_customers?: string;
@@ -17,6 +20,19 @@ export interface CompanyContext {
   raw_search_data?: any;
   updated_at?: string;
   created_at?: string;
+}
+
+export interface SavedSupervisorContextItem {
+  agent_uuid: string;
+  agent_name: string;
+  website: string;
+  summary: string;
+  additional_info?: string;
+  value_proposition?: string;
+  target_customers?: string;
+  competitors?: string;
+  raw_search_data?: any;
+  updated_at?: string;
 }
 
 export interface CompanyResearchResult {
@@ -40,6 +56,7 @@ export interface CompanyContextSaveResponse {
 
 export interface CompanyContextModalProps {
   isOpen?: boolean;
+  agentId?: string;
   context?: CompanyContext | any;
   onClose: () => void;
   onSaveContext?: (updatedContext: any) => void | Promise<void>;
