@@ -315,6 +315,29 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
           </div>
         )}
 
+        {/* Mode dégradé : n8n en erreur, l'écran montre le dernier résultat enregistré */}
+        {isKpiAuthorized && agentData?._isDegraded && (
+          <div role="status" style={{
+            fontSize: '11px',
+            lineHeight: 1.45,
+            color: '#FDBA74',
+            background: 'rgba(249, 115, 22, 0.10)',
+            border: '1px solid rgba(249, 115, 22, 0.45)',
+            borderRadius: '8px',
+            padding: '8px 10px',
+            marginBottom: '14px',
+            marginTop: '-6px'
+          }}>
+            <div style={{ fontWeight: 600 }}>
+              ⚠ Actualisation impossible{formattedLastUpdate ? ` — données du ${formattedLastUpdate} (dernier résultat enregistré)` : ' — dernier résultat enregistré affiché'}.
+            </div>
+            {agentData?._degradedReason && (
+              <div style={{ opacity: 0.85, marginTop: '2px' }}>Cause : {String(agentData._degradedReason)}</div>
+            )}
+            <div style={{ opacity: 0.85, marginTop: '2px' }}>Réessayez plus tard.</div>
+          </div>
+        )}
+
         {!isKpiAuthorized ? (
           !isErpConnected ? (
             <div style={{

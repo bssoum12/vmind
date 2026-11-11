@@ -58,6 +58,9 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   const { activeConnection } = useConnections();
   const lastActiveConnKeyRef = useRef<string>('');
   const lastPassiveFetchKeyRef = useRef<string>('');
+  // Incrémenté quand les cartes sont vidées : relance la lecture passive même si
+  // « déconnecté » puis « connecté » arrivent dans le même rendu
+  const [passiveReloadToken, setPassiveReloadToken] = useState<number>(0);
 
   useEffect(() => {
     if (activeConnection && activeConnection.status === 'connected') {
@@ -74,12 +77,19 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
         }));
         setKpisByAgent({});
         setLastUpdatedByAgent({});
+        // Cartes vidées : la prochaine lecture passive doit relire la base
+        lastPassiveFetchKeyRef.current = '';
+        setPassiveReloadToken(t => t + 1);
       }
     } else if (activeConnection && activeConnection.status !== 'connected') {
       if (lastActiveConnKeyRef.current !== 'disconnected') {
         lastActiveConnKeyRef.current = 'disconnected';
         setIsConnectorConnected(false);
         setKpisByAgent({});
+        setLastUpdatedByAgent({});
+        // Cartes vidées : à la reconnexion, la lecture passive relira la base
+        lastPassiveFetchKeyRef.current = '';
+        setPassiveReloadToken(t => t + 1);
       }
     }
   }, [activeConnection?.id, activeConnection?.status, activeConnection?.client_id]);
@@ -128,6 +138,11 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
           setCurrentUser(user);
         }
         setKpisByAgent({});
+        setLastUpdatedByAgent({});
+        // Cartes vidées : dès que le connecteur est de nouveau signalé connecté,
+        // la lecture passive relit la dernière actualisation en base (jamais n8n)
+        lastPassiveFetchKeyRef.current = '';
+        setPassiveReloadToken(t => t + 1);
         setError(null);
         setLoadingByAgent({});
       } else {
@@ -270,14 +285,19 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
           };
         }
 
+        // Mode dégradé : l'état suit toujours la dernière réponse (s'efface au prochain calcul réussi)
+        updatedAgentData._isDegraded = Boolean(response?._isDegraded);
+        updatedAgentData._degradedWarning = response?._isDegraded ? response._degradedWarning : undefined;
+        updatedAgentData._degradedReason = response?._isDegraded ? response._degradedReason : undefined;
+
         return {
           ...prev,
           [agentKey]: updatedAgentData
         };
       });
 
-      // Update manual cooldown if applicable (1 heure)
-      if (force) {
+      // Update manual cooldown if applicable (1 heure) — pas de délai d'attente si l'actualisation a échoué (mode dégradé)
+      if (force && !response?._isDegraded) {
         setCooldowns(prev => ({
           ...prev,
           [cooldownKey]: Date.now()
@@ -324,7 +344,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     if (lastPassiveFetchKeyRef.current === fetchKey) return;
     lastPassiveFetchKeyRef.current = fetchKey;
     fetchKpis(lowerAgent, false);
-  }, [startDate, endDate, activeAgentId, currentUser?.username, currentUser?.client_id, isConnectorConnected]);
+  }, [startDate, endDate, activeAgentId, currentUser?.username, currentUser?.client_id, isConnectorConnected, passiveReloadToken]);
 
   // Polling automatique si un calcul est en cours en tâche de fond pour l'agent actif
   const currentAgentForPoll = (activeAgentId || 'VDATA').toLowerCase();
