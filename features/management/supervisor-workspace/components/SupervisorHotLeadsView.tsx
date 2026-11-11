@@ -11,7 +11,9 @@ import {
   Bot,
   ArrowRight,
   ChevronDown,
-  ChevronsUpDown
+  ChevronsUpDown,
+  AlertTriangle,
+  RotateCw,
 } from 'lucide-react';
 import { FleetAlertsData, HotLeadAlertItem } from '../types/supervisor.types';
 import { useToast } from '@/shared/contexts/ToastContext';
@@ -20,6 +22,7 @@ interface SupervisorHotLeadsViewProps {
   alertsData: FleetAlertsData;
   onRefresh?: () => void;
   isLoading?: boolean;
+  hasError?: boolean;
 }
 
 interface AgentLeadGroup {
@@ -30,7 +33,7 @@ interface AgentLeadGroup {
 }
 
 const formatUnattendedDelay = (hours: number): string => {
-  if (!hours || hours < 48) {
+  if (!hours || hours < 24) {
     return `${hours || 0}h sans contact`;
   }
   const days = Math.floor(hours / 24);
@@ -40,7 +43,8 @@ const formatUnattendedDelay = (hours: number): string => {
 export const SupervisorHotLeadsView: React.FC<SupervisorHotLeadsViewProps> = ({
   alertsData,
   onRefresh,
-  isLoading = false
+  isLoading = false,
+  hasError = false,
 }) => {
   const router = useRouter();
   const { showToast } = useToast();
@@ -194,7 +198,7 @@ export const SupervisorHotLeadsView: React.FC<SupervisorHotLeadsViewProps> = ({
           <h1 className="view-title">Hot Leads non contactés</h1>
           <p className="view-subtitle">
             {totalCount > 0
-              ? `${totalCount} prospect${totalCount > 1 ? 's' : ''} qualifié${totalCount > 1 ? 's' : ''} en attente de premier contact depuis plus de 48h`
+              ? `${totalCount} prospect${totalCount > 1 ? 's' : ''} qualifié${totalCount > 1 ? 's' : ''} en attente de premier contact`
               : 'Tous les prospects qualifiés ont été contactés dans les délais impartis'}
           </p>
         </div>
@@ -332,6 +336,7 @@ export const SupervisorHotLeadsView: React.FC<SupervisorHotLeadsViewProps> = ({
                         {group.leads.map((lead) => {
                           const fullName = `${lead.prenom || ''} ${lead.nom || ''}`.trim() || 'Prospect';
                           const isCritical = lead.urgency === 'CRITICAL';
+                          const isWarning = lead.urgency === 'WARNING';
                           const isDraft = lead.contactStatus === 'DRAFT_READY';
                           const targetAgentUuid = lead.agentUuid || group.agentUuid;
 
@@ -374,7 +379,7 @@ export const SupervisorHotLeadsView: React.FC<SupervisorHotLeadsViewProps> = ({
                               {/* Attente: Pure colored typography in days when >= 48h, NO dots, NO badges */}
                               <td className="cell-attente">
                                 <span
-                                  className={isCritical ? 'text-critical' : 'text-warning'}
+                                  className={isCritical ? 'text-critical' : isWarning ? 'text-warning' : 'text-cyan'}
                                   title={`${lead.hoursUnattended}h sans contact`}
                                 >
                                   {formatUnattendedDelay(lead.hoursUnattended)}
@@ -422,6 +427,39 @@ export const SupervisorHotLeadsView: React.FC<SupervisorHotLeadsViewProps> = ({
               </section>
             );
           })
+        ) : hasError ? (
+          /* Error State */
+          <div className="hot-leads-empty error" style={{ borderColor: 'rgba(255, 71, 87, 0.3)' }}>
+            <AlertTriangle size={32} color="#FF4757" className="empty-icon" />
+            <h3 style={{ color: '#F0F4F8' }}>Erreur de chargement des alertes</h3>
+            <p style={{ color: '#94A3B8' }}>
+              Impossible de récupérer la liste des prospects en attente. Veuillez vérifier votre connexion ou réactualiser.
+            </p>
+            {onRefresh && (
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={isLoading}
+                style={{
+                  marginTop: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '7px 16px',
+                  borderRadius: '6px',
+                  background: 'rgba(255, 71, 87, 0.15)',
+                  border: '1px solid rgba(255, 71, 87, 0.4)',
+                  color: '#FF6B7A',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                <RotateCw size={12} className={isLoading ? 'spin-icon' : ''} />
+                <span>Réessayer</span>
+              </button>
+            )}
+          </div>
         ) : (
           /* Clean Empty State */
           <div className="hot-leads-empty">

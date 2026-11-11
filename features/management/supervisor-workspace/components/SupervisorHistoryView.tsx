@@ -60,6 +60,7 @@ import { VMindGuideArrow } from '@/shared/management/components/VMindGuide';
 interface SupervisorHistoryViewProps {
   historyData: FleetHistoryData;
   isLoading: boolean;
+  hasError?: boolean;
   onRefresh: () => void;
   onRunAuditNow?: () => void;
   isRunningAudit?: boolean;
@@ -85,6 +86,7 @@ interface ChartPointItem {
 export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
   historyData,
   isLoading,
+  hasError = false,
   onRefresh,
   onRunAuditNow,
   isRunningAudit = false,
@@ -92,6 +94,10 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
 }) => {
   const audits = historyData?.audits || [];
   const agentHistories = historyData?.agentHistories || [];
+  const rawOptimalThreshold = historyData?.optimalThreshold ?? 75;
+  const showOptimalLine = rawOptimalThreshold > 0;
+  const optimalThreshold = rawOptimalThreshold > 0 ? rawOptimalThreshold : 75;
+  const criticalThreshold = Math.min(50, Math.max(1, optimalThreshold - 1));
 
   // Tutorial Target Refs & Smooth Auto-Scroll
   const chartCardRef = useRef<HTMLDivElement>(null);
@@ -456,7 +462,7 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
       >
         {lastPoints.map((pt, idx) => {
           const height = Math.max(4, Math.round((pt.score / 100) * 16));
-          const color = pt.score >= 75 ? '#00E5C8' : pt.score >= 50 ? '#FFA502' : '#FF4757';
+          const color = pt.score >= optimalThreshold ? '#00E5C8' : pt.score >= criticalThreshold ? '#FFA502' : '#FF4757';
           return (
             <div
               key={idx}
@@ -474,8 +480,8 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
     if (!active || !payload || !payload.length) return null;
     const pt = payload[0].payload as ChartPointItem;
     const scoreVal = pt.score;
-    const isOptimal = scoreVal >= 75;
-    const isWarning = scoreVal >= 50 && scoreVal < 75;
+    const isOptimal = scoreVal >= optimalThreshold;
+    const isWarning = scoreVal >= criticalThreshold && scoreVal < optimalThreshold;
 
     return (
       <div className="chart-apple-tooltip">
@@ -572,20 +578,47 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
               <VMindGuideArrow direction="down" color="#00E5C8" />
             </div>
           )}
-          <Calendar size={28} className="empty-icon" />
-          <h3 className="empty-title">Aucun audit enregistré</h3>
-          <p className="empty-desc">
-            Lancez un audit flash ou activez l'autopilot pour enregistrer des sessions de contrôle de conformité.
-          </p>
-          {onRunAuditNow && (
-            <button
-              className="journal-primary-btn"
-              onClick={onRunAuditNow}
-              disabled={isRunningAudit || isLoading}
-            >
-              <Zap size={14} />
-              <span>Démarrer le premier audit</span>
-            </button>
+          {hasError ? (
+            <>
+              <AlertTriangle size={32} style={{ color: '#FF4757', marginBottom: 12 }} />
+              <h3 className="empty-title" style={{ color: '#F0F4F8' }}>Erreur de chargement de l'historique</h3>
+              <p className="empty-desc" style={{ color: '#94A3B8' }}>
+                Impossible de charger les sessions d'audit et la progression temporelle.
+              </p>
+              <button
+                type="button"
+                className="journal-primary-btn"
+                onClick={onRefresh}
+                disabled={isLoading}
+                style={{
+                  background: 'rgba(255, 71, 87, 0.15)',
+                  border: '1px solid rgba(255, 71, 87, 0.4)',
+                  color: '#FF6B7A',
+                  cursor: 'pointer'
+                }}
+              >
+                <RotateCw size={14} className={isLoading ? 'spin-icon' : ''} />
+                <span>Réessayer</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <Calendar size={28} className="empty-icon" />
+              <h3 className="empty-title">Aucun audit enregistré</h3>
+              <p className="empty-desc">
+                Lancez un audit flash ou activez l'autopilot pour enregistrer des sessions de contrôle de conformité.
+              </p>
+              {onRunAuditNow && (
+                <button
+                  className="journal-primary-btn"
+                  onClick={onRunAuditNow}
+                  disabled={isRunningAudit || isLoading}
+                >
+                  <Zap size={14} />
+                  <span>Démarrer le premier audit</span>
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -599,6 +632,50 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
 
   return (
     <div className="supervisor-history-journal">
+      {hasError && (
+        <div
+          style={{
+            marginBottom: '16px',
+            padding: '10px 16px',
+            borderRadius: '8px',
+            background: 'rgba(255, 71, 87, 0.1)',
+            border: '1px solid rgba(255, 71, 87, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            color: '#FF6B7A',
+            fontSize: '13px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={16} style={{ color: '#FF4757', flexShrink: 0 }} />
+            <span>Impossible d'actualiser les sessions d'audit. Les données ci-dessous peuvent être obsolètes.</span>
+          </div>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isLoading}
+            style={{
+              background: 'rgba(255, 71, 87, 0.15)',
+              border: '1px solid rgba(255, 71, 87, 0.4)',
+              color: '#FF6B7A',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <RotateCw size={12} className={isLoading ? 'spin-icon' : ''} />
+            <span>Réessayer</span>
+          </button>
+        </div>
+      )}
+
       {/* ── 1. Header ── */}
       <div className="journal-header">
         <div className="header-text">
@@ -675,7 +752,7 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
           <span className="summary-label">Agents Supervisés</span>
           <span className="summary-value font-mono">{agentHistories.length}</span>
           <span className="summary-sub">
-            {agentHistories.filter((a) => a.currentScore >= 75).length} alignés
+            {agentHistories.filter((a) => a.currentScore >= optimalThreshold).length} alignés
           </span>
         </div>
       </div>
@@ -941,17 +1018,19 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
                   tickFormatter={(v) => `${v}%`}
                 />
                 <Tooltip content={<CustomChartTooltip />} />
-                <ReferenceLine
-                  y={75}
-                  stroke="rgba(0, 229, 200, 0.3)"
-                  strokeDasharray="4 4"
-                  label={{
-                    value: 'Seuil optimal (75%)',
-                    fill: '#00E5C8',
-                    fontSize: 10,
-                    position: 'insideTopRight',
-                  }}
-                />
+                {showOptimalLine && (
+                  <ReferenceLine
+                    y={optimalThreshold}
+                    stroke="rgba(0, 229, 200, 0.3)"
+                    strokeDasharray="4 4"
+                    label={{
+                      value: `Seuil optimal (${optimalThreshold}%)`,
+                      fill: '#00E5C8',
+                      fontSize: 10,
+                      position: 'insideTopRight',
+                    }}
+                  />
+                )}
                 <Area
                   type="monotone"
                   dataKey="score"
@@ -1053,8 +1132,8 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
                 const isSelected = selectedTrack === agent.agentUuid;
                 const isSourcing = agent.role === 'sourcing';
                 const score = agent.currentScore;
-                const isOptimal = score >= 75;
-                const isWarning = score >= 50 && score < 75;
+                const isOptimal = score >= optimalThreshold;
+                const isWarning = score >= criticalThreshold && score < optimalThreshold;
 
                 return (
                   <tr
@@ -1349,8 +1428,8 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
                                 {audit.nodeSnapshots.map((node: AuditNodeSnapshot) => {
                                   const isSourcing = node.agentRole === 'sourcing';
                                   const scoreVal = node.score ?? 0;
-                                  const isOptimal = scoreVal >= 75;
-                                  const isWarning = scoreVal >= 50 && scoreVal < 75;
+                                  const isOptimal = scoreVal >= optimalThreshold;
+                                  const isWarning = scoreVal >= criticalThreshold && scoreVal < optimalThreshold;
 
                                   return (
                                     <div key={node.agentUuid} className="agent-snapshot-card">

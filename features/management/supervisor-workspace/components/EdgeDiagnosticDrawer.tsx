@@ -71,8 +71,9 @@ export const EdgeDiagnosticDrawer: React.FC<EdgeDiagnosticDrawerProps> = ({
     (async () => {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+        const supParam = supervisorId ? `&supervisor_agent_uuid=${encodeURIComponent(supervisorId)}` : '';
         const res = await fetch(
-          `${baseUrl}/api/supervisor/link-evaluation/latest?source_agent_uuid=${encodeURIComponent(sourceUuid)}&target_agent_uuid=${encodeURIComponent(targetUuid)}`,
+          `${baseUrl}/api/supervisor/link-evaluation/latest?source_agent_uuid=${encodeURIComponent(sourceUuid)}&target_agent_uuid=${encodeURIComponent(targetUuid)}${supParam}`,
           { credentials: 'include' }
         );
         if (!res.ok || cancelled) return;

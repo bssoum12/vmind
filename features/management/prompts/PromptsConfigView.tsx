@@ -31,7 +31,8 @@ import {
   CheckCheck,
   Eye,
   EyeOff,
-  Database
+  Database,
+  HelpCircle
 } from 'lucide-react';
 import { useToast } from '@/shared/contexts/ToastContext';
 
@@ -54,6 +55,19 @@ interface PromptConfig {
   sourcing_min_leads?: number;
   sourcing_max_leads?: number;
   sourcing_allow_existing_companies_visible?: boolean;
+  supervisor_optimal_threshold?: number;
+  weight_email_offer_fidelity?: number;
+  weight_email_personalization?: number;
+  weight_email_cta_clarity?: number;
+  weight_email_delivery_health?: number;
+  weight_sourcing_job_title?: number;
+  weight_sourcing_seniority?: number;
+  weight_sourcing_industry?: number;
+  weight_sourcing_geography?: number;
+  weight_sourcing_company_size?: number;
+  weight_link_acceptance_rate?: number;
+  weight_link_avg_icp_score?: number;
+  penalty_link_false_positive?: number;
 }
 
 interface ProviderStatus {
@@ -122,6 +136,23 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
   const [formSourcingMinLeads, setFormSourcingMinLeads] = useState<number>(1);
   const [formSourcingMaxLeads, setFormSourcingMaxLeads] = useState<number>(15);
   const [formAllowExistingVisible, setFormAllowExistingVisible] = useState<boolean>(true);
+  const [formSupervisorOptimalThreshold, setFormSupervisorOptimalThreshold] = useState<number>(75);
+  // Dynamic Scoring Weights for Supervisor Audits
+  const [formWeightEmailOffer, setFormWeightEmailOffer] = useState<number>(40);
+  const [formWeightEmailPersonalization, setFormWeightEmailPersonalization] = useState<number>(30);
+  const [formWeightEmailCta, setFormWeightEmailCta] = useState<number>(20);
+  const [formWeightEmailDelivery, setFormWeightEmailDelivery] = useState<number>(10);
+
+  const [formWeightSourcingJob, setFormWeightSourcingJob] = useState<number>(25);
+  const [formWeightSourcingSeniority, setFormWeightSourcingSeniority] = useState<number>(20);
+  const [formWeightSourcingIndustry, setFormWeightSourcingIndustry] = useState<number>(25);
+  const [formWeightSourcingGeo, setFormWeightSourcingGeo] = useState<number>(15);
+  const [formWeightSourcingSize, setFormWeightSourcingSize] = useState<number>(15);
+
+  const [formWeightLinkAcceptance, setFormWeightLinkAcceptance] = useState<number>(50);
+  const [formWeightLinkAvgIcp, setFormWeightLinkAvgIcp] = useState<number>(50);
+  const [formPenaltyLinkFalsePositive, setFormPenaltyLinkFalsePositive] = useState<number>(15);
+
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string>('');
 
   // Interactive Test State
@@ -188,6 +219,19 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
     setFormSourcingMinLeads(p.sourcing_min_leads ?? 1);
     setFormSourcingMaxLeads(p.sourcing_max_leads ?? 15);
     setFormAllowExistingVisible(p.sourcing_allow_existing_companies_visible !== false);
+    setFormSupervisorOptimalThreshold(p.supervisor_optimal_threshold ?? 75);
+    setFormWeightEmailOffer(p.weight_email_offer_fidelity ?? 40);
+    setFormWeightEmailPersonalization(p.weight_email_personalization ?? 30);
+    setFormWeightEmailCta(p.weight_email_cta_clarity ?? 20);
+    setFormWeightEmailDelivery(p.weight_email_delivery_health ?? 10);
+    setFormWeightSourcingJob(p.weight_sourcing_job_title ?? 25);
+    setFormWeightSourcingSeniority(p.weight_sourcing_seniority ?? 20);
+    setFormWeightSourcingIndustry(p.weight_sourcing_industry ?? 25);
+    setFormWeightSourcingGeo(p.weight_sourcing_geography ?? 15);
+    setFormWeightSourcingSize(p.weight_sourcing_company_size ?? 15);
+    setFormWeightLinkAcceptance(p.weight_link_acceptance_rate ?? 50);
+    setFormWeightLinkAvgIcp(p.weight_link_avg_icp_score ?? 50);
+    setFormPenaltyLinkFalsePositive(p.penalty_link_false_positive ?? 15);
     setLastUpdatedAt(p.updated_at ? new Date(p.updated_at).toLocaleString('fr-FR') : '');
   };
 
@@ -222,7 +266,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
   };
 
   const handleSave = async () => {
-    if (!formPromptText.trim() || formPromptText.trim().length < 10) {
+    if (activeKey !== 'supervisor_audit_config' && (!formPromptText.trim() || formPromptText.trim().length < 10)) {
       showToast('Le texte du prompt système doit contenir au moins 10 caractères.', 'error');
       return;
     }
@@ -232,6 +276,28 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
       return;
     }
 
+    if (activeKey === 'supervisor_audit_config') {
+      if (formSupervisorOptimalThreshold < 0 || formSupervisorOptimalThreshold > 100) {
+        showToast('Le seuil optimal doit être compris entre 0 (masqué) et 100%.', 'error');
+        return;
+      }
+      const sumEmail = formWeightEmailOffer + formWeightEmailPersonalization + formWeightEmailCta + formWeightEmailDelivery;
+      if (sumEmail !== 100) {
+        showToast(`La somme des pondérations d'évaluation des Emails doit faire 100% (actuellement ${sumEmail}%).`, 'error');
+        return;
+      }
+      const sumSourcing = formWeightSourcingJob + formWeightSourcingSeniority + formWeightSourcingIndustry + formWeightSourcingGeo + formWeightSourcingSize;
+      if (sumSourcing !== 100) {
+        showToast(`La somme des pondérations de ciblage Sourcing doit faire 100% (actuellement ${sumSourcing}%).`, 'error');
+        return;
+      }
+      const sumLink = formWeightLinkAcceptance + formWeightLinkAvgIcp;
+      if (sumLink !== 100) {
+        showToast(`La somme des pondérations de Liaison doit faire 100% (actuellement ${sumLink}%).`, 'error');
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const res = await fetch(`${API_BASE}/api/admin/prompts/${activeKey}`, {
@@ -239,8 +305,8 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
         credentials: 'include',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          name: formName,
-          prompt_text: formPromptText,
+          name: formName || (activeKey === 'supervisor_audit_config' ? 'Superviseur Commercial - Paramètres & Seuils d\'Audit' : formName),
+          prompt_text: formPromptText || 'Configuration globale des seuils de conformité et paramètres de gouvernance pour le Superviseur Commercial.',
           provider_mode: formProviderMode,
           model: formModel,
           fallback_model: formFallbackModel,
@@ -253,6 +319,21 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
             sourcing_min_leads: formSourcingMinLeads,
             sourcing_max_leads: formSourcingMaxLeads,
             sourcing_allow_existing_companies_visible: formAllowExistingVisible
+          } : {}),
+          ...(activeKey === 'supervisor_audit_config' ? {
+            supervisor_optimal_threshold: formSupervisorOptimalThreshold,
+            weight_email_offer_fidelity: formWeightEmailOffer,
+            weight_email_personalization: formWeightEmailPersonalization,
+            weight_email_cta_clarity: formWeightEmailCta,
+            weight_email_delivery_health: formWeightEmailDelivery,
+            weight_sourcing_job_title: formWeightSourcingJob,
+            weight_sourcing_seniority: formWeightSourcingSeniority,
+            weight_sourcing_industry: formWeightSourcingIndustry,
+            weight_sourcing_geography: formWeightSourcingGeo,
+            weight_sourcing_company_size: formWeightSourcingSize,
+            weight_link_acceptance_rate: formWeightLinkAcceptance,
+            weight_link_avg_icp_score: formWeightLinkAvgIcp,
+            penalty_link_false_positive: formPenaltyLinkFalsePositive
           } : {})
         })
       });
@@ -612,39 +693,41 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
             <span>Rétablir</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setShowTestModal(true);
-              setTestUserMessage(
-                activeKey === 'prospect_onboarding_chat'
-                  ? "Bonjour ! Je m'appelle Thomas, directeur commercial chez CloudSecure. Nous vendons une solution de cybersécurité pour les PME."
-                  : "Directeurs logistique en France dans le secteur du transport"
-              );
-            }}
-            disabled={loading}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '10px 18px', borderRadius: 9,
-              background: 'rgba(0, 229, 200, 0.12)',
-              border: '1px solid rgba(0, 229, 200, 0.45)',
-              color: '#00E5C8', fontSize: 13, fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-              boxShadow: '0 0 12px rgba(0, 229, 200, 0.15)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(0, 229, 200, 0.2)';
-              e.currentTarget.style.boxShadow = '0 0 18px rgba(0, 229, 200, 0.3)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(0, 229, 200, 0.12)';
-              e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 229, 200, 0.15)';
-            }}
-          >
-            <Play size={15} />
-            <span>Tester en direct</span>
-          </button>
+          {activeKey !== 'supervisor_audit_config' && (
+            <button
+              type="button"
+              onClick={() => {
+                setShowTestModal(true);
+                setTestUserMessage(
+                  activeKey === 'prospect_onboarding_chat'
+                    ? "Bonjour ! Je m'appelle Thomas, directeur commercial chez CloudSecure. Nous vendons une solution de cybersécurité pour les PME."
+                    : "Directeurs logistique en France dans le secteur du transport"
+                );
+              }}
+              disabled={loading}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '10px 18px', borderRadius: 9,
+                background: 'rgba(0, 229, 200, 0.12)',
+                border: '1px solid rgba(0, 229, 200, 0.45)',
+                color: '#00E5C8', fontSize: 13, fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                boxShadow: '0 0 12px rgba(0, 229, 200, 0.15)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 229, 200, 0.2)';
+                e.currentTarget.style.boxShadow = '0 0 18px rgba(0, 229, 200, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 229, 200, 0.12)';
+                e.currentTarget.style.boxShadow = '0 0 12px rgba(0, 229, 200, 0.15)';
+              }}
+            >
+              <Play size={15} />
+              <span>Tester en direct</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -730,12 +813,741 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
             Sourcing Modals
           </span>
         </button>
+
+        <button
+          onClick={() => handleSelectTab('supervisor_audit_config')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '11px 18px', borderRadius: 10,
+            background: activeKey === 'supervisor_audit_config' ? 'rgba(0, 229, 200, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+            border: `1px solid ${activeKey === 'supervisor_audit_config' ? '#00E5C8' : 'rgba(255, 255, 255, 0.12)'}`,
+            color: activeKey === 'supervisor_audit_config' ? '#00E5C8' : '#CBD5E1',
+            fontWeight: 600, fontSize: 13.5, cursor: 'pointer',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxShadow: activeKey === 'supervisor_audit_config' ? '0 0 16px rgba(0, 229, 200, 0.18)' : 'none'
+          }}
+        >
+          <Sliders size={16} />
+          <span> Superviseur : Seuils & Gouvernance</span>
+          <span style={{
+            fontSize: 11, padding: '2px 8px', borderRadius: 12,
+            background: activeKey === 'supervisor_audit_config' ? 'rgba(0, 229, 200, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+            color: activeKey === 'supervisor_audit_config' ? '#00E5C8' : '#94A3B8',
+            fontWeight: 600
+          }}>
+            Superviseur Commercial
+          </span>
+        </button>
       </div>
 
       {loading ? (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 380, gap: 12, color: '#CBD5E1' }}>
           <Loader2 size={24} className="spin" color="#00E5C8" />
           <span style={{ fontSize: 14.5, fontWeight: 500 }}>Chargement des configurations...</span>
+        </div>
+      ) : activeKey === 'supervisor_audit_config' ? (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) 420px',
+          gap: 24,
+          alignItems: 'start',
+          flex: 1
+        }}>
+          {/* Main Column: Supervisor Thresholds & Governance Parameters */}
+          <div style={{
+            background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.9) 0%, rgba(12, 28, 52, 0.75) 100%)',
+            border: '1px solid rgba(0, 229, 200, 0.28)',
+            borderRadius: 16,
+            padding: 28,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 24,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: '10%',
+              right: '10%',
+              height: '1px',
+              background: 'linear-gradient(90deg, transparent, #00E5C8, transparent)',
+              opacity: 0.6
+            }} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                  <Target size={18} color="#00E5C8" />
+                  <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#FFFFFF' }}>
+                    Seuil Optimal de Conformité (Historique & Flotte)
+                  </h2>
+                </div>
+                <p style={{ margin: 0, fontSize: 13.5, color: '#94A3B8', lineHeight: 1.55, maxWidth: 640 }}>
+                  {formSupervisorOptimalThreshold === 0 ? (
+                    <>
+                      La ligne de référence <strong style={{ color: '#FF7582' }}>« Seuil optimal » est actuellement masquée</strong> sur le graphique d&apos;Historique. Le seuil par défaut (75%) reste utilisé en interne pour les pastilles de statut des agents.
+                    </>
+                  ) : (
+                    <>
+                      Définit la ligne de référence <strong style={{ color: '#00E5C8' }}>« Seuil optimal ({formSupervisorOptimalThreshold}%) »</strong> affichée sur la courbe d&apos;évolution dans l&apos;onglet Historique du Superviseur Commercial ainsi que le score minimal pour classer un agent ou un binôme en statut <strong>Optimal</strong>.
+                    </>
+                  )}
+                </p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <button
+                  type="button"
+                  onClick={() => setFormSupervisorOptimalThreshold(formSupervisorOptimalThreshold === 0 ? 75 : 0)}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: 10,
+                    background: formSupervisorOptimalThreshold === 0 ? 'rgba(0, 229, 200, 0.14)' : 'rgba(255, 71, 87, 0.12)',
+                    border: `1px solid ${formSupervisorOptimalThreshold === 0 ? 'rgba(0, 229, 200, 0.45)' : 'rgba(255, 71, 87, 0.4)'}`,
+                    color: formSupervisorOptimalThreshold === 0 ? '#00E5C8' : '#FF7582',
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    transition: 'all 0.18s ease'
+                  }}
+                >
+                  {formSupervisorOptimalThreshold === 0 ? '+ Réactiver la ligne (75%)' : 'Masquer la ligne'}
+                </button>
+                <div style={{
+                  padding: '10px 18px',
+                  borderRadius: 12,
+                  background: formSupervisorOptimalThreshold === 0 ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 229, 200, 0.12)',
+                  border: `1px solid ${formSupervisorOptimalThreshold === 0 ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 229, 200, 0.4)'}`,
+                  color: formSupervisorOptimalThreshold === 0 ? '#94A3B8' : '#00E5C8',
+                  fontSize: formSupervisorOptimalThreshold === 0 ? 15 : 22,
+                  fontWeight: 800,
+                  fontFamily: 'monospace',
+                  boxShadow: formSupervisorOptimalThreshold === 0 ? 'none' : '0 0 20px rgba(0, 229, 200, 0.15)',
+                  flexShrink: 0
+                }}>
+                  {formSupervisorOptimalThreshold === 0 ? 'Masqué' : `${formSupervisorOptimalThreshold}%`}
+                </div>
+              </div>
+            </div>
+
+            {/* Interactive Slider + Numeric Input */}
+            <div style={{
+              background: 'rgba(4, 11, 22, 0.85)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              borderRadius: 12,
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16
+            }}>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                opacity: formSupervisorOptimalThreshold === 0 ? 0.5 : 1,
+                transition: 'opacity 0.2s ease'
+              }}>
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={formSupervisorOptimalThreshold === 0 ? 75 : formSupervisorOptimalThreshold}
+                  onChange={(e) => setFormSupervisorOptimalThreshold(Math.min(100, Math.max(1, parseInt(e.target.value, 10) || 75)))}
+                  style={{ flex: 1, accentColor: '#00E5C8', cursor: 'pointer', height: 6 }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={formSupervisorOptimalThreshold}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val)) {
+                        setFormSupervisorOptimalThreshold(Math.min(100, Math.max(0, val)));
+                      }
+                    }}
+                    style={{
+                      width: 76,
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(0, 229, 200, 0.35)',
+                      borderRadius: 8,
+                      padding: '8px 10px',
+                      color: '#FFFFFF',
+                      fontSize: 15,
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      outline: 'none'
+                    }}
+                  />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: '#94A3B8' }}>%</span>
+                </div>
+              </div>
+
+              {/* Preset Quick Chips */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                <span style={{ fontSize: 12, color: '#94A3B8', fontWeight: 600 }}>Valeurs recommandées :</span>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    onClick={() => setFormSupervisorOptimalThreshold(0)}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: 8,
+                      background: formSupervisorOptimalThreshold === 0 ? 'rgba(255, 71, 87, 0.18)' : 'rgba(255, 255, 255, 0.04)',
+                      border: `1px solid ${formSupervisorOptimalThreshold === 0 ? '#FF4757' : 'rgba(255, 255, 255, 0.1)'}`,
+                      color: formSupervisorOptimalThreshold === 0 ? '#FF7582' : '#94A3B8',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Masquer la ligne
+                  </button>
+                  {[60, 65, 70, 75, 80, 85, 90].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setFormSupervisorOptimalThreshold(preset)}
+                      style={{
+                        padding: '5px 12px',
+                        borderRadius: 8,
+                        background: formSupervisorOptimalThreshold === preset ? 'rgba(0, 229, 200, 0.18)' : 'rgba(255, 255, 255, 0.04)',
+                        border: `1px solid ${formSupervisorOptimalThreshold === preset ? '#00E5C8' : 'rgba(255, 255, 255, 0.1)'}`,
+                        color: formSupervisorOptimalThreshold === preset ? '#00E5C8' : '#CBD5E1',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {preset}% {preset === 75 ? '(Défaut)' : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Live Chart Reference Line Visual Preview */}
+            <div style={{
+              background: 'rgba(4, 11, 22, 0.92)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: 12,
+              padding: '18px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 11.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#94A3B8' }}>
+                  Aperçu en direct sur le graphique d&apos;Historique
+                </span>
+                <span style={{ fontSize: 11.5, color: formSupervisorOptimalThreshold === 0 ? '#94A3B8' : '#00E5C8', fontWeight: 600 }}>
+                  {formSupervisorOptimalThreshold === 0 ? 'Aucune ligne de seuil affichée' : `Seuil optimal (${formSupervisorOptimalThreshold}%)`}
+                </span>
+              </div>
+
+              <div style={{
+                position: 'relative',
+                height: 110,
+                background: 'linear-gradient(180deg, rgba(0, 229, 200, 0.07) 0%, rgba(0, 229, 200, 0.01) 100%)',
+                borderRadius: 8,
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                {formSupervisorOptimalThreshold === 0 ? (
+                  <span style={{ fontSize: 12, color: '#64748B', fontWeight: 600 }}>
+                    Ligne « Seuil optimal » masquée sur la courbe
+                  </span>
+                ) : (
+                  <div style={{
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: `${formSupervisorOptimalThreshold}%`,
+                    borderTop: '1.5px dashed rgba(0, 229, 200, 0.65)',
+                    transition: 'bottom 0.15s ease'
+                  }}>
+                    <span style={{
+                      position: 'absolute',
+                      right: 10,
+                      top: 4,
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      color: '#00E5C8',
+                      background: 'rgba(4, 11, 22, 0.85)',
+                      padding: '1px 6px',
+                      borderRadius: 4
+                    }}>
+                      Seuil optimal ({formSupervisorOptimalThreshold}%)
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* BARÈME DE NOTATION MATHÉMATIQUE & PONDÉRATIONS DYNAMIQUES */}
+            <div style={{
+              background: 'rgba(4, 11, 22, 0.92)',
+              border: '1px solid rgba(0, 229, 200, 0.25)',
+              borderRadius: 16,
+              padding: 24,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 20
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <Database size={18} color="#00E5C8" />
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: '#FFFFFF', margin: 0 }}>
+                    Formule &amp; Pondérations de Notation (Calcul Déterministe)
+                  </h3>
+                </div>
+                <p style={{ fontSize: 12.5, color: '#94A3B8', marginTop: 6, marginBottom: 0, lineHeight: 1.5 }}>
+                  Configurez le barème mathématique utilisé pour attribuer les notes de conformité. Les scores sont calculés par code JavaScript déterministe avec ces coefficients stricts, garantissant des résultats stables et reproductibles entre chaque exécution.
+                </p>
+              </div>
+
+              {/* 1. Barème Prospection (Emails) */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: 12,
+                padding: 18,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#00E5C8' }}>
+                    1. Évaluation des Emails (Agent de Prospection)
+                  </span>
+                  <span style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    background: (formWeightEmailOffer + formWeightEmailPersonalization + formWeightEmailCta + formWeightEmailDelivery === 100)
+                      ? 'rgba(0, 229, 200, 0.15)' : 'rgba(255, 71, 87, 0.2)',
+                    color: (formWeightEmailOffer + formWeightEmailPersonalization + formWeightEmailCta + formWeightEmailDelivery === 100)
+                      ? '#00E5C8' : '#FF4757',
+                    border: `1px solid ${(formWeightEmailOffer + formWeightEmailPersonalization + formWeightEmailCta + formWeightEmailDelivery === 100) ? 'rgba(0, 229, 200, 0.3)' : '#FF4757'}`
+                  }}>
+                    Total : {formWeightEmailOffer + formWeightEmailPersonalization + formWeightEmailCta + formWeightEmailDelivery} / 100%
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                  <div>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#CBD5E1', marginBottom: 4, cursor: 'help' }}
+                      title="Vérifie que le nom du produit/service et au moins un avantage concurrentiel (différenciateur clé) du Briefing sont cités dans chaque email."
+                    >
+                      <span>Fidélité à l&apos;Offre &amp; Différenciateurs (%)</span>
+                      <HelpCircle size={12} color="#00E5C8" style={{ opacity: 0.8 }} />
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={formWeightEmailOffer}
+                      onChange={(e) => setFormWeightEmailOffer(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                      style={{ width: '100%', padding: '8px 12px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#FFF' }}
+                    />
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#64748B', marginTop: 3 }}>
+                      Citation du produit et arguments clés
+                    </span>
+                  </div>
+                  <div>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#CBD5E1', marginBottom: 4, cursor: 'help' }}
+                      title="Mesure la personnalisation de l'accroche : l'email est-il contextualisé selon le poste, l'entreprise et le secteur d'activité du destinataire ?"
+                    >
+                      <span>Personnalisation par Entreprise (%)</span>
+                      <HelpCircle size={12} color="#00E5C8" style={{ opacity: 0.8 }} />
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={formWeightEmailPersonalization}
+                      onChange={(e) => setFormWeightEmailPersonalization(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                      style={{ width: '100%', padding: '8px 12px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#FFF' }}
+                    />
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#64748B', marginTop: 3 }}>
+                      Accroche adaptée au profil du prospect
+                    </span>
+                  </div>
+                  <div>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#CBD5E1', marginBottom: 4, cursor: 'help' }}
+                      title="Évalue si l'email se termine par une proposition concrète et facile à accepter (ex: appel de 15 minutes, créneau de démo, échange rapide)."
+                    >
+                      <span>Clarté de l&apos;Invitation à Échanger (%)</span>
+                      <HelpCircle size={12} color="#00E5C8" style={{ opacity: 0.8 }} />
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={formWeightEmailCta}
+                      onChange={(e) => setFormWeightEmailCta(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                      style={{ width: '100%', padding: '8px 12px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#FFF' }}
+                    />
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#64748B', marginTop: 3 }}>
+                      Proposition de rendez-vous claire
+                    </span>
+                  </div>
+                  <div>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: '#CBD5E1', marginBottom: 4, cursor: 'help' }}
+                      title="Pénalise uniquement les erreurs techniques d'envoi et les rebonds. Les brouillons manuels et envois réussis reçoivent 100% de cette note."
+                    >
+                      <span>Santé &amp; Délivrabilité des Envois (%)</span>
+                      <HelpCircle size={12} color="#00E5C8" style={{ opacity: 0.8 }} />
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={formWeightEmailDelivery}
+                      onChange={(e) => setFormWeightEmailDelivery(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                      style={{ width: '100%', padding: '8px 12px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#FFF' }}
+                    />
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#64748B', marginTop: 3 }}>
+                      Absence d&apos;erreurs et de rejets d&apos;envoi
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Barème Sourcing (Qualité des leads) */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: 12,
+                padding: 18,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#00E5C8' }}>
+                    2. Évaluation du Sourcing (Critères de Recherche)
+                  </span>
+                  <span style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    background: (formWeightSourcingJob + formWeightSourcingSeniority + formWeightSourcingIndustry + formWeightSourcingGeo + formWeightSourcingSize === 100)
+                      ? 'rgba(0, 229, 200, 0.15)' : 'rgba(255, 71, 87, 0.2)',
+                    color: (formWeightSourcingJob + formWeightSourcingSeniority + formWeightSourcingIndustry + formWeightSourcingGeo + formWeightSourcingSize === 100)
+                      ? '#00E5C8' : '#FF4757',
+                    border: `1px solid ${(formWeightSourcingJob + formWeightSourcingSeniority + formWeightSourcingIndustry + formWeightSourcingGeo + formWeightSourcingSize === 100) ? 'rgba(0, 229, 200, 0.3)' : '#FF4757'}`
+                  }}>
+                    Total : {formWeightSourcingJob + formWeightSourcingSeniority + formWeightSourcingIndustry + formWeightSourcingGeo + formWeightSourcingSize} / 100%
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                  <div>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#CBD5E1', marginBottom: 4, cursor: 'help' }}
+                      title="Vérifie que l'intitulé de poste du profil extrait correspond bien aux fonctions recherchées dans la Mission de l'Agent de Sourcing (ex: Directeur commercial, Chef cuisinier)."
+                    >
+                      <span>Intitulé du Poste (%)</span>
+                      <HelpCircle size={12} color="#00E5C8" style={{ opacity: 0.8 }} />
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={formWeightSourcingJob}
+                      onChange={(e) => setFormWeightSourcingJob(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                      style={{ width: '100%', padding: '8px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#FFF' }}
+                    />
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#64748B', marginTop: 3 }}>
+                      Adéquation fonctionnelle du poste
+                    </span>
+                  </div>
+                  <div>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#CBD5E1', marginBottom: 4, cursor: 'help' }}
+                      title="Vérifie le niveau hiérarchique et le pouvoir de décision (C-Suite, VP, Director, Gérant, etc.) demandé dans la mission."
+                    >
+                      <span>Niveau Hiérarchique (%)</span>
+                      <HelpCircle size={12} color="#00E5C8" style={{ opacity: 0.8 }} />
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={formWeightSourcingSeniority}
+                      onChange={(e) => setFormWeightSourcingSeniority(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                      style={{ width: '100%', padding: '8px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#FFF' }}
+                    />
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#64748B', marginTop: 3 }}>
+                      Séniorité et rôle de décideur
+                    </span>
+                  </div>
+                  <div>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#CBD5E1', marginBottom: 4, cursor: 'help' }}
+                      title="Vérifie que l'entreprise du lead appartient au bon secteur d'activité (avec équivalence FR/EN garantie, ex: Hospitality = Hôtellerie)."
+                    >
+                      <span>Secteur d&apos;Activité (%)</span>
+                      <HelpCircle size={12} color="#00E5C8" style={{ opacity: 0.8 }} />
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={formWeightSourcingIndustry}
+                      onChange={(e) => setFormWeightSourcingIndustry(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                      style={{ width: '100%', padding: '8px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#FFF' }}
+                    />
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#64748B', marginTop: 3 }}>
+                      Industrie cible de l&apos;entreprise
+                    </span>
+                  </div>
+                  <div>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#CBD5E1', marginBottom: 4, cursor: 'help' }}
+                      title="Vérifie que le pays ou la région de l'entreprise correspond aux zones géographiques ciblées (ex: France, Belgique, Suisse)."
+                    >
+                      <span>Zone Géographique (%)</span>
+                      <HelpCircle size={12} color="#00E5C8" style={{ opacity: 0.8 }} />
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={formWeightSourcingGeo}
+                      onChange={(e) => setFormWeightSourcingGeo(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                      style={{ width: '100%', padding: '8px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#FFF' }}
+                    />
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#64748B', marginTop: 3 }}>
+                      Pays et localisation géographique
+                    </span>
+                  </div>
+                  <div>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#CBD5E1', marginBottom: 4, cursor: 'help' }}
+                      title="Vérifie que le nombre de salariés de l'entreprise s'inscrit dans la tranche d'effectif demandée (ex: 50 à 1 000 salariés)."
+                    >
+                      <span>Taille de l&apos;Entreprise (%)</span>
+                      <HelpCircle size={12} color="#00E5C8" style={{ opacity: 0.8 }} />
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={formWeightSourcingSize}
+                      onChange={(e) => setFormWeightSourcingSize(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                      style={{ width: '100%', padding: '8px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#FFF' }}
+                    />
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#64748B', marginTop: 3 }}>
+                      Tranche d&apos;effectif salarié
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Barème Liaison Inter-Agents */}
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: 12,
+                padding: 18,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#00E5C8' }}>
+                    3. Évaluation de la Liaison Inter-Agents (Sourcing ➔ Prospection)
+                  </span>
+                  <span style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                    background: (formWeightLinkAcceptance + formWeightLinkAvgIcp === 100)
+                      ? 'rgba(0, 229, 200, 0.15)' : 'rgba(255, 71, 87, 0.2)',
+                    color: (formWeightLinkAcceptance + formWeightLinkAvgIcp === 100)
+                      ? '#00E5C8' : '#FF4757',
+                    border: `1px solid ${(formWeightLinkAcceptance + formWeightLinkAvgIcp === 100) ? 'rgba(0, 229, 200, 0.3)' : '#FF4757'}`
+                  }}>
+                    Total Poids : {formWeightLinkAcceptance + formWeightLinkAvgIcp} / 100%
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                  <div>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#CBD5E1', marginBottom: 4, cursor: 'help' }}
+                      title="Proportion de leads transmis par le sourcing qui sont acceptés par la prospection. Mesure l'absence de gaspillage (Quantité de leads qualifiés sur le total envoyé)."
+                    >
+                      <span>Part de Leads Retenus (%)</span>
+                      <HelpCircle size={12} color="#00E5C8" style={{ opacity: 0.8 }} />
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={formWeightLinkAcceptance}
+                      onChange={(e) => setFormWeightLinkAcceptance(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                      style={{ width: '100%', padding: '8px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#FFF' }}
+                    />
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#64748B', marginTop: 3 }}>
+                      Taux d&apos;acceptation en prospection
+                    </span>
+                  </div>
+                  <div>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#CBD5E1', marginBottom: 4, cursor: 'help' }}
+                      title="Note moyenne sur 100 donnée par l'agent de prospection aux profils qu'il a acceptés. Mesure la proximité avec la cible idéale (Qualité et pertinence des profils retenus)."
+                    >
+                      <span>Correspondance Cible (%)</span>
+                      <HelpCircle size={12} color="#00E5C8" style={{ opacity: 0.8 }} />
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={formWeightLinkAvgIcp}
+                      onChange={(e) => setFormWeightLinkAvgIcp(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                      style={{ width: '100%', padding: '8px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#FFF' }}
+                    />
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#64748B', marginTop: 3 }}>
+                      Note moyenne des profils qualifiés
+                    </span>
+                  </div>
+                  <div>
+                    <label
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#CBD5E1', marginBottom: 4, cursor: 'help' }}
+                      title="Points déduits si un lead hors-cible (mauvais pays ou mauvaise taille) a été qualifié par erreur à cause d'un seuil trop permissif."
+                    >
+                      <span>Pénalité Faux Positifs (pts)</span>
+                      <HelpCircle size={12} color="#00E5C8" style={{ opacity: 0.8 }} />
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={50}
+                      value={formPenaltyLinkFalsePositive}
+                      onChange={(e) => setFormPenaltyLinkFalsePositive(Math.max(0, Math.min(50, parseInt(e.target.value, 10) || 0)))}
+                      style={{ width: '100%', padding: '8px 10px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#FFF' }}
+                    />
+                    <span style={{ display: 'block', fontSize: 10.5, color: '#64748B', marginTop: 3 }}>
+                      Déduction si un hors-cible est accepté
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Side Column: Summary & Save */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{
+              background: 'linear-gradient(145deg, rgba(8, 20, 38, 0.9) 0%, rgba(12, 28, 52, 0.75) 100%)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              borderRadius: 16,
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.35)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Sliders size={16} color="#00E5C8" />
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#FFFFFF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Impact des Seuils
+                </span>
+              </div>
+
+              <div style={{
+                background: 'rgba(4, 11, 22, 0.75)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                borderRadius: 10,
+                padding: 14,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                fontSize: 12.5
+              }}>
+                {(() => {
+                  const effectiveOpt = formSupervisorOptimalThreshold > 0 ? formSupervisorOptimalThreshold : 75;
+                  const critCutoff = Math.min(50, Math.max(1, effectiveOpt - 1));
+                  return (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#94A3B8', fontWeight: 600 }}>Ligne sur graphique</span>
+                        <span style={{ fontFamily: 'monospace', color: formSupervisorOptimalThreshold === 0 ? '#FF7582' : '#00E5C8', fontWeight: 700 }}>
+                          {formSupervisorOptimalThreshold === 0 ? 'Masquée' : `Active (${formSupervisorOptimalThreshold}%)`}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#00E5C8', fontWeight: 700 }}>● Optimal</span>
+                        <span style={{ fontFamily: 'monospace', color: '#F0F4F8', fontWeight: 700 }}>≥ {effectiveOpt}%</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#FFA502', fontWeight: 700 }}>● À surveiller</span>
+                        <span style={{ fontFamily: 'monospace', color: '#F0F4F8', fontWeight: 700 }}>
+                          {critCutoff}% – {Math.max(1, effectiveOpt - 1)}%
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: '#FF4757', fontWeight: 700 }}>● Critique</span>
+                        <span style={{ fontFamily: 'monospace', color: '#F0F4F8', fontWeight: 700 }}>
+                          &lt; {critCutoff}%
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+
+              {lastUpdatedAt && (
+                <div style={{ fontSize: 11.5, color: '#94A3B8' }}>
+                  Dernière synchronisation : <strong style={{ color: '#F0F4F8' }}>{lastUpdatedAt}</strong>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving || loading}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  borderRadius: 10,
+                  background: 'linear-gradient(135deg, #00E5C8 0%, #00C2A8 100%)',
+                  border: 'none',
+                  color: '#04111D',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  boxShadow: '0 0 16px rgba(0, 229, 200, 0.35)'
+                }}
+              >
+                {saving ? <Loader2 size={15} className="spin" /> : <Save size={15} />}
+                <span>{saving ? 'Sauvegarde...' : 'Sauvegarder la configuration'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       ) : (
         <div style={{ 

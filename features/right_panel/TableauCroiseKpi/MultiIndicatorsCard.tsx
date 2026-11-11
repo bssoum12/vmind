@@ -35,7 +35,16 @@ export const MultiIndicatorsCard: React.FC<Props> = ({
     const exportData = toolData.data?.exportData || toolData.exportData || null;
 
     const effectiveLoading = (loadingByAgent["vdata"] || loadingByAgent["VDATA"]) && !toolData.ok;
-    const error = !effectiveLoading && !toolData.ok && globalError ? globalError : "";
+    // Carte calculée mais en échec (ok: false) : on affiche un message au lieu du graphique avec des zéros
+    const blocResult = agentData.get_tableau_croise;
+    const blocFailed = Boolean(blocResult && typeof blocResult === "object" && blocResult.ok === false);
+    const engineError = (agentData._meta?.erreurs_moteur || []).find((e: any) => e && e.bloc === "get_tableau_croise");
+    const blocError = !blocFailed
+        ? ""
+        : (!engineError || engineError.error === "ERP_ERROR")
+            ? "Indisponible – ERP injoignable, réessayez."
+            : `Indisponible – ${engineError.message || "calcul impossible"}, réessayez.`;
+    const error = effectiveLoading ? "" : (!toolData.ok && globalError ? globalError : blocError);
 
     const updateCoords = () => {
         if (cardRef.current) {
