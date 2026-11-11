@@ -11,6 +11,7 @@ import {
   FileText,
   Send,
   CornerDownRight,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   FleetFunnelData,
@@ -23,12 +24,14 @@ interface SupervisorFunnelViewProps {
   isLoading: boolean;
   onRefresh: () => void;
   onOpenContextModal?: () => void;
+  hasError?: boolean;
 }
 
 export const SupervisorFunnelView: React.FC<SupervisorFunnelViewProps> = ({
   funnelData,
   isLoading,
   onRefresh,
+  hasError = false,
 }) => {
   if (isLoading && !funnelData) {
     return (
@@ -180,7 +183,15 @@ export const SupervisorFunnelView: React.FC<SupervisorFunnelViewProps> = ({
           </p>
         </div>
 
-        {agentPairs.length === 0 ? (
+        {hasError ? (
+          <div className="funnel-empty-state error" style={{ borderColor: 'rgba(255, 71, 87, 0.3)' }}>
+            <AlertTriangle size={20} style={{ color: '#FF4757' }} />
+            <span className="empty-title" style={{ color: '#F0F4F8' }}>Erreur de chargement du pipeline</span>
+            <span className="empty-desc" style={{ color: '#94A3B8' }}>
+              Impossible de récupérer les métriques de conversion. Veuillez vérifier votre connexion ou réactualiser.
+            </span>
+          </div>
+        ) : agentPairs.length === 0 ? (
           <div className="funnel-empty-state">
             <Info size={18} className="text-cyan" />
             <span className="empty-title">Aucune liaison configurée</span>

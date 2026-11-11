@@ -22,6 +22,7 @@ interface NodeDiagnosticDrawerProps {
   onClose: () => void;
   onEvaluationComplete?: (node: SupervisorNode, data: any) => void;
   unattendedLeads?: HotLeadAlertItem[];
+  alertsLoadError?: boolean;
 }
 
 export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
@@ -30,6 +31,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
   onClose,
   onEvaluationComplete,
   unattendedLeads = [],
+  alertsLoadError = false,
 }) => {
   const router = useRouter();
   const { showToast } = useToast();
@@ -56,7 +58,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
   const [copiedLeadId, setCopiedLeadId] = useState<number | null>(null);
 
   const formatUnattendedDelay = (hours: number): string => {
-    if (!hours || hours < 48) {
+    if (!hours || hours < 24) {
       return `${hours || 0}h`;
     }
     const days = Math.floor(hours / 24);
@@ -371,15 +373,25 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
           {activeDrawerTab === 'leads' && !isSourcing ? (
             <div className="drawer-unattended-leads-pane">
               <div className="pane-header-info">
-                <span className="pane-kicker">Périmètre mission active</span>
+                <span className="pane-kicker">Prospects qualifiés</span>
                 <span className="pane-subtitle">
-                  {unattendedLeads.length > 0
-                    ? `${unattendedLeads.length} prospect${unattendedLeads.length > 1 ? 's' : ''} qualifié${unattendedLeads.length > 1 ? 's' : ''} en attente de premier contact depuis plus de 48h`
-                    : 'Tous les prospects qualifiés de la mission en cours ont été contactés'}
+                  {alertsLoadError
+                    ? 'Impossible de récupérer les leads en attente'
+                    : unattendedLeads.length > 0
+                    ? `${unattendedLeads.length} prospect${unattendedLeads.length > 1 ? 's' : ''} qualifié${unattendedLeads.length > 1 ? 's' : ''} en attente de premier contact`
+                    : 'Tous les prospects qualifiés ont été contactés'}
                 </span>
               </div>
 
-              {unattendedLeads.length === 0 ? (
+              {alertsLoadError ? (
+                <div className="drawer-leads-empty-state" style={{ borderColor: 'rgba(255, 71, 87, 0.3)' }}>
+                  <AlertTriangle size={32} style={{ color: '#FF4757', marginBottom: 8 }} />
+                  <div className="empty-title" style={{ color: '#F0F4F8' }}>Erreur de chargement</div>
+                  <p className="empty-desc" style={{ color: '#94A3B8' }}>
+                    Impossible de récupérer les leads en attente pour cet agent. Veuillez réessayer ultérieurement.
+                  </p>
+                </div>
+              ) : unattendedLeads.length === 0 ? (
                 <div className="drawer-leads-empty-state">
                   <CheckCircle2 size={32} className="empty-icon-ok" />
                   <div className="empty-title">Aucun lead en attente</div>
@@ -430,7 +442,7 @@ export const NodeDiagnosticDrawer: React.FC<NodeDiagnosticDrawerProps> = ({
 
                             {/* Inactivity Delay in days */}
                             <td className="col-lead-delay">
-                              <span className={`delay-text ${lead.urgency === 'CRITICAL' ? 'critical' : 'warning'}`}>
+                              <span className={`delay-text ${lead.urgency === 'CRITICAL' ? 'critical' : lead.urgency === 'WARNING' ? 'warning' : 'recent'}`}>
                                 {formatUnattendedDelay(lead.hoursUnattended)}
                               </span>
                             </td>

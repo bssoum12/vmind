@@ -60,6 +60,7 @@ import { VMindGuideArrow } from '@/shared/management/components/VMindGuide';
 interface SupervisorHistoryViewProps {
   historyData: FleetHistoryData;
   isLoading: boolean;
+  hasError?: boolean;
   onRefresh: () => void;
   onRunAuditNow?: () => void;
   isRunningAudit?: boolean;
@@ -85,6 +86,7 @@ interface ChartPointItem {
 export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
   historyData,
   isLoading,
+  hasError = false,
   onRefresh,
   onRunAuditNow,
   isRunningAudit = false,
@@ -576,20 +578,47 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
               <VMindGuideArrow direction="down" color="#00E5C8" />
             </div>
           )}
-          <Calendar size={28} className="empty-icon" />
-          <h3 className="empty-title">Aucun audit enregistré</h3>
-          <p className="empty-desc">
-            Lancez un audit flash ou activez l'autopilot pour enregistrer des sessions de contrôle de conformité.
-          </p>
-          {onRunAuditNow && (
-            <button
-              className="journal-primary-btn"
-              onClick={onRunAuditNow}
-              disabled={isRunningAudit || isLoading}
-            >
-              <Zap size={14} />
-              <span>Démarrer le premier audit</span>
-            </button>
+          {hasError ? (
+            <>
+              <AlertTriangle size={32} style={{ color: '#FF4757', marginBottom: 12 }} />
+              <h3 className="empty-title" style={{ color: '#F0F4F8' }}>Erreur de chargement de l'historique</h3>
+              <p className="empty-desc" style={{ color: '#94A3B8' }}>
+                Impossible de charger les sessions d'audit et la progression temporelle.
+              </p>
+              <button
+                type="button"
+                className="journal-primary-btn"
+                onClick={onRefresh}
+                disabled={isLoading}
+                style={{
+                  background: 'rgba(255, 71, 87, 0.15)',
+                  border: '1px solid rgba(255, 71, 87, 0.4)',
+                  color: '#FF6B7A',
+                  cursor: 'pointer'
+                }}
+              >
+                <RotateCw size={14} className={isLoading ? 'spin-icon' : ''} />
+                <span>Réessayer</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <Calendar size={28} className="empty-icon" />
+              <h3 className="empty-title">Aucun audit enregistré</h3>
+              <p className="empty-desc">
+                Lancez un audit flash ou activez l'autopilot pour enregistrer des sessions de contrôle de conformité.
+              </p>
+              {onRunAuditNow && (
+                <button
+                  className="journal-primary-btn"
+                  onClick={onRunAuditNow}
+                  disabled={isRunningAudit || isLoading}
+                >
+                  <Zap size={14} />
+                  <span>Démarrer le premier audit</span>
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -603,6 +632,50 @@ export const SupervisorHistoryView: React.FC<SupervisorHistoryViewProps> = ({
 
   return (
     <div className="supervisor-history-journal">
+      {hasError && (
+        <div
+          style={{
+            marginBottom: '16px',
+            padding: '10px 16px',
+            borderRadius: '8px',
+            background: 'rgba(255, 71, 87, 0.1)',
+            border: '1px solid rgba(255, 71, 87, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            color: '#FF6B7A',
+            fontSize: '13px'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={16} style={{ color: '#FF4757', flexShrink: 0 }} />
+            <span>Impossible d'actualiser les sessions d'audit. Les données ci-dessous peuvent être obsolètes.</span>
+          </div>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isLoading}
+            style={{
+              background: 'rgba(255, 71, 87, 0.15)',
+              border: '1px solid rgba(255, 71, 87, 0.4)',
+              color: '#FF6B7A',
+              padding: '4px 10px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <RotateCw size={12} className={isLoading ? 'spin-icon' : ''} />
+            <span>Réessayer</span>
+          </button>
+        </div>
+      )}
+
       {/* ── 1. Header ── */}
       <div className="journal-header">
         <div className="header-text">

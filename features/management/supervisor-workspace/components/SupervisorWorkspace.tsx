@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, RotateCw, Share2, Filter, Clock, Sparkles, BarChart3, ChevronRight } from 'lucide-react';
+import { ArrowLeft, RotateCw, Share2, Filter, Clock, Sparkles, BarChart3, ChevronRight, AlertTriangle } from 'lucide-react';
 import { SupervisorGraphCanvas } from './SupervisorGraphCanvas';
 import { NodeDiagnosticDrawer } from './NodeDiagnosticDrawer';
 import { EdgeDiagnosticDrawer } from './EdgeDiagnosticDrawer';
@@ -54,6 +54,12 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
   const [isPipelineModalOpen, setIsPipelineModalOpen] = useState<boolean>(false);
   const [alertsData, setAlertsData] = useState<FleetAlertsData>(DEFAULT_FLEET_ALERTS_DATA);
   const [optimalThreshold, setOptimalThreshold] = useState<number>(75);
+  const [fleetLoadError, setFleetLoadError] = useState<string | null>(null);
+  const [partialErrors, setPartialErrors] = useState<{
+    funnel?: boolean;
+    history?: boolean;
+    alerts?: boolean;
+  }>({});
 
   // ─── Onboarding Tutorial State (VMindGuide) ────────────────────────────────
   const [tutorialStep, setTutorialStep] = useState<number>(0);
@@ -223,6 +229,8 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
 
   const fetchRealFleet = useCallback(async () => {
     setIsLoadingFleet(true);
+    setFleetLoadError(null);
+    setPartialErrors({});
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
 
@@ -274,6 +282,9 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
         setNodes(incomingNodes);
         setLinks(incomingLinks);
         setFleetSummary(calculateSummary(incomingNodes));
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        setFleetLoadError(errJson.error || "Impossible de charger la cartographie de la flotte.");
       }
 
       // 3. Fetch fleet conversion funnel (KBN-13)
@@ -284,9 +295,12 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
         if (funnelRes.ok) {
           const fData = await funnelRes.json();
           setFunnelData(fData);
+        } else {
+          setPartialErrors(prev => ({ ...prev, funnel: true }));
         }
       } catch (fErr) {
         console.warn('[SupervisorWorkspace] Error loading fleet funnel:', fErr);
+        setPartialErrors(prev => ({ ...prev, funnel: true }));
       }
 
       // 4. Fetch fleet audit history (KBN-16)
@@ -300,9 +314,12 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
           if (typeof hData.optimalThreshold === 'number') {
             setOptimalThreshold(hData.optimalThreshold);
           }
+        } else {
+          setPartialErrors(prev => ({ ...prev, history: true }));
         }
       } catch (hErr) {
         console.warn('[SupervisorWorkspace] Error loading fleet history:', hErr);
+        setPartialErrors(prev => ({ ...prev, history: true }));
       }
 
       // 5. Fetch operational alerts & unattended hot leads (KBN-15)
@@ -313,12 +330,16 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
         if (alertsRes.ok) {
           const aData = await alertsRes.json();
           setAlertsData(aData);
+        } else {
+          setPartialErrors(prev => ({ ...prev, alerts: true }));
         }
       } catch (aErr) {
         console.warn('[SupervisorWorkspace] Error loading fleet alerts:', aErr);
+        setPartialErrors(prev => ({ ...prev, alerts: true }));
       }
     } catch (err) {
       console.error('[SupervisorWorkspace] Error loading fleet graph:', err);
+      setFleetLoadError("Impossible de se connecter au serveur pour charger la flotte.");
     } finally {
       setIsLoadingFleet(false);
     }
@@ -702,6 +723,60 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
         </div>
       </header>
 
+      {/* Partial Errors Warning Ribbon */}
+      {Object.values(partialErrors).some(Boolean) && (
+        <div
+          style={{
+            margin: '0 24px 12px 24px',
+            padding: '10px 16px',
+            borderRadius: '10px',
+            background: 'rgba(255, 171, 0, 0.08)',
+            border: '1px solid rgba(255, 171, 0, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            zIndex: 25,
+            position: 'relative',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <AlertTriangle size={16} style={{ color: '#FFAB00', flexShrink: 0 }} />
+            <span style={{ fontSize: '13px', color: '#F0F4F8' }}>
+              Certaines métriques (
+              {[
+                partialErrors.funnel && 'pipeline commercial',
+                partialErrors.history && 'historique des audits',
+                partialErrors.alerts && 'alertes & hot leads'
+              ].filter(Boolean).join(', ')}
+              ) n&apos;ont pas pu être actualisées.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={fetchRealFleet}
+            disabled={isLoadingFleet}
+            style={{
+              background: 'rgba(255, 171, 0, 0.15)',
+              border: '1px solid rgba(255, 171, 0, 0.4)',
+              color: '#FFD666',
+              borderRadius: '6px',
+              padding: '4px 12px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <RotateCw size={12} className={isLoadingFleet ? 'spin-icon' : ''} />
+            <span>Réessayer</span>
+          </button>
+        </div>
+      )}
+
       {/* 2. Main Workspace View Container */}
       {activeTab === 'canvas' ? (
         <div
@@ -848,8 +923,75 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
               </div>
             )}
 
+            {/* Error State Banner if fleet loading failed */}
+            {!isLoadingFleet && fleetLoadError && nodes.length === 0 && (
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(6, 17, 31, 0.88)',
+                zIndex: 10,
+                padding: 32,
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  maxWidth: 460,
+                  padding: '28px 32px',
+                  borderRadius: 16,
+                  background: 'rgba(25, 12, 18, 0.85)',
+                  border: '1px solid rgba(255, 71, 87, 0.35)',
+                  boxShadow: '0 8px 32px rgba(255, 71, 87, 0.15)'
+                }}>
+                  <div style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: '50%',
+                    background: 'rgba(255, 71, 87, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 14px auto',
+                    color: '#FF4757'
+                  }}>
+                    <AlertTriangle size={22} />
+                  </div>
+                  <div style={{ color: '#F0F4F8', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>
+                    Erreur de chargement de la flotte
+                  </div>
+                  <div style={{ color: '#94A3B8', fontSize: 13, lineHeight: 1.6, marginBottom: 20 }}>
+                    {fleetLoadError}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRefresh}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '9px 20px',
+                      borderRadius: 8,
+                      background: 'linear-gradient(135deg, #FF4757, #E84118)',
+                      color: '#FFF',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      border: 'none',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 14px rgba(255, 71, 87, 0.35)',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <RotateCw size={14} />
+                    <span>Réessayer</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Empty State Banner if 0 agents are attached */}
-            {!isLoadingFleet && nodes.length === 0 && (
+            {!isLoadingFleet && !fleetLoadError && nodes.length === 0 && (
               <div style={{
                 position: 'absolute',
                 inset: 0,
@@ -888,6 +1030,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
           <SupervisorHistoryView
             historyData={historyData}
             isLoading={isLoadingFleet}
+            hasError={Boolean(partialErrors.history)}
             onRefresh={handleRefresh}
             onRunAuditNow={handleRunAuditNow}
             isRunningAudit={isRunningAudit}
@@ -903,6 +1046,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
           supervisorId={agentId}
           onClose={handleClearSelection}
           onEvaluationComplete={handleNodeEvaluationUpdated}
+          alertsLoadError={Boolean(partialErrors.alerts)}
           unattendedLeads={
             (alertsData?.hotLeads || []).filter(
               (l) => l.agentUuid === selectedNode.id || (Boolean(selectedNode.agent_id) && l.agentId === selectedNode.agent_id)
@@ -926,6 +1070,7 @@ export const SupervisorWorkspace: React.FC<SupervisorWorkspaceProps> = ({
         onClose={() => setIsPipelineModalOpen(false)}
         funnelData={funnelData}
         isLoading={isLoadingFleet}
+        hasError={Boolean(partialErrors.funnel)}
       />
 
       {/* 4. VMind Guide Floating AI Assistant Panel */}

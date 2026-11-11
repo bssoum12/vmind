@@ -368,7 +368,7 @@ export interface HotLeadAlertItem {
   emailsSent: number;
   draftsCount: number;
   hoursUnattended: number;
-  urgency: 'CRITICAL' | 'WARNING';
+  urgency: 'CRITICAL' | 'WARNING' | 'RECENT';
   contactStatus: 'NEVER_CONTACTED' | 'DRAFT_READY';
 }
 

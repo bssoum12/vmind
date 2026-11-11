@@ -14,6 +14,7 @@ import {
   CornerDownRight,
   Bot,
   Target,
+  AlertTriangle,
 } from 'lucide-react';
 import { FleetFunnelData } from '../types/supervisor.types';
 
@@ -22,6 +23,7 @@ interface SupervisorPipelineModalProps {
   onClose: () => void;
   funnelData: FleetFunnelData | null;
   isLoading?: boolean;
+  hasError?: boolean;
 }
 
 export const SupervisorPipelineModal: React.FC<SupervisorPipelineModalProps> = ({
@@ -29,6 +31,7 @@ export const SupervisorPipelineModal: React.FC<SupervisorPipelineModalProps> = (
   onClose,
   funnelData,
   isLoading = false,
+  hasError = false,
 }) => {
   // Close on Escape key press (Apple design standard)
   useEffect(() => {
@@ -122,6 +125,28 @@ export const SupervisorPipelineModal: React.FC<SupervisorPipelineModalProps> = (
 
         {/* Modal Scrollable Content */}
         <div className="pipeline-modal-content">
+          {hasError && (
+            <div
+              style={{
+                marginBottom: '18px',
+                padding: '12px 16px',
+                borderRadius: '10px',
+                background: 'rgba(255, 71, 87, 0.1)',
+                border: '1px solid rgba(255, 71, 87, 0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                color: '#FF6B7A',
+                fontSize: '13px',
+              }}
+            >
+              <AlertTriangle size={18} style={{ color: '#FF4757', flexShrink: 0 }} />
+              <span>
+                Impossible de synchroniser les dernières métriques du pipeline commercial. Les volumes affichés peuvent être incomplets.
+              </span>
+            </div>
+          )}
+
           {/* 1. Linear Conversion Stages (Clean, Spacious, NO Kicker & NO Badge Spam) */}
           <section className="pipeline-stages-section">
             <div className="section-label-row">
