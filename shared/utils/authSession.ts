@@ -9,7 +9,6 @@ export function clearAuthSession() {
     localStorage.removeItem('vmind_mcp_token');
     localStorage.removeItem('vmind_connector_status');
     localStorage.removeItem('vmind_client_id');
-    localStorage.removeItem('vmind_allowed_agents');
     sessionStorage.clear();
   } catch (err) {
     console.error('Error clearing auth session:', err);

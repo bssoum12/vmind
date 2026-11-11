@@ -2,16 +2,21 @@
 
 import React, { useEffect, useRef } from 'react';
 import { BookOpen, X } from 'lucide-react';
-import type { SkillIssue } from '@/shared/api/skills-api';
+import type { SkillIssue, SkillLimits } from '@/shared/api/skills-api';
+import { useSkillLimits } from './useSkillLimits';
 
-export type GuideSectionId = 'quand' | 'pasPour' | 'contenu' | 'erp' | 'nom' | 'portee' | 'expert';
+export type GuideSectionId = 'quand' | 'pasPour' | 'contenu' | 'erp' | 'nom' | 'portee' | 'expert' | 'references';
 
 interface GuideSection {
   id: GuideSectionId;
   title: string;
   paragraphs: string[];
+  // Shown once the backend limits are loaded
+  limits?: (limits: SkillLimits) => string;
   example?: string;
 }
+
+const formatCount = (value: number) => value.toLocaleString('fr-FR');
 
 const GUIDE_SECTIONS: GuideSection[] = [
   {
@@ -38,6 +43,7 @@ const GUIDE_SECTIONS: GuideSection[] = [
       "Pour une compétence de type Méthode, décrivez la Démarche étape par étape. Ajoutez si besoin les Définitions des termes métier, les Règles de vérité (ce qui doit toujours être vrai dans la réponse) et la Restitution (la forme de la réponse).",
       "Pour une compétence de type Style, donnez l'Objectif, puis la Structure de la réponse et les Règles à respecter.",
       "Restez précis et concret : quelques phrases claires valent mieux qu'un long texte. Un texte trop court laisse l'assistant deviner.",
+      "Mettez du texte sous chaque titre, n'utilisez pas deux fois le même titre au même niveau, et fermez chaque bloc de code ouvert par ``` avec une ligne ``` .",
     ],
   },
   {
@@ -70,9 +76,24 @@ const GUIDE_SECTIONS: GuideSection[] = [
     id: 'expert',
     title: 'Quand passer en Mode expert',
     paragraphs: [
-      "Le mode simple suffit pour la plupart des compétences. Passez en Mode expert si vous devez joindre des fichiers de référence (par exemple une liste de codes ou un tableau de règles), ou écrire le texte complet vous-même.",
+      "Le mode simple suffit pour la plupart des compétences. Passez en Mode expert si vous devez joindre des fichiers de référence (voir « Fichiers de référence » ci-dessous), ou écrire le texte complet vous-même.",
       'Le Mode expert reste activé pour votre compte tant que vous ne le désactivez pas.',
     ],
+  },
+  {
+    id: 'references',
+    title: 'Fichiers de référence',
+    paragraphs: [
+      "Les instructions décrivent la méthode ; les fichiers de référence gardent le détail dont elle a besoin et qui change rarement : une liste de codes, un tableau de règles, des exemples longs.",
+      "Quand l'assistant utilise la compétence, il reçoit les instructions et le contenu de tous les fichiers en même temps. Il ne devine pas à quoi sert chaque fichier : dans les instructions, citez chaque fichier par son nom et dites quand l'utiliser.",
+      "Un nom de fichier finit par .md et ne contient que des lettres minuscules, des chiffres, des tirets (-), des tirets bas (_) et des points. Rangez les fichiers dans des dossiers avec une barre oblique, par exemple regles/relances.md.",
+      "Écrivez le contenu en texte simple et présentez les tableaux en Markdown. Gardez un sujet par fichier : un fichier qui mélange plusieurs sujets est plus difficile à citer.",
+      "Chaque nom n'est utilisé qu'une fois, même dans des dossiers différents : regles/sage.md et sage/SKILL.md portent tous deux le nom « sage ». Si vous renommez un fichier, mettez à jour les endroits qui le citent.",
+      "Avancé : un fichier nommé dossier/SKILL.md, avec son propre en-tête (name et description), devient une compétence à part que l'assistant trouve seule et qui ne reçoit que son propre texte. Son dossier devient son nom : lettres minuscules, chiffres et tirets, différent de toute autre compétence. Une compétence complète (SKILL.md et ses fichiers) peut aussi être importée en .zip avec « Importer un Skill ».",
+    ],
+    limits: (l) =>
+      `Limites : ${formatCount(l.maxReferenceFiles)} fichiers au maximum, ${formatCount(l.maxReferenceFileChars)} caractères par fichier et ${formatCount(l.maxTotalReferencesChars)} caractères au total.`,
+    example: "Dans les instructions : « Pour les délais de relance selon le type de client, utilise regles/relances.md. »",
   },
 ];
 
@@ -82,14 +103,13 @@ const FIELD_SECTIONS: Record<string, GuideSectionId> = {
   exclusion: 'pasPour',
   body_md: 'contenu',
   erp_types: 'erp',
-  mapped_tools: 'erp',
   title: 'nom',
   slug: 'nom',
   scope: 'portee',
   tenant_key: 'portee',
   category: 'portee',
   kind: 'portee',
-  references: 'expert',
+  references: 'references',
 };
 
 const CODE_SECTIONS: Record<string, GuideSectionId> = {
@@ -113,6 +133,7 @@ interface SkillGuidePanelProps {
 /** The short best practices guide, opened at a given section. */
 export const SkillGuidePanel: React.FC<SkillGuidePanelProps> = ({ section, onClose }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const limits = useSkillLimits();
 
   useEffect(() => {
     const container = containerRef.current;
@@ -173,6 +194,9 @@ export const SkillGuidePanel: React.FC<SkillGuidePanelProps> = ({ section, onClo
               {p}
             </p>
           ))}
+          {s.limits && limits && (
+            <p style={{ margin: '0 0 4px', color: '#cbd5e1' }}>{s.limits(limits)}</p>
+          )}
           {s.example && (
             <div style={{ color: '#e2e8f0' }}>
               <span style={{ color: '#8FA3B8' }}>Exemple : </span>

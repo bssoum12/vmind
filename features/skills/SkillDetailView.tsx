@@ -33,6 +33,7 @@ import {
   SkillVersionItem,
   fetchSkillVersions,
   rollbackSkillVersion,
+  applyCatalogUpdate,
   exportSkillMd,
   exportSkillZip,
 } from '@/shared/api/skills-api';
@@ -363,23 +364,8 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
           logoColor: '#00E5C8',
           description: `Connecteur ERP ${skill.erp_type.toUpperCase()} associé à ce skill.`,
           adapterFile: '/SKILL.md',
-          tools: skill.mapped_tools || [],
+          tools: [],
           isConnected: activeErp === skill.erp_type.toLowerCase() && activeConnection?.status === 'connected',
-        },
-      ];
-    }
-
-    if (skill.mapped_tools && skill.mapped_tools.length > 0) {
-      return [
-        {
-          id: 'active-connector',
-          name: 'Connecteur ERP Actif (MCP)',
-          type: activeErp || 'erp',
-          logoColor: '#00E5C8',
-          description: 'Outils MCP configurés pour le déclenchement automatique de ce skill.',
-          adapterFile: '/SKILL.md',
-          tools: skill.mapped_tools,
-          isConnected: Boolean(activeConnection && activeConnection.status === 'connected'),
         },
       ];
     }
@@ -582,6 +568,23 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
       showToast(`Skill restauré vers la version v${targetVersion}.`, 'success');
     } catch (err: any) {
       showToast(err.message || 'Impossible de restaurer cette version.', 'error');
+    }
+  };
+
+  const handleCatalogUpdate = async () => {
+    if (
+      !window.confirm(
+        'Remplacer le contenu actuel par la version du catalogue ?\nLes modifications faites ici restent dans l’historique et peuvent être restaurées.'
+      )
+    ) {
+      return;
+    }
+    try {
+      const version = await applyCatalogUpdate(skill.id);
+      await onSkillUpdated();
+      showToast(`Skill mis à jour depuis le catalogue (v${version}).`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Mise à jour depuis le catalogue impossible.', 'error');
     }
   };
 
@@ -1389,6 +1392,35 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
                     >
                       <Edit3 size={15} style={{ color: '#00e5c8', flexShrink: 0 }} />
                       <span>Modifier ce skill</span>
+                    </button>
+                  )}
+
+                  {isAdmin && skill.catalog_update_available && (
+                    <button
+                      type="button"
+                      className="sk-menu-item"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        handleCatalogUpdate();
+                      }}
+                      title="Ce skill a été modifié ici : le catalogue en a une version plus récente, qui ne s'applique pas toute seule."
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#fbbf24',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <Edit3 size={15} style={{ color: '#fbbf24', flexShrink: 0 }} />
+                      <span>Mettre à jour depuis le catalogue</span>
                     </button>
                   )}
 

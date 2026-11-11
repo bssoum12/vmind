@@ -15,7 +15,6 @@ export interface McpSession {
     username: string;
     client_id: string;
     roles: string[];
-    allowedAgents: string[];
   };
   // The ERP login of the connection, shown only as connection information
   erp: {
@@ -26,22 +25,15 @@ export interface McpSession {
   allTools?: any[];
 }
 
-const ALL_AGENTS = ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE'];
-const ADMIN_ROLES = ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'];
-
 const toRoleList = (raw: unknown): string[] =>
   Array.isArray(raw) ? raw.filter((r): r is string => typeof r === 'string') : typeof raw === 'string' && raw ? [raw] : [];
 
 function buildMcpSession(status: any, vmindUser: any): McpSession {
-  const roles = toRoleList(vmindUser?.roles ?? vmindUser?.role);
-  const isAdmin = roles.some((r) => ADMIN_ROLES.includes(r));
-  const receivedAgents: string[] = Array.isArray(status.allowedAgents) ? status.allowedAgents : [];
   return {
     user: {
       username: vmindUser?.username || '',
       client_id: status.client_id || 'DEMO',
-      roles,
-      allowedAgents: receivedAgents.length > 0 ? receivedAgents : isAdmin ? ALL_AGENTS : [],
+      roles: toRoleList(vmindUser?.roles ?? vmindUser?.role),
     },
     erp: {
       username: status.erp_username || '',
@@ -71,7 +63,6 @@ export const ConnectorsHub: React.FC = () => {
       localStorage.removeItem('vmind_mcp_token');
       localStorage.removeItem('vmind_connector_status');
       localStorage.removeItem('vmind_client_id');
-      localStorage.removeItem('vmind_allowed_agents');
 
       if (res.ok) {
         const data = await res.json();
@@ -160,7 +151,6 @@ export const ConnectorsHub: React.FC = () => {
     localStorage.removeItem('vmind_mcp_token');
     localStorage.removeItem('vmind_connector_status');
     localStorage.removeItem('vmind_client_id');
-    localStorage.removeItem('vmind_allowed_agents');
     setTralisSession(null);
     setTralisStatus('idle');
     broadcastMcpSessionUpdate(null);

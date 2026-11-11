@@ -276,7 +276,7 @@ export const VmoveBlNonFacturesCard: React.FC<VmoveBlNonFacturesCardProps> = ({
         <button
           onClick={handleRefresh}
           disabled={effectiveLoading}
-          title="Rafraîchir les données via n8n"
+          title="Rafraîchir les données"
           style={{
             background: 'rgba(245, 158, 11, 0.08)',
             border: '1px solid rgba(245, 158, 11, 0.25)',

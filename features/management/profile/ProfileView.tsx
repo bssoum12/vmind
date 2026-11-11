@@ -24,7 +24,7 @@ export const ProfileView: React.FC = () => {
   const [roleLabel, setRoleLabel] = useState('');
   const [avatarInitials, setAvatarInitials] = useState('HA');
   const [connectors, setConnectors] = useState<ConnectorInfo[]>([]);
-  const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
+  const activeConnectors = connectors.filter(c => c.is_active);
   const [mobileTab, setMobileTab] = useState<'form' | 'hud' | 'erp' | 'all'>('form');
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -60,9 +60,6 @@ export const ProfileView: React.FC = () => {
           setEmail(data.user.email || '');
           setPhone(data.user.phone_number || '');
           setRoleLabel(data.user.role || 'Administrateur');
-          if (Array.isArray(data.user.allowed_agents)) {
-            setAllowedAgents(data.user.allowed_agents.map((a: string) => a.toUpperCase()));
-          }
           if (Array.isArray(data.user.connectors) && data.user.connectors.length > 0) {
             setConnectors(data.user.connectors);
           }
@@ -167,7 +164,6 @@ export const ProfileView: React.FC = () => {
       });
       localStorage.removeItem('vmind_session');
       localStorage.removeItem('vmind_mcp_token');
-      localStorage.removeItem('vmind_allowed_agents');
       sessionStorage.clear();
     } catch {}
     window.location.href = '/login';
@@ -395,24 +391,15 @@ export const ProfileView: React.FC = () => {
               </div>
               <div style={{ height: '1px', background: 'rgba(0,229,200,0.1)' }} />
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Server size={12} color={connectors.length > 0 ? cyan : '#6B85A0'} />
+                <Server size={12} color={activeConnectors.length > 0 ? cyan : '#6B85A0'} />
                 <span style={{ fontSize: '10px', color: '#8FA3B8' }}>
-                  {connectors.length > 0
-                    ? `${connectors[0].connector_type.toUpperCase()} (${connectors[0].client_id})`
+                  {activeConnectors.length > 0
+                    ? `${activeConnectors[0].connector_type.toUpperCase()} (${activeConnectors[0].client_id})`
                     : 'Aucun ERP'}
                 </span>
-                <span style={{ fontSize: '9px', color: connectors.length > 0 ? '#00E676' : '#6B85A0', marginLeft: 'auto', fontWeight: 700 }}>
-                  {connectors.length > 0 ? 'ACTIF' : 'INACTIF'}
+                <span style={{ fontSize: '9px', color: activeConnectors.length > 0 ? '#00E676' : '#6B85A0', marginLeft: 'auto', fontWeight: 700 }}>
+                  {activeConnectors.length > 0 ? 'ACTIF' : 'INACTIF'}
                 </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Cpu size={12} color={cyan} />
-                <span style={{ fontSize: '10px', color: '#8FA3B8' }}>{allowedAgents.length} Agents</span>
-                <div style={{ marginLeft: 'auto', display: 'flex', gap: '3px' }}>
-                  {allowedAgents.map((ag, i) => (
-                    <div key={i} title={ag} style={{ width: '6px', height: '6px', borderRadius: '50%', background: cyan, opacity: 0.6 + (i % 6) * 0.07, boxShadow: `0 0 4px ${cyan}` }} />
-                  ))}
-                </div>
               </div>
             </div>
 
@@ -662,26 +649,29 @@ export const ProfileView: React.FC = () => {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '9.5px', fontWeight: 800, color: cyan, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
-                CONNECTEUR ERP ({connectors.length})
+                CONNECTEUR ERP ({activeConnectors.length})
               </span>
               <span style={{
                 fontSize: '9.5px', fontWeight: 800,
-                color: connectors.length > 0 ? '#00E676' : '#6B85A0',
-                background: connectors.length > 0 ? 'rgba(0,230,118,0.1)' : 'rgba(107,133,160,0.1)',
-                border: `1px solid ${connectors.length > 0 ? 'rgba(0,230,118,0.25)' : 'rgba(107,133,160,0.25)'}`,
+                color: activeConnectors.length > 0 ? '#00E676' : '#6B85A0',
+                background: activeConnectors.length > 0 ? 'rgba(0,230,118,0.1)' : 'rgba(107,133,160,0.1)',
+                border: `1px solid ${activeConnectors.length > 0 ? 'rgba(0,230,118,0.25)' : 'rgba(107,133,160,0.25)'}`,
                 padding: '2px 7px', borderRadius: '5px'
               }}>
-                {connectors.length > 0 ? 'CONNECTÉ' : 'AUCUN'}
+                {activeConnectors.length > 0 ? 'CONNECTÉ' : 'AUCUN'}
               </span>
             </div>
 
             {connectors.length > 0 ? (
               connectors.map((c, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', borderTop: i > 0 ? '1px solid rgba(0,229,200,0.1)' : 'none', paddingTop: i > 0 ? '10px' : '0' }}>
-                  <Server size={16} color={cyan} />
-                  <div style={{ fontSize: '13px', fontWeight: 800, color: '#FFFFFF' }}>
-                    {c.connector_type.toUpperCase()}
+                  <Server size={16} color={c.is_active ? cyan : '#6B85A0'} />
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: c.is_active ? '#FFFFFF' : '#8FA3B8' }}>
+                    {c.connector_type.toUpperCase()} ({c.client_id})
                   </div>
+                  <span style={{ fontSize: '9px', color: c.is_active ? '#00E676' : '#6B85A0', marginLeft: 'auto', fontWeight: 700 }}>
+                    {c.is_active ? 'ACTIF' : 'INACTIF'}
+                  </span>
                 </div>
               ))
             ) : (
@@ -690,45 +680,6 @@ export const ProfileView: React.FC = () => {
                 <div style={{ fontSize: '13px', fontWeight: 800, color: '#8FA3B8' }}>Aucun connecteur ERP</div>
               </div>
             )}
-          </div>
-
-          {/* Agents autorisés */}
-          <div style={{
-            background: 'rgba(5,14,28,0.88)', border: '1px solid rgba(0,229,200,0.26)',
-            borderRadius: '14px', padding: '18px 20px',
-            backdropFilter: 'blur(12px)', boxShadow: '0 8px 30px rgba(0,0,0,0.45)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <span style={{ fontSize: '9.5px', fontWeight: 800, color: cyan, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
-                AGENTS AUTORISÉS
-              </span>
-              <span style={{
-                fontSize: '9.5px', fontWeight: 800,
-                color: allowedAgents.length > 0 ? cyan : '#6B85A0',
-                background: allowedAgents.length > 0 ? 'rgba(0,229,200,0.1)' : 'rgba(107,133,160,0.1)',
-                border: `1px solid ${allowedAgents.length > 0 ? 'rgba(0,229,200,0.25)' : 'rgba(107,133,160,0.25)'}`,
-                padding: '2px 7px', borderRadius: '5px'
-              }}>
-                {allowedAgents.length} {allowedAgents.length === 1 ? 'ACTIF' : 'ACTIFS'}
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {allowedAgents.length > 0 ? (
-                allowedAgents.map(ag => (
-                  <span key={ag} style={{
-                    fontSize: '9.5px', fontWeight: 800, color: cyan,
-                    background: 'rgba(0,229,200,0.09)', border: '1px solid rgba(0,229,200,0.28)',
-                    padding: '3px 8px', borderRadius: '6px'
-                  }}>
-                    {ag}
-                  </span>
-                ))
-              ) : (
-                <span style={{ fontSize: '11px', color: '#6B85A0', fontStyle: 'italic' }}>
-                  Aucun agent autorisé
-                </span>
-              )}
-            </div>
           </div>
 
         </div>

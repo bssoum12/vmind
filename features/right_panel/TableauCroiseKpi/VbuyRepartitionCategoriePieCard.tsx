@@ -149,7 +149,7 @@ export const VbuyRepartitionCategoriePieCard: React.FC<VbuyRepartitionCategorieP
               display: 'flex',
               alignItems: 'center'
             }}
-            title="Rafraîchir les données via n8n"
+            title="Rafraîchir les données"
           >
             <RefreshCw size={13} style={{ animation: effectiveLoading ? 'spin 1s linear infinite' : 'none' }} />
           </button>

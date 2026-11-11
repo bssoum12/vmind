@@ -138,7 +138,7 @@ export const GenericErpConnectorPanel: React.FC<GenericErpConnectorPanelProps> =
               Connecteur {erpType.display_name}
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '12px', color: '#8FA3B8' }}>Protocole standard MCP (tools/list)</span>
+              <span style={{ fontSize: '12px', color: '#8FA3B8' }}>Protocole standard MCP</span>
               <span style={{ color: 'rgba(255,255,255,0.2)' }}>•</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <div
@@ -262,7 +262,7 @@ export const GenericErpConnectorPanel: React.FC<GenericErpConnectorPanelProps> =
               </div>
               <div>
                 <div style={{ fontSize: '11px', color: '#6A7E95', marginBottom: '4px' }}>SÉCURITÉ DU JETON</div>
-                <div style={{ fontSize: '13px', fontWeight: 600, color: '#00E5C8' }}>OAuth 2.1 (Auto-Refresh 1h)</div>
+                <div style={{ fontSize: '13px', fontWeight: 600, color: '#00E5C8' }}>Connexion sécurisée</div>
               </div>
             </div>
           </div>

@@ -180,7 +180,7 @@ export const VbuyFacturesAReglerCard: React.FC<VbuyFacturesAReglerCardProps> = (
               display: 'flex',
               alignItems: 'center'
             }}
-            title="Rafraîchir KPI via n8n"
+            title="Rafraîchir les indicateurs"
           >
             <RefreshCw 
               size={12} 

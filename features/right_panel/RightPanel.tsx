@@ -78,8 +78,6 @@ interface RightPanelProps {
 const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, activeAgentId }) => {
   const { startDate, endDate, updateGlobalDates, error, clearError, notice, clearNotice, fetchKpis, kpisByAgent, loadingByAgent, lastUpdatedByAgent } = useKpis();
   const [isErpConnected, setIsErpConnected] = React.useState<boolean>(false);
-  const [allowedAgents, setAllowedAgents] = React.useState<string[]>([]);
-  const [isAdmin, setIsAdmin] = React.useState<boolean>(false);
 
   const agentKey = (activeAgentId || 'vdata').toLowerCase();
   const agentData = kpisByAgent[agentKey];
@@ -116,32 +114,9 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
   const checkPermissions = (event?: any) => {
     if (typeof window === 'undefined') return;
 
-    let connected = false;
-    let currentAllowed: string[] = [];
-    let isUserAdmin = false;
-
     // Priorité au détail de l'événement en direct mcp-session-updated (en mémoire)
     const sessionDetail = event?.detail;
-    if (sessionDetail && sessionDetail.connected === true) {
-      connected = true;
-      const user = sessionDetail.user || sessionDetail;
-      const agents = sessionDetail.allowedAgents || user?.allowedAgents;
-      if (Array.isArray(agents) && agents.length > 0) {
-        currentAllowed = agents;
-      }
-      const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles || ''];
-      isUserAdmin = roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r));
-    } else if (sessionDetail?.user) {
-      // Événement d'authentification VMIND sans connecteur ERP actif
-      const user = sessionDetail.user;
-      const roles = Array.isArray(user?.roles) ? user.roles : [user?.roles || ''];
-      isUserAdmin = roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r));
-      connected = false;
-    }
-
-    setIsAdmin(isUserAdmin);
-    setAllowedAgents(currentAllowed);
-    setIsErpConnected(connected);
+    setIsErpConnected(Boolean(sessionDetail && sessionDetail.connected === true));
   };
 
   React.useEffect(() => {
@@ -155,7 +130,6 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
     };
   }, []);
 
-  const isKpiAuthorized = isErpConnected && (isAdmin || allowedAgents.includes(activeAgentId || 'VDATA'));
 
   const [performances, setPerformances] = React.useState<Record<string, number>>({
     VDATA: 0,
@@ -258,14 +232,14 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                           : 'INDICATEURS CLÉS'}
             </span>
           </div>
-          {isKpiAuthorized && (
+          {isErpConnected && (
             <button
               onClick={() => {
                 const agentKey = (activeAgentId || 'vdata').toLowerCase();
                 fetchKpis(agentKey, true);
               }}
               disabled={loadingByAgent[(activeAgentId || 'vdata').toLowerCase()]}
-              title="Actualiser les indicateurs en direct depuis l'ERP (n8n)"
+              title="Actualiser les indicateurs en direct depuis l'ERP"
               style={{
                 background: loadingByAgent[(activeAgentId || 'vdata').toLowerCase()] ? `${agentColor}0A` : agentBgColor,
                 border: `1px solid ${agentColor}55`,
@@ -299,7 +273,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
         </div>
 
         {/* Timestamp de dernière mise à jour stockée en base */}
-        {isKpiAuthorized && formattedLastUpdate && (
+        {isErpConnected && formattedLastUpdate && (
           <div style={{
             fontSize: '10.5px',
             color: 'var(--muted)',
@@ -315,8 +289,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
           </div>
         )}
 
-        {!isKpiAuthorized ? (
-          !isErpConnected ? (
+        {!isErpConnected ? (
             <div style={{
               padding: '24px 16px',
               backgroundColor: 'rgba(6, 17, 31, 0.7)',
@@ -376,40 +349,6 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
                 Accéder aux Connecteurs →
               </button>
             </div>
-          ) : (
-            <div style={{
-              padding: '20px 16px',
-              backgroundColor: 'rgba(255, 170, 0, 0.04)',
-              border: '1px solid rgba(255, 170, 0, 0.2)',
-              borderRadius: '10px',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '10px',
-              margin: '8px 0 16px 0'
-            }}>
-              <div style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '8px',
-                background: 'rgba(255, 170, 0, 0.1)',
-                border: '1px solid rgba(255, 170, 0, 0.25)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '18px'
-              }}>
-                🔒
-              </div>
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#ffaa00' }}>
-                Accès aux données restreint
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--muted)', lineHeight: '1.5' }}>
-                Accès aux données et indicateurs TraLIS non autorisé pour cet agent. Il est possible d'échanger avec l'agent pour des questions métier ou de contacter un administrateur.
-              </div>
-            </div>
-          )
         ) : (
           <>
             {/* Global Date Picker (VDATA, VBUY, VMOVE, VFIN, VSELL) */}
@@ -601,7 +540,7 @@ const RightPanelContent: React.FC<RightPanelProps> = ({ logs, onInsertPrompt, ac
       </div>
 
       {/* Performance par Domaine */}
-      {activeAgentId === 'VDATA' && isKpiAuthorized && KPI_CARD_VISIBILITY.VDATA_PERFORMANCE_DOMAINES && (
+      {activeAgentId === 'VDATA' && isErpConnected && KPI_CARD_VISIBILITY.VDATA_PERFORMANCE_DOMAINES && (
         <div className="rp-section" style={{ marginTop: '20px' }}>
           <div className="rp-title" style={{ marginBottom: '14px' }}>Performance par Domaine</div>
         
