@@ -46,30 +46,18 @@ const getToolDisplayName = (tool?: string | null) => {
 };
 
 const VDATA_FAST_TRACK_REGISTRY: Record<string, string> = {
-  "Taux livraison à temps ?": "Veuillez me fournir le taux de livraison à temps global.",
-  "Compare Jan-Avr ?": "Fais une comparaison détaillée des indicateurs entre Janvier et Avril.",
-  "3 KPIs dégradés ?": "Affiche-moi les 3 KPIs les plus dégradés actuellement.",
-  "Rapport mensuel PDF ?": "Génère et affiche le rapport mensuel d'activité au format PDF.",
-  "Retards par type client ?": "Quels sont les retards actuels classés par type de client ?",
-  "Volume 12 mois ?": "Quel est le volume total traité sur les 12 derniers mois ?"
+  "Volume dossiers (année) ?": "Quel est le volume de dossiers traités depuis le début de l'année ?",
+  "Évolution CA 6 mois ?": "Quelle est l'évolution du chiffre d'affaires validé sur les 6 derniers mois ?"
 };
 
 const VFIN_FAST_TRACK_REGISTRY: Record<string, string> = {
   "CA validé ce mois ?": "Quel est le chiffre d'affaires validé pour ce mois en cours ?",
-  "Clients Impayés > 30 jours ?": "Combien de clients ont des impayés supérieurs à 30 jours ?",
-  "Comparer CA mois précédent": "Fais une comparaison détaillée du chiffre d'affaires entre ce mois-ci et le mois précédent.",
-  "Top 5 marges faibles": "Montre-moi les 5 clients avec les marges les plus faibles sur ce trimestre.",
-  "Trésorerie aujourd'hui ?": "Quelle est la situation précise de la trésorerie aujourd'hui ?",
-  "Prévision trésorerie 30J ?": "Génère la prévision de trésorerie pour les 30 prochains jours."
+  "Clients impayés > 30 jours ?": "Combien de clients ont des impayés supérieurs à 30 jours ?"
 };
 
 const VSELL_FAST_TRACK_REGISTRY: Record<string, string> = {
   "Top 10 clients CA ce mois ?": "Quels sont les 10 meilleurs clients ce mois en chiffre d'affaires ?",
-  "Compare CA clients mois": "Compare les revenus par client entre ce mois et le mois dernier",
-  "Nouveaux clients trimestre ?": "Combien de nouveaux clients ont été acquis ce trimestre ?",
-  "Clients inactifs > 60j ?": "Quels clients n'ont pas commandé depuis plus de 60 jours ?",
-  "État du pipeline ?": "Quel est l'état du pipeline commercial actuel ?",
-  "Risque de départ ?": "Quels clients présentent un risque de départ selon leur historique ?"
+  "Clients inactifs > 60j ?": "Quels clients n'ont pas commandé depuis plus de 60 jours ?"
 };
 
 const VBUY_FAST_TRACK_REGISTRY: Record<string, string> = {
@@ -82,12 +70,8 @@ const VBUY_FAST_TRACK_REGISTRY: Record<string, string> = {
 };
 
 const VMOVE_FAST_TRACK_REGISTRY: Record<string, string> = {
-  "Dossiers en acheminement ?": "Combien de dossiers sont en cours d'acheminement ?",
   "Dossiers en retard ETA ?": "Quels dossiers sont en retard par rapport à la date ETA ?",
-  "Dossiers clients en cours ?": "Affiche les dossiers en cours par client",
-  "Top transporteurs (Ponctualité) ?": "Quel transporteur a le meilleur taux de ponctualité ce mois ?",
-  "Top ports (Retards) ?": "Quels sont les ports avec le plus de retards ce trimestre ?",
-  "BL non facturés ?": "Combien de BL ne sont pas encore facturés ?"
+  "Top transporteurs (ponctualité) ?": "Quel transporteur a le meilleur taux de ponctualité ce mois ?"
 };
 
 const FAST_TRACK_REGISTRY: Record<string, string> = {
@@ -283,6 +267,8 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       setMessages([{ id: 'init-1', sender: 'vm', text: getWelcomeMessage(), time: new Date().toLocaleTimeString('fr-FR', { hour12: false }) }]);
       return;
     }
+    // A conversation created by the message being sent has no history yet: loading it would wipe that message.
+    if (creatingConversationRef.current) return;
     const fetchHistory = async () => {
       try {
         setIsLoading(true);
@@ -320,6 +306,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeConversationIdRef = useRef<string | null>(null);
   const abortControllersRef = useRef<Record<string, AbortController>>({});
+  const creatingConversationRef = useRef(false);
 
   // Keep ref in sync to avoid stale closures in async callbacks
   useEffect(() => {
@@ -407,6 +394,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
     try {
       let targetConvId = activeConversationId;
       if (!targetConvId) {
+         creatingConversationRef.current = true;
          targetConvId = await createNewConversation(agentAtClickTime, text);
          // Forcer le refresh pour avoir la nouvelle conv dans le state
          await refreshConversations();
@@ -434,6 +422,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       }
 
       const controller = new AbortController();
+      abortControllersRef.current[targetConvId] = controller;
       let response = await sendVmindMessage(
         text,
         targetConvId,
@@ -443,6 +432,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         activeConnection?.id,
         skillsToSend
       );
+      delete abortControllersRef.current[targetConvId];
 
       if (activeConversationIdRef.current !== targetConvId) return;
 
@@ -539,6 +529,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         error: error.message,
       }]);
     } finally {
+      creatingConversationRef.current = false;
       setIsLoading(false);
       setMessages((prev) => prev.filter(m => !m.isThinking));
     }
@@ -579,6 +570,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
       // Déclenche le Webhook n8n comme pour un message normal (via l'IA)
       let targetConvId = activeConversationId;
       if (!targetConvId) {
+         creatingConversationRef.current = true;
          targetConvId = await createNewConversation(agentAtClickTime, professionalMessage);
          await refreshConversations();
       }
@@ -696,6 +688,7 @@ export const VmindChat: React.FC<VmindChatProps> = ({
         error: error.message,
       }]);
     } finally {
+      creatingConversationRef.current = false;
       setIsLoading(false);
       setMessages((prev) => prev.filter(m => !m.isThinking));
     }

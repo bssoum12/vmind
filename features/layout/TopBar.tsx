@@ -92,11 +92,15 @@ export const TopBar: React.FC = () => {
           return;
         }
 
-        // Connexion explicite via événement
-        const user = e?.detail?.user || (e?.detail && e.detail.connected ? e.detail : null);
-        if (user && e?.detail?.connected !== false) {
-          applyUser(user);
+        // Connexion explicite via événement : l'événement porte l'identité ERP, jamais celle de l'utilisateur VMIND
+        if (e?.detail?.connected === true) {
           setIsErpConnected(true);
+          fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+              if (data?.user) applyUser(data.user);
+            })
+            .catch(() => {});
         } else {
           // Montage initial : interroger l'utilisateur VMIND et le statut réel du connecteur
           fetch(`${baseUrl}/api/auth/vmind/me`, { credentials: 'include' })

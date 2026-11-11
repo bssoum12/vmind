@@ -68,11 +68,17 @@ export const AdminCriticalAlertBadge: React.FC = () => {
       }
     };
 
-    fetchHealth();
-    const handleSessionUpdated = (e: any) => {
-      const user = e?.detail?.user || e?.detail;
-      fetchHealth(user);
+    // Le rôle vient de l'utilisateur VMIND : config-health n'est appelé que pour un administrateur
+    const checkVmindUser = () => {
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001').trim();
+      fetch(`${apiUrl}/api/auth/vmind/me`, { credentials: 'include' })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => fetchHealth(data?.user || { roles: [] }))
+        .catch(() => fetchHealth({ roles: [] }));
     };
+
+    checkVmindUser();
+    const handleSessionUpdated = () => checkVmindUser();
 
     window.addEventListener('mcp-session-updated', handleSessionUpdated);
     return () => window.removeEventListener('mcp-session-updated', handleSessionUpdated);

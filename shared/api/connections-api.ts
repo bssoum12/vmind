@@ -122,8 +122,15 @@ export interface DiscoveredTool {
 export async function fetchConnectionTools(connectionId: number): Promise<DiscoveredTool[]> {
   const res = await secureFetch(`${getBaseUrl()}/api/mcp-connections/${connectionId}/tools`);
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Impossible de récupérer les outils du connecteur (${res.status})`);
+    const body = await res.json().catch(() => ({}));
+    // Le statut permet de distinguer une session expirée (401) d'un quota atteint (429)
+    const error = new Error(body.error || `Impossible de récupérer les outils du connecteur (${res.status})`) as Error & {
+      status?: number;
+      retryAfterSec?: number;
+    };
+    error.status = res.status;
+    error.retryAfterSec = Number(body.retryAfterSec) || undefined;
+    throw error;
   }
   const data = await res.json();
   return data.tools || [];

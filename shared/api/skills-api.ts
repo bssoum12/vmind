@@ -18,6 +18,7 @@ export interface InstalledSkillItem {
   kind: SkillKind;
   scope: SkillScope;
   erp_type: string | null;
+  erp_types?: string[];
   tenant_key: string | null;
   owner_user_id: number | null;
   mapped_tools: string[];
@@ -42,6 +43,7 @@ export interface DiscoverSkillItem {
   slug: string;
   scope: 'GLOBAL' | 'ERP';
   erp_type: string | null;
+  erp_types?: string[];
   title: string;
   description: string;
   category: SkillCategory;
@@ -82,7 +84,7 @@ export interface SkillWritePayload {
   category: SkillCategory;
   kind: SkillKind;
   scope: SkillScope;
-  erp_type?: string | null;
+  erp_types?: string[];
   tenant_key?: string | null;
   body_md: string;
   references_json?: Record<string, string>;
@@ -180,6 +182,47 @@ export async function fetchSkillToolOptions(connectionId?: number | string | nul
   };
 }
 
+export type SkillIssueLevel = 'blocking' | 'warning' | 'info';
+
+export interface SkillIssue {
+  code: string;
+  level: SkillIssueLevel;
+  field: string;
+  title: string;
+  why: string;
+  fix: string;
+  term?: string;
+}
+
+/** Error thrown by a save, carrying the problems found so the editor can show them. */
+export class SkillSaveError extends Error {
+  issues: SkillIssue[];
+  constructor(message: string, issues: SkillIssue[] = []) {
+    super(message);
+    this.issues = issues;
+  }
+}
+
+/**
+ * Runs the save rules and the warnings on a skill being written, without saving anything.
+ */
+export async function checkSkill(
+  payload: SkillWritePayload & { skill_id?: number | null },
+  connectionId?: number | string | null
+): Promise<SkillIssue[]> {
+  const res = await fetch(`${getBaseUrl()}/api/skills/check${formatConnectionQuery(connectionId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || 'Vérification impossible pour le moment.');
+  }
+  return Array.isArray(data.issues) ? data.issues : [];
+}
+
 export async function createSkill(payload: SkillWritePayload): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/skills`, {
     method: 'POST',
@@ -189,7 +232,7 @@ export async function createSkill(payload: SkillWritePayload): Promise<any> {
   });
   const data = await res.json();
   if (!res.ok || !data.ok) {
-    throw new Error(data.error || 'Erreur lors de la création du skill.');
+    throw new SkillSaveError(data.error || 'Erreur lors de la création du skill.', Array.isArray(data.issues) ? data.issues : []);
   }
   return data.skill;
 }
@@ -206,7 +249,7 @@ export async function updateSkill(
   });
   const data = await res.json();
   if (!res.ok || !data.ok) {
-    throw new Error(data.error || 'Erreur lors de la sauvegarde du skill.');
+    throw new SkillSaveError(data.error || 'Erreur lors de la sauvegarde du skill.', Array.isArray(data.issues) ? data.issues : []);
   }
   return { mode: data.mode, skill: data.skill };
 }
