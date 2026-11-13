@@ -15,42 +15,16 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId, onAgentClick }) => {
   const [activeNav, setActiveNav] = useState('dashboard');
-  const [allowedAgents, setAllowedAgents] = useState<string[]>([]);
   const [username, setUsername] = useState<string>('');
   const { conversations, activeConversationId, setActiveConversationId, createNewConversation, resetToNewConversation, renameConversation, deleteConversation } = useConversations();
   const [editingConvId, setEditingConvId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
-  const [isErpConnected, setIsErpConnected] = useState<boolean>(false);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   const updatePermissions = (event?: any) => {
     try {
       const sessionDetail = event?.detail;
-      if (sessionDetail === null || sessionDetail?.connected === false) {
-        setAllowedAgents([]);
-        setIsErpConnected(false);
-        if (sessionDetail?.user) {
-          const user = sessionDetail.user;
-          if (user.username) setUsername(user.username);
-          const roles = Array.isArray(user.roles) ? user.roles : [user.roles || ''];
-          setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)));
-        }
-        return;
-      }
-      if (sessionDetail && sessionDetail.connected === true) {
-        const user = sessionDetail.user || sessionDetail;
-        if (user) {
-          if (user.username) setUsername(user.username);
-          const roles = Array.isArray(user.roles) ? user.roles : [user.roles || ''];
-          setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)));
-          const agents = sessionDetail.allowedAgents || user.allowedAgents || user.allowed_agents || [];
-          if (Array.isArray(agents)) {
-            setAllowedAgents(agents);
-          }
-          setIsErpConnected(true);
-          return;
-        }
-      }
+      const user = sessionDetail?.user || (sessionDetail?.connected === true ? sessionDetail : null);
+      if (user?.username) setUsername(user.username);
     } catch (e) {
       console.error("Erreur de synchronisation des permissions dans la sidebar", e);
     }
@@ -65,8 +39,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
           const data = await res.json();
           if (data?.ok && data.user) {
             if (data.user.username) setUsername(data.user.username);
-            const roles = Array.isArray(data.user.roles) ? data.user.roles : [data.user.roles || ''];
-            setIsAdmin(roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers', 'SuperAdmin'].includes(r)));
           }
         }
       } catch {}
@@ -128,7 +100,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
       {visibleAgents.map((agent) => {
         const agentConvs = conversations.filter(c => c.agent_id === agent.id);
         const isActiveAgent = activeAgentId === agent.id;
-        const isAgentAllowed = isErpConnected && (isAdmin || allowedAgents.includes(agent.id));
 
         return (
           <div key={agent.id} style={{ display: 'flex', flexDirection: 'column' }}>
@@ -170,40 +141,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId,
                   <span style={{ fontSize: '12px', color: 'var(--white)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {agent.name}
                   </span>
-                  {isAgentAllowed ? (
-                    <span style={{
-                      fontSize: '8px',
-                      padding: '1px 5px',
-                      borderRadius: '4px',
-                      background: 'rgba(0, 240, 255, 0.1)',
-                      color: '#00f0ff',
-                      border: '1px solid rgba(0, 240, 255, 0.25)',
-                      fontWeight: 600,
-                      letterSpacing: '0.03em',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      ERP
-                    </span>
-                  ) : (
-                    <span style={{
-                      fontSize: '8px',
-                      padding: '1px 5px',
-                      borderRadius: '4px',
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      color: 'var(--muted)',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      fontWeight: 500,
-                      whiteSpace: 'nowrap'
-                    }}>
-                      Conseil
-                    </span>
-                  )}
                 </div>
                 <div style={{ fontSize: '9px', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agent.desc}</div>
               </div>
               <div style={{
                 width: '6px', height: '6px', borderRadius: '50%',
-                background: isActiveAgent ? agent.color : (isAgentAllowed ? '#00f0ff' : 'var(--muted)'),
+                background: isActiveAgent ? agent.color : 'var(--muted)',
                 boxShadow: isActiveAgent ? `0 0 6px ${agent.color}` : 'none',
                 flexShrink: 0
               }}></div>

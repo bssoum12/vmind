@@ -1,4 +1,6 @@
 # Audit VMIND AI — Analyse Comparative & Plan d'Action
+
+> **Remplacé le 2026-11-10** : les permissions par agent (`allowedAgents`, `TOOL_AGENT_MAPPING`, `canUseTool`, `ROLE_TO_AGENTS_MAP`, `syncUserAllowedAgents`) ont été supprimées. Les droits sur les outils sont appliqués uniquement par le serveur MCP de l'ERP. Voir `Vmind_Backend/documentation/authorization_outils.md`.
 ## Bilan de la Version Actuelle : Ce qui est Fait (DONE), Ce qui Reste à Faire (TODO) et Guide de Mise en Œuvre
 
 Ce document fournit une analyse comparative approfondie suite au rapport d'audit architectural et de sécurité de la plateforme **VMIND**. Il détaille précisément, axe par axe, les éléments déjà résolus dans la version actuelle, les dettes techniques restantes et la méthodologie concrète pour les traiter avec un impact minimal sur le code existant.

@@ -208,7 +208,7 @@ export const AlertsCard: React.FC<AlertsCardProps> = ({ activeAgentId }) => {
 
         <button
           onClick={() => fetchKpis('vdata', true, 'get_alerts_kpi_vdata')}
-          title="Rafraîchir KPI via n8n"
+          title="Rafraîchir les indicateurs"
           disabled={effectiveLoading}
           style={{
             background: 'transparent',

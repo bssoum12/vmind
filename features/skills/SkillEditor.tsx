@@ -20,14 +20,14 @@ import {
   SkillKind,
   SkillScope,
   SkillDetail,
-  SkillToolOption,
   SkillVersionItem,
   SkillIssue,
+  SkillCitations,
   SkillSaveError,
   checkSkill,
   createSkill,
   updateSkill,
-  fetchSkillToolOptions,
+  fetchSkillConnection,
   fetchSkillVersions,
   rollbackSkillVersion,
   fetchAvailableTenantsForAdmin,
@@ -38,9 +38,9 @@ import { SkillGuidedFields } from './SkillGuidedFields';
 import { SkillHelpStrip } from './SkillHelpStrip';
 import { SkillChecksPanel, SkillChecksSummary, issueKey, issueTarget, issuesForHelpKey } from './SkillChecks';
 import { SkillGuidePanel, guideSectionFor, type GuideSectionId } from './SkillGuide';
+import { useSkillLimits } from './useSkillLimits';
 import {
   EXPERT_MODE_STORAGE_KEY,
-  NEW_SKILL_BODY_TEMPLATE,
   GUIDED_SECTIONS,
   type CustomBody,
   type SectionValues,
@@ -53,6 +53,17 @@ import {
   parseDescription,
   slugifyTitle,
   usesFreeDescription,
+  describeReferenceKind,
+  citationPlaces,
+  findShortNameConflict,
+  normalizeReferenceName,
+  referenceKind,
+  referenceNameProblem,
+  referenceShortName,
+  referenceStarter,
+  renamedReferenceContent,
+  replaceCitations,
+  sanitizeReferenceInput,
 } from './skill-guided-form';
 import './skills-premium.css';
 
@@ -79,7 +90,19 @@ const CATEGORIES: Array<{ value: SkillCategory; label: string }> = [
   { value: 'autre', label: 'Autre' },
 ];
 
-const MAX_REFERENCE_FILES = Number(process.env.NEXT_PUBLIC_MAX_REFERENCE_FILES) || 15;
+// Counter suffix "/max" once the backend limits are loaded
+const outOf = (max?: number) => (max ? `/${max.toLocaleString('fr-FR')}` : '');
+const isOver = (value: number, max?: number) => max !== undefined && value > max;
+// Dismissals of a skill not created yet: kept while the editor is open, never stored (no '|' in a slug)
+const NEW_SKILL_DISMISS_SCOPE = '(nouveau)';
+// A counter turns orange from 90 % of its limit and red past it
+const COUNTER_NEAR = '#fbbf24';
+const COUNTER_OVER = '#f87171';
+const counterColor = (counts: Array<[number, number | undefined]>, base: string) => {
+  if (counts.some(([value, max]) => isOver(value, max))) return COUNTER_OVER;
+  if (counts.some(([value, max]) => max !== undefined && value >= max * 0.9)) return COUNTER_NEAR;
+  return base;
+};
 
 function readStoredExpertMode(accountName: string): boolean {
   try {
@@ -130,17 +153,90 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
   const [activeSection, setActiveSection] = useState(GUIDED_SECTIONS.style[0].key);
   const [helpField, setHelpField] = useState<string | null>(null);
   const [referencesJson, setReferencesJson] = useState<Record<string, string>>({});
+  const limits = useSkillLimits();
   const [newRefName, setNewRefName] = useState('');
   const [selectedRefKey, setSelectedRefKey] = useState<string | null>(null);
-  const [mappedTools, setMappedTools] = useState<string[]>([]);
-  const [versionComment, setVersionComment] = useState('');
+  // The name field drives the References tab: an existing name opens that file, and each button is only
+  // enabled when its action is safe (no duplicate name, no hidden change to another file)
+  const refFileName = normalizeReferenceName(newRefName);
+  const refProblem = referenceNameProblem(newRefName, limits?.maxSlugLength);
+  // Only the full name, .md included, opens a file: a name still being typed never switches the open file
+  const existingRefKey =
+    refFileName && !refProblem && newRefName.trim().toLowerCase().endsWith('.md')
+      ? Object.keys(referencesJson).find((key) => key.toLowerCase() === refFileName.toLowerCase()) ?? null
+      : null;
+  const refLimitReached = Boolean(limits && Object.keys(referencesJson).length >= limits.maxReferenceFiles);
+  const refNameUsable = Boolean(refFileName) && !refProblem && !existingRefKey;
+  const addConflict = refNameUsable ? findShortNameConflict(refFileName, referenceStarter(refFileName), referencesJson) : null;
+  const renameConflict =
+    refNameUsable && selectedRefKey
+      ? findShortNameConflict(
+          refFileName,
+          renamedReferenceContent(selectedRefKey, refFileName, referencesJson[selectedRefKey] ?? ''),
+          referencesJson,
+          selectedRefKey
+        )
+      : null;
+  const canAddReference = refNameUsable && !addConflict && !refLimitReached;
+  const canRenameReference = refNameUsable && Boolean(selectedRefKey) && !renameConflict;
+  const showRenameButton = Boolean(selectedRefKey) && Boolean(newRefName.trim()) && !existingRefKey;
+  const refHints = describeNewReference();
 
-  const [isErpConnected, setIsErpConnected] = useState<boolean>(Boolean(activeConnectionId));
-  const [toolOptions, setToolOptions] = useState<SkillToolOption[]>([]);
-  const [toolsReauth, setToolsReauth] = useState(false);
-  const [loadingTools, setLoadingTools] = useState(false);
-  const [toolsDropdownOpen, setToolsDropdownOpen] = useState(false);
-  const [toolSearchQuery, setToolSearchQuery] = useState('');
+  // The lines under the name field: what the name will create, and why a button is disabled
+  function describeNewReference(): Array<{ tone: 'ok' | 'error' | 'muted'; text: string }> {
+    const limitHint = {
+      tone: 'error' as const,
+      text: `Limite de ${limits?.maxReferenceFiles} fichiers atteinte : supprimez un fichier pour en ajouter un.`,
+    };
+    if (!newRefName.trim()) return refLimitReached ? [limitHint] : [];
+    if (refProblem) return [{ tone: refProblem.incomplete ? 'muted' : 'error', text: refProblem.text }];
+    if (existingRefKey) {
+      return [{
+        tone: 'ok',
+        text: `« ${existingRefKey} » existe déjà : il est ouvert. Modifiez le nom puis cliquez sur Renommer, ou tapez un autre nom pour ajouter un fichier.`,
+      }];
+    }
+    const hints: Array<{ tone: 'ok' | 'error' | 'muted'; text: string }> = [
+      { tone: 'ok', text: describeReferenceKind(refFileName) },
+    ];
+    const shortName = referenceShortName(refFileName, referenceStarter(refFileName));
+    if (addConflict && (!selectedRefKey || renameConflict === addConflict)) {
+      hints.push({ tone: 'error', text: `Le nom « ${shortName} » est déjà utilisé par ${addConflict}.` });
+      return hints;
+    }
+    if (addConflict) {
+      hints.push({ tone: 'error', text: `Ajouter : le nom « ${shortName} » est déjà utilisé par ${addConflict}.` });
+    } else if (refLimitReached) {
+      hints.push(limitHint);
+    }
+    if (selectedRefKey && renameConflict) {
+      hints.push({ tone: 'error', text: `Renommer : le nom « ${shortName} » est déjà utilisé par ${renameConflict}.` });
+    } else if (selectedRefKey) {
+      const before = referenceKind(selectedRefKey);
+      const after = referenceKind(refFileName);
+      const label = { documentation: 'documentation', subSkill: 'sous-compétence' };
+      hints.push({
+        tone: 'ok',
+        text: `Renommer changera le nom de « ${selectedRefKey} » (fichier ouvert)${
+          before !== after ? ` et le fera passer de ${label[before]} à ${label[after]}` : ''
+        }.`,
+      });
+    }
+    return hints;
+  }
+
+  // Typing the name of an existing file opens it, so the field and the open file never disagree
+  useEffect(() => {
+    if (existingRefKey && existingRefKey !== selectedRefKey) setSelectedRefKey(existingRefKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [existingRefKey]);
+
+  // The help strip speaks about the References tab as soon as it opens, and forgets it when leaving
+  useEffect(() => {
+    setHelpField(activeTab === 'references' ? 'referenceName' : null);
+  }, [activeTab]);
+  const [versionComment, setVersionComment] = useState('');
+  const [citations, setCitations] = useState<SkillCitations>({});
 
   const [tenants, setTenants] = useState<Array<{ client_id: string; display_name?: string }>>([]);
   const [versions, setVersions] = useState<SkillVersionItem[]>([]);
@@ -159,6 +255,11 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
   const [dismissedWarnings, setDismissedWarnings] = useState<string[]>([]);
   const checkRunRef = useRef(0);
   const modalRef = useRef<HTMLDivElement>(null);
+  // What the form held once loaded, to ask before closing with unsaved changes
+  const savedSnapshotRef = useRef<string | null>(null);
+  // The form as of the last render, for callbacks that finish later
+  const editorSnapshotRef = useRef<string | null>(null);
+  const [snapshotTick, setSnapshotTick] = useState(0);
   const dismissedStorageKey = `vmind.skills.editor.dismissed.${accountName}`;
 
   // Only one of the checks panel and the guide is shown at a time
@@ -175,13 +276,14 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     if (!isOpen) return;
     setErrorMsg(null);
     setActiveTab('general');
-    setToolsDropdownOpen(false);
-    setToolSearchQuery('');
     setHelpField(null);
     setCheckIssues([]);
     setCheckUnavailable(false);
     setChecksPanelOpen(false);
     setGuide(null);
+    // The snapshot is taken on the next render, once the values below are in place
+    savedSnapshotRef.current = null;
+    setSnapshotTick((tick) => tick + 1);
     try {
       const stored = JSON.parse(window.localStorage.getItem(dismissedStorageKey) || '[]');
       setDismissedWarnings(Array.isArray(stored) ? stored : []);
@@ -220,8 +322,6 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
       setReferencesJson({ ...refs });
       const refKeys = Object.keys(refs);
       setSelectedRefKey(refKeys.length > 0 ? refKeys[0] : null);
-      const tools = Array.isArray(initialSkill.mapped_tools) ? initialSkill.mapped_tools : [];
-      setMappedTools(tools);
       setVersionComment('');
     } else {
       setSlug('');
@@ -240,10 +340,9 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
       setActiveSection(GUIDED_SECTIONS.style[0].key);
       const startsExpert = readStoredExpertMode(accountName);
       setExpertMode(startsExpert);
-      setBodyMd(startsExpert ? NEW_SKILL_BODY_TEMPLATE : '');
+      setBodyMd(startsExpert ? limits?.starters.body ?? '' : '');
       setReferencesJson({});
       setSelectedRefKey(null);
-      setMappedTools([]);
       setVersionComment('');
     }
   }, [isOpen, initialSkill, mode, isAdmin, accountName, activeErpType, activeClientId]);
@@ -251,20 +350,16 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     let cancelled = false;
-    setLoadingTools(true);
-    fetchSkillToolOptions(activeConnectionId)
-      .then((res) => {
-        if (cancelled) return;
-        setIsErpConnected(res.connected || Boolean(activeConnectionId));
-        if (res.clientId && !initialSkill?.tenant_key) {
-          setTenantKey(res.clientId);
-        }
-        setToolOptions(res.tools);
-        setToolsReauth(res.reauth);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingTools(false);
-      });
+    fetchSkillConnection(activeConnectionId).then((res) => {
+      if (cancelled || !res.clientId || initialSkill?.tenant_key) return;
+      // A value filled in by the editor is not a change of the user's: retake the snapshot if nothing was touched
+      const untouched = savedSnapshotRef.current === null || savedSnapshotRef.current === editorSnapshotRef.current;
+      setTenantKey(res.clientId);
+      if (untouched) {
+        savedSnapshotRef.current = null;
+        setSnapshotTick((tick) => tick + 1);
+      }
+    });
 
     if (isAdmin) {
       fetchAvailableTenantsForAdmin().then((list) => {
@@ -306,7 +401,9 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
   const saveDisabled = saving;
   const canUseGuidedForm = fitsGuidedForm(referencesJson);
 
-  const finalSlug = !expertMode && mode === 'create' ? slugifyTitle(title) : slug.trim().toLowerCase();
+  // Shared skills always need a version comment; personal skills from their first change on, for the history
+  const commentRequired = scope !== 'USER' || mode !== 'create';
+  const finalSlug = !expertMode && mode === 'create' ? slugifyTitle(title, limits?.maxSlugLength) : slug.trim().toLowerCase();
   const buildPayload = () => ({
     slug: finalSlug,
     title: title.trim(),
@@ -318,7 +415,6 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     tenant_key: scope === 'TENANT' ? tenantKey.trim().toUpperCase() : null,
     body_md: effectiveBody,
     references_json: referencesJson,
-    mapped_tools: scope === 'GLOBAL' || !isErpConnected ? [] : mappedTools,
     comment: versionComment.trim() || undefined,
   });
   const checkPayload = () => ({
@@ -327,9 +423,25 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     skill_id: mode !== 'create' ? initialSkill?.id ?? null : null,
   });
   const checkPayloadJson = JSON.stringify(checkPayload());
+  const editorSnapshot = JSON.stringify(buildPayload());
+  editorSnapshotRef.current = editorSnapshot;
 
-  // A warning marked « C'est voulu » stays hidden for this skill and this account only
-  const dismissKeyOf = (issue: SkillIssue) => `${finalSlug}|${issueKey(issue)}`;
+  useEffect(() => {
+    if (isOpen) savedSnapshotRef.current = editorSnapshot;
+    // Only right after the form is loaded, not on each change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshotTick]);
+
+  const handleRequestClose = () => {
+    const unsaved = savedSnapshotRef.current !== null && savedSnapshotRef.current !== editorSnapshot;
+    if (unsaved && !window.confirm('Vos modifications ne sont pas enregistrées. Fermer quand même ?')) return;
+    onClose();
+  };
+
+  // A warning marked « C'est voulu » stays hidden for this skill and this account only.
+  // A new skill's name still changes while it is typed, so its choices hold for this editing only
+  const dismissScope = mode === 'create' ? NEW_SKILL_DISMISS_SCOPE : finalSlug;
+  const dismissKeyOf = (issue: SkillIssue) => `${dismissScope}|${issueKey(issue)}`;
   const isDismissed = (issue: SkillIssue) => issue.level === 'warning' && dismissedWarnings.includes(dismissKeyOf(issue));
   const visibleIssues = checkIssues.filter((issue) => !isDismissed(issue));
   const dismissedCount = checkIssues.length - visibleIssues.length;
@@ -338,14 +450,15 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
   const storeDismissed = (next: string[]) => {
     setDismissedWarnings(next);
     try {
-      window.localStorage.setItem(dismissedStorageKey, JSON.stringify(next));
+      const kept = next.filter((key) => !key.startsWith(`${NEW_SKILL_DISMISS_SCOPE}|`));
+      window.localStorage.setItem(dismissedStorageKey, JSON.stringify(kept));
     } catch {
       // The choice simply isn't remembered
     }
   };
   const handleDismissIssue = (issue: SkillIssue) => storeDismissed([...dismissedWarnings, dismissKeyOf(issue)]);
   const handleRestoreDismissed = () =>
-    storeDismissed(dismissedWarnings.filter((key) => !key.startsWith(`${finalSlug}|`)));
+    storeDismissed(dismissedWarnings.filter((key) => !key.startsWith(`${dismissScope}|`)));
 
   useEffect(() => {
     if (!isOpen || activeTab === 'history') return;
@@ -353,9 +466,10 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     setChecking(true);
     const timer = setTimeout(async () => {
       try {
-        const issues = await checkSkill(JSON.parse(checkPayloadJson), activeConnectionId);
+        const { issues, citations: found } = await checkSkill(JSON.parse(checkPayloadJson), activeConnectionId);
         if (runId !== checkRunRef.current) return;
         setCheckIssues(issues);
+        setCitations(found);
         setCheckUnavailable(false);
       } catch {
         if (runId === checkRunRef.current) setCheckUnavailable(true);
@@ -393,14 +507,14 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
       setQuand(sentences?.quand ?? '');
       setPasPour(sentences?.pasPour ?? '');
       setFreeDescription(usesFreeDescription(description));
-      const guided = loadGuidedBody(effectiveKind, title, bodyMd);
+      const guided = loadGuidedBody(effectiveKind, title, bodyMd, limits?.starters.body);
       setSectionValues(guided.values);
       setCustomBody(guided.custom);
       setActiveSection(guided.custom?.sections[0]?.key ?? GUIDED_SECTIONS[effectiveKind][0].key);
       if (activeTab === 'references') setActiveTab('general');
     } else {
       setDescription(effectiveDescription);
-      setBodyMd(effectiveBody || NEW_SKILL_BODY_TEMPLATE);
+      setBodyMd(effectiveBody || limits?.starters.body || '');
     }
     setExpertMode(!expertMode);
     setErrorMsg(null);
@@ -438,40 +552,94 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     if (field) setHelpField(field);
   };
 
-  const toggleToolSelection = (toolName: string) => {
-    setMappedTools((prev) => {
-      if (prev.includes(toolName)) {
-        return prev.filter((t) => t !== toolName);
-      }
-      if (prev.length >= 20) {
-        return prev;
-      }
-      return [...prev, toolName];
-    });
-  };
-
+  // Always creates a new file: never touches the open file's content
   const handleAddReference = () => {
-    const clean = newRefName.trim().toLowerCase();
-    if (!clean) return;
-    const fileName = clean.endsWith('.md') ? clean : `${clean}.md`;
-    if (!/^(?:[a-z0-9_-]+\/)*[a-z0-9._-]+\.md$/.test(fileName) || fileName.includes('..')) {
-      setErrorMsg('Nom de fichier de référence invalide (ex: capacites/creances.md ou guide.md).');
-      return;
-    }
-    if (Object.keys(referencesJson).length >= MAX_REFERENCE_FILES && !referencesJson[fileName]) {
-      setErrorMsg(`Maximum ${MAX_REFERENCE_FILES} fichiers de référence autorisés.`);
-      return;
-    }
-    setReferencesJson((prev) => ({
-      ...prev,
-      [fileName]: prev[fileName] ?? `# ${fileName}\n\nContenu de référence...\n`,
-    }));
+    if (!canAddReference) return;
+    const fileName = refFileName;
+    setReferencesJson((prev) => ({ ...prev, [fileName]: referenceStarter(fileName, limits?.starters) }));
     setSelectedRefKey(fileName);
     setNewRefName('');
     setErrorMsg(null);
   };
 
-  const handleDeleteReference = (key: string) => {
+  const handleSelectReference = (key: string) => {
+    setSelectedRefKey(key);
+    setNewRefName(key);
+    setErrorMsg(null);
+  };
+
+  // Enter adds the file when Ajouter is enabled, and never saves the whole skill
+  const handleRefNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    handleAddReference();
+  };
+
+  // Renames the open file in place (same content, same position) and can update the places that cite it
+  // The citations as the backend finds them now; the last known ones if it cannot be reached
+  const currentCitations = async (): Promise<SkillCitations> => {
+    try {
+      return (await checkSkill(checkPayload(), activeConnectionId)).citations;
+    } catch {
+      return citations;
+    }
+  };
+
+  const handleRenameReference = async () => {
+    if (!canRenameReference || !selectedRefKey) return;
+    const oldName = selectedRefKey;
+    const newName = refFileName;
+    const found = await currentCitations();
+    const citedIn = citationPlaces(oldName, found);
+    const updateCitations =
+      citedIn.length > 0 &&
+      window.confirm(`« ${oldName} » est cité dans : ${citedIn.join(', ')}.\nRemplacer ces mentions par « ${newName} » ?`);
+    setReferencesJson((prev) =>
+      Object.fromEntries(
+        Object.entries(prev).map(([key, content]) =>
+          key === oldName
+            ? [newName, renamedReferenceContent(oldName, newName, content)]
+            : [key, updateCitations ? replaceCitations(content, key, oldName, newName, found) : content]
+        )
+      )
+    );
+    if (updateCitations) setBodyMd((prev) => replaceCitations(prev, 'body', oldName, newName, found));
+    setSelectedRefKey(newName);
+    setNewRefName('');
+    setErrorMsg(null);
+  };
+
+  // Opens the place of a problem: the reference file concerned, or the field, with the word selected when found
+  const handleOpenIssue = (issue: SkillIssue) => {
+    setChecksPanelOpen(false);
+    if (issue.field === 'references') {
+      setActiveTab('references');
+      const file = issue.path ?? issue.term;
+      if (file && file in referencesJson) handleSelectReference(file);
+      return;
+    }
+    setActiveTab('general');
+    const target = issueTarget(issue);
+    setTimeout(() => {
+      const area = modalRef.current?.querySelector<HTMLElement>(`[data-check~="${target}"]`);
+      if (!area) return;
+      area.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      const field = area.querySelector<HTMLTextAreaElement | HTMLInputElement>('textarea, input');
+      field?.focus();
+      const at = issue.term && field ? field.value.indexOf(issue.term) : -1;
+      if (field && issue.term && at >= 0) field.setSelectionRange(at, at + issue.term.length);
+    }, 50);
+  };
+
+  const handleDeleteReference = async (key: string) => {
+    const citedIn = citationPlaces(key, await currentCitations());
+    if (
+      citedIn.length > 0 &&
+      !window.confirm(`« ${key} » est encore cité dans : ${citedIn.join(', ')}.\nLe supprimer quand même ?`)
+    ) {
+      return;
+    }
+    if (newRefName.trim().toLowerCase() === key.toLowerCase()) setNewRefName('');
     setReferencesJson((prev) => {
       const copy = { ...prev };
       delete copy[key];
@@ -485,9 +653,12 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     e.preventDefault();
     setErrorMsg(null);
 
-    const finalTools = scope === 'GLOBAL' || !isErpConnected ? [] : mappedTools;
-    if (scope !== 'USER' && !versionComment.trim()) {
-      setErrorMsg('Un commentaire de version est obligatoire pour les portées partagées (TENANT, ERP, GLOBAL).');
+    if (commentRequired && !versionComment.trim()) {
+      setErrorMsg(
+        scope !== 'USER'
+          ? 'Un commentaire de version est obligatoire pour les portées partagées (TENANT, ERP, GLOBAL).'
+          : "Indiquez ce qui a changé : c'est ce qui apparaît dans l'historique de la compétence."
+      );
       return;
     }
     if (scope === 'ERP' && erpTypes.length === 0) {
@@ -509,12 +680,13 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
 
     try {
       setSaving(true);
-      const payload = { ...buildPayload(), mapped_tools: finalTools };
+      const payload = buildPayload();
 
       // Same rules as the backend save: check first so every blocking problem is explained at once
       try {
-        const issues = await checkSkill(checkPayload(), activeConnectionId);
+        const { issues, citations: found } = await checkSkill(checkPayload(), activeConnectionId);
         setCheckIssues(issues);
+        setCitations(found);
         setCheckUnavailable(false);
         if (issues.some((issue) => issue.level === 'blocking')) {
           setChecksPanelOpen(true);
@@ -579,7 +751,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
         justifyContent: 'center',
         padding: '20px',
       }}
-      onClick={onClose}
+      onClick={handleRequestClose}
     >
       <div
         ref={modalRef}
@@ -628,7 +800,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleRequestClose}
             style={{
               background: 'rgba(255,255,255,0.05)',
               border: '1px solid rgba(255,255,255,0.1)',
@@ -692,7 +864,10 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                 color: activeTab === 'references' ? '#00E5C8' : '#94a3b8',
               }}
             >
-              <FileText size={14} /> Références ({Object.keys(referencesJson).length}/{MAX_REFERENCE_FILES})
+              <FileText size={14} /> Références
+              <span style={{ color: counterColor([[Object.keys(referencesJson).length, limits?.maxReferenceFiles]], 'inherit') }}>
+                ({Object.keys(referencesJson).length}{outOf(limits?.maxReferenceFiles)})
+              </span>
             </button>
           )}
 
@@ -845,6 +1020,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                   sections={guidedValues}
                   activeSection={activeSection}
                   title={title}
+                  maxTitleLength={limits?.maxTitleLength}
                   onDescriptionChange={setDescription}
                   onQuandChange={setQuand}
                   onPasPourChange={setPasPour}
@@ -893,7 +1069,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="ex: Synthèse Comité de Direction"
                     required
-                    maxLength={200}
+                    maxLength={limits?.maxTitleLength}
                     style={{
                       width: '100%',
                       padding: '9px 12px',
@@ -1035,12 +1211,12 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                     style={{
                       fontSize: '11px',
                       color:
-                        descChars < 20 || descChars > 1024 || hasForbiddenAngles
-                          ? '#f87171'
-                          : '#00E5C8',
+                        (limits !== null && descChars < limits.minDescriptionLength) || hasForbiddenAngles
+                          ? COUNTER_OVER
+                          : counterColor([[descChars, limits?.maxDescriptionLength]], '#00E5C8'),
                     }}
                   >
-                    {descWords} mots · {descChars}/1024 caractères {hasForbiddenAngles ? '(chevrons < > interdits)' : ''}
+                    {descWords} mots · {descChars}{outOf(limits?.maxDescriptionLength)} caractères {hasForbiddenAngles ? '(chevrons < > interdits)' : ''}
                   </span>
                 </div>
                 <textarea
@@ -1071,10 +1247,16 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                   <span
                     style={{
                       fontSize: '11px',
-                      color: bodyLines > 500 || bodyChars > 20000 ? '#f87171' : '#8FA3B8',
+                      color: counterColor(
+                        [
+                          [bodyLines, limits?.maxBodyLines],
+                          [bodyChars, limits?.maxBodyChars],
+                        ],
+                        '#8FA3B8'
+                      ),
                     }}
                   >
-                    {bodyLines}/500 lignes · {bodyChars}/20 000 caractères
+                    {bodyLines}{outOf(limits?.maxBodyLines)} lignes · {bodyChars}{outOf(limits?.maxBodyChars)} caractères
                   </span>
                 </div>
                 <textarea
@@ -1099,8 +1281,8 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
               </>
               )}
 
-              {/* Version comment input for shared scopes */}
-              {scope !== 'USER' && (
+              {/* Version comment input: shared scopes, and any change to an existing skill */}
+              {commentRequired && (
                 <div data-help="commentaire">
                   <label style={{ display: 'block', fontSize: '11px', fontWeight: 600, color: '#00E5C8', marginBottom: '6px' }}>
                     {expertMode ? 'Commentaire de version *' : 'Ce qui a changé *'}
@@ -1128,12 +1310,14 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
 
           {activeTab === 'references' && (
             <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div data-help="referenceName" data-check="references">
               <div style={{ display: 'flex', gap: '8px' }}>
                 <input
                   type="text"
                   value={newRefName}
-                  onChange={(e) => setNewRefName(e.target.value)}
-                  placeholder="nom-reference.md"
+                  onChange={(e) => setNewRefName(sanitizeReferenceInput(e.target.value))}
+                  onKeyDown={handleRefNameKeyDown}
+                  placeholder="regles/relances.md ou relances-clients/SKILL.md"
                   style={{
                     flex: 1,
                     padding: '8px 12px',
@@ -1148,6 +1332,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                 <button
                   type="button"
                   onClick={handleAddReference}
+                  disabled={!canAddReference}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -1159,16 +1344,54 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                     color: '#00E5C8',
                     fontSize: '12px',
                     fontWeight: 600,
-                    cursor: 'pointer',
+                    cursor: canAddReference ? 'pointer' : 'not-allowed',
+                    opacity: canAddReference ? 1 : 0.4,
                   }}
                 >
                   <Plus size={14} /> Ajouter un fichier `.md`
                 </button>
+                {showRenameButton && (
+                  <button
+                    type="button"
+                    onClick={handleRenameReference}
+                    disabled={!canRenameReference}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      background: 'transparent',
+                      border: '1px solid rgba(255,255,255,0.25)',
+                      color: '#e2e8f0',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: canRenameReference ? 'pointer' : 'not-allowed',
+                      opacity: canRenameReference ? 1 : 0.4,
+                    }}
+                  >
+                    <Pencil size={13} /> Renommer
+                  </button>
+                )}
+              </div>
+              {refHints.map((hint) => (
+                <div
+                  key={hint.text}
+                  style={{
+                    marginTop: '6px',
+                    fontSize: '11.5px',
+                    color: hint.tone === 'error' ? '#f87171' : hint.tone === 'muted' ? '#8FA3B8' : '#00E5C8',
+                  }}
+                >
+                  {hint.text}
+                </div>
+              ))}
               </div>
 
               {Object.keys(referencesJson).length === 0 ? (
                 <div style={{ padding: '32px', textAlign: 'center', color: '#8FA3B8', fontSize: '12.5px' }}>
-                  Aucun fichier de référence (Niveau 3). Ajoutez des fichiers `.md` chargés à la demande par l&apos;agent.
+                  Aucun fichier de référence. Ajoutez une documentation (ex. regles/relances.md) ou une sous-compétence
+                  (ex. relances-clients/SKILL.md).
                 </div>
               ) : (
                 <div style={{ flex: 1, minHeight: 0, height: '360px', display: 'grid', gridTemplateColumns: '220px 1fr', gap: '14px' }}>
@@ -1176,7 +1399,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                     {Object.keys(referencesJson).map((fileKey) => (
                       <div
                         key={fileKey}
-                        onClick={() => setSelectedRefKey(fileKey)}
+                        onClick={() => handleSelectReference(fileKey)}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -1219,10 +1442,20 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
 
                   <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                     {selectedRefKey && referencesJson[selectedRefKey] !== undefined && (
-                      <>
+                      <div
+                        data-help={referenceKind(selectedRefKey) === 'subSkill' ? 'referenceSubSkill' : 'referenceDoc'}
+                        data-check="references"
+                        style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}
+                      >
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '11px', color: '#8FA3B8' }}>
                           <span>Contenu de `{selectedRefKey}`</span>
-                          <span>{referencesJson[selectedRefKey].length}/8 000 caractères</span>
+                          <span
+                            style={{
+                              color: counterColor([[referencesJson[selectedRefKey].length, limits?.maxReferenceFileChars]], '#8FA3B8'),
+                            }}
+                          >
+                            {referencesJson[selectedRefKey].length}{outOf(limits?.maxReferenceFileChars)} caractères
+                          </span>
                         </div>
                         <textarea
                           rows={15}
@@ -1247,7 +1480,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                             resize: 'none',
                           }}
                         />
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -1394,25 +1627,6 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                           <div style={{ fontSize: '11.5px', color: '#94a3b8' }}>
                             <strong style={{ color: '#e2e8f0' }}>Description :</strong> {v.description}
                           </div>
-                          {Array.isArray(v.mapped_tools) && v.mapped_tools.length > 0 && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                              {v.mapped_tools.map((t) => (
-                                <span
-                                  key={t}
-                                  style={{
-                                    fontSize: '10px',
-                                    fontFamily: 'monospace',
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    background: 'rgba(0, 240, 255, 0.08)',
-                                    color: '#7dd3fc',
-                                  }}
-                                >
-                                  {t}
-                                </span>
-                              ))}
-                            </div>
-                          )}
                           <pre
                             style={{
                               margin: 0,
@@ -1440,7 +1654,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
           )}
         </form>
 
-        {!expertMode && activeTab === 'general' && (
+        {((!expertMode && activeTab === 'general') || activeTab === 'references') && (
           <SkillHelpStrip
             fieldKey={helpField}
             issues={issuesForHelpKey(visibleIssues, helpField, guidedTabs.map((t) => t.key))}
@@ -1455,6 +1669,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
             onDismiss={handleDismissIssue}
             onRestoreDismissed={handleRestoreDismissed}
             onLearnMore={(issue) => openGuide(guideSectionFor(issue))}
+            onOpenIssue={handleOpenIssue}
             onClose={() => setChecksPanelOpen(false)}
           />
         )}
@@ -1511,7 +1726,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
             )}
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleRequestClose}
               style={{
                 padding: '9px 18px',
                 borderRadius: '10px',

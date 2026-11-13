@@ -58,6 +58,9 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   const { activeConnection } = useConnections();
   const lastActiveConnKeyRef = useRef<string>('');
   const lastPassiveFetchKeyRef = useRef<string>('');
+  // Incrémenté quand les cartes sont vidées : relance la lecture passive même si
+  // « déconnecté » puis « connecté » arrivent dans le même rendu
+  const [passiveReloadToken, setPassiveReloadToken] = useState<number>(0);
 
   useEffect(() => {
     if (activeConnection && activeConnection.status === 'connected') {
@@ -69,17 +72,23 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
         setCurrentUser((prev: any) => ({
           ...(prev || {}),
           client_id: activeConnection.client_id || 'DEMO',
-          roles: prev?.roles || [],
-          allowedAgents: prev?.allowedAgents || ['VDATA', 'VFIN', 'VSELL', 'VSTOCK', 'VBUY', 'VMOVE']
+          roles: prev?.roles || []
         }));
         setKpisByAgent({});
         setLastUpdatedByAgent({});
+        // Cartes vidées : la prochaine lecture passive doit relire la base
+        lastPassiveFetchKeyRef.current = '';
+        setPassiveReloadToken(t => t + 1);
       }
     } else if (activeConnection && activeConnection.status !== 'connected') {
       if (lastActiveConnKeyRef.current !== 'disconnected') {
         lastActiveConnKeyRef.current = 'disconnected';
         setIsConnectorConnected(false);
         setKpisByAgent({});
+        setLastUpdatedByAgent({});
+        // Cartes vidées : à la reconnexion, la lecture passive relira la base
+        lastPassiveFetchKeyRef.current = '';
+        setPassiveReloadToken(t => t + 1);
       }
     }
   }, [activeConnection?.id, activeConnection?.status, activeConnection?.client_id]);
@@ -103,8 +112,7 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
             setCurrentUser({
               username: me?.user?.username || '',
               client_id: data.client_id || 'LOCAL',
-              roles: Array.isArray(rawRoles) ? rawRoles : rawRoles ? [rawRoles] : [],
-              allowedAgents: Array.isArray(data.allowedAgents) ? data.allowedAgents : []
+              roles: Array.isArray(rawRoles) ? rawRoles : rawRoles ? [rawRoles] : []
             });
           } else {
             setIsConnectorConnected(false);
@@ -128,6 +136,11 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
           setCurrentUser(user);
         }
         setKpisByAgent({});
+        setLastUpdatedByAgent({});
+        // Cartes vidées : dès que le connecteur est de nouveau signalé connecté,
+        // la lecture passive relit la dernière actualisation en base (jamais n8n)
+        lastPassiveFetchKeyRef.current = '';
+        setPassiveReloadToken(t => t + 1);
         setError(null);
         setLoadingByAgent({});
       } else {
@@ -150,16 +163,6 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
   const clearError = () => setError(null);
   const clearNotice = () => setNotice(null);
 
-  // Helper to check if user has ERP connected and agent is allowed
-  const isAgentKpiAllowed = (agentId: string) => {
-    if (!currentUser) return false;
-    const roles = Array.isArray(currentUser.roles) ? currentUser.roles : [currentUser.roles || ''];
-    if (roles.some((r: string) => ['Administrator', 'Administrators', 'Admin', 'Superusers'].includes(r))) return true;
-    if (Array.isArray(currentUser.allowedAgents)) {
-      return currentUser.allowedAgents.includes(agentId.toUpperCase());
-    }
-    return false;
-  };
 
   const fetchKpis = async (agentId: string, force = false, targetTool?: string, horizon?: string) => {
     if (!currentUser) return;
@@ -170,12 +173,6 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
     if (!isConnectorConnected) {
       console.log(`[KPI CONTEXT] Connecteur ERP déconnecté — requête KPI évitée.`);
-      setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
-      return;
-    }
-
-    if (!isAgentKpiAllowed(allowedAgentUpper)) {
-      console.log(`[KPI CONTEXT] KPIs not allowed for agent ${allowedAgentUpper} (ERP not connected or agent not authorized)`);
       setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
       return;
     }
@@ -270,14 +267,19 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
           };
         }
 
+        // Mode dégradé : l'état suit toujours la dernière réponse (s'efface au prochain calcul réussi)
+        updatedAgentData._isDegraded = Boolean(response?._isDegraded);
+        updatedAgentData._degradedWarning = response?._isDegraded ? response._degradedWarning : undefined;
+        updatedAgentData._degradedReason = response?._isDegraded ? response._degradedReason : undefined;
+
         return {
           ...prev,
           [agentKey]: updatedAgentData
         };
       });
 
-      // Update manual cooldown if applicable (1 heure)
-      if (force) {
+      // Update manual cooldown if applicable (1 heure) — pas de délai d'attente si l'actualisation a échoué (mode dégradé)
+      if (force && !response?._isDegraded) {
         setCooldowns(prev => ({
           ...prev,
           [cooldownKey]: Date.now()
@@ -314,17 +316,12 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
     const lowerAgent = currentAgent.toLowerCase();
     if (lowerAgent !== 'vdata' && lowerAgent !== 'vfin' && lowerAgent !== 'vsell' && lowerAgent !== 'vbuy' && lowerAgent !== 'vmove') return;
 
-    if (!isAgentKpiAllowed(currentAgent)) {
-      setLoadingByAgent(prev => ({ ...prev, [lowerAgent]: false }));
-      return;
-    }
-
     // Interrogation de la base PostgreSQL en mode passif (force = false)
     const fetchKey = `${lowerAgent}_${startDate}_${endDate}_${currentUser?.client_id || 'LOCAL'}`;
     if (lastPassiveFetchKeyRef.current === fetchKey) return;
     lastPassiveFetchKeyRef.current = fetchKey;
     fetchKpis(lowerAgent, false);
-  }, [startDate, endDate, activeAgentId, currentUser?.username, currentUser?.client_id, isConnectorConnected]);
+  }, [startDate, endDate, activeAgentId, currentUser?.username, currentUser?.client_id, isConnectorConnected, passiveReloadToken]);
 
   // Polling automatique si un calcul est en cours en tâche de fond pour l'agent actif
   const currentAgentForPoll = (activeAgentId || 'VDATA').toLowerCase();

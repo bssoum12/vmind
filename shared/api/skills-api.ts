@@ -21,7 +21,6 @@ export interface InstalledSkillItem {
   erp_types?: string[];
   tenant_key: string | null;
   owner_user_id: number | null;
-  mapped_tools: string[];
   references: string[];
   sub_skills?: Array<{ slug: string; path: string; title: string; description: string }>;
   version: number;
@@ -36,6 +35,8 @@ export interface InstalledSkillItem {
 export interface SkillDetail extends InstalledSkillItem {
   body_md: string;
   references_json: Record<string, string>;
+  // Admins only: the catalog has a newer version of this skill, which was edited in the UI
+  catalog_update_available?: boolean;
 }
 
 export interface DiscoverSkillItem {
@@ -48,19 +49,12 @@ export interface DiscoverSkillItem {
   description: string;
   category: SkillCategory;
   kind: SkillKind;
-  mapped_tools: string[];
   references: string[];
   sub_skills?: Array<{ slug: string; path: string; title: string; description: string }>;
   version: number;
   enabled: boolean;
   source: 'ui' | 'catalog';
   updated_at?: string;
-}
-
-export interface SkillToolOption {
-  name: string;
-  description: string;
-  category: string;
 }
 
 export interface SkillVersionItem {
@@ -70,7 +64,6 @@ export interface SkillVersionItem {
   description: string;
   body_md: string;
   references_json: Record<string, string>;
-  mapped_tools: string[];
   comment: string | null;
   changed_by: number | null;
   changed_by_username?: string | null;
@@ -88,7 +81,6 @@ export interface SkillWritePayload {
   tenant_key?: string | null;
   body_md: string;
   references_json?: Record<string, string>;
-  mapped_tools?: string[];
   comment?: string;
   enabled?: boolean;
 }
@@ -158,28 +150,63 @@ export async function fetchSkillDetail(
   return data.skill;
 }
 
-export async function fetchSkillToolOptions(connectionId?: number | string | null): Promise<{
+/** The active connection for the editor: connected or not, ERP and client. Never calls the ERP. */
+export async function fetchSkillConnection(connectionId?: number | string | null): Promise<{
   connected: boolean;
   erpType: string | null;
   clientId: string | null;
-  tools: SkillToolOption[];
-  reauth: boolean;
 }> {
   const qs = formatConnectionQuery(connectionId);
-  const res = await fetch(`${getBaseUrl()}/api/skills/tool-options${qs}`, {
-    credentials: 'include',
-  });
-  const data = await res.json();
-  if (!res.ok || !data.ok) {
-    return { connected: false, erpType: null, clientId: null, tools: [], reauth: false };
+  try {
+    const res = await fetch(`${getBaseUrl()}/api/skills/connection${qs}`, {
+      credentials: 'include',
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) return { connected: false, erpType: null, clientId: null };
+    return {
+      connected: Boolean(data.connected),
+      erpType: data.erp_type ?? null,
+      clientId: data.client_id ?? null,
+    };
+  } catch {
+    return { connected: false, erpType: null, clientId: null };
   }
-  return {
-    connected: Boolean(data.connected),
-    erpType: data.erp_type ?? null,
-    clientId: data.client_id ?? null,
-    tools: Array.isArray(data.tools) ? data.tools : [],
-    reauth: Boolean(data.reauth),
-  };
+}
+
+/** Authoring limits, set in the backend .env and applied by its validator. */
+export interface SkillLimits {
+  maxSlugLength: number;
+  maxTitleLength: number;
+  minDescriptionLength: number;
+  maxDescriptionLength: number;
+  maxBodyLines: number;
+  maxBodyChars: number;
+  maxReferenceFiles: number;
+  maxReferenceFileChars: number;
+  maxTotalReferencesChars: number;
+  // Starting texts of new instructions and reference files, written by the backend only; {name} is the file name
+  starters: { body: string; document: string; subSkill: string };
+}
+
+let skillLimitsRequest: Promise<SkillLimits | null> | null = null;
+
+/** Loads the limits and starting texts once per page; null when the backend cannot be reached. */
+export function fetchSkillLimits(): Promise<SkillLimits | null> {
+  if (!skillLimitsRequest) {
+    skillLimitsRequest = fetch(`${getBaseUrl()}/api/skills/limits`, { credentials: 'include' })
+      .then(async (res) => {
+        const data = await res.json();
+        return res.ok && data.ok && data.limits && data.starters
+          ? ({ ...data.limits, starters: data.starters } as SkillLimits)
+          : null;
+      })
+      .catch(() => null)
+      .then((limits) => {
+        if (!limits) skillLimitsRequest = null;
+        return limits;
+      });
+  }
+  return skillLimitsRequest;
 }
 
 export type SkillIssueLevel = 'blocking' | 'warning' | 'info';
@@ -192,6 +219,8 @@ export interface SkillIssue {
   why: string;
   fix: string;
   term?: string;
+  // The reference file to open when the issue is clicked, when it differs from `term`
+  path?: string;
 }
 
 /** Error thrown by a save, carrying the problems found so the editor can show them. */
@@ -206,10 +235,13 @@ export class SkillSaveError extends Error {
 /**
  * Runs the save rules and the warnings on a skill being written, without saving anything.
  */
+/** Where each reference file is cited: `body` (the instructions) or the citing file, with the exact text used. */
+export type SkillCitations = Record<string, Array<{ place: string; token: string }>>;
+
 export async function checkSkill(
   payload: SkillWritePayload & { skill_id?: number | null },
   connectionId?: number | string | null
-): Promise<SkillIssue[]> {
+): Promise<{ issues: SkillIssue[]; citations: SkillCitations }> {
   const res = await fetch(`${getBaseUrl()}/api/skills/check${formatConnectionQuery(connectionId)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -220,7 +252,10 @@ export async function checkSkill(
   if (!res.ok || !data.ok) {
     throw new Error(data.error || 'Vérification impossible pour le moment.');
   }
-  return Array.isArray(data.issues) ? data.issues : [];
+  return {
+    issues: Array.isArray(data.issues) ? data.issues : [],
+    citations: data.citations && typeof data.citations === 'object' ? data.citations : {},
+  };
 }
 
 export async function createSkill(payload: SkillWritePayload): Promise<any> {
@@ -322,6 +357,19 @@ export async function rollbackSkillVersion(
   return data.skill;
 }
 
+/** Platform admins: replaces a catalog skill edited in the UI by the newer catalog version (kept in the history). */
+export async function applyCatalogUpdate(id: number): Promise<number> {
+  const res = await fetch(`${getBaseUrl()}/api/skills/${id}/catalog-update`, {
+    method: 'POST',
+    credentials: 'include',
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || 'Mise à jour depuis le catalogue impossible.');
+  }
+  return Number(data.version);
+}
+
 export async function importSkillMd(payload: {
   content?: string;
   markdown?: string;
@@ -331,7 +379,7 @@ export async function importSkillMd(payload: {
   tenant_key?: string;
   comment?: string;
   references_json?: Record<string, string>;
-}): Promise<any> {
+}, askComment?: () => string | null): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/skills/import`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -339,6 +387,12 @@ export async function importSkillMd(payload: {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
+  // An import that replaces an existing skill says what changed, like an edit: ask once, then retry
+  const needsComment = Array.isArray(data.issues) && data.issues.some((i: SkillIssue) => i.code === 'comment_required');
+  if (needsComment && askComment && !payload.comment) {
+    const comment = askComment()?.trim();
+    if (comment) return importSkillMd({ ...payload, comment });
+  }
   if (!res.ok || !data.ok) {
     const errMsg =
       Array.isArray(data.errors) && data.errors.length > 0

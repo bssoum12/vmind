@@ -271,7 +271,7 @@ export const DeliveryRateKpi: React.FC<DeliveryRateKpiProps> = ({ activeAgentId 
 
         <button
           onClick={() => fetchKpis('vdata', true, 'get_delivery_rate')}
-          title="Rafraîchir KPI via n8n"
+          title="Rafraîchir les indicateurs"
           disabled={effectiveLoading}
           style={{
             background: 'transparent',

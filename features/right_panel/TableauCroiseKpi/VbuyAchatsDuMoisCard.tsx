@@ -137,7 +137,7 @@ export const VbuyAchatsDuMoisCard: React.FC<VbuyAchatsDuMoisCardProps> = ({
 
         <button
           onClick={() => fetchKpis('vbuy', true, 'get_factures_achats')}
-          title="Rafraîchir KPI via n8n"
+          title="Rafraîchir les indicateurs"
           disabled={effectiveLoading}
           style={{
             background: 'transparent',

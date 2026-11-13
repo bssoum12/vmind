@@ -266,7 +266,7 @@ export const VmoveDossiersEnRetardCard: React.FC<VmoveDossiersEnRetardCardProps>
         <button
           onClick={handleRefresh}
           disabled={effectiveLoading}
-          title="Rafraîchir les données via n8n"
+          title="Rafraîchir les données"
           style={{
             background: 'rgba(248, 113, 113, 0.08)',
             border: '1px solid rgba(248, 113, 113, 0.25)',

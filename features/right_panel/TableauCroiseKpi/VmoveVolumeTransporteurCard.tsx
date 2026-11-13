@@ -220,7 +220,7 @@ export const VmoveVolumeTransporteurCard: React.FC<VmoveVolumeTransporteurCardPr
         <button
           onClick={handleRefresh}
           disabled={effectiveLoading}
-          title="Rafraîchir les données via n8n"
+          title="Rafraîchir les données"
           style={{
             background: 'rgba(0, 229, 200, 0.08)',
             border: '1px solid rgba(0, 229, 200, 0.25)',
