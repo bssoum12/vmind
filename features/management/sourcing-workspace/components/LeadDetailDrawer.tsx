@@ -11,7 +11,6 @@ import {
   Target, 
   Copy, 
   Check, 
-  Sparkles, 
   MapPin, 
   Layers,
   Phone,
@@ -337,23 +336,6 @@ export default function LeadDetailDrawer({
 
         {/* 2. DRAWER CONTENT */}
         <div className="drawer-body-content">
-
-          {/* SOURCING STATUS CARD */}
-          <div className="drawer-intelligence-card">
-            <div className="intelligence-header">
-              <span className="intelligence-title">
-                <Sparkles size={13} /> Ciblage IA
-              </span>
-              <span className="prequalified-badge">
-                ⚡ Score {lead.score ?? 90}%
-              </span>
-            </div>
-            {lead.raison && (
-              <p className="intelligence-reason">
-                {lead.raison}
-              </p>
-            )}
-          </div>
 
           {/* CONTACT SECTION */}
           <div className="drawer-section-card">
