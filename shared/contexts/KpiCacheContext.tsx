@@ -179,23 +179,12 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
 
     const cooldownKey = targetTool ? `${allowedAgentUpper}_${targetTool}` : `${allowedAgentUpper}_ALL`;
 
-    // Cooldown anti-spam for manual force refresh (1 hour)
-    if (force) {
-      const lastRun = cooldowns[cooldownKey] || 0;
-      const nowMs = Date.now();
-      const isDev = process.env.NODE_ENV === 'development';
-      const ONE_HOUR_MS = isDev ? 5 * 1000 : 60 * 60 * 1000; // 5s en dev, 1h en prod
-      if (nowMs - lastRun < ONE_HOUR_MS) {
-        const remainingMin = Math.ceil((ONE_HOUR_MS - (nowMs - lastRun)) / (60 * 1000));
-        console.log(`[KPI CONTEXT] Cooldown actif pour ${cooldownKey} (reste ${remainingMin} min). Requête conservée pour économiser les tokens.`);
-        setNotice(`Données déjà à jour. Prochaine actualisation autorisée dans ${remainingMin} min.`);
-        setLoadingByAgent(prev => ({ ...prev, [agentKey]: false }));
-        return;
-      }
-    }
+    // Compteur d'actualisation : décidé par le backend (KPI_REFRESH_COOLDOWN_MINUTES).
+    // Pendant le compteur, le backend renvoie le dernier calcul enregistré avec _cooldown, sans appeler n8n.
 
     // Set loading state for this agent independently (never aborts other specialists)
     if (force) { setLoadingByAgent(prev => ({ ...prev, [agentKey]: true })); }
+    const refreshStartedAt = Date.now();
     try {
       const clientId = currentUser?.client_id || 'LOCAL';
 
@@ -213,6 +202,16 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
           horizon: horizon || '1m'
         }
       );
+
+      // Pendant le compteur du backend, la réponse vient de la base en moins d'une seconde :
+      // le chargement « Actualisation... » reste visible au moins 1,5 s, comme une actualisation normale
+      if (force && response?._cooldown) {
+        const MIN_LOADING_MS = 1500;
+        const elapsed = Date.now() - refreshStartedAt;
+        if (elapsed < MIN_LOADING_MS) {
+          await new Promise(resolve => setTimeout(resolve, MIN_LOADING_MS - elapsed));
+        }
+      }
 
       // Si le backend indique qu'aucune donnée n'est encore stockée en base (État 'En attente')
       if (response && response.stored === false) {
@@ -278,8 +277,11 @@ export const KpiCacheProvider: React.FC<KpiCacheProviderProps> = ({ children, in
         };
       });
 
-      // Update manual cooldown if applicable (1 heure) — pas de délai d'attente si l'actualisation a échoué (mode dégradé)
-      if (force && !response?._isDegraded) {
+      // Actualisation pendant le compteur du backend : aucune notification affichée.
+      // L'utilisateur voit une actualisation normale ; « Dernière actualisation » garde l'heure réelle du calcul (_updatedAt).
+
+      // Mémorise l'heure du dernier calcul réel (information seulement : le compteur est décidé par le backend)
+      if (force && !response?._isDegraded && !response?._cooldown) {
         setCooldowns(prev => ({
           ...prev,
           [cooldownKey]: Date.now()
