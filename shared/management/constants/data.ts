@@ -11,6 +11,8 @@ export interface AgentTemplate {
   requiresErp?: boolean;
   deployments: number;
   connections: string[];
+  /** Points clés affichés sous la description de la carte (facultatif). */
+  highlights?: string[];
 }
 
 export const AGENT_TEMPLATES: AgentTemplate[] = [
@@ -144,6 +146,24 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     iconBg: 'rgba(255,184,0,0.1)',
     deployments: 198, // Estimated
     connections: ['TraLIS', 'Email']
+  },
+  {
+    id: 'achats_supply',
+    name: 'Directeur des Achats et Supply Chain Amont',
+    description: 'Surveille vos fournisseurs, commandes et dépenses, vous alerte quand un seuil est dépassé et vous propose les actions à faire, dans un rapport envoyé par email.',
+    category: 'Achats · Supply Chain',
+    icon: '🏭',
+    accent: '#2196F3',
+    iconBg: 'rgba(33,150,243,0.12)',
+    tag: 'new',
+    deployments: 0,
+    connections: ['TraLIS', 'Email'],
+    highlights: [
+      'Commandes en retard et livraisons à l\'heure',
+      'Dépenses et principaux fournisseurs',
+      'Dettes fournisseurs et factures à traiter',
+      'Alertes et actions recommandées'
+    ]
   }
 ];
 
