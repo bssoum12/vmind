@@ -39,6 +39,7 @@ import {
 } from '@/shared/api/skills-api';
 import { useToast } from '@/shared/contexts/ToastContext';
 import { useConnections } from '@/shared/contexts/ConnectionsContext';
+import { useConfirmDialog } from './ConfirmDialog';
 import './skills-premium.css';
 
 interface SkillDetailViewProps {
@@ -75,6 +76,7 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
 }) => {
   const { showToast } = useToast();
   const { activeConnection } = useConnections();
+  const [confirm, confirmDialog] = useConfirmDialog();
 
   const [activeTab, setActiveTab] = useState<'apercu' | 'contenu' | 'skills' | 'connecteurs'>(initialTab);
   const [selectedFilePath, setSelectedFilePath] = useState<string>('/SKILL.md');
@@ -573,9 +575,12 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
 
   const handleCatalogUpdate = async () => {
     if (
-      !window.confirm(
-        'Remplacer le contenu actuel par la version du catalogue ?\nLes modifications faites ici restent dans l’historique et peuvent être restaurées.'
-      )
+      !(await confirm({
+        title: 'Mettre à jour depuis le catalogue ?',
+        message:
+          'Remplacer le contenu actuel par la version du catalogue ?\nLes modifications faites ici restent dans l’historique et peuvent être restaurées.',
+        confirmLabel: 'Mettre à jour',
+      }))
     ) {
       return;
     }
@@ -1134,6 +1139,7 @@ export const SkillDetailView: React.FC<SkillDetailViewProps> = ({
         position: 'relative',
       }}
     >
+      {confirmDialog}
       <div className="sk-ambient" />
       <div className="sk-grid-bg" />
       {/* Top Header Bar */}

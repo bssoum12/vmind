@@ -7,6 +7,8 @@ export interface AgentTemplate {
   accent: string;
   iconBg: string;
   tag?: string;
+  /** Overrides the ERP check deduced from `connections` (true = an active ERP connection is required). */
+  requiresErp?: boolean;
   deployments: number;
   connections: string[];
 }
@@ -22,6 +24,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     accent: '#E01A59',
     iconBg: 'rgba(224, 26, 89, 0.12)',
     tag: 'new',
+    requiresErp: false,
     deployments: 0,
     connections: ['tralis', 'Email', 'odoo']
   },

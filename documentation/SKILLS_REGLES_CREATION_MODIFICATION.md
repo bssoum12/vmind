@@ -70,7 +70,7 @@ Une citation est un mot qui finit par `.md` dans le texte, par exemple `regles/r
 | `SKILLS_MAX_BODY_LINES` | 500 | Instructions |
 | `SKILLS_MAX_BODY_CHARS` | 20000 | Instructions |
 | `SKILLS_MAX_REFERENCE_FILES` | 15 | Nombre de fichiers de référence |
-| `SKILLS_MAX_REFERENCE_FILE_CHARS` | 8000 | Taille d'un fichier de référence |
+| `SKILLS_MAX_REFERENCE_FILE_CHARS` | 25000 | Taille d'un fichier de référence |
 | `SKILLS_MAX_TOTAL_REFERENCES_CHARS` | 120000 | Taille de tous les fichiers de référence |
 | `SKILLS_ZIP_MAX_ARCHIVE_BYTES` | 1 048 576 | Taille d'une archive importée |
 | `SKILLS_ZIP_MAX_UNCOMPRESSED_BYTES` | 1 048 576 | Taille décompressée d'une archive |
@@ -223,10 +223,12 @@ Un seul de ces trois avertissements par document, dans cet ordre de priorité : 
 
 ## 8. Import (SKILL.md, ZIP, URL)
 
-- Un import passe par les **mêmes règles** que l'éditeur.
+- Un import (fichier `.md`, archive ZIP, lien HTTPS ou Markdown collé) **n'enregistre rien** : son contenu s'ouvre dans l'éditeur (« Skill importé », mode expert) et les vérifications habituelles bloquent l'enregistrement tant que les points bloquants ne sont pas corrigés (`POST /api/skills/import/preview`).
+- Seule la **source** peut être refusée avant l'ouverture : lien invalide, non `https://`, hôte interne, échec du téléchargement, redirection, fichier de plus de 1 Mo, archive ZIP invalide, contenu vide.
 - Archive ZIP : `<slug>/SKILL.md` et des fichiers `.md` sous `references/`. Tout autre fichier, chemin avec `..`, barre oblique inverse ou chemin absolu est refusé.
-- En-tête de `SKILL.md` : seules les clés `name`, `description`, `compatibility` et `metadata` sont acceptées.
-- Si l'import **remplace** un skill existant (même nom, même portée, même ERP principal), « Ce qui a changé » est demandé avant de continuer.
+- En-tête de `SKILL.md` : VMIND ne conserve que `name`, `description`, `compatibility` et `metadata`. Les autres clés (par ex. `license`) sont **ignorées** et signalées à l'ouverture. Un en-tête absent ou illisible laisse tout le texte dans les instructions : le nom et la description sont alors à remplir.
+- L'enregistrement est une **création** : si le nom existe déjà, la vérification `duplicate_name` le bloque ; changez le nom.
+- Le bouton « Enregistrer » d'un skill rédigé dans le chat par l'assistant de création enregistre directement (`POST /api/skills/import`), avec les mêmes règles bloquantes.
 
 ---
 
@@ -250,7 +252,8 @@ Quand le catalogue contient une version plus récente d'un skill modifié dans l
 | `POST /api/skills/check` | Règles bloquantes, avertissements, informations et carte des citations d'un brouillon. |
 | `POST /api/skills` | Création. |
 | `PUT /api/skills/:id` | Modification (commentaire obligatoire). |
-| `POST /api/skills/import` | Import SKILL.md, ZIP ou URL. |
+| `POST /api/skills/import/preview` | Lit un SKILL.md, ZIP ou lien en champs d'éditeur, sans enregistrer. |
+| `POST /api/skills/import` | Enregistre directement un SKILL.md (skill rédigé dans le chat). |
 | `GET /api/skills/:id/export` | Export ZIP. |
 | `GET /api/skills/:id/versions` | Historique. |
 | `POST /api/skills/:id/rollback` | Restauration d'une version. |

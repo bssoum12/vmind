@@ -98,8 +98,8 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, onNa
 
   const handleDeployTarget = (templateId: string) => {
     const targetAgent = AGENT_TEMPLATES.find(t => t.id === templateId);
-    const requiresErp = templateId === 'recouvrement' || templateId === 'recovery' ||
-      (targetAgent?.connections && targetAgent.connections.some(c => ['tralis', 'sage', 'odoo', 'erp'].includes(c.toLowerCase())));
+    const requiresErp = targetAgent?.requiresErp ?? (templateId === 'recouvrement' || templateId === 'recovery' ||
+      Boolean(targetAgent?.connections && targetAgent.connections.some(c => ['tralis', 'sage', 'odoo', 'erp'].includes(c.toLowerCase()))));
 
     if (requiresErp && (!activeConnection || activeConnection.status !== 'connected')) {
       setBlockedAgentName(targetAgent?.name || 'Agent de Recouvrement');

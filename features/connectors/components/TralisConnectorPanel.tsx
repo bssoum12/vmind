@@ -1146,7 +1146,7 @@ export const TralisConnectorPanel: React.FC<TralisConnectorPanelProps> = ({
               }}
             >
               <ShieldCheck size={16} />
-              {oauthLoading ? 'Connexion en cours…' : 'Connexion OAuth 2.1 (Protocole MCP Standard)'}
+              {oauthLoading ? 'Connexion en cours…' : 'Se Connecter'}
             </button>
 
             {/* Message d'aide contextuel si le formulaire n'est pas encore éligible */}

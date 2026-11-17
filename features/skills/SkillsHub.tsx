@@ -35,7 +35,7 @@ import {
   removeSkillFromSpace,
   exportSkillMd,
   exportSkillZip,
-  importSkillMd,
+  previewSkillImport,
 } from '@/shared/api/skills-api';
 import { useSkills } from '@/shared/contexts/SkillsContext';
 import { useConnections } from '@/shared/contexts/ConnectionsContext';
@@ -254,11 +254,27 @@ export const SkillsHub: React.FC = () => {
     return true;
   };
 
-  // An import that replaces one of your skills asks what changed, for its history
-  const importAskingComment = (payload: Parameters<typeof importSkillMd>[0]) =>
-    importSkillMd(payload, () =>
-      window.prompt('Ce skill existe déjà et sera remplacé. Qu’est-ce qui a changé ? (visible dans l’historique)')
-    );
+  // An import never saves at once: its content opens in the editor, whose checks block the save until it is fixed
+  const openImportedDraft = async (payload: Parameters<typeof previewSkillImport>[0]) => {
+    setImportErrors([]);
+    try {
+      setImporting(true);
+      const { draft, notices } = await previewSkillImport(payload);
+      setImportModalOpen(false);
+      setSelectedFile(null);
+      setImportUrl('');
+      setImportMarkdownText('');
+      setEditingSkill(draft as unknown as SkillDetail);
+      setEditorMode('create');
+      setEditorOpen(true);
+      notices.forEach((notice) => showToast(notice, 'info'));
+    } catch (err: any) {
+      const lines = String(err.message || 'Import refusé.').split('\n').filter(Boolean);
+      setImportErrors(lines);
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const handleExecuteFileImport = async (fileToImport?: File) => {
     const targetFile = fileToImport || selectedFile;
@@ -266,92 +282,32 @@ export const SkillsHub: React.FC = () => {
       setImportErrors(['Veuillez sélectionner ou glisser-déposer un fichier .md ou .zip.']);
       return;
     }
-
-    setImportErrors([]);
-    try {
-      setImporting(true);
-      const lowerName = targetFile.name.toLowerCase();
-      let imported: any;
-      if (lowerName.endsWith('.zip')) {
-        const arrayBuffer = await targetFile.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuffer);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        const zipBase64 = btoa(binary);
-        imported = await importAskingComment({ zipBase64, scope: 'USER' });
-      } else {
-        const content = await targetFile.text();
-        imported = await importAskingComment({ content, scope: 'USER' });
+    if (targetFile.name.toLowerCase().endsWith('.zip')) {
+      const bytes = new Uint8Array(await targetFile.arrayBuffer());
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
       }
-      await refreshSkills();
-      setImportModalOpen(false);
-      setSelectedFile(null);
-      setImportUrl('');
-      setImportMarkdownText('');
-      showToast(`Skill /${imported.slug} importé avec succès dans vos skills personnels !`, 'success');
-    } catch (err: any) {
-      const lines = String(err.message || 'Fichier invalide.').split('\n').filter(Boolean);
-      setImportErrors(lines);
-      showToast(lines[0] || 'Import refusé.', 'error');
-    } finally {
-      setImporting(false);
+      await openImportedDraft({ zipBase64: btoa(binary) });
+    } else {
+      await openImportedDraft({ content: await targetFile.text() });
     }
   };
 
   const handleImportSubmitUrl = async () => {
-    setImportErrors([]);
     if (!importUrl.trim()) {
       setImportErrors(['Veuillez saisir une URL sécurisée commençant par https://']);
       return;
     }
-
-    try {
-      setImporting(true);
-      const imported = await importAskingComment({
-        url: importUrl.trim(),
-        scope: 'USER',
-      });
-      await refreshSkills();
-      setImportModalOpen(false);
-      setImportUrl('');
-      setImportMarkdownText('');
-      setSelectedFile(null);
-      showToast(`Skill /${imported.slug} importé dans vos skills personnels !`, 'success');
-    } catch (err: any) {
-      const lines = String(err.message || 'Import refusé.').split('\n').filter(Boolean);
-      setImportErrors(lines);
-    } finally {
-      setImporting(false);
-    }
+    await openImportedDraft({ url: importUrl.trim() });
   };
 
   const handleImportSubmitText = async () => {
-    setImportErrors([]);
     if (!importMarkdownText.trim()) {
       setImportErrors(['Veuillez coller le contenu Markdown (avec frontmatter YAML).']);
       return;
     }
-
-    try {
-      setImporting(true);
-      const imported = await importAskingComment({
-        content: importMarkdownText.trim(),
-        scope: 'USER',
-      });
-      await refreshSkills();
-      setImportModalOpen(false);
-      setImportUrl('');
-      setImportMarkdownText('');
-      setSelectedFile(null);
-      showToast(`Skill /${imported.slug} importé dans vos skills personnels !`, 'success');
-    } catch (err: any) {
-      const lines = String(err.message || 'Import refusé.').split('\n').filter(Boolean);
-      setImportErrors(lines);
-    } finally {
-      setImporting(false);
-    }
+    await openImportedDraft({ content: importMarkdownText.trim() });
   };
 
   const handleInsertTemplate = () => {
@@ -1488,7 +1444,7 @@ Décrivez ici les instructions spécifiques pour ce skill...
                           }}
                         >
                           <RotateCcw size={11} style={{ color: '#00E5C8' }} />
-                          <span>Survoler pour voir la méthodologie</span>
+                          <span>Survoler pour voir la description</span>
                         </div>
                       </div>
 
@@ -1551,281 +1507,94 @@ Décrivez ici les instructions spécifiques pour ce skill...
 
                   {/* ÉTAGE 3 : COCKPIT DU BAS (IMMOBILE & IMMÉDIATEMENT ACCESSIBLE) */}
                   <div className="sk-card-footer">
-                    {/* Left: Content file count button */}
-                    <button
-                      type="button"
-                      onClick={() => handleOpenInspect(skill, 'contenu')}
-                      title="Examiner les fichiers et instructions"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        height: '28px',
-                        padding: '0 10px',
-                        borderRadius: '8px',
-                        border: '1px solid rgba(148, 163, 184, 0.16)',
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        color: '#94a3b8',
-                        fontSize: '11.5px',
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        transition: 'all 0.18s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.4)';
-                        e.currentTarget.style.background = 'rgba(0, 229, 200, 0.08)';
-                        e.currentTarget.style.color = '#00E5C8';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.16)';
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-                        e.currentTarget.style.color = '#94a3b8';
-                      }}
-                    >
-                      <FileText size={12} color="#00E5C8" />
-                      <span>{skill.references ? skill.references.length + 1 : 1} fichier{skill.references && skill.references.length > 0 ? 's' : ''}</span>
-                    </button>
-
-                    {/* Right: Actions Cluster */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {/* Edit or Customize button */}
+                    <div className="sk-foot-actions">
                       {canEditDirectly ? (
                         <button
                           type="button"
+                          className="sk-foot-btn is-main"
                           onClick={() => handleOpenEditOrCustomize(skill, 'edit')}
                           title="Modifier ce skill"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            height: '28px',
-                            padding: '0 11px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(148, 163, 184, 0.22)',
-                            background: 'rgba(255, 255, 255, 0.04)',
-                            color: '#e2e8f0',
-                            fontSize: '11.5px',
-                            fontWeight: 650,
-                            cursor: 'pointer',
-                            transition: 'all 0.18s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.5)';
-                            e.currentTarget.style.background = 'rgba(0, 229, 200, 0.1)';
-                            e.currentTarget.style.color = '#00E5C8';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.22)';
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
-                            e.currentTarget.style.color = '#e2e8f0';
-                          }}
                         >
-                          <Edit3 size={11} />
+                          <Edit3 size={13} />
                           <span>Modifier</span>
                         </button>
                       ) : canCustomizeForSelf ? (
                         <button
                           type="button"
+                          className="sk-foot-btn is-main is-violet"
                           onClick={() => handleOpenEditOrCustomize(skill, 'customize')}
                           title="Personnaliser une copie pour moi"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            height: '28px',
-                            padding: '0 11px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(167, 139, 250, 0.35)',
-                            background: 'rgba(167, 139, 250, 0.1)',
-                            color: '#ddd6fe',
-                            fontSize: '11.5px',
-                            fontWeight: 650,
-                            cursor: 'pointer',
-                            transition: 'all 0.18s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = 'rgba(167, 139, 250, 0.7)';
-                            e.currentTarget.style.background = 'rgba(167, 139, 250, 0.2)';
-                            e.currentTarget.style.color = '#fff';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = 'rgba(167, 139, 250, 0.35)';
-                            e.currentTarget.style.background = 'rgba(167, 139, 250, 0.1)';
-                            e.currentTarget.style.color = '#ddd6fe';
-                          }}
                         >
-                          <Edit3 size={11} />
+                          <Edit3 size={13} />
                           <span>Personnaliser</span>
                         </button>
                       ) : null}
+
+                      <button
+                        type="button"
+                        className="sk-foot-btn"
+                        onClick={() => handleOpenInspect(skill, 'contenu')}
+                        title="Examiner les fichiers et instructions"
+                        aria-label={`${(skill.references?.length ?? 0) + 1} fichier(s) : examiner`}
+                      >
+                        <FileText size={13} />
+                        <span>{(skill.references?.length ?? 0) + 1}</span>
+                      </button>
 
                       {/* Reset override if personal has lower scope default */}
                       {skill.is_personal_owner && skill.has_lower_scope_default && (
                         <button
                           type="button"
+                          className="sk-foot-btn is-warn"
                           onClick={() => handleRestoreDefault(skill)}
                           title="Restaurer la compétence globale par défaut"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(251, 191, 36, 0.3)',
-                            background: 'rgba(251, 191, 36, 0.08)',
-                            color: '#fde68a',
-                            cursor: 'pointer',
-                            transition: 'all 0.18s ease',
-                          }}
+                          aria-label="Restaurer la compétence globale par défaut"
                         >
-                          <RotateCcw size={12} />
+                          <RotateCcw size={13} />
                         </button>
                       )}
 
-                      {/* Downloads Group: .md and .zip */}
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(148, 163, 184, 0.16)',
-                          background: 'rgba(255, 255, 255, 0.025)',
-                          overflow: 'hidden',
-                        }}
+                      <button
+                        type="button"
+                        className="sk-foot-btn"
+                        onClick={() => exportSkillMd(skill.id, skill.slug)}
+                        title="Télécharger le fichier Markdown (.md)"
                       >
-                        <button
-                          type="button"
-                          title="Télécharger Markdown (.md)"
-                          onClick={() => exportSkillMd(skill.id, skill.slug)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            height: '28px',
-                            padding: '0 8px',
-                            border: 'none',
-                            borderRight: '1px solid rgba(148, 163, 184, 0.14)',
-                            background: 'transparent',
-                            color: '#94a3b8',
-                            fontSize: '11px',
-                            fontWeight: 650,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#38bdf8';
-                            e.currentTarget.style.background = 'rgba(56, 189, 248, 0.1)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = '#94a3b8';
-                            e.currentTarget.style.background = 'transparent';
-                          }}
-                        >
-                          <Download size={10} />
-                          <span>.md</span>
-                        </button>
+                        <Download size={12} />
+                        <span className="sk-foot-ext">MD</span>
+                      </button>
 
-                        <button
-                          type="button"
-                          title="Télécharger Archive (.zip)"
-                          onClick={() => exportSkillZip(skill.id, skill.slug)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '3px',
-                            height: '28px',
-                            padding: '0 8px',
-                            border: 'none',
-                            background: 'transparent',
-                            color: '#94a3b8',
-                            fontSize: '11px',
-                            fontWeight: 650,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.color = '#00E5C8';
-                            e.currentTarget.style.background = 'rgba(0, 229, 200, 0.1)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.color = '#94a3b8';
-                            e.currentTarget.style.background = 'transparent';
-                          }}
-                        >
-                          <Download size={10} />
-                          <span>.zip</span>
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        className="sk-foot-btn"
+                        onClick={() => exportSkillZip(skill.id, skill.slug)}
+                        title="Télécharger l'archive (.zip)"
+                      >
+                        <FileArchive size={12} />
+                        <span className="sk-foot-ext">ZIP</span>
+                      </button>
 
-                      {/* Delete or Remove icon button */}
                       {skill.is_personal_owner && !skill.has_lower_scope_default ? (
                         <button
                           type="button"
-                          title="Supprimer définitivement ce skill personnel"
+                          className="sk-foot-btn is-danger"
                           onClick={() => handleDeletePersonalSkill(skill)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(248, 113, 113, 0.22)',
-                            background: 'rgba(239, 68, 68, 0.04)',
-                            color: '#f87171',
-                            cursor: 'pointer',
-                            transition: 'all 0.18s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = 'rgba(248, 113, 113, 0.6)';
-                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.16)';
-                            e.currentTarget.style.color = '#fff';
-                            e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.35)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = 'rgba(248, 113, 113, 0.22)';
-                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.04)';
-                            e.currentTarget.style.color = '#f87171';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }}
+                          title="Supprimer définitivement ce skill personnel"
+                          aria-label="Supprimer définitivement ce skill personnel"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={13} />
                         </button>
-                      ) : (!skill.is_personal_owner || skill.has_lower_scope_default) ? (
+                      ) : (
                         <button
                           type="button"
-                          title="Retirer de mon espace (retour au catalogue)"
+                          className="sk-foot-btn is-danger"
                           onClick={() => handleRemoveFromSpace(skill)}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '8px',
-                            border: '1px solid rgba(248, 113, 113, 0.22)',
-                            background: 'rgba(239, 68, 68, 0.04)',
-                            color: '#f87171',
-                            cursor: 'pointer',
-                            transition: 'all 0.18s ease',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = 'rgba(248, 113, 113, 0.6)';
-                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.16)';
-                            e.currentTarget.style.color = '#fff';
-                            e.currentTarget.style.boxShadow = '0 0 12px rgba(239, 68, 68, 0.35)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = 'rgba(248, 113, 113, 0.22)';
-                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.04)';
-                            e.currentTarget.style.color = '#f87171';
-                            e.currentTarget.style.boxShadow = 'none';
-                          }}
+                          title="Retirer de mon espace (retour au catalogue)"
+                          aria-label="Retirer de mon espace (retour au catalogue)"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={13} />
                         </button>
-                      ) : null}
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2009,7 +1778,7 @@ Décrivez ici les instructions spécifiques pour ce skill...
                         }}
                       >
                         <RotateCcw size={11} style={{ color: '#00E5C8' }} />
-                        <span>Survoler pour voir la méthodologie</span>
+                        <span>Survoler pour voir la description</span>
                       </div>
                     </div>
 
@@ -2072,149 +1841,59 @@ Décrivez ici les instructions spécifiques pour ce skill...
 
                 {/* ÉTAGE 3 : COCKPIT DU BAS (IMMOBILE & IMMÉDIATEMENT ACCESSIBLE) */}
                 <div className="sk-card-footer">
-                  {/* Left: Content file count */}
-                  <button
-                    type="button"
-                    onClick={() => handleOpenInspect(item, 'contenu')}
-                    title="Examiner les fichiers et instructions"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      height: '28px',
-                      padding: '0 10px',
-                      borderRadius: '8px',
-                      border: '1px solid rgba(148, 163, 184, 0.16)',
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      color: '#94a3b8',
-                      fontSize: '11.5px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.18s ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(0, 229, 200, 0.4)';
-                      e.currentTarget.style.background = 'rgba(0, 229, 200, 0.08)';
-                      e.currentTarget.style.color = '#00E5C8';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(148, 163, 184, 0.16)';
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-                      e.currentTarget.style.color = '#94a3b8';
-                    }}
-                  >
-                    <FileText size={12} color="#00E5C8" />
-                    <span>{item.references ? item.references.length + 1 : 1} fichier{item.references && item.references.length > 0 ? 's' : ''}</span>
-                  </button>
-
-                  {/* Right: Actions */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div className="sk-foot-actions">
                     <button
                       type="button"
+                      className="sk-foot-btn is-primary"
                       onClick={() => handleAddToSpace(item)}
                       title="Installer dans mon espace de travail"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        height: '28px',
-                        padding: '0 12px',
-                        borderRadius: '8px',
-                        border: 'none',
-                        background: 'linear-gradient(135deg, #00E5C8 0%, #21F3D6 100%)',
-                        color: '#021010',
-                        fontSize: '11.5px',
-                        fontWeight: 800,
-                        cursor: 'pointer',
-                        boxShadow: '0 6px 18px -4px rgba(0, 229, 200, 0.65)',
-                        transition: 'all 0.18s ease',
-                      }}
                     >
-                      <Plus size={13} />
+                      <Plus size={14} />
                       <span>Ajouter</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="sk-foot-btn"
+                      onClick={() => handleOpenInspect(item, 'contenu')}
+                      title="Examiner les fichiers et instructions"
+                      aria-label={`${(item.references?.length ?? 0) + 1} fichier(s) : examiner`}
+                    >
+                      <FileText size={13} />
+                      <span>{(item.references?.length ?? 0) + 1}</span>
                     </button>
 
                     {(item.kind === 'style' || isAdmin) && (
                       <button
                         type="button"
-                        title="Personnaliser une copie pour moi"
+                        className="sk-foot-btn"
                         onClick={() => handleOpenEditOrCustomize(item, 'customize')}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          height: '28px',
-                          padding: '0 9px',
-                          borderRadius: '8px',
-                          border: '1px solid rgba(167, 139, 250, 0.35)',
-                          background: 'rgba(167, 139, 250, 0.1)',
-                          color: '#ddd6fe',
-                          fontSize: '11px',
-                          fontWeight: 650,
-                          cursor: 'pointer',
-                        }}
+                        title="Personnaliser une copie pour moi"
+                        aria-label="Personnaliser une copie pour moi"
                       >
-                        <Copy size={11} />
-                        <span>Copier</span>
+                        <Copy size={13} />
                       </button>
                     )}
 
-                    {/* Downloads Group */}
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        borderRadius: '8px',
-                        border: '1px solid rgba(148, 163, 184, 0.16)',
-                        background: 'rgba(255, 255, 255, 0.025)',
-                        overflow: 'hidden',
-                      }}
+                    <button
+                      type="button"
+                      className="sk-foot-btn"
+                      onClick={() => exportSkillMd(item.id, item.slug)}
+                      title="Télécharger le fichier Markdown (.md)"
                     >
-                      <button
-                        type="button"
-                        title="Télécharger le fichier Markdown (.md)"
-                        onClick={() => exportSkillMd(item.id, item.slug)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          height: '28px',
-                          padding: '0 8px',
-                          border: 'none',
-                          borderRight: '1px solid rgba(148, 163, 184, 0.14)',
-                          background: 'transparent',
-                          color: '#94a3b8',
-                          fontSize: '11px',
-                          fontWeight: 650,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <Download size={10} />
-                        <span>.md</span>
-                      </button>
+                      <Download size={12} />
+                      <span className="sk-foot-ext">MD</span>
+                    </button>
 
-                      <button
-                        type="button"
-                        title="Télécharger l'archive (.zip)"
-                        onClick={() => exportSkillZip(item.id, item.slug)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '3px',
-                          height: '28px',
-                          padding: '0 8px',
-                          border: 'none',
-                          background: 'transparent',
-                          color: '#94a3b8',
-                          fontSize: '11px',
-                          fontWeight: 650,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <Download size={10} />
-                        <span>.zip</span>
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      className="sk-foot-btn"
+                      onClick={() => exportSkillZip(item.id, item.slug)}
+                      title="Télécharger l'archive (.zip)"
+                    >
+                      <FileArchive size={12} />
+                      <span className="sk-foot-ext">ZIP</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2779,7 +2458,7 @@ Décrivez ici les instructions spécifiques pour ce skill...
                   }}
                 >
                   {importing
-                    ? 'Import en cours...'
+                    ? 'Lecture du skill...'
                     : importTab === 'file' && selectedFile
                     ? `Importer "${selectedFile.name.length > 20 ? selectedFile.name.slice(0, 18) + '...' : selectedFile.name}"`
                     : 'Importer le Skill'}

@@ -60,11 +60,14 @@ import {
   referenceKind,
   referenceNameProblem,
   referenceShortName,
+  referenceSkeleton,
   referenceStarter,
   renamedReferenceContent,
   replaceCitations,
   sanitizeReferenceInput,
+  sectionSkeleton,
 } from './skill-guided-form';
+import { useConfirmDialog } from './ConfirmDialog';
 import './skills-premium.css';
 
 interface SkillEditorProps {
@@ -103,6 +106,32 @@ const counterColor = (counts: Array<[number, number | undefined]>, base: string)
   if (counts.some(([value, max]) => max !== undefined && value >= max * 0.9)) return COUNTER_NEAR;
   return base;
 };
+
+// Puts the empty layout (headings, header) into a text that has nothing written yet
+function FillButton({ enabled, onClick }: { enabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!enabled}
+      title={enabled ? 'Ajoute les titres et l’en-tête à compléter' : 'Disponible seulement quand le texte est vide'}
+      style={{
+        marginLeft: 'auto',
+        marginRight: '10px',
+        padding: '2px 8px',
+        borderRadius: '6px',
+        border: '1px solid rgba(0,229,200,0.35)',
+        background: 'transparent',
+        color: '#00E5C8',
+        fontSize: '11px',
+        cursor: enabled ? 'pointer' : 'not-allowed',
+        opacity: enabled ? 1 : 0.4,
+      }}
+    >
+      Remplir la structure
+    </button>
+  );
+}
 
 function readStoredExpertMode(accountName: string): boolean {
   try {
@@ -255,6 +284,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
   const [dismissedWarnings, setDismissedWarnings] = useState<string[]>([]);
   const checkRunRef = useRef(0);
   const modalRef = useRef<HTMLDivElement>(null);
+  const [confirm, confirmDialog] = useConfirmDialog();
   // What the form held once loaded, to ask before closing with unsaved changes
   const savedSnapshotRef = useRef<string | null>(null);
   // The form as of the last render, for callbacks that finish later
@@ -317,7 +347,8 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
       setSectionValues(guided.values);
       setCustomBody(guided.custom);
       setActiveSection(guided.custom?.sections[0]?.key ?? GUIDED_SECTIONS[initialKind][0].key);
-      setExpertMode(!fitsGuidedForm(initialSkill.references_json) || readStoredExpertMode(accountName));
+      // An imported skill opens as written: its SKILL.md text, not the guided form
+      setExpertMode(mode === 'create' || !fitsGuidedForm(initialSkill.references_json) || readStoredExpertMode(accountName));
       const refs = initialSkill.references_json || {};
       setReferencesJson({ ...refs });
       const refKeys = Object.keys(refs);
@@ -432,9 +463,19 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshotTick]);
 
-  const handleRequestClose = () => {
+  const handleRequestClose = async () => {
     const unsaved = savedSnapshotRef.current !== null && savedSnapshotRef.current !== editorSnapshot;
-    if (unsaved && !window.confirm('Vos modifications ne sont pas enregistrées. Fermer quand même ?')) return;
+    if (
+      unsaved &&
+      !(await confirm({
+        title: 'Modifications non enregistrées',
+        message: 'Vos modifications ne sont pas enregistrées. Fermer quand même ?',
+        confirmLabel: 'Fermer sans enregistrer',
+        cancelLabel: 'Continuer l’édition',
+      }))
+    ) {
+      return;
+    }
     onClose();
   };
 
@@ -562,6 +603,24 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     setErrorMsg(null);
   };
 
+  // The layout only goes into an empty text or the untouched starting text, so nothing written is lost
+  const bodyIsBlank = !bodyMd.trim() || bodyMd === limits?.starters.body;
+  const openRefContent = selectedRefKey ? referencesJson[selectedRefKey] : undefined;
+  const refIsBlank =
+    !!selectedRefKey &&
+    openRefContent !== undefined &&
+    (!openRefContent.trim() || openRefContent === referenceStarter(selectedRefKey, limits?.starters));
+
+  const handleFillBody = () => {
+    if (bodyIsBlank) setBodyMd(sectionSkeleton(effectiveKind, title));
+  };
+
+  const handleFillReference = () => {
+    if (refIsBlank && selectedRefKey) {
+      setReferencesJson((prev) => ({ ...prev, [selectedRefKey]: referenceSkeleton(selectedRefKey) }));
+    }
+  };
+
   const handleSelectReference = (key: string) => {
     setSelectedRefKey(key);
     setNewRefName(key);
@@ -593,7 +652,12 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     const citedIn = citationPlaces(oldName, found);
     const updateCitations =
       citedIn.length > 0 &&
-      window.confirm(`« ${oldName} » est cité dans : ${citedIn.join(', ')}.\nRemplacer ces mentions par « ${newName} » ?`);
+      (await confirm({
+        title: 'Mettre à jour les mentions ?',
+        message: `« ${oldName} » est cité dans : ${citedIn.join(', ')}.\nRemplacer ces mentions par « ${newName} » ?`,
+        confirmLabel: 'Remplacer les mentions',
+        cancelLabel: 'Renommer seulement',
+      }));
     setReferencesJson((prev) =>
       Object.fromEntries(
         Object.entries(prev).map(([key, content]) =>
@@ -635,7 +699,12 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
     const citedIn = citationPlaces(key, await currentCitations());
     if (
       citedIn.length > 0 &&
-      !window.confirm(`« ${key} » est encore cité dans : ${citedIn.join(', ')}.\nLe supprimer quand même ?`)
+      !(await confirm({
+        title: 'Fichier encore cité',
+        message: `« ${key} » est encore cité dans : ${citedIn.join(', ')}.\nLe supprimer quand même ?`,
+        confirmLabel: 'Supprimer',
+        tone: 'danger',
+      }))
     ) {
       return;
     }
@@ -753,6 +822,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
       }}
       onClick={handleRequestClose}
     >
+      {confirmDialog}
       <div
         ref={modalRef}
         onClick={(e) => e.stopPropagation()}
@@ -785,7 +855,9 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
           <div>
             <h2 style={{ fontSize: '17px', fontWeight: 700, color: '#ffffff', margin: 0 }}>
               {mode === 'create'
-                ? 'Nouveau Skill'
+                ? initialSkill
+                  ? 'Skill importé'
+                  : 'Nouveau Skill'
                 : mode === 'customize'
                   ? `Personnaliser /${initialSkill?.slug}`
                   : `Modifier /${initialSkill?.slug}`}
@@ -793,6 +865,8 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
             <p style={{ fontSize: '12px', color: '#8FA3B8', margin: '4px 0 0 0' }}>
               {mode === 'customize'
                 ? 'Crée une copie personnelle isolée sans modifier la compétence par défaut.'
+                : mode === 'create' && initialSkill
+                  ? 'Rien n’est enregistré : corrigez les points bloquants, puis enregistrez.'
                 : expertMode
                   ? 'Format standardisé SKILL.md (niveau 1 : index, niveau 2 : instructions, niveau 3 : références).'
                   : "Décrivez quand et comment l'assistant doit agir."}
@@ -1244,6 +1318,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                   <label style={{ fontSize: '11px', fontWeight: 600, color: '#00E5C8' }}>
                     Instructions Markdown (`SKILL.md`) *
                   </label>
+                  <FillButton enabled={bodyIsBlank} onClick={handleFillBody} />
                   <span
                     style={{
                       fontSize: '11px',
@@ -1449,6 +1524,7 @@ export const SkillEditor: React.FC<SkillEditorProps> = ({
                       >
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '11px', color: '#8FA3B8' }}>
                           <span>Contenu de `{selectedRefKey}`</span>
+                          <FillButton enabled={refIsBlank} onClick={handleFillReference} />
                           <span
                             style={{
                               color: counterColor([[referencesJson[selectedRefKey].length, limits?.maxReferenceFileChars]], '#8FA3B8'),

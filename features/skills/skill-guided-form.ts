@@ -439,3 +439,19 @@ export function referenceStarter(fileName: string, starters?: SkillLimits['start
   const baseName = fileName.split('/').pop()?.replace(/\.md$/, '') ?? fileName;
   return starters ? starters.document.split('{name}').join(baseName) : `# ${baseName}\n`;
 }
+
+/** The headings of a body with nothing under them: the title, then each section of the skill's type. */
+export function sectionSkeleton(kind: SkillKind, title: string): string {
+  const sections = GUIDED_SECTIONS[kind].map((section) => `## ${section.title}\n`);
+  return [`# ${title.trim() || 'Titre'}`, ...sections].join('\n\n');
+}
+
+/** The empty layout of a reference file: a sub-skill gets its header and the method sections, a document its title. */
+export function referenceSkeleton(fileName: string): string {
+  if (referenceKind(fileName) === 'subSkill') {
+    const folder = fileName.match(SUB_SKILL_FILE)?.[1] ?? 'sous-competence';
+    return `---\nname: ${folder}\ndescription: \n---\n\n${sectionSkeleton('method', folder)}`;
+  }
+  const baseName = fileName.split('/').pop()?.replace(/\.md$/, '') ?? fileName;
+  return `# ${baseName}\n\n## Section\n`;
+}

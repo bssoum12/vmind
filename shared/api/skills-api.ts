@@ -370,16 +370,12 @@ export async function applyCatalogUpdate(id: number): Promise<number> {
   return Number(data.version);
 }
 
+// Saves a SKILL.md at once (the chat's drafted skills); file, URL and pasted imports go through previewSkillImport.
 export async function importSkillMd(payload: {
   content?: string;
-  markdown?: string;
-  zipBase64?: string;
-  url?: string;
   scope?: SkillScope;
-  tenant_key?: string;
   comment?: string;
-  references_json?: Record<string, string>;
-}, askComment?: () => string | null): Promise<any> {
+}): Promise<any> {
   const res = await fetch(`${getBaseUrl()}/api/skills/import`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -387,12 +383,6 @@ export async function importSkillMd(payload: {
     body: JSON.stringify(payload),
   });
   const data = await res.json();
-  // An import that replaces an existing skill says what changed, like an edit: ask once, then retry
-  const needsComment = Array.isArray(data.issues) && data.issues.some((i: SkillIssue) => i.code === 'comment_required');
-  if (needsComment && askComment && !payload.comment) {
-    const comment = askComment()?.trim();
-    if (comment) return importSkillMd({ ...payload, comment });
-  }
   if (!res.ok || !data.ok) {
     const errMsg =
       Array.isArray(data.errors) && data.errors.length > 0
@@ -401,6 +391,40 @@ export async function importSkillMd(payload: {
     throw new Error(errMsg);
   }
   return data.skill;
+}
+
+export interface SkillImportDraft {
+  slug: string;
+  title: string;
+  description: string;
+  category: string;
+  kind: SkillKind;
+  erp_types: string[];
+  body_md: string;
+  references_json: Record<string, string>;
+}
+
+// Reads an imported SKILL.md / .zip / URL into editor fields; nothing is saved: the editor opens it.
+export async function previewSkillImport(payload: {
+  content?: string;
+  zipBase64?: string;
+  url?: string;
+}): Promise<{ draft: SkillImportDraft; notices: string[] }> {
+  const res = await fetch(`${getBaseUrl()}/api/skills/import/preview`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    const errMsg =
+      Array.isArray(data.errors) && data.errors.length > 0
+        ? data.errors.join('\n')
+        : data.error || 'Erreur lors de la lecture du skill importé.';
+    throw new Error(errMsg);
+  }
+  return { draft: data.draft, notices: Array.isArray(data.notices) ? data.notices : [] };
 }
 
 export async function exportSkillMd(id: number, fallbackSlug = 'skill'): Promise<void> {
