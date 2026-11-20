@@ -3,9 +3,9 @@
 /**
  * Agent « Directeur des Achats et Supply Chain Amont » (templateId: 'achats_supply').
  *
- * Partie front de l'agent. Le module backend (run_mode 'achats_supply') et le workflow n8n restent à brancher :
- * en attendant, les deux boutons de déploiement n'appellent aucune API ; ils confirment la configuration
- * puis reviennent à la Marketplace. L'aperçu du rapport utilise des chiffres d'exemple, clairement signalés.
+ * Déploiement : /api/deploy-agent (run_mode 'achats_supply', skill achats-supply-tralis), comme le Recouvrement ;
+ * le backend planifie l'agent et l'envoie au workflow n8n « VMIND - Agent Achats ». « Déployer et exécuter
+ * maintenant » lance aussi /api/run-now. L'aperçu du rapport utilise des chiffres d'exemple, clairement signalés.
  *
  * Données prévues (vues TraLIS existantes, lecture seule) :
  *   vw_AI_Commande_Achat (retards, réception), vw_AI_Facture_Achat (dépenses, catégories, devises,
@@ -16,6 +16,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/shared/contexts/ToastContext';
 import { VMindGuide } from '@/shared/management/components/VMindGuide';
 import { getBrowserTimezone } from '@/shared/utils/timezone';
+import { deployAgent, runAgentNow } from '@/shared/api/n8n-api';
 import './WizardAchatsView.scss';
 
 interface WizardAchatsViewProps {
@@ -38,7 +39,7 @@ const SECTIONS: { g: string; items: SectionDef[] }[] = [
   { g: 'Commandes et livraisons', items: [
     { k: 'late', t: 'Commandes en retard de livraison', d: 'Commandes non reçues dont la date de livraison prévue est dépassée, par fournisseur', on: true,
       rep: 'Un tableau par fournisseur : nombre de commandes en retard, retard le plus long, montant. Alimente aussi la tuile « Commandes en retard », les alertes et l\'action « Relancer ».', ex: 'Transporteur routier B : 3 commandes, jusqu\'à 12 jours de retard.' },
-    { k: 'ontime', t: 'Livraisons à l\'heure', d: 'Part des commandes reçues avant ou à la date prévue, sur la période', on: true,
+    { k: 'ontime', t: 'Livraisons à l\'heure', d: 'Part des commandes reçues avant ou à la date prévue, sur la période', on: false, na: 'Donnée à confirmer', nad: 'Les réceptions de commandes ne sont presque jamais saisies dans l\'ERP.',
       rep: 'Le nombre de commandes reçues, la part reçue à temps et les fournisseurs les moins ponctuels. Alimente la tuile « Livrées à l\'heure ».', ex: '37 commandes reçues à temps sur 44, soit 84 %.' },
     { k: 'pending', t: 'Commandes en attente de réception', d: 'Commandes passées, pas encore reçues et pas encore en retard', on: true,
       rep: 'Le nombre de commandes attendues et leur montant total. Alimente la tuile « En attente de réception ».', ex: '17 commandes attendues pour 96 200 TND.' },
@@ -66,7 +67,7 @@ const SECTIONS: { g: string; items: SectionDef[] }[] = [
       rep: 'Un tableau des factures contestées par fournisseur, avec le montant. Alimente la tuile « Factures à traiter » et l\'action « Clore les litiges ».', ex: 'Compagnie maritime A : 1 facture, 14 200 TND.' },
     { k: 'missing', t: 'Factures non parvenues', d: 'Factures enregistrées dont l\'original n\'est pas encore reçu', on: true,
       rep: 'Un tableau des factures non parvenues par fournisseur. Alimente la tuile « Factures à traiter ».', ex: 'Agent portuaire F : 1 facture, 3 400 TND.' },
-    { k: 'notbooked', t: 'Factures non comptabilisées', d: 'Factures de la période pas encore passées en comptabilité', on: false,
+    { k: 'notbooked', t: 'Factures non comptabilisées', d: 'Factures de la période pas encore passées en comptabilité', on: false, na: 'Donnée à confirmer', nad: 'L\'indicateur de comptabilisation n\'est pas fiable dans les données récentes de l\'ERP.',
       rep: 'Le nombre et le montant des factures de la période non comptabilisées.', ex: '9 factures pour 57 800 TND.' },
     { k: 'disb', t: 'Débours de la période', d: 'Frais payés pour le compte des clients, par dossier, à vérifier avant facturation client', on: false,
       rep: 'Le nombre de débours, leur montant et les dossiers concernés, avec un rappel de vérification.', ex: '23 débours pour 46 900 TND sur 14 dossiers.' },
@@ -77,8 +78,8 @@ const ALLSEC: SectionDef[] = SECTIONS.flatMap(g => g.items);
 interface GuideEntry { t: string; how: string; rep: string; blk?: string; na?: string }
 const FIELD_GUIDE: Record<string, GuideEntry> = {
   name: { t: 'Nom de l\'agent', how: 'Gardez le nom proposé ou précisez le site. Exemple : « Directeur des Achats - Radès ».', rep: 'Dans l\'en-tête de l\'email et sous le titre du rapport.', blk: 'meta' },
-  period: { t: 'Période analysée', how: 'Choisissez dans la liste. « Mois précédent » donne des chiffres clos ; les autres choix suivent l\'activité jusqu\'à la veille de l\'envoi.', rep: 'Dans l\'objet de l\'email, sous le titre et dans la section « Dépenses de la période ».', blk: 'spend' },
-  compare: { t: 'Comparaison des dépenses', how: 'Cliquez sur un choix. Les mois indiqués sous chaque choix sont ceux qui seront réellement comparés.', rep: 'Lignes « Période précédente » et « Même période l\'an dernier » de la section « Dépenses de la période », et la tuile des dépenses.', blk: 'spend' },
+  period: { t: 'Période analysée', how: 'Choisissez la période selon la fréquence d\'envoi : « Mois en cours, jusqu\'à la veille » pour un envoi chaque semaine (le cumul du mois avance à chaque email), « Mois précédent » pour un envoi chaque mois. « Semaine précédente » se compare seulement à l\'an dernier.', rep: 'Dans l\'objet de l\'email, sous le titre et dans la section « Dépenses de la période ».', blk: 'spend' },
+  compare: { t: 'Comparaison des dépenses', how: 'Cliquez sur un choix. Les dates indiquées sous chaque choix sont celles qui seront réellement comparées. « Aucune comparaison » affiche les montants seuls, sans alerte de hausse.', rep: 'Lignes « Période précédente » et « Même période l\'an dernier » de la section « Dépenses de la période », et la tuile des dépenses.', blk: 'spend' },
   delay: { t: 'Seuil de retard de livraison', how: 'Tapez un nombre de jours, de 1 à 365. Exemple : 3 signale une commande prévue le lundi et toujours pas reçue le jeudi.', rep: 'Filtre le tableau « Commandes en retard de livraison », la tuile et l\'alerte correspondantes.', blk: 'late' },
   ontime: { t: 'Taux de livraison à l\'heure attendu', how: 'Tapez un pourcentage, de 1 à 100. Exemple : 90 veut dire 36 commandes à temps sur 40 au minimum.', rep: 'Colore la tuile « Livrées à l\'heure » et déclenche une alerte en dessous du taux.', blk: 'ontime' },
   thprev: { t: 'Hausse par rapport à la période précédente', how: 'Tapez un pourcentage. Exemple : 15 signale un fournisseur passé de 100 000 à 116 000 TND.', rep: 'Alertes de hausse, colonne « Évolution » des principaux fournisseurs, couleur de la tuile des dépenses.', blk: 'spend' },
@@ -132,28 +133,10 @@ interface Rule {
 }
 const newRule = (): Rule => ({ interval: 'Weeks', daysBetween: 1, weeksBetween: 1, hoursBetween: 1, minutesBetween: 5, secondsBetween: 30, monthsBetween: 1, dayOfMonth: 1, hour: 8, minute: 0, weekdays: ['Monday'] });
 
-/* Chiffres d'exemple (fictifs) pour l'aperçu */
-const D = {
-  late: [['Transporteur routier B', 3, 12, 18400], ['Fournisseur emballages E', 2, 6, 7200], ['Agent portuaire F', 1, 4, 3100], ['Transitaire G', 1, 3, 2600], ['Manutention portuaire C', 1, 2, 1900], ['Fournisseur fournitures H', 1, 1, 600]] as [string, number, number, number][],
-  ontime: { rate: 84, received: 44, onTime: 37, worst: [['Transporteur routier B', 58], ['Fournisseur emballages E', 71]] as [string, number][] },
-  pending: { count: 17, amount: 96200 },
-  spend: { cur: 962000, prev: 838000, year: 891000 },
-  trend: [812000, 790000, 845000, 861000, 838000, 962000],
-  top: [['Compagnie maritime A', 318000, 256000], ['Transporteur routier B', 142000, 139000], ['Manutention portuaire C', 97000, 88000], ['Transitaire G', 64000, 71000], ['Agent portuaire F', 51000, 49000], ['Fournisseur emballages E', 38000, 36500], ['Assurance transport I', 27000, 27000], ['Fournisseur fournitures H', 12000, 14000], ['Prestataire informatique J', 9800, 9800], ['Location matériel K', 8400, 7900]] as [string, number, number][],
-  cat: [['Fret maritime', 402000], ['Transport routier', 188000], ['Manutention', 121000], ['Frais portuaires', 96000], ['Autres', 155000]] as [string, number][],
-  fx: [['euros', 68400], ['dollars', 41200]] as [string, number][],
-  debt: { billed: 1240000, paid: 998200, rest: 241800, late: 62300, alerts: [['Manutention portuaire C', 12400], ['Transitaire G', 8100]] as [string, number][] },
-  disputed: [['Transporteur routier B', 2, 8900], ['Compagnie maritime A', 1, 14200]] as [string, number, number][],
-  missing: [['Agent portuaire F', 1, 3400], ['Location matériel K', 1, 2100]] as [string, number, number][],
-  notbooked: { count: 9, amount: 57800 },
-  disb: { count: 23, amount: 46900, dossiers: 14 },
-};
 
 /* ───────────────────────── Utilitaires ───────────────────────── */
 
 const nf = (n: number) => Math.round(n).toLocaleString('fr-FR').replace(/[  ]/g, ' ');
-const pct = (a: number, b: number) => (a - b) / b * 100;
-const fmtPct = (v: number) => (v > 0 ? '+' : '') + v.toFixed(1).replace('.', ',') + ' %';
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const emailOk = (v: string) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
 const hhmm = (h: number, m: number) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -161,9 +144,23 @@ const hhmm = (h: number, m: number) => `${String(h).padStart(2, '0')}:${String(m
 function monthsAgo(n: number) { const t = new Date(); const d = new Date(t.getFullYear(), t.getMonth() - n, 1); return { m: d.getMonth(), y: d.getFullYear() }; }
 const lbl = (p: { m: number; y: number }) => MOIS[p.m] + ' ' + p.y;
 
-type Period = 'prev_month' | 'cur_month' | 'cur_quarter' | 'cur_year';
+type Period = 'prev_week' | 'prev_month' | 'cur_month' | 'cur_quarter' | 'cur_year';
+type Compare = 'both' | 'prev' | 'lastyear' | 'none';
+/* « du 9 au 15 novembre 2026 » ou « du 26 octobre au 1 novembre 2026 » */
+function semaine(lundi: Date) {
+  const d = new Date(lundi.getFullYear(), lundi.getMonth(), lundi.getDate() + 6);
+  const memeMois = d.getMonth() === lundi.getMonth() && d.getFullYear() === lundi.getFullYear();
+  return `du ${lundi.getDate()}${memeMois ? '' : ' ' + MOIS[lundi.getMonth()] + (d.getFullYear() !== lundi.getFullYear() ? ' ' + lundi.getFullYear() : '')} au ${d.getDate()} ${MOIS[d.getMonth()]} ${d.getFullYear()}`;
+}
 function periodInfo(v: Period) {
   const t = new Date(), y = t.getFullYear(), q = Math.floor(t.getMonth() / 3) + 1;
+  if (v === 'prev_week') {
+    // Semaine complète (lundi à dimanche) qui précède l'envoi.
+    const lundi = new Date(t.getFullYear(), t.getMonth(), t.getDate() - ((t.getDay() + 6) % 7) - 7);
+    const avant = new Date(lundi.getFullYear(), lundi.getMonth(), lundi.getDate() - 7);
+    const anDernier = new Date(lundi.getFullYear() - 1, lundi.getMonth(), lundi.getDate());
+    return { name: 'semaine ' + semaine(lundi), prev: 'semaine ' + semaine(avant), year: 'mêmes dates en ' + (lundi.getFullYear() - 1) + ' (' + semaine(anDernier) + ')' };
+  }
   if (v === 'prev_month') { const a = monthsAgo(1), b = monthsAgo(2); return { name: lbl(a), prev: lbl(b), year: lbl({ m: a.m, y: a.y - 1 }) }; }
   if (v === 'cur_month') { const a = monthsAgo(0), b = monthsAgo(1); return { name: lbl(a) + ' jusqu\'à la veille', prev: 'même nombre de jours en ' + MOIS[b.m], year: 'même nombre de jours en ' + MOIS[a.m] + ' ' + (a.y - 1) }; }
   if (v === 'cur_quarter') { const pq = q === 1 ? 4 : q - 1, py = q === 1 ? y - 1 : y; return { name: `trimestre ${q} de ${y}`, prev: `trimestre ${pq} de ${py}`, year: `trimestre ${q} de ${y - 1}` }; }
@@ -185,30 +182,48 @@ function ruleText(r: Rule) {
 
 /* ───────────────────────── Composant ───────────────────────── */
 
-export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, initialStep }) => {
+export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, initialStep, agentToEdit }) => {
   const { showToast } = useToast();
+
+  /* Modification : « Modifier la configuration » dans Mes agents rouvre l'assistant avec la configuration enregistrée.
+     L'enregistrement repasse par /api/deploy-agent, qui met à jour l'agent du même nom (même identifiant). */
+  const isEdit = Boolean(agentToEdit);
+  const ac: any = (agentToEdit && (agentToEdit.achats_config || agentToEdit.parameters?.achats_config || agentToEdit.config?.achats_config)) || null;
+  const pick = <T extends string>(v: any, ok: readonly T[], def: T): T => (ok.includes(v) ? v : def);
 
   const [step, setStep] = useState<number>(Math.min(4, Math.max(1, initialStep || 1)));
   const [showPreview, setShowPreview] = useState(true);
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
 
-  const [name, setName] = useState('Directeur des Achats - Siège');
-  const [period, setPeriod] = useState<Period>('prev_month');
-  const [compare, setCompare] = useState<'both' | 'prev' | 'lastyear'>('both');
-  const [secOn, setSecOn] = useState<Record<string, boolean>>(() => Object.fromEntries(ALLSEC.map(i => [i.k, i.na ? false : i.on])));
+  const [name, setName] = useState<string>(String((isEdit && (agentToEdit.agent_name || agentToEdit.nom)) || 'Directeur des Achats - Siège'));
+  // Par défaut : envoi chaque semaine (newRule) → « Mois en cours, jusqu'à la veille » : le cumul avance à chaque email
+  // et se compare au mois précédent et à l'an dernier (comparaison fiable, contrairement à semaine contre semaine).
+  const [period, setPeriod] = useState<Period>(pick(ac?.period, ['prev_week', 'prev_month', 'cur_month', 'cur_quarter', 'cur_year'] as const, 'cur_month'));
+  const [compare, setCompare] = useState<Compare>(pick(ac?.compare, ['both', 'prev', 'lastyear', 'none'] as const, 'both'));
+  const [secOn, setSecOn] = useState<Record<string, boolean>>(() => Object.fromEntries(ALLSEC.map(i => [i.k, i.na ? false : Array.isArray(ac?.sections) ? ac.sections.includes(i.k) : i.on])));
 
-  const [nums, setNums] = useState<Record<NumKey, string>>({ delay: '3', ontime: '90', thprev: '15', thyear: '20', conc: '30', thlate: '', topn: '5', objspend: '', objlate: '', objontime: '' });
-  const [erpAlert, setErpAlert] = useState(true);
+  const [nums, setNums] = useState<Record<NumKey, string>>(() => {
+    const d: Record<NumKey, string> = { delay: '3', ontime: '90', thprev: '15', thyear: '20', conc: '30', thlate: '', topn: '5', objspend: '', objlate: '', objontime: '' };
+    const th = ac?.thresholds && typeof ac.thresholds === 'object' ? ac.thresholds : {};
+    for (const k of Object.keys(d) as NumKey[]) if (th[k] !== undefined && th[k] !== null) d[k] = String(th[k]);
+    return d;
+  });
+  const [erpAlert, setErpAlert] = useState(ac ? ac.erp_payment_alert !== false : true);
 
-  const [rcp, setRcp] = useState<{ to: string[]; cc: string[] }>({ to: [], cc: [] });
+  const [rcp, setRcp] = useState<{ to: string[]; cc: string[] }>(() => ({
+    to: Array.isArray(ac?.recipients?.to) ? ac.recipients.to.map(String) : [],
+    cc: Array.isArray(ac?.recipients?.cc) ? ac.recipients.cc.map(String) : [],
+  }));
   const [rcpIn, setRcpIn] = useState<{ to: string; cc: string }>({ to: '', cc: '' });
   const [rcpErr, setRcpErr] = useState<{ to: string; cc: string }>({ to: '', cc: '' });
-  const [rules, setRules] = useState<Rule[]>([newRule()]);
-  const [send, setSend] = useState<'always' | 'alerts'>('always');
+  const [rules, setRules] = useState<Rule[]>(() => (Array.isArray(ac?.regles_assistant) && ac.regles_assistant.length
+    ? ac.regles_assistant.map((r: any) => ({ ...newRule(), ...r, weekdays: Array.isArray(r?.weekdays) && r.weekdays.length ? r.weekdays : newRule().weekdays }))
+    : [newRule()]));
+  const [send, setSend] = useState<'always' | 'alerts'>(pick(ac?.send, ['always', 'alerts'] as const, 'always'));
 
-  const [tone, setTone] = useState<'factual' | 'direct'>('factual');
-  const [length, setLength] = useState<'short' | 'standard' | 'long'>('standard');
-  const [instr, setInstr] = useState('');
+  const [tone, setTone] = useState<'factual' | 'direct'>(pick(ac?.tone, ['factual', 'direct'] as const, 'factual'));
+  const [length, setLength] = useState<'short' | 'standard' | 'long'>(pick(ac?.length, ['short', 'standard', 'long'] as const, 'standard'));
+  const [instr, setInstr] = useState<string>(typeof ac?.instructions === 'string' ? ac.instructions : '');
 
   const [guideKey, setGuideKey] = useState<string | null>(null);
   const [guideClosed, setGuideClosed] = useState(false);
@@ -238,51 +253,58 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
   const [showNumErr, setShowNumErr] = useState<Record<string, boolean>>({});
 
   const p = periodInfo(period);
-  const cmpLabel = { both: period === 'cur_year' ? p.year : `${p.prev} et ${p.year}`, prev: p.prev, lastyear: p.year }[compare];
+  /* Période et fréquence d'envoi doivent aller ensemble, sinon les emails répètent les mêmes dépenses (ou en oublient). */
+  const PERIODE_LIB: Record<Period, string> = { prev_week: 'Semaine précédente', prev_month: 'Mois précédent', cur_month: 'Mois en cours, jusqu\'à la veille', cur_quarter: 'Trimestre en cours, jusqu\'à la veille', cur_year: 'Année en cours, jusqu\'à la veille' };
+  const conseilPeriode = (() => {
+    if (!rules.length) return null;
+    const rang = (r: Rule) => (r.interval === 'Months' ? 2 : r.interval === 'Weeks' ? 1 : 0);   // 0 : plusieurs fois par semaine
+    const fq = Math.min(...rules.map(rang));
+    const c = (texte: string, periode: Period) => ({ texte, periode, libelle: PERIODE_LIB[periode] });
+    if (fq === 0 && (period === 'prev_week' || period === 'prev_month')) return c(`Envoi plusieurs fois par semaine avec « ${PERIODE_LIB[period]} » : plusieurs emails de suite montreront les mêmes dépenses.`, 'cur_month');
+    if (fq === 1 && period === 'prev_month') return c('Envoi chaque semaine avec « Mois précédent » : les emails d\'un même mois montreront les mêmes dépenses.', 'cur_month');
+    if (fq === 2 && period === 'prev_week') return c('Envoi chaque mois avec « Semaine précédente » : les dépenses des autres semaines du mois ne seront dans aucun rapport.', 'prev_month');
+    return null;
+  })();
+  const cmpLabel = { both: period === 'cur_year' ? p.year : `${p.prev} et ${p.year}`, prev: p.prev, lastyear: p.year, none: '' }[compare];
   useEffect(() => { if (period === 'cur_year' && compare === 'prev') setCompare('lastyear'); }, [period, compare]);
+  // Semaine contre semaine n'est pas fiable (factures d'achat irrégulières) : la semaine se compare à l'an dernier, ou à rien.
+  useEffect(() => { if (period === 'prev_week' && (compare === 'prev' || compare === 'both')) setCompare('lastyear'); }, [period, compare]);
 
-  /* Calculs du rapport d'exemple */
+  /* Aperçu = mise en page seulement : aucun chiffre, ils sont calculés depuis l'ERP à chaque envoi.
+     Les blocs, tuiles et alertes suivent exactement la configuration, comme dans l'email. */
+  const V = '—';
   const topn = Math.min(20, Math.max(1, val('topn') || 5));
   const delay = val('delay') || 1;
-  const thP = val('thprev') ?? Infinity, thY = val('thyear') ?? Infinity, conc = val('conc'), ot = val('ontime') ?? 0, thLate = val('thlate');
-  const lateRows = D.late.filter(r => r[2] >= delay);
-  const vp = pct(D.spend.cur, D.spend.prev), vy = pct(D.spend.cur, D.spend.year);
-  const showPrev = compare !== 'lastyear', showYear = compare !== 'prev';
-  const topShare = D.top[0][1] / D.spend.cur * 100;
-
-  const alerts = (() => {
-    const a: { lv: 'red' | 'amber'; t: string }[] = [];
-    if (secOn.late && lateRows.length) a.push({ lv: 'red', t: `${lateRows.reduce((s, r) => s + r[1], 0)} commandes en retard d'au moins ${delay} jours, chez ${lateRows.length} fournisseur${lateRows.length > 1 ? 's' : ''}` });
-    if (secOn.ontime && val('ontime') !== null && D.ontime.rate < ot) a.push({ lv: 'amber', t: `Livraisons à l'heure : ${D.ontime.rate} %, sous le taux attendu de ${ot} %` });
+  const conc = val('conc'), thLate = val('thlate');
+  const showPrev = compare === 'both' || compare === 'prev', showYear = compare === 'both' || compare === 'lastyear';
+  const lignesListe = Math.min(topn, 5);   // lignes montrées dans l'aperçu ; « … » au-delà
+  const liste = (libelle: string) => Array.from({ length: lignesListe }, (_, i) => `${libelle} ${i + 1}`);
+  const nbActions = { short: 2, standard: 3, long: 5 }[length];
+  // Mêmes règles que le calcul du rapport dans n8n (nœud « Contrôler et calculer »).
+  const alertesPossibles = (() => {
+    const a: string[] = [];
+    if (secOn.late) a.push(`Commandes en retard d'au moins ${delay} jour${delay > 1 ? 's' : ''}`);
     if (secOn.spend) {
-      if (showPrev && vp >= thP) a.push({ lv: 'amber', t: `Dépenses ${fmtPct(vp)} par rapport à la période précédente (seuil ${thP} %)` });
-      if (showYear && vy >= thY) a.push({ lv: 'amber', t: `Dépenses ${fmtPct(vy)} par rapport à l'an dernier (seuil ${thY} %)` });
+      if (showPrev && val('thprev') !== null) a.push(`Dépenses en hausse d'au moins ${val('thprev')} % par rapport à la période précédente`);
+      if (showYear && val('thyear') !== null) a.push(`Dépenses en hausse d'au moins ${val('thyear')} % par rapport à la même période de l'an dernier`);
+      if (val('objspend') !== null) a.push(`Dépenses au-dessus de l'objectif de ${nf(val('objspend') as number)} TND`);
     }
     if (secOn.topsup) {
-      const up = D.top.filter(r => pct(r[1], r[2]) >= thP);
-      if (up.length) a.push({ lv: 'amber', t: `${up[0][0]} : dépenses ${fmtPct(pct(up[0][1], up[0][2]))} sur la période` });
-      if (conc !== null && topShare >= conc) a.push({ lv: 'amber', t: `${D.top[0][0]} pèse ${Math.round(topShare)} % des dépenses (seuil ${conc} %)` });
+      if (conc !== null) a.push(`Premier fournisseur au-delà de ${conc} % des dépenses`);
+      if (showPrev && val('thprev') !== null) a.push(`Fournisseur en hausse d'au moins ${val('thprev')} % sur la période`);
     }
     if (secOn.debt) {
-      if (erpAlert) a.push({ lv: 'red', t: `${D.debt.alerts.length} fournisseurs en alerte de paiement dans TraLIS` });
-      if (thLate !== null) { const n = D.debt.alerts.filter(r => r[1] >= thLate).length; if (n) a.push({ lv: 'red', t: `${n} fournisseur${n > 1 ? 's' : ''} avec au moins ${nf(thLate)} TND en retard de paiement` }); }
+      if (erpAlert) a.push('Fournisseurs en alerte de paiement dans l\'ERP (CRITIQUE ou ÉLEVÉ)');
+      if (thLate !== null) a.push(`Fournisseurs avec au moins ${nf(thLate)} TND en retard de paiement`);
+      if (val('objlate') !== null) a.push(`Dettes en retard au-dessus de l'objectif de ${nf(val('objlate') as number)} TND`);
     }
-    if (secOn.disputed) a.push({ lv: 'amber', t: `${D.disputed.reduce((s, r) => s + r[1], 0)} factures contestées en attente de règlement du litige` });
+    if (secOn.disputed) a.push('Factures contestées sur la période');
+    if (secOn.missing) a.push('Factures dont l\'original n\'est pas parvenu');
     return a;
   })();
 
-  const actions = (() => {
-    const x: [string, string][] = [];
-    if (secOn.late && lateRows[0]) { const r = lateRows[0]; x.push(['Relancer ' + r[0], `${r[1]} commande${r[1] > 1 ? 's' : ''} en retard, jusqu'à ${r[2]} jours. Demander une date de livraison ferme.`]); }
-    if (secOn.debt && erpAlert) x.push(['Régler en priorité ' + D.debt.alerts[0][0], `${nf(D.debt.alerts[0][1])} TND en retard, fournisseur en alerte de paiement.`]);
-    if (secOn.topsup || secOn.spend) x.push([`Analyser la hausse chez ${D.top[0][0]}`, `${fmtPct(pct(D.top[0][1], D.top[0][2]))} sur la période : vérifier s'il s'agit de volume ou d'un nouveau tarif.`]);
-    if (secOn.disputed) x.push([`Clore les litiges avec ${D.disputed[1][0]}`, `${nf(D.disputed[1][2])} TND contestés bloquent le paiement.`]);
-    if (secOn.topsup && conc !== null && topShare >= conc) x.push(['Consulter un deuxième fournisseur maritime', `${D.top[0][0]} représente ${Math.round(topShare)} % des dépenses.`]);
-    return x.slice(0, { short: 2, standard: 3, long: 5 }[length]);
-  })();
-
   const activeSections = ALLSEC.filter(i => secOn[i.k]);
-  const subject = `[VMIND] Rapport Achats — ${p.name}` + (alerts.length ? ` · ${alerts.length} alerte${alerts.length > 1 ? 's' : ''}` : '');
+  const subject = `[VMIND] Rapport Achats — ${p.name} · — alertes`;
   const r0 = rules[0];
   const when = r0 ? `${r0.interval === 'Weeks' ? (JOURS.find(j => j[0] === r0.weekdays[0]) || ['', ''])[1].toLowerCase() : r0.interval === 'Months' ? `le ${r0.dayOfMonth}` : 'aujourd\'hui'}, ${hhmm(r0.hour, r0.minute)}` : 'non planifié';
 
@@ -322,7 +344,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
 
   /* Navigation entre étapes */
   const stepValid = (s: number): boolean => {
-    if (s === 1) { const ok = name.trim() !== ''; setNameErr(ok ? '' : 'Donnez un nom à l\'agent.'); return ok; }
+    if (s === 1) { const ok = name.trim() !== ''; setNameErr(ok ? '' : 'Donnez un nom à l\'agent.'); return ok && activeSections.length > 0; }
     if (s === 2) {
       const errs = (Object.keys(NUM_RULES) as NumKey[]).filter(k => numError(k));
       setShowNumErr(Object.fromEntries((Object.keys(NUM_RULES) as NumKey[]).map(k => [k, true])));
@@ -335,7 +357,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
     for (let k = step; k < target; k++) {
       if (!stepValid(k)) {
         setStep(k); setGuideKey(null);
-        showToast(k === 3 ? 'Ajoutez au moins un destinataire principal et une règle d\'envoi.' : 'Corrigez les champs signalés en rouge.', 'warning');
+        showToast(k === 3 ? 'Ajoutez au moins un destinataire principal et une règle d\'envoi.' : k === 1 && name.trim() !== '' && activeSections.length === 0 ? 'Activez au moins une section du rapport.' : 'Corrigez les champs signalés en rouge.', 'warning');
         return;
       }
     }
@@ -365,39 +387,60 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
     return { ...r, weekdays: has ? r.weekdays.filter(x => x !== d) : [...r.weekdays, d] };
   }));
 
-  /* Déploiement : module serveur pas encore branché, aucun appel API */
-  const deploy = (mode: 'run_now' | 'deploy_only') => {
+  /* Déploiement : même chemin que le Recouvrement (/api/deploy-agent), workflow n8n « VMIND - Agent Achats » */
+  const deploy = async (mode: 'run_now' | 'deploy_only') => {
+    if (!stepValid(1)) { setStep(1); showToast(activeSections.length === 0 ? 'Activez au moins une section du rapport.' : 'Donnez un nom à l\'agent.', 'warning'); return; }
     if (!stepValid(3)) { go(3); return; }
     setDeploying(mode);
+    // Règles de l'assistant → format lu par le planificateur du backend (convertToCron).
+    const heure = (h: number) => (h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`);
+    const reglesBackend = rules.map(r => ({
+      interval: r.interval, daysBetween: r.daysBetween, weeksBetween: r.weeksBetween, hoursBetween: r.hoursBetween,
+      minutesBetween: r.minutesBetween, monthsBetween: r.monthsBetween,
+      triggerAtHour: heure(r.hour), triggerAtMinute: r.minute, triggerOnWeekdays: r.weekdays, triggerAtDayOfMonth: r.dayOfMonth,
+    }));
+    // Recette uniquement : date de référence passée (la base de test s'arrête en avril 2026). Vide en production.
+    const dateTest = String(process.env.NEXT_PUBLIC_AGENT_TEST_REFERENCE_DATE || '').trim();
     const config = {
-      agent_name: name.trim(), run_mode: 'achats_supply', action: mode, workflow_timezone: timezone,
-      achats_config: { period, compare, sections: activeSections.map(s => s.k), thresholds: nums, erp_payment_alert: erpAlert, recipients: rcp, send, tone, length, instructions: instr },
-      trigger_rules: rules,
+      agent_name: name.trim(), run_mode: 'achats_supply', template_id: 'achats_supply', action: mode, workflow_timezone: timezone,
+      erp_type: 'tralis', selected_skills: ['achats-supply-tralis'],
+      achats_config: {
+        period, compare, sections: activeSections.map(s => s.k), thresholds: nums, erp_payment_alert: erpAlert, recipients: rcp,
+        send, tone, length, instructions: instr, regles_assistant: rules,
+        ...(/^\d{4}-\d{2}-\d{2}$/.test(dateTest) ? { date_reference: dateTest } : {}),
+      },
+      trigger_rules: reglesBackend,
     };
-    // Le module backend de l'agent Achats n'est pas encore branché : configuration journalisée uniquement
-    console.info('[Agent Achats] Configuration à enregistrer dans agents.parameters :', config);
-    setTimeout(() => {
-      setDeploying(null);
-      showToast(mode === 'run_now'
-        ? `Agent « ${name.trim()} » configuré. Le premier rapport sera envoyé à ${rcp.to.join(', ')} dès que le module d'exécution de l'agent Achats sera branché.`
-        : `Agent « ${name.trim()} » configuré. Envoi prévu ${rules.map(ruleText).join(' ; ')}, dès que le module d'exécution de l'agent Achats sera branché.`, 'success', 6000);
+    try {
+      await deployAgent(config);
+      if (mode === 'run_now') await runAgentNow(config.agent_name);
+      showToast(isEdit
+        ? (mode === 'run_now' ? `Configuration de « ${name.trim()} » enregistrée. Le rapport est en préparation et sera envoyé à ${rcp.to.join(', ')} dans quelques minutes.` : `Configuration de « ${name.trim()} » enregistrée. Envoi prévu ${rules.map(ruleText).join(' ; ')}.`)
+        : mode === 'run_now'
+        ? `Agent « ${name.trim()} » déployé. Le rapport est en préparation et sera envoyé à ${rcp.to.join(', ')} dans quelques minutes ; suivez-le dans le journal de l'agent.`
+        : `Agent « ${name.trim()} » déployé. Envoi prévu ${rules.map(ruleText).join(' ; ')}.`, 'success', 7000);
       onCancel();
-    }, 900);
+    } catch (err: any) {
+      console.error('[Agent Achats] Déploiement :', err);
+      showToast(`Déploiement impossible : ${err?.message || 'erreur inconnue'}`, 'error', 9000);
+    } finally {
+      setDeploying(null);
+    }
   };
 
   /* Récapitulatif */
   const recapRows: [string, React.ReactNode, number, string][] = (() => {
-    const th = [`retard de livraison dès ${val('delay') ?? '—'} jours`, `livraisons à l'heure au moins ${val('ontime') ?? '—'} %`, `hausse au-delà de ${val('thprev') ?? '—'} % par rapport à la période précédente et ${val('thyear') ?? '—'} % par rapport à l'an dernier`];
+    const th = [`retard de livraison dès ${val('delay') ?? '—'} jours`, ...(secOn.ontime ? [`livraisons à l'heure au moins ${val('ontime') ?? '—'} %`] : []), `hausse au-delà de ${val('thprev') ?? '—'} % par rapport à la période précédente et ${val('thyear') ?? '—'} % par rapport à l'an dernier`];
     if (conc !== null) th.push(`un fournisseur au-delà de ${conc} % des dépenses`);
     if (erpAlert) th.push('alerte de paiement de TraLIS');
     if (thLate !== null) th.push(`retard de paiement dès ${nf(thLate)} TND`);
     const obj: string[] = [];
     if (val('objspend') !== null) obj.push(`dépenses au plus ${nf(val('objspend') as number)} TND`);
     if (val('objlate') !== null) obj.push(`dettes en retard au plus ${nf(val('objlate') as number)} TND`);
-    if (val('objontime') !== null) obj.push(`livraisons à l'heure au moins ${val('objontime')} %`);
+    if (secOn.ontime && val('objontime') !== null) obj.push(`livraisons à l'heure au moins ${val('objontime')} %`);
     return [
       ['Agent', name, 1, 'aw-name'],
-      ['Période', `${p.name}, comparée à ${cmpLabel}`, 1, 'aw-period'],
+      ['Période', compare === 'none' ? `${p.name}, sans comparaison` : `${p.name}, comparée à ${cmpLabel}`, 1, 'aw-period'],
       ['Sections', `${activeSections.length} : ${activeSections.map(i => i.t).join(', ')}`, 1, 'sec-late'],
       ['Alertes', th.join(' · '), 2, 'aw-delay'],
       ['Listes', `${val('topn') ?? '—'} fournisseurs par liste`, 2, 'aw-topn'],
@@ -468,7 +511,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
         <div className="aw-head-l">
           <div className="aw-hic" aria-hidden="true">🏭</div>
           <div style={{ minWidth: 0 }}>
-            <h1 className="aw-htitle">Configuration : Directeur des Achats et Supply Chain Amont</h1>
+            <h1 className="aw-htitle">Configuration : Directeur des Achats et Supply Chain Amont{isEdit ? ' (modification)' : ''}</h1>
             <p className="aw-hsub">Commandes en retard, dépenses, dettes fournisseurs et factures à traiter, avec alertes et actions recommandées, envoyés par email</p>
           </div>
         </div>
@@ -494,25 +537,29 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
             <div className="aw-card">
               <h2 className="aw-ct">Identité de l&apos;agent</h2>
               <label className="aw-lbl" htmlFor="aw-name">Nom de l&apos;agent *</label>
-              <input id="aw-name" className={`aw-inp${nameErr ? ' bad' : ''}`} value={name} {...f('name')} onChange={e => { setName(e.target.value); setNameErr(''); }} />
+              <input id="aw-name" className={`aw-inp${nameErr ? ' bad' : ''}`} value={name} readOnly={isEdit} {...f('name')} onChange={e => { if (isEdit) return; setName(e.target.value); setNameErr(''); }} />
               {nameErr && <div className="aw-ferr">{nameErr}</div>}
+              {isEdit && <div className="aw-help">Le nom ne change pas en modification : un autre nom créerait un second agent.</div>}
             </div>
             <div className="aw-card">
               <h2 className="aw-ct">Période et comparaison</h2>
-              <p className="aw-cs">Concerne les dépenses et les livraisons à l&apos;heure. Les retards, les dettes et les factures à traiter sont toujours la situation du jour de l&apos;envoi.</p>
+              <p className="aw-cs">Concerne les dépenses (montant, tendance, fournisseurs, catégories) et les factures à traiter. Les retards de livraison, les commandes en attente et les dettes sont toujours la situation du jour de l&apos;envoi.</p>
               <label className="aw-lbl" htmlFor="aw-period">Période analysée</label>
               <select id="aw-period" className="aw-inp" value={period} {...f('period')} onChange={e => { setPeriod(e.target.value as Period); openGuide('period'); }}>
-                <option value="prev_month">Mois précédent</option>
                 <option value="cur_month">Mois en cours, jusqu&apos;à la veille</option>
+                <option value="prev_month">Mois précédent</option>
+                <option value="prev_week">Semaine précédente (lundi à dimanche)</option>
                 <option value="cur_quarter">Trimestre en cours, jusqu&apos;à la veille</option>
                 <option value="cur_year">Année en cours, jusqu&apos;à la veille</option>
               </select>
               <div className="aw-help">Prochain rapport : {p.name}.</div>
+              {conseilPeriode && <div className="aw-warnbox">⚠ {conseilPeriode.texte} <button type="button" className="aw-gbtn" onClick={() => { setPeriod(conseilPeriode.periode); openGuide('period'); }}>Utiliser « {conseilPeriode.libelle} »</button></div>}
               <span className="aw-lbl">Comparer les dépenses avec</span>
               {Seg({ value: compare, onChange: setCompare, gk: 'compare', options: [
-                { v: 'both', b: 'Les deux', s: period === 'cur_year' ? p.year : `${p.prev} et ${p.year}` },
-                { v: 'prev', b: 'La période précédente', s: p.prev, hidden: period === 'cur_year' },
+                { v: 'both', b: 'Les deux', s: period === 'cur_year' ? p.year : `${p.prev} et ${p.year}`, hidden: period === 'prev_week' },
+                { v: 'prev', b: 'La période précédente', s: p.prev, hidden: period === 'cur_year' || period === 'prev_week' },
                 { v: 'lastyear', b: 'La même période l\'an dernier', s: p.year },
+                { v: 'none', b: 'Aucune comparaison', s: 'les montants seuls, sans alerte de hausse' },
               ] })}
             </div>
             <div className="aw-card">
@@ -543,7 +590,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
               <p className="aw-cs">Les commandes non reçues après leur date de livraison prévue.</p>
               <div className="aw-grid2">
                 {NumField({ k: 'delay', label: 'Signaler une commande en retard à partir de', unit: 'jours' })}
-                {NumField({ k: 'ontime', label: 'Taux de livraison à l\'heure attendu', unit: '%' })}
+                {secOn.ontime && NumField({ k: 'ontime', label: 'Taux de livraison à l\'heure attendu', unit: '%' })}
               </div>
             </div>
             <div className="aw-card">
@@ -574,7 +621,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
                 {NumField({ k: 'objspend', label: 'Dépenses de la période au plus', unit: 'TND', placeholder: 'Exemple : 900 000' })}
                 {NumField({ k: 'objlate', label: 'Dettes en retard de paiement au plus', unit: 'TND', placeholder: 'Exemple : 50 000' })}
               </div>
-              <div className="aw-grid2">{NumField({ k: 'objontime', label: 'Livraisons à l\'heure au moins', unit: '%', placeholder: 'Exemple : 95' })}</div>
+              {secOn.ontime && <div className="aw-grid2">{NumField({ k: 'objontime', label: 'Livraisons à l\'heure au moins', unit: '%', placeholder: 'Exemple : 95' })}</div>}
             </div>
           </>)}
 
@@ -639,6 +686,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
                 { v: 'always', b: 'À chaque fois', s: 'même quand tout va bien' },
                 { v: 'alerts', b: 'Seulement en cas d\'alerte', s: 'pas d\'email si rien ne dépasse vos seuils' },
               ] })}
+              {conseilPeriode && <div className="aw-warnbox">⚠ {conseilPeriode.texte} <button type="button" className="aw-gbtn" onClick={() => setPeriod(conseilPeriode.periode)}>Utiliser « {conseilPeriode.libelle} »</button></div>}
               <div className="aw-infobox">{rules.length ? `⚡ Envoi ${rules.map(ruleText).join(' ; ')}${send === 'alerts' ? ', seulement les jours où une alerte est levée' : ''}.` : 'Ajoutez une règle pour planifier l\'envoi.'}</div>
             </div>
           </>)}
@@ -681,11 +729,11 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
               {step < 4 && <button type="button" className="aw-bnext" onClick={() => go(step + 1)}>{STEPS[step]} →</button>}
               {step === 4 && (<>
                 <button type="button" className="aw-bdep" disabled={!!deploying} onFocus={() => openGuide('deployonly')} onMouseEnter={() => openGuide('deployonly')} onClick={() => deploy('deploy_only')}>
-                  {deploying === 'deploy_only' ? 'Déploiement…' : 'Déployer'}
+                  {deploying === 'deploy_only' ? 'Enregistrement…' : isEdit ? 'Enregistrer' : 'Déployer'}
                 </button>
                 <button type="button" className="aw-bdep main" disabled={!!deploying} onFocus={() => openGuide('runnow')} onMouseEnter={() => openGuide('runnow')} onClick={() => deploy('run_now')}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" /></svg>
-                  <span>{deploying === 'run_now' ? 'Déploiement…' : 'Déployer et exécuter maintenant'}</span>
+                  <span>{deploying === 'run_now' ? 'Enregistrement…' : isEdit ? 'Enregistrer et exécuter maintenant' : 'Déployer et exécuter maintenant'}</span>
                 </button>
               </>)}
             </div>
@@ -696,11 +744,12 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
         {showPreview && (
           <aside className="aw-preview" aria-label="Aperçu du rapport envoyé">
             <div className="aw-pt">APERÇU DU RAPPORT ENVOYÉ</div>
-            <div className="aw-ps">En direct · {activeSections.length} sections · {rcp.to.length + rcp.cc.length} destinataire{rcp.to.length + rcp.cc.length > 1 ? 's' : ''} · {alerts.length} alerte{alerts.length > 1 ? 's' : ''}</div>
+            <div className="aw-ps">En direct · {activeSections.length} sections · {rcp.to.length + rcp.cc.length} destinataire{rcp.to.length + rcp.cc.length > 1 ? 's' : ''}</div>
             <div className="aw-dev">
               <button type="button" className={device === 'desktop' ? 'on' : ''} onClick={() => setDevice('desktop')}>Ordinateur</button>
               <button type="button" className={device === 'mobile' ? 'on' : ''} onClick={() => setDevice('mobile')}>Mobile</button>
             </div>
+            <div className="aw-pinfo">ⓘ Aperçu de la mise en page. Les chiffres seront calculés depuis votre ERP à chaque envoi.</div>
             <div className="aw-inbox">
               <div className="aw-ibar"><i style={{ background: '#F0525C' }} /><i style={{ background: '#F2B53A' }} /><i style={{ background: '#2BD47D' }} /><span>Boîte de réception</span></div>
               <div className="aw-scroll" ref={scrollRef}>
@@ -715,155 +764,137 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
                   </>, 'aw-mhead')}
                   <div className="aw-mbody">
                     <div className="aw-mbanner">
-                      <div className="row1"><small>VMIND</small><span className="ex">Données d&apos;exemple</span></div>
+                      <div className="row1"><small>VMIND</small></div>
                       <h4>Rapport Achats et Supply Chain</h4>
                       <p>{cap(p.name)} · {name}</p>
                     </div>
                     <div className="aw-msheet">
-                      {/* Tuiles */}
+                      {/* Tuiles : même ordre que l'email (retard, dépenses, retard de paiement, factures à traiter, attente) */}
                       <div className="aw-tiles" data-blk="tiles">
-                        {secOn.late && <div className="aw-tile red"><small>Commandes en retard</small><b>{lateRows.reduce((s, r) => s + r[1], 0)}</b><span>{lateRows.length} fournisseurs</span></div>}
-                        {secOn.ontime && <div className={`aw-tile ${D.ontime.rate < ot ? 'amber' : 'green'}`}><small>Livrées à l&apos;heure</small><b>{D.ontime.rate} %</b><span>taux attendu {ot || '—'} %</span></div>}
-                        {secOn.spend && <div className={`aw-tile${vp >= thP ? ' amber' : ''}`}><small>Dépenses hors taxes</small><b>{nf(D.spend.cur)}<em>TND</em></b><span>{showPrev ? <><span className={vp > 0 ? 'bad' : 'good'}>{fmtPct(vp)}</span> par rapport à la période précédente</> : <><span className={vy > 0 ? 'bad' : 'good'}>{fmtPct(vy)}</span> par rapport à l&apos;an dernier</>}</span></div>}
-                        {secOn.debt && <div className="aw-tile red"><small>Retard de paiement</small><b>{nf(D.debt.late)}<em>TND</em></b><span>sur {nf(D.debt.rest)} TND restant à payer</span></div>}
-                        {(secOn.disputed || secOn.missing) && <div className="aw-tile amber"><small>Factures à traiter</small><b>{(secOn.disputed ? 3 : 0) + (secOn.missing ? 2 : 0)}</b><span>contestées ou non parvenues</span></div>}
-                        {secOn.pending && <div className="aw-tile"><small>En attente de réception</small><b>{D.pending.count}</b><span>{nf(D.pending.amount)} TND commandés</span></div>}
+                        {secOn.late && <div className="aw-tile"><small>Commandes en retard</small><b>{V}</b><span>{V} fournisseurs</span></div>}
+                        {secOn.spend && <div className="aw-tile"><small>Dépenses hors taxes</small><b>{V}<em>TND</em></b><span>{showPrev || showYear ? `${V} % par rapport ${showPrev ? 'à la période précédente' : 'à l\'an dernier'}` : ''}</span></div>}
+                        {secOn.debt && <div className="aw-tile"><small>Retard de paiement</small><b>{V}<em>TND</em></b><span>sur {V} TND restant à payer</span></div>}
+                        {(secOn.disputed || secOn.missing) && <div className="aw-tile"><small>Factures à traiter</small><b>{V}</b><span>contestées ou non parvenues</span></div>}
+                        {secOn.pending && <div className="aw-tile"><small>En attente de réception</small><b>{V}</b><span>{V} TND commandés</span></div>}
                       </div>
 
                       {Blk("synth", <>
                         <h5>Synthèse</h5>
                         <div className="aw-syn">
-                          {tone === 'direct' && actions[0] && <p><b>À décider.</b> {actions[0][0]}.</p>}
-                          <p><b>Constat.</b> {(() => {
-                            const c: string[] = [];
-                            if (secOn.spend) c.push(`les dépenses atteignent ${nf(D.spend.cur)} TND hors taxes, soit ${showPrev ? fmtPct(vp) + ' par rapport à la période précédente' : fmtPct(vy) + ' par rapport à l\'an dernier'}`);
-                            if (secOn.late) c.push(`${lateRows.reduce((s, r) => s + r[1], 0)} commandes sont en retard de livraison`);
-                            if (secOn.debt) c.push(`${nf(D.debt.late)} TND de dettes fournisseurs sont en retard de paiement`);
-                            return c.length ? cap(c.join(' ; ')) + '.' : 'Aucune section active.';
-                          })()}</p>
-                          {length !== 'short' && <p><b>Causes probables.</b> Hausse concentrée sur le fret maritime et retards répétés d&apos;un transporteur routier.</p>}
-                          {length === 'long' && <p><b>Points de vigilance.</b> Dépendance au premier fournisseur maritime et factures contestées qui retardent les paiements.</p>}
+                          <p className="aw-skh">Rédigée par l&apos;agent à chaque envoi · ton {tone === 'direct' ? 'direct' : 'factuel'} · longueur {{ short: 'courte', standard: 'standard', long: 'détaillée' }[length]}</p>
+                          {tone === 'direct' && <><p><b>À décider.</b></p><div className="aw-sk w90" /></>}
+                          <p><b>Constat.</b></p><div className="aw-sk" /><div className="aw-sk w60" />
+                          {length === 'long' && <><p><b>Points de vigilance.</b></p><div className="aw-sk" /><div className="aw-sk w60" /></>}
                         </div>
                       </>)}
 
                       {Blk("alerts", <>
-                        <h5>Alertes ({alerts.length})</h5>
-                        {alerts.length ? <ul className="aw-al">{alerts.map(a => <li key={a.t}><span className={`d ${a.lv}`} /><span>{a.t}</span></li>)}</ul> : <p className="aw-note">Aucune alerte : tout est sous vos seuils.</p>}
+                        <h5>Alertes</h5>
+                        {alertesPossibles.length ? <>
+                          <p className="aw-note">Signalées dans l&apos;email seulement si elles sont déclenchées :</p>
+                          <ul className="aw-alc">{alertesPossibles.map(t => <li key={t}>▲ {t}</li>)}</ul>
+                        </> : <p className="aw-note">Aucune alerte possible avec les sections et les seuils choisis.</p>}
                       </>)}
 
-                      {actions.length > 0 && Blk("actions", <>
+                      {Blk("actions", <>
                         <h5>Actions recommandées</h5>
-                        <ol className="aw-act">{actions.map(a => <li key={a[0]}><b>{a[0]}</b><span>{a[1]}</span></li>)}</ol>
+                        <p className="aw-note">Proposées par l&apos;agent à partir des alertes déclenchées, {nbActions} au plus.</p>
+                        <ol className="aw-act">{Array.from({ length: Math.min(nbActions, 3) }, (_, i) => <li key={i}><div className="aw-sk w60" /><div className="aw-sk" /></li>)}</ol>
                       </>)}
 
                       {Blk("objectives", <>
                         <h5>Objectifs</h5>
-                        {(val('objspend') !== null || val('objlate') !== null || val('objontime') !== null) ? (
+                        {(secOn.spend && val('objspend') !== null) || (secOn.debt && val('objlate') !== null) ? (
                           <table className="aw-mt"><tbody>
-                            {val('objspend') !== null && <tr><td>Dépenses au plus {nf(val('objspend') as number)} TND</td><td className={`r${D.spend.cur > (val('objspend') as number) ? ' bad' : ''}`}>{D.spend.cur > (val('objspend') as number) ? 'non atteint' : 'atteint'}</td></tr>}
-                            {val('objlate') !== null && <tr><td>Dettes en retard au plus {nf(val('objlate') as number)} TND</td><td className={`r${D.debt.late > (val('objlate') as number) ? ' bad' : ''}`}>{D.debt.late > (val('objlate') as number) ? 'non atteint' : 'atteint'}</td></tr>}
-                            {val('objontime') !== null && <tr><td>Livraisons à l&apos;heure au moins {val('objontime')} %</td><td className={`r${D.ontime.rate < (val('objontime') as number) ? ' bad' : ''}`}>{D.ontime.rate < (val('objontime') as number) ? 'non atteint' : 'atteint'}</td></tr>}
+                            {secOn.spend && val('objspend') !== null && <tr><td>Dépenses au plus {nf(val('objspend') as number)} TND</td><td className="r">atteint ou non atteint</td></tr>}
+                            {secOn.debt && val('objlate') !== null && <tr><td>Dettes en retard au plus {nf(val('objlate') as number)} TND</td><td className="r">atteint ou non atteint</td></tr>}
                           </tbody></table>
                         ) : <p className="aw-note">Aucun objectif renseigné à l&apos;étape 2.</p>}
                       </>)}
 
                       {secOn.late && Blk("late", <>
                         <h5>Commandes en retard de livraison</h5>
-                        {lateRows.length ? <table className="aw-mt"><tbody>
-                          <tr><th>Fournisseur</th><th className="r">Commandes</th><th className="r">Retard maximum</th><th className="r">Montant</th></tr>
-                          {lateRows.slice(0, topn).map(r => <tr key={r[0]}><td>{r[0]}</td><td className="r">{r[1]}</td><td className="r bad">{r[2]} jours</td><td className="r">{nf(r[3])} TND</td></tr>)}
-                        </tbody></table> : <p className="aw-note">Aucune commande au-delà du seuil.</p>}
-                        <p className="aw-note">Commandes non reçues dont la date de livraison prévue est dépassée d&apos;au moins {val('delay') || '—'} jours.</p>
-                      </>)}
-
-                      {secOn.ontime && Blk("ontime", <>
-                        <h5>Livraisons à l&apos;heure</h5>
                         <table className="aw-mt"><tbody>
-                          <tr><td>Commandes reçues sur la période</td><td className="r">{D.ontime.received}</td></tr>
-                          <tr><td>Reçues à temps</td><td className="r">{D.ontime.onTime} · {D.ontime.rate} %</td></tr>
-                          {D.ontime.worst.map(r => <tr key={r[0]}><td>{r[0]}</td><td className="r bad">{r[1]} % à l&apos;heure</td></tr>)}
+                          <tr><th>Fournisseur</th><th className="r">Commandes</th><th className="r">Retard maximum</th><th className="r">Montant</th></tr>
+                          {liste('Fournisseur').map(f => <tr key={f}><td>{f}</td><td className="r">{V}</td><td className="r">{V} jours</td><td className="r">{V} TND</td></tr>)}
+                          {topn > lignesListe && <tr><td colSpan={4}>…</td></tr>}
                         </tbody></table>
+                        <p className="aw-note">Commandes non reçues dont la date de livraison prévue est dépassée d&apos;au moins {delay} jours ; {topn} fournisseurs au plus, du plus long retard au plus court.</p>
                       </>)}
 
                       {secOn.pending && Blk("pending", <>
                         <h5>Commandes en attente de réception</h5>
                         <table className="aw-mt"><tbody>
-                          <tr><td>Commandes passées, pas encore reçues</td><td className="r">{D.pending.count}</td></tr>
-                          <tr><td>Montant commandé</td><td className="r">{nf(D.pending.amount)} TND</td></tr>
+                          <tr><td>Commandes passées, pas encore reçues</td><td className="r">{V}</td></tr>
+                          <tr><td>Montant commandé</td><td className="r">{V} TND</td></tr>
                         </tbody></table>
                       </>)}
 
                       {secOn.spend && Blk("spend", <>
                         <h5>Dépenses de la période</h5>
                         <table className="aw-mt"><tbody>
-                          <tr><td>{cap(p.name)}</td><td className="r">{nf(D.spend.cur)} TND</td></tr>
-                          {showPrev && <tr><td>Période précédente : {p.prev}</td><td className="r">{nf(D.spend.prev)} TND · <span className={vp > 0 ? 'bad' : ''}>{fmtPct(vp)}</span></td></tr>}
-                          {showYear && <tr><td>Même période l&apos;an dernier : {p.year}</td><td className="r">{nf(D.spend.year)} TND · <span className={vy > 0 ? 'bad' : ''}>{fmtPct(vy)}</span></td></tr>}
+                          <tr><td>{cap(p.name)}</td><td className="r">{V} TND</td></tr>
+                          {showPrev && <tr><td>Période précédente : {p.prev}</td><td className="r">{V} TND · {V} %</td></tr>}
+                          {showYear && <tr><td>Même période l&apos;an dernier : {p.year}</td><td className="r">{V} TND · {V} %</td></tr>}
                         </tbody></table>
                         <p className="aw-note">Factures d&apos;achat hors taxes, avoirs déduits. Une hausse peut venir du volume autant que des prix.</p>
                       </>)}
 
                       {secOn.trend && Blk("trend", <>
                         <h5>Tendance des dépenses sur 6 mois</h5>
-                        <div className="aw-bars">{D.trend.map((v, i) => <div key={i} className={i === 5 ? 'last' : ''} style={{ height: `${Math.round(v / Math.max(...D.trend) * 100)}%` }} title={`${nf(v)} TND`} />)}</div>
-                        <div className="aw-bl">{[5, 4, 3, 2, 1, 0].map(n => <span key={n}>{MOIS[monthsAgo(n + 1).m]}</span>)}</div>
+                        <div className="aw-bars">{[5, 4, 3, 2, 1, 0].map(n => <div key={n} className={`sk${n === 0 ? ' last' : ''}`} style={{ height: '55%' }} />)}</div>
+                        <div className="aw-bl">{[5, 4, 3, 2, 1, 0].map(n => <span key={n}>{MOIS[monthsAgo(n + 1).m]}<br />{V}</span>)}</div>
                       </>)}
 
                       {secOn.topsup && Blk("topsup", <>
                         <h5>Principaux fournisseurs</h5>
                         <table className="aw-mt"><tbody>
                           <tr><th>Fournisseur</th><th className="r">Dépenses</th><th className="r">Part</th><th className="r">Évolution</th></tr>
-                          {D.top.slice(0, topn).map(r => { const e = pct(r[1], r[2]); return <tr key={r[0]}><td>{r[0]}</td><td className="r">{nf(r[1])}</td><td className="r">{Math.round(r[1] / D.spend.cur * 100)} %</td><td className={`r${e >= thP ? ' bad' : ''}`}>{fmtPct(e)}</td></tr>; })}
+                          {liste('Fournisseur').map(f => <tr key={f}><td>{f}</td><td className="r">{V} TND</td><td className="r">{V} %</td><td className="r">{showPrev ? `${V} %` : ''}</td></tr>)}
+                          {topn > lignesListe && <tr><td colSpan={4}>…</td></tr>}
                         </tbody></table>
                       </>)}
 
                       {secOn.cat && Blk("cat", <>
                         <h5>Dépenses par catégorie</h5>
-                        <table className="aw-mt"><tbody>{D.cat.map(r => <tr key={r[0]}><td>{r[0]}</td><td className="r">{nf(r[1])} TND</td><td className="r">{Math.round(r[1] / D.spend.cur * 100)} %</td></tr>)}</tbody></table>
+                        <table className="aw-mt"><tbody>{['Catégorie 1', 'Catégorie 2', 'Catégorie 3'].map(c => <tr key={c}><td>{c}</td><td className="r">{V} TND</td><td className="r">{V} %</td></tr>)}<tr><td colSpan={3}>…</td></tr></tbody></table>
                       </>)}
 
                       {secOn.fx && Blk("fx", <>
                         <h5>Achats en devises</h5>
-                        <table className="aw-mt"><tbody>{D.fx.map(r => <tr key={r[0]}><td>En {r[0]}</td><td className="r">{nf(r[1])} {r[0]}</td></tr>)}</tbody></table>
+                        <table className="aw-mt"><tbody>{['Devise 1', 'Devise 2'].map(c => <tr key={c}><td>{c}</td><td className="r">{V}</td></tr>)}</tbody></table>
                         <p className="aw-note">Montants dans la devise d&apos;origine de la facture.</p>
                       </>)}
 
                       {secOn.debt && Blk("debt", <>
                         <h5>Dettes fournisseurs</h5>
                         <table className="aw-mt"><tbody>
-                          <tr><td>Facturé</td><td className="r">{nf(D.debt.billed)} TND</td></tr>
-                          <tr><td>Payé</td><td className="r">{nf(D.debt.paid)} TND</td></tr>
-                          <tr><td>Reste à payer</td><td className="r">{nf(D.debt.rest)} TND</td></tr>
-                          <tr><td>Dont en retard de paiement</td><td className="r bad">{nf(D.debt.late)} TND</td></tr>
+                          <tr><td>Facturé</td><td className="r">{V} TND</td></tr>
+                          <tr><td>Payé</td><td className="r">{V} TND</td></tr>
+                          <tr><td>Reste à payer</td><td className="r">{V} TND</td></tr>
+                          <tr><td>Dont en retard de paiement</td><td className="r">{V} TND</td></tr>
                         </tbody></table>
-                        {erpAlert && <p className="aw-note">En alerte de paiement dans TraLIS : {D.debt.alerts.map(r => `${r[0]} (${nf(r[1])} TND)`).join(', ')}.</p>}
+                        {erpAlert && <p className="aw-note">En alerte de paiement dans l&apos;ERP : fournisseurs classés CRITIQUE ou ÉLEVÉ, {topn} au plus, avec leur montant en retard.</p>}
+                        <p className="aw-note">Montants issus de la balance fournisseurs, non rapprochés avec le solde comptable officiel.</p>
                       </>)}
 
                       {secOn.disputed && Blk("disputed", <>
                         <h5>Factures contestées</h5>
-                        <table className="aw-mt"><tbody>{D.disputed.map(r => <tr key={r[0]}><td>{r[0]}</td><td className="r">{r[1]} facture{r[1] > 1 ? 's' : ''}</td><td className="r">{nf(r[2])} TND</td></tr>)}</tbody></table>
+                        <table className="aw-mt"><tbody>{liste('Fournisseur').slice(0, 2).map(f => <tr key={f}><td>{f}</td><td className="r">{V} factures</td><td className="r">{V} TND</td></tr>)}</tbody></table>
                       </>)}
 
                       {secOn.missing && Blk("missing", <>
                         <h5>Factures non parvenues</h5>
-                        <table className="aw-mt"><tbody>{D.missing.map(r => <tr key={r[0]}><td>{r[0]}</td><td className="r">{r[1]} facture</td><td className="r">{nf(r[2])} TND</td></tr>)}</tbody></table>
-                      </>)}
-
-                      {secOn.notbooked && Blk("notbooked", <>
-                        <h5>Factures non comptabilisées</h5>
-                        <table className="aw-mt"><tbody><tr><td>Factures de la période</td><td className="r">{D.notbooked.count}</td><td className="r">{nf(D.notbooked.amount)} TND</td></tr></tbody></table>
+                        <table className="aw-mt"><tbody>{liste('Fournisseur').slice(0, 2).map(f => <tr key={f}><td>{f}</td><td className="r">{V} factures</td><td className="r">{V} TND</td></tr>)}</tbody></table>
                       </>)}
 
                       {secOn.disb && Blk("disb", <>
                         <h5>Débours de la période</h5>
-                        <table className="aw-mt"><tbody>
-                          <tr><td>Débours payés</td><td className="r">{D.disb.count}</td><td className="r">{nf(D.disb.amount)} TND</td></tr>
-                          <tr><td>Dossiers concernés</td><td className="r" colSpan={2}>{D.disb.dossiers}</td></tr>
-                        </tbody></table>
+                        <table className="aw-mt"><tbody>{liste('Fournisseur').slice(0, 2).map(f => <tr key={f}><td>{f}</td><td className="r">{V} débours</td><td className="r">{V} TND</td></tr>)}</tbody></table>
                         <p className="aw-note">À vérifier avant facturation client : le rapprochement automatique avec les factures de vente n&apos;est pas encore disponible.</p>
                       </>)}
 
-                      <div className="aw-mfoot">Généré par VMIND à partir des commandes, factures d&apos;achat et soldes fournisseurs de TraLIS, en lecture seule. Chiffres de cet aperçu fictifs.</div>
+                      <div className="aw-mfoot">Généré par VMIND à partir des commandes, factures d&apos;achat et soldes fournisseurs de l&apos;ERP, en lecture seule.</div>
                     </div>
                   </div>
                 </div>

@@ -122,6 +122,8 @@
   .aw-wd button { background: var(--aw-field); border: 1px solid var(--aw-line); border-radius: 16px; padding: 5px 11px; cursor: pointer; font-size: 12.5px; color: #C5D2DF; }
   .aw-wd button.on { border-color: var(--aw-teal); background: var(--aw-tealbg); color: var(--aw-teal); }
   .aw-infobox { background: rgba(59, 155, 240, 0.08); border: 1px solid rgba(59, 155, 240, 0.3); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; color: #C5D2DF; margin-top: 12px; }
+  .aw-warnbox { background: rgba(242, 181, 58, 0.08); border: 1px solid rgba(242, 181, 58, 0.35); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; color: #F2C46B; margin-top: 10px; line-height: 1.5; }
+  .aw-warnbox .aw-gbtn { margin-left: 6px; padding: 4px 10px; font-size: 12px; }
 
   .aw-recap { display: grid; grid-template-columns: minmax(130px, 190px) 1fr; gap: 9px 16px; margin: 0; font-size: 13px; }
   .aw-recap dt { color: var(--aw-muted); }
@@ -209,6 +211,17 @@
   .aw-bl { display: flex; gap: 6px; font-size: 9.5px; color: var(--m-muted); }
   .aw-bl span { flex: 1; text-align: center; }
   .aw-mfoot { font-size: 10.5px; color: var(--m-muted); border-top: 1px solid var(--m-line); margin-top: 14px; padding-top: 8px; }
+  /* Aperçu vide : mise en page sans chiffres (les chiffres viennent de l'ERP à chaque envoi) */
+  .aw-pinfo { margin: 8px 0 10px; padding: 8px 10px; border: 1px solid rgba(242, 181, 58, 0.35); background: rgba(242, 181, 58, 0.08); color: #F2C46B; border-radius: 8px; font-size: 11.5px; line-height: 1.4; }
+  .aw-sk { height: 8px; border-radius: 4px; background: #E3E9EF; margin: 4px 0 8px; width: 100%; }
+  .aw-sk.w60 { width: 60%; }
+  .aw-sk.w90 { width: 90%; }
+  .aw-skh { font-size: 11px; color: var(--m-muted); }
+  .aw-alc { list-style: none; margin: 4px 0 0; padding: 0; font-size: 12px; }
+  .aw-alc li { border: 1px dashed var(--m-line); background: #F7F9FB; border-radius: 6px; padding: 6px 8px; margin-bottom: 6px; color: var(--m-ink); }
+  .aw-bars div.sk { background: transparent; border: 1px dashed #B9C6D3; border-bottom: 0; }
+  .aw-bars div.sk.last { border-color: var(--m-teal); }
+  .aw-bl span { flex: 1; text-align: center; }
 
   /* Mise en évidence liée au guide */
   .aw-hl { outline: 2px solid #12B5A4; outline-offset: 4px; border-radius: 8px; background: rgba(18, 181, 164, 0.07); box-shadow: 0 0 0 6px rgba(18, 181, 164, 0.12); }
