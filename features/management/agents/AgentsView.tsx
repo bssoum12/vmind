@@ -11,7 +11,7 @@ import {
   getProspectAgentStats,
   qualifyManualProspects,
   triggerAIQualificationAllPending,
-  invalidateAgentsCache,
+  invalidateAgentsCache, runExploitationAgent, startExploitationAutopilot, stopExploitationAutopilot, deleteExploitationAgent, getExploitationLogs,
 } from '@/shared/api/n8n-api';
 import { useProspectSocket } from '../prospect-workspace/hooks/useProspectSocket';
 import { useRouter } from 'next/navigation';
@@ -19,12 +19,13 @@ import { getBrowserTimezone } from '@/shared/utils/timezone';
 import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Brain, CheckSquare, ListChecks, SkipForward, Users, Info, ExternalLink, UploadCloud, RefreshCw, LayoutDashboard } from 'lucide-react';
+import { Play, Brain, CheckSquare, ListChecks, SkipForward, Users, Info, ExternalLink, UploadCloud, RefreshCw, LayoutDashboard, FileText, X } from 'lucide-react';
 import { ProspectAgentExecutionModal } from './components/ProspectAgentExecutionModal';
 import { SourcingAgentExecutionModal } from './components/SourcingAgentExecutionModal';
 import { ProspectAgentScheduleModal } from './components/ProspectAgentScheduleModal';
 import { SourcingAgentScheduleModal } from './components/SourcingAgentScheduleModal';
 import { SupervisorScheduleModal } from './components/SupervisorScheduleModal';
+import { ExploitationAgentScheduleModal } from './components/ExploitationAgentScheduleModal';
 import { DeleteAgentConfirmModal } from './components/DeleteAgentConfirmModal';
 import { AGENT_TEMPLATES } from '@/shared/management/constants/data';
 import { useToast } from '@/shared/contexts/ToastContext';
@@ -413,6 +414,24 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const [runModalAgent, setRunModalAgent] = useState<LiveAgent | null>(null);
   const [scheduleModalAgent, setScheduleModalAgent] = useState<LiveAgent | null>(null);
   const [deleteModalAgent, setDeleteModalAgent] = useState<LiveAgent | null>(null);
+  const [logsModalAgent, setLogsModalAgent] = useState<LiveAgent | null>(null);
+  const [logsData, setLogsData] = useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+
+  const openExploitationLogs = async (agent: LiveAgent) => {
+    setLogsModalAgent(agent);
+    setLogsLoading(true);
+    setLogsData([]);
+    try {
+      const publicId = agent.uuid || (agent as any).agent_id;
+      const res = await getExploitationLogs(publicId);
+      setLogsData(Array.isArray(res?.logs) ? res.logs : []);
+    } catch (e: any) {
+      showToast(e?.message || 'Impossible de charger le journal.', 'err');
+    } finally {
+      setLogsLoading(false);
+    }
+  };
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   // Tutorial state
@@ -760,7 +779,12 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
         }
         showToast(`Superviseur "${agent.agent_name}" mis en pause.`);
       } else {
-        await pauseAgent(agent.agent_name);
+        if (agent.run_mode === 'exploitation') {
+          const publicId = agent.uuid || (agent as any).agent_id;
+          await stopExploitationAutopilot(publicId);
+        } else {
+          await pauseAgent(agent.agent_name);
+        }
         showToast(`Agent "${agent.agent_name}" mis en pause.`);
       }
       invalidateAgentsCache();
@@ -805,6 +829,14 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           showToast(`Autopilot activé pour "${agent.agent_name}" !`);
         }
       } else {
+        if (agent.run_mode === 'exploitation') {
+          const publicId = agent.uuid || (agent as any).agent_id;
+          await startExploitationAutopilot(publicId, { workflow_timezone: getBrowserTimezone() });
+          showToast(`Autopilot activé pour "${agent.agent_name}" !`);
+          invalidateAgentsCache();
+          await refresh(true);
+          return;
+        }
         await resumeAgent(agent.agent_name, {
           ...(params || {}),
           workflow_timezone: getBrowserTimezone()
@@ -832,7 +864,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
       await deleteAgent(deleteModalAgent.agent_name);
       showToast(`Agent "${deleteModalAgent.agent_name}" supprimé avec succès.`);
       setDeleteModalAgent(null);
-      await refresh();
+      invalidateAgentsCache();
+      await refresh(true);
     } catch (e: any) {
       showToast(e.message, 'err');
     } finally {
@@ -854,6 +887,25 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
         return;
       }
       setRunModalAgent(agent);
+      return;
+    }
+
+    if (agent.run_mode === 'exploitation') {
+      const publicId = agent.uuid || (agent as any).agent_id;
+      if (!publicId) {
+        showToast("Impossible de trouver l'identifiant de cet agent", 'err');
+        return;
+      }
+      setActionLoading(agent.agent_name);
+      try {
+        await runExploitationAgent(publicId);
+        showToast(`Analyse lancée pour "${agent.agent_name}".`, 'ok');
+        await refresh(true);
+      } catch (err: any) {
+        showToast(err?.message || "Impossible de lancer l'analyse.", 'err');
+      } finally {
+        setActionLoading(null);
+      }
       return;
     }
 
@@ -1237,7 +1289,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                                 fontSize: '11px',
                                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                               }}>
-                                {agent.run_mode === 'supervisor' ? 'Superviseur IA' : (agent.run_mode || resolveAgentType(agent))}
+                                {agent.run_mode === 'supervisor' ? 'Superviseur IA' : agent.run_mode === 'exploitation' ? 'Exploitation & Transport' : (agent.run_mode || resolveAgentType(agent))}
                               </span>
                               {agent.run_mode === 'sourcing' && (
                                 <TargetAgentsBadge targets={getTargetAgentNames(agent)} />
@@ -1368,7 +1420,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                               className="row-btn"
                               disabled={busy || agent.is_executing}
                               onClick={() => {
-                                if (agent.run_mode === 'prospection' || agent.run_mode === 'sourcing' || agent.run_mode === 'supervisor') {
+                                if (agent.run_mode === 'prospection' || agent.run_mode === 'sourcing' || agent.run_mode === 'supervisor' || agent.run_mode === 'exploitation') {
                                   setScheduleModalAgent(agent);
                                 } else {
                                   handleResume(agent);
@@ -1397,7 +1449,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                           </button>
 
                           {/* Open Workspace (Prospect, Sourcing, Supervisor) - Tutorial Step 2 */}
-                          {(agent.run_mode === 'prospection' || agent.run_mode === 'sourcing' || agent.run_mode === 'supervisor') && (
+                          {(agent.run_mode === 'prospection' || agent.run_mode === 'sourcing' || agent.run_mode === 'supervisor' || agent.run_mode === 'exploitation') && (
                             <button
                               className="row-btn"
                               onClick={() => {
@@ -1407,6 +1459,8 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                                   route = `/sourcing-agent-workspace/${agent.uuid || (agent as any).agent_id}`;
                                 } else if (agent.run_mode === 'supervisor') {
                                   route = `/supervisor-agent-workspace/${agent.uuid || (agent as any).agent_id}`;
+                                } else if (agent.run_mode === 'exploitation') {
+                                  route = `/exploitation-agent-workspace/${agent.uuid || (agent as any).agent_id}`;
                                 }
                                 router.push(route);
                               }}
@@ -1577,6 +1631,124 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
             onConfigure('supervisor', scheduleModalAgent, 3);
           }}
         />
+      )}
+
+      {scheduleModalAgent && scheduleModalAgent.run_mode === 'exploitation' && (
+        <ExploitationAgentScheduleModal
+          agent={scheduleModalAgent}
+          onClose={() => setScheduleModalAgent(null)}
+          onToast={showToast}
+          onConfirm={async () => {
+            await handleResume(scheduleModalAgent);
+            setScheduleModalAgent(null);
+          }}
+          onEditSchedule={() => {
+            setScheduleModalAgent(null);
+            onConfigure('exploitation', scheduleModalAgent, 3);
+          }}
+        />
+      )}
+
+      {/* ── EXPLOITATION LOGS MODAL ── */}
+      {logsModalAgent && typeof document !== 'undefined' && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 999998,
+            background: 'rgba(2, 8, 20, 0.78)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+          onClick={() => setLogsModalAgent(null)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: 680,
+              maxHeight: '80vh',
+              background: 'rgba(6, 17, 31, 0.96)',
+              border: '1px solid rgba(0, 229, 200, 0.25)',
+              borderRadius: 16,
+              padding: 24,
+              color: '#F0F4F8',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+              overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
+                  Journal — {logsModalAgent.agent_name}
+                </h3>
+                <div style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>
+                  Historique des analyses et envois de rapports
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLogsModalAgent(null)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#94A3B8',
+                  cursor: 'pointer',
+                  padding: 4,
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {logsLoading ? (
+                <div style={{ color: '#94A3B8', fontSize: 13, padding: '20px 0', textAlign: 'center' }}>
+                  Chargement du journal...
+                </div>
+              ) : logsData.length === 0 ? (
+                <div style={{ color: '#94A3B8', fontSize: 13, padding: '20px 0', textAlign: 'center' }}>
+                  Aucune exécution enregistrée pour le moment.
+                </div>
+              ) : (
+                logsData.map((log: any, idx: number) => {
+                  const st = String(log.statut || log.status || '').toUpperCase();
+                  const isErr = st === 'FAIL' || st === 'ERROR';
+                  const isOk = st === 'COMPLETED' || st === 'SUCCESS';
+                  const badgeColor = isErr ? '#FF4757' : isOk ? '#00E5C8' : '#F59E0B';
+                  return (
+                    <div
+                      key={log.id || idx}
+                      style={{
+                        padding: '12px 14px',
+                        borderRadius: 10,
+                        background: 'rgba(15, 23, 42, 0.75)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
+                        <span style={{ color: badgeColor, fontWeight: 700 }}>{st || 'INFO'}</span>
+                        <span style={{ color: '#64748B' }}>
+                          {log.timestamp ? new Date(log.timestamp).toLocaleString('fr-FR') : ''}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 13, color: '#E2E8F0' }}>{log.message || log.details || '—'}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       {/* ── DELETE CONFIRMATION MODAL ── */}

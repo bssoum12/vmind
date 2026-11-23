@@ -281,6 +281,7 @@ function HomeContent() {
     const handleSwitchView = (e: Event) => {
       const customEvent = e as CustomEvent<string>;
       if (customEvent.detail === 'connectors' || customEvent.detail === 'chat' || customEvent.detail === 'skills') {
+        setMode('ASSISTANT');
         setAssistantView(customEvent.detail as 'chat' | 'connectors' | 'skills');
       }
     };

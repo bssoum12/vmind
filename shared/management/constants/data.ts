@@ -40,6 +40,18 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
   //**************************
 
   {
+    id: 'exploitation',
+    name: 'Agent Exploitation & Transport',
+    description: "Identifie les dossiers déficitaires, retards transporteurs/fournisseurs, expéditions non facturées et anomalies d'exploitation, puis envoie un rapport priorisé par e-mail.",
+    category: 'Operations · Transport',
+    icon: '📦',
+    accent: '#00E5C8',
+    iconBg: 'rgba(0,229,200,0.12)',
+    tag: 'new',
+    deployments: 0,
+    connections: ['TraLIS', 'Odoo', 'Sage', 'SAP']
+  },
+  {
     id: 'recouvrement',
     name: 'Agent de Recouvrement',
     description: 'Relance automatique les clients en impayé via email, SMS ou WhatsApp selon un calendrier configurable.',
@@ -61,7 +73,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     iconBg: 'rgba(0,229,200,0.1)',
     tag: 'new',
     deployments: 312,
-    connections: ['TraLIS', 'Email']
+    connections: ['TraLIS', 'Odoo', 'Sage', 'SAP']
   },
   {
     id: 'transport',
@@ -118,7 +130,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     accent: '#2196F3',
     iconBg: 'rgba(33,150,243,0.1)',
     deployments: 112, // Estimated
-    connections: ['TraLIS', 'Email']
+    connections: ['TraLIS', 'Odoo', 'Sage', 'SAP']
   },
   {
     id: 'anomalie',
@@ -140,7 +152,7 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     accent: '#FFB800',
     iconBg: 'rgba(255,184,0,0.1)',
     deployments: 198, // Estimated
-    connections: ['TraLIS', 'Email']
+    connections: ['TraLIS', 'Odoo', 'Sage', 'SAP']
   }
 ];
 

@@ -23,6 +23,7 @@ const AGENT_PROMPT_KEYS: Record<string, string> = {
   prospection: 'prospect_onboarding_chat',
   sourcing: 'sourcing_execution_chat',
   supervisor: 'supervisor_audit_config',
+  exploitation: 'exploitation_agent_config',
 };
 
 
@@ -540,13 +541,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, onNa
                 type="button"
                 onClick={() => {
                   setShowErpRequiredModal(false);
-                  if (onNavigate) {
-                    onNavigate('integrations');
-                  } else {
-                    window.dispatchEvent(new CustomEvent('vmind-assistant-view', { detail: 'connectors' }));
-                    const navBtn = document.querySelector('[data-view="integrations"]') as HTMLElement;
-                    if (navBtn) navBtn.click();
-                  }
+                  window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'connectors' }));
                 }}
                 style={{
                   padding: '10px 20px',

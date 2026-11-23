@@ -552,3 +552,197 @@ export async function triggerProspectAutoMode(agentId: string): Promise<any> {
   return res.json();
 }
 
+export interface ExploitationAgentPayload {
+  nom: string;
+  emails: string[];
+  cc?: string[];
+  periode: '7d' | 'current_month' | 'prev_month' | 'custom';
+  date_debut?: string | null;
+  date_fin?: string | null;
+  sections?: Record<string, boolean>;
+  seuils?: {
+    perte_critique_tnd?: number | null;
+    stationnement_long_jours?: number | null;
+    top_n?: number | null;
+  };
+  send_mode?: 'always' | 'alerts';
+  tone?: 'factual' | 'direct';
+  length?: 'short' | 'standard' | 'long';
+  objectifs?: {
+    delai_facturation_max_jours?: number | null;
+  };
+  delais?: {
+    cout_non_facture_jours?: number;
+    sans_suite_jours?: number;
+    cloture_jours?: number;
+  };
+  contexte_ia?: string;
+  trigger_rules?: any[];
+  workflow_timezone?: string;
+  client_id?: string;
+}
+
+export async function getExploitationAdminDefaults(): Promise<{
+  defaultPeriode: '7d' | 'current_month' | 'prev_month' | 'custom';
+  dateDebut: string | null;
+  dateFin: string | null;
+  maxCustomDays: number;
+  allowCustomRange: boolean;
+  delais?: {
+    cout_non_facture_jours: number;
+    sans_suite_jours: number;
+    cloture_jours: number;
+  };
+  userEmail?: string | null;
+}> {
+  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/admin-defaults`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Impossible de charger les paramètres par défaut.');
+  const data = await res.json();
+  return {
+    ...data.config,
+    userEmail: data.userEmail ?? null,
+  };
+}
+
+export async function checkExploitationAgentName(name: string): Promise<{ ok: boolean; available: boolean }> {
+  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/check-name/${encodeURIComponent(name)}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Impossible de vérifier la disponibilité du nom.');
+  return res.json();
+}
+
+export async function deployExploitationAgent(payload: ExploitationAgentPayload): Promise<any> {
+  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/deploy`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Échec lors de la création de l'agent.");
+  }
+  const result = await res.json();
+  invalidateAgentsCache();
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
+  return result;
+}
+
+export async function updateExploitationAgent(agentUuid: string, payload: Partial<ExploitationAgentPayload>): Promise<any> {
+  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/update/${encodeURIComponent(agentUuid)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Échec lors de la mise à jour de l'agent.");
+  }
+  const result = await res.json();
+  invalidateAgentsCache();
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
+  return result;
+}
+
+export async function deleteExploitationAgent(agentUuid: string): Promise<any> {
+  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/delete/${encodeURIComponent(agentUuid)}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Échec lors de la suppression de l'agent.");
+  }
+  const result = await res.json();
+  invalidateAgentsCache();
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('vmind_agent_updated'));
+  return result;
+}
+
+export async function runExploitationAgent(agentUuid: string): Promise<any> {
+  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/run/${encodeURIComponent(agentUuid)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Impossible de lancer l'analyse.");
+  }
+  return res.json();
+}
+
+export async function startExploitationAutopilot(
+  agentUuid: string,
+  payload: { trigger_rules?: any[]; workflow_timezone?: string }
+): Promise<any> {
+  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/start/${encodeURIComponent(agentUuid)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Impossible de démarrer la planification.');
+  }
+  return res.json();
+}
+
+export async function stopExploitationAutopilot(agentUuid: string): Promise<any> {
+  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/stop/${encodeURIComponent(agentUuid)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Impossible d'arrêter la planification.");
+  }
+  return res.json();
+}
+
+export async function getExploitationLogs(agentUuid: string): Promise<{ ok: boolean; logs: any[] }> {
+  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/logs/${encodeURIComponent(agentUuid)}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || 'Impossible de charger le journal.');
+  }
+  return res.json();
+}
+
+export async function getExploitationWorkspace(agentUuid: string): Promise<any> {
+  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/workspace/${encodeURIComponent(agentUuid)}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Impossible de charger l'espace de travail.");
+  }
+  return res.json();
+}
+
+export async function updateExploitationAnomaly(
+  agentUuid: string,
+  anomalyId: number,
+  payload: { statut_traitement?: string; note_interne?: string }
+): Promise<any> {
+  const res = await secureFetch(
+    `${getBaseUrl()}/api/exploitation-agent/anomalies/${encodeURIComponent(agentUuid)}/${anomalyId}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || "Impossible de mettre à jour l'anomalie.");
+  }
+  return res.json();
+}
+
+

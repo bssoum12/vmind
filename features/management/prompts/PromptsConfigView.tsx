@@ -68,6 +68,14 @@ interface PromptConfig {
   weight_link_acceptance_rate?: number;
   weight_link_avg_icp_score?: number;
   penalty_link_false_positive?: number;
+  exploitation_default_periode?: '7d' | 'current_month' | 'prev_month' | 'custom';
+  exploitation_date_debut?: string | null;
+  exploitation_date_fin?: string | null;
+  exploitation_max_custom_days?: number;
+  exploitation_allow_custom_range?: boolean;
+  exploitation_delai_cout_non_facture_jours?: number;
+  exploitation_delai_sans_suite_jours?: number;
+  exploitation_delai_cloture_jours?: number;
 }
 
 interface ProviderStatus {
@@ -153,6 +161,13 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
   const [formWeightLinkAvgIcp, setFormWeightLinkAvgIcp] = useState<number>(50);
   const [formPenaltyLinkFalsePositive, setFormPenaltyLinkFalsePositive] = useState<number>(15);
 
+  const [formExploitPeriode, setFormExploitPeriode] = useState<'7d' | 'current_month' | 'prev_month'>('7d');
+  const [formExploitMaxDays, setFormExploitMaxDays] = useState<number>(92);
+  const [formExploitAllowCustom, setFormExploitAllowCustom] = useState<boolean>(true);
+  const [formExploitDelaiCout, setFormExploitDelaiCout] = useState<number>(15);
+  const [formExploitDelaiSansSuite, setFormExploitDelaiSansSuite] = useState<number>(7);
+  const [formExploitDelaiCloture, setFormExploitDelaiCloture] = useState<number>(90);
+
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string>('');
 
   // Interactive Test State
@@ -232,6 +247,15 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
     setFormWeightLinkAcceptance(p.weight_link_acceptance_rate ?? 50);
     setFormWeightLinkAvgIcp(p.weight_link_avg_icp_score ?? 50);
     setFormPenaltyLinkFalsePositive(p.penalty_link_false_positive ?? 15);
+    const preset = p.exploitation_default_periode === 'current_month' || p.exploitation_default_periode === 'prev_month'
+      ? p.exploitation_default_periode
+      : '7d';
+    setFormExploitPeriode(preset);
+    setFormExploitMaxDays(p.exploitation_max_custom_days ?? 92);
+    setFormExploitAllowCustom(p.exploitation_allow_custom_range !== false);
+    setFormExploitDelaiCout(p.exploitation_delai_cout_non_facture_jours ?? 15);
+    setFormExploitDelaiSansSuite(p.exploitation_delai_sans_suite_jours ?? 7);
+    setFormExploitDelaiCloture(p.exploitation_delai_cloture_jours ?? 90);
     setLastUpdatedAt(p.updated_at ? new Date(p.updated_at).toLocaleString('fr-FR') : '');
   };
 
@@ -266,9 +290,16 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
   };
 
   const handleSave = async () => {
-    if (activeKey !== 'supervisor_audit_config' && (!formPromptText.trim() || formPromptText.trim().length < 10)) {
+    if (activeKey !== 'supervisor_audit_config' && activeKey !== 'exploitation_agent_config' && (!formPromptText.trim() || formPromptText.trim().length < 10)) {
       showToast('Le texte du prompt système doit contenir au moins 10 caractères.', 'error');
       return;
+    }
+
+    if (activeKey === 'exploitation_agent_config') {
+      if (formExploitMaxDays < 1 || formExploitMaxDays > 92) {
+        showToast('La durée maximale autorisée doit être comprise entre 1 et 92 jours (3 mois max).', 'error');
+        return;
+      }
     }
 
     if (activeKey === 'sourcing_execution_chat' && formSourcingMinLeads > formSourcingMaxLeads) {
@@ -305,8 +336,18 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
         credentials: 'include',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          name: formName || (activeKey === 'supervisor_audit_config' ? 'Superviseur Commercial - Paramètres & Seuils d\'Audit' : formName),
-          prompt_text: formPromptText || 'Configuration globale des seuils de conformité et paramètres de gouvernance pour le Superviseur Commercial.',
+          name: formName || (
+            activeKey === 'supervisor_audit_config'
+              ? 'Superviseur Commercial - Paramètres & Seuils d\'Audit'
+              : activeKey === 'exploitation_agent_config'
+              ? 'Agent Exploitation & Transport - Fenêtre d\'Analyse & Limites'
+              : formName
+          ),
+          prompt_text: formPromptText || (
+            activeKey === 'exploitation_agent_config'
+              ? 'Configuration globale de la fenêtre d\'analyse par défaut et des limites de plage personnalisée pour l\'Agent Exploitation & Transport.'
+              : 'Configuration globale des seuils de conformité et paramètres de gouvernance pour le Superviseur Commercial.'
+          ),
           provider_mode: formProviderMode,
           model: formModel,
           fallback_model: formFallbackModel,
@@ -334,6 +375,16 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
             weight_link_acceptance_rate: formWeightLinkAcceptance,
             weight_link_avg_icp_score: formWeightLinkAvgIcp,
             penalty_link_false_positive: formPenaltyLinkFalsePositive
+          } : {}),
+          ...(activeKey === 'exploitation_agent_config' ? {
+            exploitation_default_periode: formExploitPeriode,
+            exploitation_date_debut: null,
+            exploitation_date_fin: null,
+            exploitation_max_custom_days: Math.min(92, Math.max(1, Number(formExploitMaxDays) || 92)),
+            exploitation_allow_custom_range: formExploitAllowCustom,
+            exploitation_delai_cout_non_facture_jours: Math.min(365, Math.max(0, Number.isFinite(Number(formExploitDelaiCout)) ? Number(formExploitDelaiCout) : 15)),
+            exploitation_delai_sans_suite_jours: Math.min(365, Math.max(0, Number(formExploitDelaiSansSuite) || 0)),
+            exploitation_delai_cloture_jours: Math.min(730, Math.max(0, Number.isFinite(Number(formExploitDelaiCloture)) ? Number(formExploitDelaiCloture) : 90))
           } : {})
         })
       });
@@ -836,6 +887,31 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
             fontWeight: 600
           }}>
             Superviseur Commercial
+          </span>
+        </button>
+
+        <button
+          onClick={() => handleSelectTab('exploitation_agent_config')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            padding: '11px 18px', borderRadius: 10,
+            background: activeKey === 'exploitation_agent_config' ? 'rgba(0, 229, 200, 0.12)' : 'rgba(255, 255, 255, 0.04)',
+            border: `1px solid ${activeKey === 'exploitation_agent_config' ? '#00E5C8' : 'rgba(255, 255, 255, 0.12)'}`,
+            color: activeKey === 'exploitation_agent_config' ? '#00E5C8' : '#CBD5E1',
+            fontWeight: 600, fontSize: 13.5, cursor: 'pointer',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            boxShadow: activeKey === 'exploitation_agent_config' ? '0 0 16px rgba(0, 229, 200, 0.18)' : 'none'
+          }}
+        >
+          <Sliders size={16} />
+          <span>Exploitation : Fenêtre d&apos;Analyse</span>
+          <span style={{
+            fontSize: 11, padding: '2px 8px', borderRadius: 12,
+            background: activeKey === 'exploitation_agent_config' ? 'rgba(0, 229, 200, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+            color: activeKey === 'exploitation_agent_config' ? '#00E5C8' : '#94A3B8',
+            fontWeight: 600
+          }}>
+            Exploitation &amp; Transport
           </span>
         </button>
       </div>
@@ -1541,6 +1617,150 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                   justifyContent: 'center',
                   gap: 8,
                   boxShadow: '0 0 16px rgba(0, 229, 200, 0.35)'
+                }}
+              >
+                {saving ? <Loader2 size={15} className="spin" /> : <Save size={15} />}
+                <span>{saving ? 'Sauvegarde...' : 'Sauvegarder la configuration'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : activeKey === 'exploitation_agent_config' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 860 }}>
+          <div style={{
+            padding: 24,
+            borderRadius: 14,
+            background: 'rgba(13, 21, 38, 0.78)',
+            border: '1px solid rgba(0, 229, 200, 0.2)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 18
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#F8FAFC' }}>
+                  Agent Exploitation &amp; Transport — Fenêtre d&apos;Analyse
+                </h2>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#94A3B8' }}>
+                  Définissez la fenêtre d&apos;analyse par défaut et les limites autorisées (maximum 3 mois / 92 jours).
+                </p>
+              </div>
+              {lastUpdatedAt && (
+                <span style={{ fontSize: 12, color: '#64748B' }}>Dernière MAJ : {lastUpdatedAt}</span>
+              )}
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: '#CBD5E1', marginBottom: 8 }}>
+                Fenêtre par défaut lors du déploiement
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+                {[
+                  { id: '7d', label: '7 derniers jours' },
+                  { id: 'current_month', label: 'Mois en cours' },
+                  { id: 'prev_month', label: 'Mois précédent' },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setFormExploitPeriode(opt.id as '7d' | 'current_month' | 'prev_month')}
+                    style={{
+                      padding: '11px 14px',
+                      borderRadius: 10,
+                      border: `1px solid ${formExploitPeriode === opt.id ? '#00E5C8' : 'rgba(255,255,255,0.12)'}`,
+                      background: formExploitPeriode === opt.id ? 'rgba(0, 229, 200, 0.14)' : 'rgba(6, 17, 31, 0.65)',
+                      color: formExploitPeriode === opt.id ? '#00E5C8' : '#CBD5E1',
+                      fontWeight: 600,
+                      fontSize: 13,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'center' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: '#CBD5E1', marginBottom: 6 }}>
+                  Durée maximale de la plage personnalisée (jours, max 92 = 3 mois)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={92}
+                  value={formExploitMaxDays}
+                  onChange={(e) => setFormExploitMaxDays(Math.min(92, Math.max(1, Number(e.target.value) || 92)))}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: '#06111F', border: '1px solid rgba(255,255,255,0.14)', color: '#F8FAFC' }}
+                />
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13, color: '#E2E8F0', marginTop: 18 }}>
+                <input
+                  type="checkbox"
+                  checked={formExploitAllowCustom}
+                  onChange={(e) => setFormExploitAllowCustom(e.target.checked)}
+                />
+                <span>Autoriser la sélection d&apos;une plage de dates personnalisée dans le Wizard</span>
+              </label>
+            </div>
+
+            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 16 }}>
+              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#00E5C8', marginBottom: 10 }}>
+                Paramètres des coûts non facturés par défaut (modifiables lors du déploiement)
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+                <div>
+                  <label
+                    title="Nombre minimum de jours après la date de départ avant qu'un dossier ayant un coût fournisseur et aucune facture client soit signalé. Mettre 0 pour signaler immédiatement."
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#CBD5E1', marginBottom: 6, cursor: 'help' }}
+                  >
+                    <span>Délai avant alerte (jours après départ)</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: '50%', background: 'rgba(0,229,200,0.16)', color: '#00E5C8', fontSize: 10.5, fontWeight: 800 }}>?</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={365}
+                    value={formExploitDelaiCout}
+                    onChange={(e) => setFormExploitDelaiCout(Math.min(365, Math.max(0, Number(e.target.value) || 0)))}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: '#06111F', border: '1px solid rgba(255,255,255,0.14)', color: '#F8FAFC' }}
+                  />
+                </div>
+                <div>
+                  <label
+                    title="Nombre maximum de jours en arrière dans lesquels l'agent recherche les coûts fournisseur non facturés (ex. 90, 180 ou 365 jours). Mettre 0 pour rechercher sur tout l'historique sans limite."
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#CBD5E1', marginBottom: 6, cursor: 'help' }}
+                  >
+                    <span>Profondeur d&apos;historique recherchée (jours · 0 = illimité)</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: '50%', background: 'rgba(0,229,200,0.16)', color: '#00E5C8', fontSize: 10.5, fontWeight: 800 }}>?</span>
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={730}
+                    value={formExploitDelaiCloture}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setFormExploitDelaiCloture(raw === '' ? 0 : Math.min(730, Math.max(0, Number(raw) || 0)));
+                    }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: '#06111F', border: '1px solid rgba(255,255,255,0.14)', color: '#F8FAFC' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingTop: 8 }}>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '10px 20px', borderRadius: 10,
+                  background: '#00E5C8', color: '#04101D',
+                  border: 'none', fontWeight: 700, fontSize: 13.5,
+                  cursor: saving ? 'not-allowed' : 'pointer'
                 }}
               >
                 {saving ? <Loader2 size={15} className="spin" /> : <Save size={15} />}
