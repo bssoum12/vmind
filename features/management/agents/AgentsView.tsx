@@ -1644,7 +1644,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           }}
           onEditSchedule={() => {
             setScheduleModalAgent(null);
-            onConfigure('exploitation', scheduleModalAgent, 3);
+            onConfigure('exploitation', scheduleModalAgent, 2);
           }}
         />
       )}
