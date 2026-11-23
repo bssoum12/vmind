@@ -1706,51 +1706,6 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
               </label>
             </div>
 
-            <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 16 }}>
-              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 700, color: '#00E5C8', marginBottom: 10 }}>
-                Paramètres des coûts non facturés par défaut (modifiables lors du déploiement)
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
-                <div>
-                  <label
-                    title="Nombre minimum de jours après la date de départ avant qu'un dossier ayant un coût fournisseur et aucune facture client soit signalé. Mettre 0 pour signaler immédiatement."
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#CBD5E1', marginBottom: 6, cursor: 'help' }}
-                  >
-                    <span>Délai avant alerte (jours après départ)</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: '50%', background: 'rgba(0,229,200,0.16)', color: '#00E5C8', fontSize: 10.5, fontWeight: 800 }}>?</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={365}
-                    value={formExploitDelaiCout}
-                    onChange={(e) => setFormExploitDelaiCout(Math.min(365, Math.max(0, Number(e.target.value) || 0)))}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: '#06111F', border: '1px solid rgba(255,255,255,0.14)', color: '#F8FAFC' }}
-                  />
-                </div>
-                <div>
-                  <label
-                    title="Nombre maximum de jours en arrière dans lesquels l'agent recherche les coûts fournisseur non facturés (ex. 90, 180 ou 365 jours). Mettre 0 pour rechercher sur tout l'historique sans limite."
-                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#CBD5E1', marginBottom: 6, cursor: 'help' }}
-                  >
-                    <span>Profondeur d&apos;historique recherchée (jours · 0 = illimité)</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 15, height: 15, borderRadius: '50%', background: 'rgba(0,229,200,0.16)', color: '#00E5C8', fontSize: 10.5, fontWeight: 800 }}>?</span>
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={730}
-                    value={formExploitDelaiCloture}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      setFormExploitDelaiCloture(raw === '' ? 0 : Math.min(730, Math.max(0, Number(raw) || 0)));
-                    }}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: '#06111F', border: '1px solid rgba(255,255,255,0.14)', color: '#F8FAFC' }}
-                  />
-                </div>
-              </div>
-            </div>
-
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingTop: 8 }}>
               <button
                 onClick={handleSave}
