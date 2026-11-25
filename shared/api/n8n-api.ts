@@ -552,26 +552,10 @@ export async function triggerProspectAutoMode(agentId: string): Promise<any> {
   return res.json();
 }
 
-export interface ExploitationChannelsConfig {
-  email: {
-    enabled: boolean;
-    recipients: string[];
-  };
-  teams: {
-    enabled: boolean;
-    webhook_url: string;
-  };
-  slack: {
-    enabled: boolean;
-    webhook_url: string;
-  };
-}
-
 export interface ExploitationAgentPayload {
   nom: string;
   emails: string[];
   cc?: string[];
-  channels?: ExploitationChannelsConfig;
   periode: '7d' | 'current_month' | 'prev_month' | 'custom';
   date_debut?: string | null;
   date_fin?: string | null;
@@ -628,23 +612,6 @@ export async function checkExploitationAgentName(name: string): Promise<{ ok: bo
   });
   if (!res.ok) throw new Error('Impossible de vérifier la disponibilité du nom.');
   return res.json();
-}
-
-export async function testExploitationChannel(payload: {
-  channel: 'teams' | 'slack';
-  webhook_url: string;
-  agent_name?: string;
-}): Promise<{ ok: boolean; message: string }> {
-  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/test-channel`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || 'Impossible de tester ce canal.');
-  }
-  return data;
 }
 
 export async function deployExploitationAgent(payload: ExploitationAgentPayload): Promise<any> {
