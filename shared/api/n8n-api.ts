@@ -606,8 +606,12 @@ export async function getExploitationAdminDefaults(): Promise<{
   };
 }
 
-export async function checkExploitationAgentName(name: string): Promise<{ ok: boolean; available: boolean }> {
-  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/check-name/${encodeURIComponent(name)}`, {
+export async function checkExploitationAgentName(
+  name: string,
+  excludeUuid?: string
+): Promise<{ ok: boolean; available: boolean }> {
+  const qs = excludeUuid ? `?excludeUuid=${encodeURIComponent(excludeUuid)}` : '';
+  const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/check-name/${encodeURIComponent(name)}${qs}`, {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error('Impossible de vérifier la disponibilité du nom.');
