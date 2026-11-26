@@ -25,7 +25,6 @@ const WizardRouter = dynamic(() => import('@/features/management/wizard/WizardRo
 const JournalView = dynamic(() => import('@/features/management/journal/JournalView').then(m => m.JournalView), { ssr: false });
 const UsersManagementView = dynamic(() => import('@/features/management/users/UsersManagementView').then(m => m.UsersManagementView), { ssr: false });
 const ReportsView = dynamic(() => import('@/features/management/reports/ReportsView').then(m => m.ReportsView), { ssr: false });
-const IntegrationsView = dynamic(() => import('@/features/management/integrations/IntegrationsView').then(m => m.IntegrationsView), { ssr: false });
 const ProfileView = dynamic(() => import('@/features/management/profile/ProfileView').then(m => m.ProfileView), { ssr: false });
 const PromptsConfigView = dynamic(() => import('@/features/management/prompts/PromptsConfigView').then(m => m.PromptsConfigView), { ssr: false });
 
@@ -282,11 +281,13 @@ function HomeContent() {
       const customEvent = e as CustomEvent<string>;
       if (customEvent.detail === 'connectors' || customEvent.detail === 'chat' || customEvent.detail === 'skills') {
         setAssistantView(customEvent.detail as 'chat' | 'connectors' | 'skills');
+        // Opened from the management mode (e.g. « Connecter mon ERP »): the view belongs to the assistant mode.
+        if (mode !== 'ASSISTANT') setMode('ASSISTANT');
       }
     };
     window.addEventListener('switch-assistant-view', handleSwitchView);
     return () => window.removeEventListener('switch-assistant-view', handleSwitchView);
-  }, []);
+  }, [mode, setMode]);
 
   // Management Mode State
 
@@ -428,6 +429,14 @@ function HomeContent() {
     window.addEventListener('switch-management-view', handleSwitchManagementView);
     return () => window.removeEventListener('switch-management-view', handleSwitchManagementView);
   }, [setMode]);
+
+  // Removed page: an old address or a saved view opens the marketplace instead of an empty screen.
+  useEffect(() => {
+    if (currentView !== 'integrations') return;
+    setCurrentView('market');
+    sessionStorage.setItem('vmind_current_view', 'market');
+    if (new URLSearchParams(window.location.search).get('view') === 'integrations') window.history.replaceState({ view: 'market' }, '', '/');
+  }, [currentView]);
 
   const [activeCategory, setActiveCategory] = useState('all');
   const [activePromptKey, setActivePromptKey] = useState<string | undefined>(undefined);
@@ -606,6 +615,7 @@ function HomeContent() {
             />
           )}
           <AssistantSidebar 
+            assistantView={assistantView}
             onInsertPrompt={handleInsertPrompt} 
             activeAgentId={activeAgentId} 
             onAgentClick={(id) => {
@@ -674,7 +684,6 @@ function HomeContent() {
           {(currentView === 'market' || currentView === 'marketplace') && (
             <MarketplaceView
               onDeploy={handleDeploy}
-              onNavigate={(view) => handleNavigate(view)}
               activeCategory={activeCategory}
               isAdmin={isAdmin}
               onSelectCategory={(cat) => {
@@ -736,10 +745,6 @@ function HomeContent() {
           )}
           {currentView === 'reports' && (
             <ReportsView />
-          )}
-
-          {currentView === 'integrations' && (
-            <IntegrationsView />
           )}
 
           {currentView === 'profile' && (

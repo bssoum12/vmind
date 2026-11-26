@@ -137,7 +137,11 @@ export async function deployAgent(config: any, clientId = "DEMO"): Promise<any> 
 
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.message || errData.error || `Erreur lors du déploiement via le scheduler Vmind: ${response.statusText}`);
+    // status / code / field let a wizard place the backend message (400 INVALID_CONFIG, 428 ERP_CONNECTOR_REQUIRED).
+    throw Object.assign(
+      new Error(errData.message || errData.error || `Erreur lors du déploiement via le scheduler Vmind: ${response.statusText}`),
+      { status: response.status, code: errData.error, field: errData.field }
+    );
   }
 
   const text = await response.text();

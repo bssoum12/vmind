@@ -40,6 +40,9 @@ export interface LiveAgent {
   agent_name: string;
   nom?: string;
   run_mode: string;
+  /** Report agents (e.g. "finance"): template of the wizard, and their saved settings for edit mode. */
+  templateId?: string;
+  parameters?: Record<string, any>;
   workflow_timezone: string;
   recovery_config: any;
   trigger_rules: any[];
@@ -1388,7 +1391,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                           {/* Config - Tutorial Step 5 */}
                           <button
                             className="row-btn"
-                            onClick={() => onConfigure(agent.run_mode || 'recouvrement', agent)}
+                            onClick={() => onConfigure(agent.templateId || agent.run_mode || 'recouvrement', agent)}
                             title="Modifier la configuration"
                             style={{ ...getBtnStyle(agent, 5) }}
                           >

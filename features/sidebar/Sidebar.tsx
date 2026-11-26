@@ -11,10 +11,15 @@ interface SidebarProps {
   onInsertPrompt: (text: string) => void;
   activeAgentId?: string;
   onAgentClick?: (agentId: string) => void;
+  /** View shown by the page: the menu follows it when the view is opened from elsewhere. */
+  assistantView?: 'chat' | 'connectors' | 'skills';
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId, onAgentClick }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ onInsertPrompt, activeAgentId, onAgentClick, assistantView }) => {
   const [activeNav, setActiveNav] = useState('dashboard');
+  useEffect(() => {
+    if (assistantView === 'connectors' || assistantView === 'skills') setActiveNav(assistantView);
+  }, [assistantView]);
   const [username, setUsername] = useState<string>('');
   const { conversations, activeConversationId, setActiveConversationId, createNewConversation, resetToNewConversation, renameConversation, deleteConversation } = useConversations();
   const [editingConvId, setEditingConvId] = useState<string | null>(null);

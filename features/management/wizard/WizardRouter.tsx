@@ -6,6 +6,8 @@ import { WizardProspectionView } from './WizardProspectionView';
 import { WizardSourcingView } from './WizardSourcingView';
 
 import { WizardSupervisorView } from './WizardSupervisorView';
+import { WizardFinanceView } from './WizardFinanceView';
+import { WizardDirectionView } from './WizardDirectionView';
 
 interface WizardRouterProps {
   templateId: string;
@@ -25,6 +27,16 @@ export const WizardRouter: React.FC<WizardRouterProps> = ({ templateId, onCancel
 
   if (templateId === 'supervisor') {
     return <WizardSupervisorView templateId={templateId} onCancel={onCancel} agentToEdit={agentToEdit} initialStep={initialStep} />;
+  }
+
+  // A deployed report agent carries its template (its run_mode is "finance_report").
+  if (templateId === 'finance' || templateId === 'finance_report' || agentToEdit?.templateId === 'finance') {
+    return <WizardFinanceView templateId={templateId} onCancel={onCancel} agentToEdit={agentToEdit} initialStep={initialStep} />;
+  }
+
+  // Direction Générale: form only for now, nothing is saved (backend not connected yet).
+  if (templateId === 'direction_generale' || agentToEdit?.templateId === 'direction_generale') {
+    return <WizardDirectionView onCancel={onCancel} />;
   }
 
   // Default to the original wizard for all other templates

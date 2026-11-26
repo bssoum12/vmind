@@ -55,16 +55,30 @@ export const AGENT_TEMPLATES: AgentTemplate[] = [
     connections: ['TraLIS', 'Sage', 'Odoo']
   },
   {
-    id: 'reporting',
-    name: 'Rapport DG Quotidien',
-    description: 'Génère et envoie chaque matin un rapport exécutif complet sur la situation financière et opérationnelle.',
-    category: 'Reporting · Finance',
-    icon: '📊',
+    id: 'finance',
+    name: 'Finance & Trésorerie',
+    description: 'Analyse le CA facturé, la trésorerie clients et fournisseurs, détecte les écarts significatifs et envoie une synthèse par email.',
+    category: 'Finance · Trésorerie',
+    icon: '💰',
+    accent: '#3DDC97',
+    iconBg: 'rgba(61, 220, 151, 0.12)',
+    tag: 'new',
+    deployments: 0,
+    connections: ['TraLIS', 'Email'],
+    requiresErp: true
+  },
+  {
+    id: 'direction_generale',
+    name: 'Rapport Direction Générale',
+    description: 'Réunit Finance & Trésorerie et Recouvrement en un seul rapport de direction : santé de l’entreprise, signaux croisés et décisions proposées.',
+    category: 'Direction · Pilotage',
+    icon: '🧭',
     accent: '#00E5C8',
     iconBg: 'rgba(0,229,200,0.1)',
     tag: 'new',
-    deployments: 312,
-    connections: ['TraLIS', 'Email']
+    deployments: 0,
+    connections: ['TraLIS', 'Email'],
+    requiresErp: true
   },
   {
     id: 'transport',

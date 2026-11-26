@@ -13,7 +13,7 @@ interface WizardViewProps {
   agentToEdit?: any;
 }
 
-const VIRTUAL_MIND_GUIDE: Record<string, { title: string; text: string; mood?: GuideMood }> = {
+export const VIRTUAL_MIND_GUIDE: Record<string, { title: string; text: string; mood?: GuideMood }> = {
   agent_name: { 
     title: "Identité de l'Agent", 
     text: "Donnez un nom unique et clair à votre agent de recouvrement pour l'identifier facilement dans votre espace de travail.",

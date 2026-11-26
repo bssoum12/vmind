@@ -12,7 +12,6 @@ import { useConnections } from '@/shared/contexts/ConnectionsContext';
 
 interface MarketplaceViewProps {
   onDeploy: (templateId: string, agent?: any, initialStep?: number) => void;
-  onNavigate?: (view: string) => void;
   activeCategory: string;
   onSelectCategory: (category: string) => void;
   onOpenPrompts?: (promptKey?: string) => void;
@@ -27,7 +26,7 @@ const AGENT_PROMPT_KEYS: Record<string, string> = {
 
 
 
-export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, onNavigate, activeCategory, onSelectCategory, onOpenPrompts, isAdmin: isAdminProp }) => {
+export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, activeCategory, onSelectCategory, onOpenPrompts, isAdmin: isAdminProp }) => {
   const router = useRouter();
 
 
@@ -517,8 +516,8 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, onNa
               Connexion ERP Requise
             </h3>
             <p style={{ color: '#8FA3B8', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
-              L&apos;<strong>{blockedAgentName}</strong> nécessite une liaison active avec votre ERP pour accéder aux factures et à la balance âgée.
-              Veuillez connecter votre ERP avant de configurer et déployer cet agent.
+              <strong>{blockedAgentName}</strong> a besoin d&apos;un ERP connecté.
+              Connectez votre ERP avant de configurer cet agent.
             </p>
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
               <button
@@ -540,13 +539,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, onNa
                 type="button"
                 onClick={() => {
                   setShowErpRequiredModal(false);
-                  if (onNavigate) {
-                    onNavigate('integrations');
-                  } else {
-                    window.dispatchEvent(new CustomEvent('vmind-assistant-view', { detail: 'connectors' }));
-                    const navBtn = document.querySelector('[data-view="integrations"]') as HTMLElement;
-                    if (navBtn) navBtn.click();
-                  }
+                  window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'connectors' }));
                 }}
                 style={{
                   padding: '10px 20px',

@@ -184,12 +184,17 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
   };
 
   const moodStyle = getMoodStyles(activeMood);
+  // Closed by its X: the same card stays hidden; another text (next field, next step) shows the guide again.
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+  const cardKey = `${activeTitle ?? ''}|${activeMessage ?? ''}`;
+  const visible = internalIsOpen && Boolean(activeMessage) && dismissedKey !== cardKey;
+  const close = () => { if (onClose) onClose(); else setDismissedKey(cardKey); };
   const handleBackdropClick = onBackdropClick || onClose;
 
   const guideContent = (
     <AnimatePresence>
       {/* Light Translucent Backdrop Overlay when showBackdrop is true */}
-      {showBackdrop && internalIsOpen && (
+      {showBackdrop && visible && (
         <motion.div
           key="vmind-guide-backdrop"
           className="vmind-guide-backdrop"
@@ -206,7 +211,7 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
         />
       )}
 
-      {internalIsOpen && activeMessage && (
+      {visible && (
         <motion.div
           key="vmind-guide-panel"
           className="vmind-guide-panel"
@@ -227,11 +232,11 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
             transition: 'all 0.5s ease-in-out'
           }} />
           
-          {onClose && (
+          {(
             <button
               type="button"
               className="vmind-guide-close-btn"
-              onClick={onClose}
+              onClick={close}
               title="Fermer le guide"
               aria-label="Fermer"
             >
@@ -255,7 +260,7 @@ export const VMindGuide: React.FC<VMindGuideProps> = ({
               transition: 'all 0.5s ease-in-out'
             }} />
             
-            <div style={{ flex: 1, marginTop: '2px' }}>
+            <div style={{ flex: 1, marginTop: '2px', paddingRight: '20px' }}>
               {activeTitle && (
                 <h5 style={{ 
                   color: moodStyle.textColor, 
