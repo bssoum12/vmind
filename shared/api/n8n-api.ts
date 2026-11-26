@@ -593,6 +593,7 @@ export async function getExploitationAdminDefaults(): Promise<{
     sans_suite_jours: number;
     cloture_jours: number;
   };
+  seuilCoutAnormalPct?: number;
   userEmail?: string | null;
 }> {
   const res = await secureFetch(`${getBaseUrl()}/api/exploitation-agent/admin-defaults`, {

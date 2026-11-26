@@ -76,6 +76,7 @@ interface PromptConfig {
   exploitation_delai_cout_non_facture_jours?: number;
   exploitation_delai_sans_suite_jours?: number;
   exploitation_delai_cloture_jours?: number;
+  exploitation_seuil_cout_anormal_pct?: number;
 }
 
 interface ProviderStatus {
@@ -167,6 +168,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
   const [formExploitDelaiCout, setFormExploitDelaiCout] = useState<number>(15);
   const [formExploitDelaiSansSuite, setFormExploitDelaiSansSuite] = useState<number>(7);
   const [formExploitDelaiCloture, setFormExploitDelaiCloture] = useState<number>(90);
+  const [formExploitSeuilCoutAnormal, setFormExploitSeuilCoutAnormal] = useState<number>(50);
 
   const [lastUpdatedAt, setLastUpdatedAt] = useState<string>('');
 
@@ -256,6 +258,7 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
     setFormExploitDelaiCout(p.exploitation_delai_cout_non_facture_jours ?? 15);
     setFormExploitDelaiSansSuite(p.exploitation_delai_sans_suite_jours ?? 7);
     setFormExploitDelaiCloture(p.exploitation_delai_cloture_jours ?? 90);
+    setFormExploitSeuilCoutAnormal(p.exploitation_seuil_cout_anormal_pct ?? 50);
     setLastUpdatedAt(p.updated_at ? new Date(p.updated_at).toLocaleString('fr-FR') : '');
   };
 
@@ -384,7 +387,8 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
             exploitation_allow_custom_range: formExploitAllowCustom,
             exploitation_delai_cout_non_facture_jours: Math.min(365, Math.max(0, Number.isFinite(Number(formExploitDelaiCout)) ? Number(formExploitDelaiCout) : 15)),
             exploitation_delai_sans_suite_jours: Math.min(365, Math.max(0, Number(formExploitDelaiSansSuite) || 0)),
-            exploitation_delai_cloture_jours: Math.min(730, Math.max(0, Number.isFinite(Number(formExploitDelaiCloture)) ? Number(formExploitDelaiCloture) : 90))
+            exploitation_delai_cloture_jours: Math.min(730, Math.max(0, Number.isFinite(Number(formExploitDelaiCloture)) ? Number(formExploitDelaiCloture) : 90)),
+            exploitation_seuil_cout_anormal_pct: Math.min(500, Math.max(10, Number(formExploitSeuilCoutAnormal) || 50))
           } : {})
         })
       });
@@ -1704,6 +1708,25 @@ export const PromptsConfigView: React.FC<PromptsConfigViewProps> = ({ initialKey
                 />
                 <span>Autoriser la sélection d&apos;une plage de dates personnalisée dans le Wizard</span>
               </label>
+            </div>
+
+            <div style={{ paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <label style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: '#CBD5E1', marginBottom: 6 }}>
+                Seuil d&apos;alerte Coûts Anormaux (% au-dessus de la moyenne historique comparable)
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <input
+                  type="number"
+                  min={10}
+                  max={500}
+                  value={formExploitSeuilCoutAnormal}
+                  onChange={(e) => setFormExploitSeuilCoutAnormal(Math.min(500, Math.max(10, Number(e.target.value) || 50)))}
+                  style={{ width: 130, padding: '10px 12px', borderRadius: 8, background: '#06111F', border: '1px solid rgba(255,255,255,0.14)', color: '#F8FAFC' }}
+                />
+                <span style={{ fontSize: 12.5, color: '#94A3B8' }}>
+                  Par défaut : <strong>+50 %</strong> (un dossier dont le coût fournisseur dépasse la moyenne de son axe de +{formExploitSeuilCoutAnormal} % ou plus est signalé).
+                </span>
+              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingTop: 8 }}>
