@@ -3,11 +3,13 @@
 /**
  * Agent « Directeur des Achats et Supply Chain Amont » (templateId: 'achats_supply').
  *
- * Déploiement : /api/deploy-agent (run_mode 'achats_supply', skill achats-supply-tralis), comme le Recouvrement ;
+ * Déploiement : /api/deploy-agent (run_mode 'achats_supply'), comme le Recouvrement. Aucun ERP ni skill n'est imposé :
+ * l'ERP vient du connecteur actif de l'utilisateur et l'IA choisit le skill à chaque envoi parmi ceux de son espace ;
  * le backend planifie l'agent et l'envoie au workflow n8n « VMIND - Agent Achats ». « Déployer et exécuter
- * maintenant » lance aussi /api/run-now. L'aperçu du rapport utilise des chiffres d'exemple, clairement signalés.
+ * maintenant » lance aussi /api/run-now. L'aperçu montre la mise en page du rapport ; les chiffres sont calculés
+ * depuis l'ERP à chaque envoi.
  *
- * Données prévues (vues TraLIS existantes, lecture seule) :
+ * Données lues dans l'ERP connecté, en lecture seule (exemple avec TraLIS) :
  *   vw_AI_Commande_Achat (retards, réception), vw_AI_Facture_Achat (dépenses, catégories, devises,
  *   factures contestées / non parvenues / non comptabilisées, débours), vw_AI_Balance_Fournisseur (dettes).
  */
@@ -16,7 +18,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useToast } from '@/shared/contexts/ToastContext';
 import { VMindGuide } from '@/shared/management/components/VMindGuide';
 import { getBrowserTimezone } from '@/shared/utils/timezone';
-import { deployAgent, runAgentNow } from '@/shared/api/n8n-api';
+import { deployAgent, runAgentNow, secureFetch } from '@/shared/api/n8n-api';
 import './WizardAchatsView.scss';
 
 interface WizardAchatsViewProps {
@@ -39,8 +41,8 @@ const SECTIONS: { g: string; items: SectionDef[] }[] = [
   { g: 'Commandes et livraisons', items: [
     { k: 'late', t: 'Commandes en retard de livraison', d: 'Commandes non reçues dont la date de livraison prévue est dépassée, par fournisseur', on: true,
       rep: 'Un tableau par fournisseur : nombre de commandes en retard, retard le plus long, montant. Alimente aussi la tuile « Commandes en retard », les alertes et l\'action « Relancer ».', ex: 'Transporteur routier B : 3 commandes, jusqu\'à 12 jours de retard.' },
-    { k: 'ontime', t: 'Livraisons à l\'heure', d: 'Part des commandes reçues avant ou à la date prévue, sur la période', on: false, na: 'Donnée à confirmer', nad: 'Les réceptions de commandes ne sont presque jamais saisies dans l\'ERP.',
-      rep: 'Le nombre de commandes reçues, la part reçue à temps et les fournisseurs les moins ponctuels. Alimente la tuile « Livrées à l\'heure ».', ex: '37 commandes reçues à temps sur 44, soit 84 %.' },
+    { k: 'ontime', t: 'Livraisons à l\'heure', d: 'Part des commandes reçues pendant la période au plus tard à la date prévue', on: false,
+      rep: 'Le nombre de commandes reçues sur la période, la part reçue à l\'heure et les fournisseurs les moins ponctuels. Alimente la tuile « Livrées à l\'heure » et l\'alerte de ponctualité.', ex: '37 commandes reçues à l\'heure sur 44, soit 84,1 %.' },
     { k: 'pending', t: 'Commandes en attente de réception', d: 'Commandes passées, pas encore reçues et pas encore en retard', on: true,
       rep: 'Le nombre de commandes attendues et leur montant total. Alimente la tuile « En attente de réception ».', ex: '17 commandes attendues pour 96 200 TND.' },
   ] },
@@ -59,16 +61,14 @@ const SECTIONS: { g: string; items: SectionDef[] }[] = [
   { g: 'Dettes fournisseurs', items: [
     { k: 'debt', t: 'Dettes fournisseurs', d: 'Facturé, payé, reste à payer, montant en retard de paiement', on: true,
       rep: 'Facturé, payé, reste à payer et part en retard, puis les fournisseurs en alerte de paiement. Alimente la tuile « Retard de paiement » et l\'action « Régler en priorité ».', ex: '241 800 TND restant à payer, dont 62 300 TND en retard.' },
-    { k: 'due', t: 'Échéances à venir', d: 'Factures à payer dans les 30 prochains jours', on: false, na: 'Donnée à confirmer', nad: 'La vue des factures d\'achat ne dit pas encore si une facture est déjà payée.',
-      rep: 'Indisponible pour l\'instant : la liste pourrait contenir des factures déjà réglées.', ex: '' },
   ] },
   { g: 'Factures à traiter', items: [
     { k: 'disputed', t: 'Factures contestées', d: 'Factures fournisseurs en litige, par fournisseur', on: true,
       rep: 'Un tableau des factures contestées par fournisseur, avec le montant. Alimente la tuile « Factures à traiter » et l\'action « Clore les litiges ».', ex: 'Compagnie maritime A : 1 facture, 14 200 TND.' },
     { k: 'missing', t: 'Factures non parvenues', d: 'Factures enregistrées dont l\'original n\'est pas encore reçu', on: true,
       rep: 'Un tableau des factures non parvenues par fournisseur. Alimente la tuile « Factures à traiter ».', ex: 'Agent portuaire F : 1 facture, 3 400 TND.' },
-    { k: 'notbooked', t: 'Factures non comptabilisées', d: 'Factures de la période pas encore passées en comptabilité', on: false, na: 'Donnée à confirmer', nad: 'L\'indicateur de comptabilisation n\'est pas fiable dans les données récentes de l\'ERP.',
-      rep: 'Le nombre et le montant des factures de la période non comptabilisées.', ex: '9 factures pour 57 800 TND.' },
+    { k: 'notbooked', t: 'Factures non comptabilisées', d: 'Factures de la période pas encore passées en comptabilité, par fournisseur', on: false,
+      rep: 'Le nombre et le montant des factures de la période pas encore comptabilisées, par fournisseur. Déclenche l\'alerte « Factures non comptabilisées ».', ex: '9 factures pour 57 800 TND, dont 6 chez la Compagnie maritime A.' },
     { k: 'disb', t: 'Débours de la période', d: 'Frais payés pour le compte des clients, par dossier, à vérifier avant facturation client', on: false,
       rep: 'Le nombre de débours, leur montant et les dossiers concernés, avec un rappel de vérification.', ex: '23 débours pour 46 900 TND sur 14 dossiers.' },
   ] },
@@ -81,13 +81,13 @@ const FIELD_GUIDE: Record<string, GuideEntry> = {
   period: { t: 'Période analysée', how: 'Choisissez la période selon la fréquence d\'envoi : « Mois en cours, jusqu\'à la veille » pour un envoi chaque semaine (le cumul du mois avance à chaque email), « Mois précédent » pour un envoi chaque mois. « Semaine précédente » se compare seulement à l\'an dernier.', rep: 'Dans l\'objet de l\'email, sous le titre et dans la section « Dépenses de la période ».', blk: 'spend' },
   compare: { t: 'Comparaison des dépenses', how: 'Cliquez sur un choix. Les dates indiquées sous chaque choix sont celles qui seront réellement comparées. « Aucune comparaison » affiche les montants seuls, sans alerte de hausse.', rep: 'Lignes « Période précédente » et « Même période l\'an dernier » de la section « Dépenses de la période », et la tuile des dépenses.', blk: 'spend' },
   delay: { t: 'Seuil de retard de livraison', how: 'Tapez un nombre de jours, de 1 à 365. Exemple : 3 signale une commande prévue le lundi et toujours pas reçue le jeudi.', rep: 'Filtre le tableau « Commandes en retard de livraison », la tuile et l\'alerte correspondantes.', blk: 'late' },
-  ontime: { t: 'Taux de livraison à l\'heure attendu', how: 'Tapez un pourcentage, de 1 à 100. Exemple : 90 veut dire 36 commandes à temps sur 40 au minimum.', rep: 'Colore la tuile « Livrées à l\'heure » et déclenche une alerte en dessous du taux.', blk: 'ontime' },
+  ontime: { t: 'Taux de livraison à l\'heure attendu', how: 'Tapez un pourcentage, de 1 à 100. Exemple : 90 veut dire au moins 36 commandes à l\'heure sur 40 reçues.', rep: 'En dessous de ce taux, la tuile « Livrées à l\'heure » passe en rouge et une alerte est envoyée.', blk: 'ontime' },
   thprev: { t: 'Hausse par rapport à la période précédente', how: 'Tapez un pourcentage. Exemple : 15 signale un fournisseur passé de 100 000 à 116 000 TND.', rep: 'Alertes de hausse, colonne « Évolution » des principaux fournisseurs, couleur de la tuile des dépenses.', blk: 'spend' },
   thyear: { t: 'Hausse par rapport à l\'an dernier', how: 'Tapez un pourcentage. Utile pour le fret, qui varie avec les saisons.', rep: 'Alerte de hausse par rapport à l\'an dernier, visible si cette comparaison est choisie à l\'étape 1.', blk: 'spend' },
   conc: { t: 'Part maximale d\'un fournisseur', how: 'Tapez un pourcentage, ou laissez vide pour ne pas surveiller. Exemple : avec 30, un fournisseur à 33 % des dépenses est signalé.', rep: 'Alerte de dépendance et action « Consulter un deuxième fournisseur ».', blk: 'topsup' },
-  erpalert: { t: 'Alerte de paiement de TraLIS', how: 'Laissez activé pour reprendre les fournisseurs que TraLIS marque déjà en alerte de paiement.', rep: 'Ligne sous la section « Dettes fournisseurs », alerte rouge et action « Régler en priorité ».', blk: 'debt' },
+  erpalert: { t: 'Alerte de paiement de l\'ERP', how: 'Laissez activé pour reprendre les fournisseurs que votre ERP classe déjà en alerte de paiement (ÉLEVÉ ou CRITIQUE).', rep: 'Ligne sous la section « Dettes fournisseurs », alerte rouge et action « Régler en priorité ».', blk: 'debt' },
   thlate: { t: 'Retard de paiement par fournisseur', how: 'Tapez un montant en TND, ou laissez vide. Exemple : 10 000 signale un fournisseur à qui on doit 12 400 TND en retard.', rep: 'Alerte rouge dans la liste des alertes.', blk: 'alerts' },
-  topn: { t: 'Longueur des listes', how: 'Tapez un nombre de 1 à 20. Cinq suffit pour une lecture rapide.', rep: 'Nombre de lignes des tableaux « Commandes en retard » et « Principaux fournisseurs ».', blk: 'topsup' },
+  topn: { t: 'Longueur des listes', how: 'Tapez un nombre de 1 à 20. Cinq suffit pour une lecture rapide.', rep: 'Nombre de lignes de chaque tableau du rapport : fournisseurs, commandes et factures.', blk: 'topsup' },
   objspend: { t: 'Objectif de dépenses', how: 'Tapez un montant en TND, ou laissez vide. Exemple : 900 000.', rep: 'Ligne « atteint » ou « non atteint » dans la section « Objectifs ».', blk: 'objectives' },
   objlate: { t: 'Objectif de dettes en retard', how: 'Tapez un montant en TND, ou laissez vide. Exemple : 50 000.', rep: 'Ligne « atteint » ou « non atteint » dans la section « Objectifs ».', blk: 'objectives' },
   objontime: { t: 'Objectif de livraisons à l\'heure', how: 'Tapez un pourcentage, ou laissez vide. Exemple : 95.', rep: 'Ligne « atteint » ou « non atteint » dans la section « Objectifs ».', blk: 'objectives' },
@@ -98,6 +98,7 @@ const FIELD_GUIDE: Record<string, GuideEntry> = {
   tone: { t: 'Ton de la synthèse', how: '« Factuel » expose la situation puis les actions. « Direct » commence par la décision à prendre.', rep: 'Section « Synthèse » : une ligne « À décider » apparaît en tête avec le ton direct.', blk: 'synth' },
   length: { t: 'Longueur de la synthèse', how: 'Courte : le constat et 2 actions. Standard : constat, causes probables et 3 actions. Détaillée : avec les points de vigilance et jusqu\'à 5 actions.', rep: 'Sections « Synthèse » et « Actions recommandées ».', blk: 'synth' },
   instr: { t: 'Consigne à l\'agent', how: 'Écrivez une phrase simple, ou laissez vide. Exemple : « Ne pas tenir compte des fournisseurs du groupe. »', rep: 'Oriente la synthèse et les actions, jamais les chiffres.', blk: 'actions' },
+  skills: { t: 'Règles utilisées', how: 'Rien à choisir : à chaque envoi, l\'IA lit les skills installés dans votre espace et prend celui qui correspond au rapport Achats et à votre ERP. Pour changer les règles, installez, désactivez ou créez un skill dans l\'écran Skills.', rep: 'Le nom et la version du skill utilisé sont indiqués en bas de l\'email.', blk: 'meta' },
   runnow: { t: 'Déployer et exécuter maintenant', how: 'L\'agent est enregistré et lancé tout de suite : utile pour vérifier le rapport réel dès aujourd\'hui.', rep: 'Un premier email part maintenant aux destinataires, puis les envois suivent la planification.', blk: 'meta' },
   deployonly: { t: 'Déployer', how: 'L\'agent est enregistré sans être lancé. Il travaillera à la prochaine date prévue par vos règles.', rep: 'Aucun email maintenant ; le premier part selon la planification.', blk: 'meta' },
 };
@@ -108,7 +109,7 @@ const STEP_GUIDE: Record<number, GuideEntry> = {
   1: { t: 'Ce que le rapport couvre', how: 'Donnez un nom, choisissez la période des dépenses, puis les sections utiles.', rep: 'Cliquez dans un champ ou survolez une section : son emplacement s\'éclaire dans l\'aperçu.' },
   2: { t: 'Quand l\'agent doit vous alerter', how: 'Tapez vos seuils. En dessous d\'un seuil, l\'information reste dans le rapport sans être signalée.', rep: 'Les seuils alimentent les alertes, les tuiles en couleur et les actions recommandées.' },
   3: { t: 'Qui reçoit le rapport, et quand', how: 'Ajoutez au moins un destinataire principal, puis réglez la planification.', rep: 'L\'en-tête de l\'email montre les destinataires et l\'heure d\'envoi.' },
-  4: { t: 'Le ton, puis la vérification', how: 'Réglez la synthèse, relisez le récapitulatif, puis choisissez : déployer et exécuter maintenant, ou déployer uniquement.', rep: 'Le rapport à droite est celui qui sera envoyé, avec vos données à la place des chiffres d\'exemple.' },
+  4: { t: 'Le ton, puis la vérification', how: 'Réglez la synthèse, relisez le récapitulatif, puis choisissez : déployer et exécuter maintenant, ou déployer uniquement.', rep: 'Le rapport à droite montre la mise en page de l\'email ; les chiffres sont calculés depuis votre ERP à chaque envoi.' },
 };
 
 type NumKey = 'delay' | 'ontime' | 'thprev' | 'thyear' | 'conc' | 'thlate' | 'topn' | 'objspend' | 'objlate' | 'objontime';
@@ -225,6 +226,30 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
   const [length, setLength] = useState<'short' | 'standard' | 'long'>(pick(ac?.length, ['short', 'standard', 'long'] as const, 'standard'));
   const [instr, setInstr] = useState<string>(typeof ac?.instructions === 'string' ? ac.instructions : '');
 
+  /* ERP connecté et skills disponibles (backend). Le choix du skill est fait par l'IA à chaque envoi. */
+  type InfoRegles = { etat: 'chargement' | 'ok' | 'aucun_erp' | 'aucun_skill' | 'erreur'; erp?: string; skills?: { slug: string; titre: string; version: number }[] };
+  const [regles, setRegles] = useState<InfoRegles>({ etat: 'chargement' });
+  useEffect(() => {
+    let actif = true;
+    const base = process.env.NEXT_PUBLIC_API_URL || 'https://localhost:3001';
+    secureFetch(`${base}/api/achats/skills-disponibles`, { method: 'GET' })
+      .then(r => r.json())
+      .then((d: any) => {
+        if (!actif) return;
+        if (!d || (!d.ok && d.code === 'ERP_NON_CONNECTE')) setRegles({ etat: 'aucun_erp' });
+        else if (!d.ok) setRegles({ etat: 'erreur' });
+        else setRegles({ etat: Array.isArray(d.skills) && d.skills.length ? 'ok' : 'aucun_skill', erp: String(d.erp || ''), skills: Array.isArray(d.skills) ? d.skills : [] });
+      })
+      .catch(() => { if (actif) setRegles({ etat: 'erreur' }); });
+    return () => { actif = false; };
+  }, []);
+  const erpNom = (regles.erp || '').toUpperCase();
+  const blocageRegles = regles.etat === 'aucun_erp'
+    ? 'Aucun ERP connecté : connectez votre ERP dans Intégrations avant de déployer l\'agent.'
+    : regles.etat === 'aucun_skill'
+      ? `Aucun skill de votre espace n'est disponible pour votre ERP (${erpNom}) : installez un skill Achats depuis l'écran Skills, ou créez le vôtre.`
+      : '';
+
   const [guideKey, setGuideKey] = useState<string | null>(null);
   const [guideClosed, setGuideClosed] = useState(false);
   const [nameErr, setNameErr] = useState('');
@@ -251,6 +276,12 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
     return '';
   };
   const [showNumErr, setShowNumErr] = useState<Record<string, boolean>>({});
+  /* Étape 2 : seuls les réglages des sections actives sont affichés et contrôlés. */
+  const numVisible = (k: NumKey): boolean => ({
+    delay: !!secOn.late, ontime: !!secOn.ontime, objontime: !!secOn.ontime,
+    thprev: !!(secOn.spend || secOn.topsup), thyear: !!(secOn.spend || secOn.topsup), conc: !!secOn.topsup, objspend: !!secOn.spend,
+    thlate: !!secOn.debt, objlate: !!secOn.debt, topn: true,
+  } as Record<NumKey, boolean>)[k];
 
   const p = periodInfo(period);
   /* Période et fréquence d'envoi doivent aller ensemble, sinon les emails répètent les mêmes dépenses (ou en oublient). */
@@ -284,6 +315,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
   const alertesPossibles = (() => {
     const a: string[] = [];
     if (secOn.late) a.push(`Commandes en retard d'au moins ${delay} jour${delay > 1 ? 's' : ''}`);
+    if (secOn.ontime && val('ontime') !== null) a.push(`Moins de ${val('ontime')} % des commandes reçues à l'heure`);
     if (secOn.spend) {
       if (showPrev && val('thprev') !== null) a.push(`Dépenses en hausse d'au moins ${val('thprev')} % par rapport à la période précédente`);
       if (showYear && val('thyear') !== null) a.push(`Dépenses en hausse d'au moins ${val('thyear')} % par rapport à la même période de l'an dernier`);
@@ -300,6 +332,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
     }
     if (secOn.disputed) a.push('Factures contestées sur la période');
     if (secOn.missing) a.push('Factures dont l\'original n\'est pas parvenu');
+    if (secOn.notbooked) a.push('Factures de la période pas encore comptabilisées');
     return a;
   })();
 
@@ -346,7 +379,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
   const stepValid = (s: number): boolean => {
     if (s === 1) { const ok = name.trim() !== ''; setNameErr(ok ? '' : 'Donnez un nom à l\'agent.'); return ok && activeSections.length > 0; }
     if (s === 2) {
-      const errs = (Object.keys(NUM_RULES) as NumKey[]).filter(k => numError(k));
+      const errs = (Object.keys(NUM_RULES) as NumKey[]).filter(k => numVisible(k) && numError(k));
       setShowNumErr(Object.fromEntries((Object.keys(NUM_RULES) as NumKey[]).map(k => [k, true])));
       return errs.length === 0;
     }
@@ -391,6 +424,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
   const deploy = async (mode: 'run_now' | 'deploy_only') => {
     if (!stepValid(1)) { setStep(1); showToast(activeSections.length === 0 ? 'Activez au moins une section du rapport.' : 'Donnez un nom à l\'agent.', 'warning'); return; }
     if (!stepValid(3)) { go(3); return; }
+    if (blocageRegles) { setStep(1); showToast(blocageRegles, 'warning', 9000); return; }
     setDeploying(mode);
     // Règles de l'assistant → format lu par le planificateur du backend (convertToCron).
     const heure = (h: number) => (h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`);
@@ -402,8 +436,8 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
     // Recette uniquement : date de référence passée (la base de test s'arrête en avril 2026). Vide en production.
     const dateTest = String(process.env.NEXT_PUBLIC_AGENT_TEST_REFERENCE_DATE || '').trim();
     const config = {
+      // Ni ERP ni skill imposés : le backend lit le connecteur actif, l'IA choisit le skill à chaque envoi.
       agent_name: name.trim(), run_mode: 'achats_supply', template_id: 'achats_supply', action: mode, workflow_timezone: timezone,
-      erp_type: 'tralis', selected_skills: ['achats-supply-tralis'],
       achats_config: {
         period, compare, sections: activeSections.map(s => s.k), thresholds: nums, erp_payment_alert: erpAlert, recipients: rcp,
         send, tone, length, instructions: instr, regles_assistant: rules,
@@ -430,20 +464,25 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
 
   /* Récapitulatif */
   const recapRows: [string, React.ReactNode, number, string][] = (() => {
-    const th = [`retard de livraison dès ${val('delay') ?? '—'} jours`, ...(secOn.ontime ? [`livraisons à l'heure au moins ${val('ontime') ?? '—'} %`] : []), `hausse au-delà de ${val('thprev') ?? '—'} % par rapport à la période précédente et ${val('thyear') ?? '—'} % par rapport à l'an dernier`];
-    if (conc !== null) th.push(`un fournisseur au-delà de ${conc} % des dépenses`);
-    if (erpAlert) th.push('alerte de paiement de TraLIS');
-    if (thLate !== null) th.push(`retard de paiement dès ${nf(thLate)} TND`);
+    const th: string[] = [];
+    if (secOn.late) th.push(`retard de livraison dès ${val('delay') ?? '—'} jours`);
+    if (secOn.ontime) th.push(`livraisons à l'heure au moins ${val('ontime') ?? '—'} %`);
+    if (secOn.spend || secOn.topsup) th.push(`hausse au-delà de ${val('thprev') ?? '—'} % par rapport à la période précédente et ${val('thyear') ?? '—'} % par rapport à l'an dernier`);
+    if (secOn.topsup && conc !== null) th.push(`un fournisseur au-delà de ${conc} % des dépenses`);
+    if (secOn.debt && erpAlert) th.push('alerte de paiement de l\'ERP');
+    if (secOn.debt && thLate !== null) th.push(`retard de paiement dès ${nf(thLate)} TND`);
+    if (secOn.disputed || secOn.missing || secOn.notbooked) th.push('factures à traiter dès la première');
     const obj: string[] = [];
-    if (val('objspend') !== null) obj.push(`dépenses au plus ${nf(val('objspend') as number)} TND`);
-    if (val('objlate') !== null) obj.push(`dettes en retard au plus ${nf(val('objlate') as number)} TND`);
+    if (secOn.spend && val('objspend') !== null) obj.push(`dépenses au plus ${nf(val('objspend') as number)} TND`);
+    if (secOn.debt && val('objlate') !== null) obj.push(`dettes en retard au plus ${nf(val('objlate') as number)} TND`);
     if (secOn.ontime && val('objontime') !== null) obj.push(`livraisons à l'heure au moins ${val('objontime')} %`);
     return [
       ['Agent', name, 1, 'aw-name'],
+      ['Règles', regles.etat === 'ok' ? `choisies par l'IA à chaque envoi parmi ${regles.skills!.length} skill${regles.skills!.length > 1 ? 's' : ''} de votre espace (ERP ${erpNom})` : (blocageRegles || 'vérifiées à chaque envoi'), 1, 'aw-name'],
       ['Période', compare === 'none' ? `${p.name}, sans comparaison` : `${p.name}, comparée à ${cmpLabel}`, 1, 'aw-period'],
       ['Sections', `${activeSections.length} : ${activeSections.map(i => i.t).join(', ')}`, 1, 'sec-late'],
-      ['Alertes', th.join(' · '), 2, 'aw-delay'],
-      ['Listes', `${val('topn') ?? '—'} fournisseurs par liste`, 2, 'aw-topn'],
+      ['Alertes', th.length ? th.join(' · ') : 'aucune avec les sections choisies', 2, secOn.late ? 'aw-delay' : 'aw-topn'],
+      ['Listes', `${val('topn') ?? '—'} lignes par tableau`, 2, 'aw-topn'],
       ['Objectifs', obj.length ? obj.join(' · ') : 'aucun', 2, 'aw-objspend'],
       ['Destinataires', rcp.to.join(', ') + (rcp.cc.length ? ` · en copie : ${rcp.cc.join(', ')}` : ''), 3, 'aw-to'],
       ['Envoi', rules.map(ruleText).join(' ; ') + (send === 'alerts' ? ', seulement en cas d\'alerte' : ''), 3, 'aw-r0-interval'],
@@ -541,6 +580,17 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
               {nameErr && <div className="aw-ferr">{nameErr}</div>}
               {isEdit && <div className="aw-help">Le nom ne change pas en modification : un autre nom créerait un second agent.</div>}
             </div>
+            <div className="aw-card" onMouseEnter={() => openGuide('skills')}>
+              <h2 className="aw-ct">Règles utilisées</h2>
+              {regles.etat === 'chargement' && <p className="aw-cs">Vérification de votre ERP et de vos skills…</p>}
+              {regles.etat === 'ok' && (<>
+                <p className="aw-cs">ERP connecté : <b>{erpNom}</b>. À chaque envoi, l&apos;IA choisit elle-même les règles du rapport Achats parmi les skills de votre espace compatibles avec cet ERP.</p>
+                <div className="aw-help">Skills disponibles : {regles.skills!.slice(0, 6).map(s => `${s.titre} (v${s.version})`).join(', ')}{regles.skills!.length > 6 ? ` et ${regles.skills!.length - 6} autre${regles.skills!.length - 6 > 1 ? 's' : ''}` : ''}.</div>
+              </>)}
+              {regles.etat === 'aucun_erp' && <div className="aw-warnbox">⚠ Aucun ERP connecté. <a href="/integrations">Connecter mon ERP dans Intégrations</a></div>}
+              {regles.etat === 'aucun_skill' && <div className="aw-warnbox">⚠ Aucun skill de votre espace n&apos;est disponible pour votre ERP ({erpNom}). Installez un skill Achats depuis l&apos;écran Skills, ou créez le vôtre.</div>}
+              {regles.etat === 'erreur' && <p className="aw-cs">Vos skills n&apos;ont pas pu être vérifiés pour l&apos;instant ; l&apos;agent les vérifiera à chaque envoi.</p>}
+            </div>
             <div className="aw-card">
               <h2 className="aw-ct">Période et comparaison</h2>
               <p className="aw-cs">Concerne les dépenses (montant, tendance, fournisseurs, catégories) et les factures à traiter. Les retards de livraison, les commandes en attente et les dettes sont toujours la situation du jour de l&apos;envoi.</p>
@@ -585,43 +635,45 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
 
           {/* ÉTAPE 2 */}
           {step === 2 && (<>
-            <div className="aw-card">
-              <h2 className="aw-ct">Retards de livraison</h2>
-              <p className="aw-cs">Les commandes non reçues après leur date de livraison prévue.</p>
+            <p className="aw-cs">Seuls les réglages des sections actives à l&apos;étape 1 sont affichés.</p>
+            {(secOn.late || secOn.ontime) && <div className="aw-card">
+              <h2 className="aw-ct">Livraisons</h2>
+              <p className="aw-cs">Les commandes non reçues après leur date prévue, et la ponctualité des commandes reçues.</p>
               <div className="aw-grid2">
-                {NumField({ k: 'delay', label: 'Signaler une commande en retard à partir de', unit: 'jours' })}
-                {secOn.ontime && NumField({ k: 'ontime', label: 'Taux de livraison à l\'heure attendu', unit: '%' })}
+                {secOn.late && NumField({ k: 'delay', label: 'Signaler une commande en retard à partir de', unit: 'jours' })}
+                {secOn.ontime && NumField({ k: 'ontime', label: 'Alerter si les livraisons à l\'heure passent sous', unit: '%' })}
               </div>
-            </div>
-            <div className="aw-card">
+            </div>}
+            {(secOn.spend || secOn.topsup) && <div className="aw-card">
               <h2 className="aw-ct">Hausse des dépenses</h2>
               <p className="aw-cs">Une dépense qui augmente au-delà du seuil est signalée, au total et pour chaque fournisseur.</p>
               <div className="aw-grid2">
                 {NumField({ k: 'thprev', label: 'Hausse par rapport à la période précédente', unit: '%' })}
                 {NumField({ k: 'thyear', label: 'Hausse par rapport à l\'an dernier', unit: '%' })}
               </div>
-              {NumField({ k: 'conc', label: 'Part maximale d\'un seul fournisseur dans les dépenses', unit: '%', placeholder: 'Laisser vide pour ne pas surveiller' })}
-            </div>
-            <div className="aw-card">
+              {secOn.topsup && NumField({ k: 'conc', label: 'Part maximale d\'un seul fournisseur dans les dépenses', unit: '%', placeholder: 'Laisser vide pour ne pas surveiller' })}
+            </div>}
+            {secOn.debt && <div className="aw-card">
               <h2 className="aw-ct">Dettes fournisseurs</h2>
               <div className="aw-tg" onMouseEnter={() => openGuide('erpalert')}>
-                <div><b>Fournisseurs en alerte de paiement</b><small>Reprendre l&apos;alerte de paiement indiquée par TraLIS</small></div>
-                <label className="aw-sw"><input id="aw-erpalert" type="checkbox" checked={erpAlert} aria-label="Reprendre l'alerte de paiement de TraLIS" {...f('erpalert')} onChange={e => setErpAlert(e.target.checked)} /><span /></label>
+                <div><b>Fournisseurs en alerte de paiement</b><small>Reprendre l&apos;alerte de paiement indiquée par votre ERP</small></div>
+                <label className="aw-sw"><input id="aw-erpalert" type="checkbox" checked={erpAlert} aria-label="Reprendre l'alerte de paiement de l'ERP" {...f('erpalert')} onChange={e => setErpAlert(e.target.checked)} /><span /></label>
               </div>
               {NumField({ k: 'thlate', label: 'Retard de paiement par fournisseur à partir de', unit: 'TND', placeholder: 'Laisser vide pour ne pas utiliser' })}
-            </div>
+            </div>}
             <div className="aw-card">
               <h2 className="aw-ct">Listes du rapport</h2>
-              {NumField({ k: 'topn', label: 'Nombre de fournisseurs affichés dans chaque liste', unit: 'sur 20' })}
+              {NumField({ k: 'topn', label: 'Nombre de lignes affichées dans chaque tableau', unit: 'sur 20' })}
             </div>
             <div className="aw-card">
               <h2 className="aw-ct">Objectifs (facultatifs)</h2>
               <p className="aw-cs">Le rapport indique pour chacun s&apos;il est atteint. Laissez vide pour ne pas suivre un objectif.</p>
               <div className="aw-grid2">
-                {NumField({ k: 'objspend', label: 'Dépenses de la période au plus', unit: 'TND', placeholder: 'Exemple : 900 000' })}
-                {NumField({ k: 'objlate', label: 'Dettes en retard de paiement au plus', unit: 'TND', placeholder: 'Exemple : 50 000' })}
+                {secOn.spend && NumField({ k: 'objspend', label: 'Dépenses de la période au plus', unit: 'TND', placeholder: 'Exemple : 900 000' })}
+                {secOn.debt && NumField({ k: 'objlate', label: 'Dettes en retard de paiement au plus', unit: 'TND', placeholder: 'Exemple : 50 000' })}
+                {secOn.ontime && NumField({ k: 'objontime', label: 'Livraisons à l\'heure au moins', unit: '%', placeholder: 'Exemple : 95' })}
               </div>
-              {secOn.ontime && <div className="aw-grid2">{NumField({ k: 'objontime', label: 'Livraisons à l\'heure au moins', unit: '%', placeholder: 'Exemple : 95' })}</div>}
+              {!secOn.spend && !secOn.debt && !secOn.ontime && <div className="aw-help">Activez « Dépenses de la période », « Dettes fournisseurs » ou « Livraisons à l&apos;heure » à l&apos;étape 1 pour suivre un objectif.</div>}
             </div>
           </>)}
 
@@ -661,7 +713,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
                   <div className="aw-fg">
                     <label className="aw-lbl" htmlFor={`aw-r${i}-interval`}>Intervalle de déclenchement</label>
                     <select id={`aw-r${i}-interval`} className="aw-inp" value={r.interval} {...f('rules')} onChange={e => setRule(i, { interval: e.target.value as Interval })}>
-                      {INTERVALS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                      {INTERVALS.filter(([v]) => (v !== 'Seconds' && v !== 'Minutes') || r.interval === v).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                     </select>
                   </div>
                   {r.interval === 'Days' && (<><div className="aw-grid2">{numF(i, r, 'daysBetween', 'Jours entre deux envois (1 à 31)', 1, 31)}{hourF(i, r)}</div><div className="aw-grid2">{numF(i, r, 'minute', 'Minute d\'exécution (0 à 59)', 0, 59)}</div></>)}
@@ -719,7 +771,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
                   </React.Fragment>
                 ))}
               </dl>
-              <div className="aw-help" style={{ marginTop: 14 }}>L&apos;agent lit les données de TraLIS sans jamais les modifier et ne contacte aucun fournisseur.</div>
+              <div className="aw-help" style={{ marginTop: 14 }}>L&apos;agent lit les données de votre ERP sans jamais les modifier et ne contacte aucun fournisseur.</div>
             </div>
           </>)}
 
@@ -772,6 +824,7 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
                       {/* Tuiles : même ordre que l'email (retard, dépenses, retard de paiement, factures à traiter, attente) */}
                       <div className="aw-tiles" data-blk="tiles">
                         {secOn.late && <div className="aw-tile"><small>Commandes en retard</small><b>{V}</b><span>{V} fournisseurs</span></div>}
+                        {secOn.ontime && <div className="aw-tile"><small>Livrées à l&apos;heure</small><b>{V}<em>%</em></b><span>{V} sur {V} commandes reçues</span></div>}
                         {secOn.spend && <div className="aw-tile"><small>Dépenses hors taxes</small><b>{V}<em>TND</em></b><span>{showPrev || showYear ? `${V} % par rapport ${showPrev ? 'à la période précédente' : 'à l\'an dernier'}` : ''}</span></div>}
                         {secOn.debt && <div className="aw-tile"><small>Retard de paiement</small><b>{V}<em>TND</em></b><span>sur {V} TND restant à payer</span></div>}
                         {(secOn.disputed || secOn.missing) && <div className="aw-tile"><small>Factures à traiter</small><b>{V}</b><span>contestées ou non parvenues</span></div>}
@@ -804,10 +857,11 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
 
                       {Blk("objectives", <>
                         <h5>Objectifs</h5>
-                        {(secOn.spend && val('objspend') !== null) || (secOn.debt && val('objlate') !== null) ? (
+                        {(secOn.spend && val('objspend') !== null) || (secOn.debt && val('objlate') !== null) || (secOn.ontime && val('objontime') !== null) ? (
                           <table className="aw-mt"><tbody>
                             {secOn.spend && val('objspend') !== null && <tr><td>Dépenses au plus {nf(val('objspend') as number)} TND</td><td className="r">atteint ou non atteint</td></tr>}
                             {secOn.debt && val('objlate') !== null && <tr><td>Dettes en retard au plus {nf(val('objlate') as number)} TND</td><td className="r">atteint ou non atteint</td></tr>}
+                            {secOn.ontime && val('objontime') !== null && <tr><td>Livraisons à l&apos;heure au moins {val('objontime')} %</td><td className="r">atteint ou non atteint</td></tr>}
                           </tbody></table>
                         ) : <p className="aw-note">Aucun objectif renseigné à l&apos;étape 2.</p>}
                       </>)}
@@ -820,6 +874,17 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
                           {topn > lignesListe && <tr><td colSpan={4}>…</td></tr>}
                         </tbody></table>
                         <p className="aw-note">Commandes non reçues dont la date de livraison prévue est dépassée d&apos;au moins {delay} jours ; {topn} fournisseurs au plus, du plus long retard au plus court.</p>
+                      </>)}
+
+                      {secOn.ontime && Blk("ontime", <>
+                        <h5>Livraisons à l&apos;heure</h5>
+                        <table className="aw-mt"><tbody>
+                          <tr><td>Commandes reçues sur la période</td><td className="r">{V}</td></tr>
+                          <tr><td>Reçues à l&apos;heure</td><td className="r">{V} · {V} %</td></tr>
+                          <tr><th>Fournisseurs les moins ponctuels</th><th className="r">En retard</th><th className="r">À l&apos;heure</th></tr>
+                          {liste('Fournisseur').slice(0, 3).map(f => <tr key={f}><td>{f}</td><td className="r">{V} sur {V}</td><td className="r">{V} %</td></tr>)}
+                        </tbody></table>
+                        <p className="aw-note">Commandes reçues pendant la période ; « à l&apos;heure » = reçue au plus tard à la date de livraison prévue.</p>
                       </>)}
 
                       {secOn.pending && Blk("pending", <>
@@ -885,6 +950,11 @@ export const WizardAchatsView: React.FC<WizardAchatsViewProps> = ({ onCancel, in
 
                       {secOn.missing && Blk("missing", <>
                         <h5>Factures non parvenues</h5>
+                        <table className="aw-mt"><tbody>{liste('Fournisseur').slice(0, 2).map(f => <tr key={f}><td>{f}</td><td className="r">{V} factures</td><td className="r">{V} TND</td></tr>)}</tbody></table>
+                      </>)}
+
+                      {secOn.notbooked && Blk("notbooked", <>
+                        <h5>Factures non comptabilisées</h5>
                         <table className="aw-mt"><tbody>{liste('Fournisseur').slice(0, 2).map(f => <tr key={f}><td>{f}</td><td className="r">{V} factures</td><td className="r">{V} TND</td></tr>)}</tbody></table>
                       </>)}
 
