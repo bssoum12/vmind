@@ -331,6 +331,11 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
                       </div>
                     </div>
                     <div className="atcard-desc">{agent.description}</div>
+                    {agent.highlights && agent.highlights.length > 0 && (
+                      <ul style={{ listStyle: 'none', margin: '-6px 0 16px', padding: 0, display: 'grid', gap: '5px', fontSize: '12.5px', color: '#C5D2DF' }}>
+                        {agent.highlights.map((h) => (<li key={h}><span style={{ color: '#00E5C8' }}>✓ </span>{h}</li>))}
+                      </ul>
+                    )}
                     <div className="atcard-meta">
                       <span className="atcard-cat">{agent.category}</span>
                       <span className="atcard-deployments">
@@ -440,6 +445,11 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, acti
                       </div>
                     </div>
                     <div className="atcard-desc">{agent.description}</div>
+                    {agent.highlights && agent.highlights.length > 0 && (
+                      <ul style={{ listStyle: 'none', margin: '-6px 0 16px', padding: 0, display: 'grid', gap: '5px', fontSize: '12.5px', color: '#C5D2DF' }}>
+                        {agent.highlights.map((h) => (<li key={h}><span style={{ color: '#00E5C8' }}>✓ </span>{h}</li>))}
+                      </ul>
+                    )}
                     <div className="atcard-meta">
                       <span className="atcard-cat">{agent.category}</span>
                       <span className="atcard-deployments">

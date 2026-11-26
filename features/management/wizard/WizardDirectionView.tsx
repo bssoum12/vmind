@@ -8,6 +8,7 @@ import { getAgents } from '@/shared/api/n8n-api';
 import { VMindGuide, GuideMood } from '@/shared/management/components/VMindGuide';
 import { Check, ArrowRight, ArrowLeft, Eye, EyeOff, Maximize2, Mail, X, Zap, Settings, Lock } from 'lucide-react';
 import { VIRTUAL_MIND_GUIDE as RECOUVREMENT_GUIDE } from './WizardView';
+import { SECTIONS as ACHATS_SECTIONS, ALLSEC as ACHATS_ALLSEC, FIELD_GUIDE as ACHATS_GUIDE, NUM_RULES as ACHATS_RULES, NumKey as AchatsNumKey } from './WizardAchatsView';
 import { TriggerRulesEditor, TriggerRule, DEFAULT_TRIGGER_RULE, describeTriggerRule } from './components/TriggerRulesEditor';
 import {
   Periode, Duree, EtatPeriode, SectionKey, Plage, Device,
@@ -28,7 +29,7 @@ import {
 const DG = '#00E5C8';
 const TITRE = 'Rapport Direction Générale';
 
-type SourceKey = 'finance' | 'recouvrement';
+type SourceKey = 'finance' | 'recouvrement' | 'achats';
 type Comparateur = 'precedente' | 'n1' | 'objectifs';
 type Priorite = 'tresorerie' | 'rentabilite' | 'croissance' | 'risque_client' | 'couts';
 type TonDg = 'direct' | 'factuel' | 'pedagogique';
@@ -41,6 +42,8 @@ interface FinanceSource {
   topClients: string; topFournisseurs: string;
   objCa: string; objEncaisser: string; objRetard: string;
 }
+/** Settings of the Achats source: the same sections and thresholds as the agent « Directeur des Achats » (WizardAchatsView). */
+interface AchatsSource { sections: Record<string, boolean>; nums: Record<AchatsNumKey, string>; erpAlert: boolean }
 interface RecouvrementSource {
   montantMin: string; devise: 'TND' | 'EUR' | 'USD'; urgence: Urgence | ''; escalade: string; relancesMax: string; consignes: string;
 }
@@ -48,7 +51,7 @@ interface RecouvrementSource {
 const SOURCES: { key: SourceKey | 'achats' | 'exploitation'; label: string; text: string; available: boolean }[] = [
   { key: 'finance', label: 'Finance & Trésorerie', text: 'Chiffre d’affaires, marge, créances, dettes, trésorerie et taxe sur la valeur ajoutée.', available: true },
   { key: 'recouvrement', label: 'Recouvrement', text: 'Factures impayées, retards et risque client. État à la date du jour.', available: true },
-  { key: 'achats', label: 'Achats & Fournisseurs', text: 'Coûts d’achat, prix fournisseurs, délais de livraison.', available: false },
+  { key: 'achats', label: 'Achats & Fournisseurs', text: 'Commandes et livraisons, dépenses, dettes fournisseurs et factures à traiter.', available: true },
   { key: 'exploitation', label: 'Exploitation & Transport', text: 'Dossiers, retards, prestations non facturées.', available: false },
 ];
 const COMPARATEURS: { value: Comparateur; label: string }[] = [
@@ -109,6 +112,40 @@ const defaultFinance = (): FinanceSource => ({
   sections: Object.fromEntries(SECTIONS.map((s) => [s.key, s.available && s.on])) as Record<SectionKey, boolean>,
   ecartPrec: '15', ecartN1: '20', alerteCredit: true, soldeMin: '', retardMin: '', topClients: '5', topFournisseurs: '5', objCa: '', objEncaisser: '', objRetard: '',
 });
+const defaultAchats = (): AchatsSource => ({
+  sections: Object.fromEntries(ACHATS_ALLSEC.map((i) => [i.k, i.na ? false : i.on])),
+  nums: { delay: '3', ontime: '90', thprev: '15', thyear: '20', conc: '30', thlate: '', topn: '5', objspend: '', objlate: '', objontime: '' },
+  erpAlert: true,
+});
+/** Settings shown, and checked, only for the sections on (as in the Achats form). */
+const achatsNumVisible = (c: AchatsSource, k: AchatsNumKey): boolean => ({
+  delay: !!c.sections.late, ontime: !!c.sections.ontime, objontime: !!c.sections.ontime,
+  thprev: !!(c.sections.spend || c.sections.topsup), thyear: !!(c.sections.spend || c.sections.topsup), conc: !!c.sections.topsup, objspend: !!c.sections.spend,
+  thlate: !!c.sections.debt, objlate: !!c.sections.debt, topn: true,
+} as Record<AchatsNumKey, boolean>)[k];
+const achatsNumError = (c: AchatsSource, k: AchatsNumKey): string | null => {
+  if (!achatsNumVisible(c, k)) return null;
+  const r = ACHATS_RULES[k];
+  const v = c.nums[k].trim();
+  const n = Number(v);
+  if (v === '' && r.req) return `Champ obligatoire. ${r.msg}`;
+  if (v !== '' && (!Number.isFinite(n) || n < r.min || n > r.max)) return r.msg;
+  return null;
+};
+const achatsErrors = (c: AchatsSource) => ({
+  sections: Object.values(c.sections).some(Boolean) ? null : 'Activez au moins une section',
+  ...Object.fromEntries((Object.keys(ACHATS_RULES) as AchatsNumKey[]).map((k) => [k, achatsNumError(c, k)])),
+}) as Record<string, string | null>;
+const achatsFrom = (a: any): AchatsSource => {
+  const p = parseParams(a?.parameters) || a || {};
+  const ac = a?.achats_config || p.achats_config || a?.config?.achats_config || {};
+  const d = defaultAchats();
+  if (Array.isArray(ac.sections)) ACHATS_ALLSEC.forEach((i) => { d.sections[i.k] = !i.na && ac.sections.includes(i.k); });
+  const th = ac.thresholds && typeof ac.thresholds === 'object' ? ac.thresholds : {};
+  (Object.keys(d.nums) as AchatsNumKey[]).forEach((k) => { if (th[k] !== undefined && th[k] !== null) d.nums[k] = String(th[k]); });
+  if (ac.erp_payment_alert === false) d.erpAlert = false;
+  return d;
+};
 const defaultRecouvrement = (): RecouvrementSource => ({ montantMin: '', devise: 'TND', urgence: '', escalade: '', relancesMax: '', consignes: '' });
 const fmtTnd = (v: string) => { const n = parseAmount(v); return n === null ? '' : `${n.toLocaleString('fr-FR')} dinars`; };
 
@@ -162,7 +199,7 @@ const noError = (o: Record<string, string | null>) => Object.values(o).every((e)
 // ─────────────────────────────────────────────────────────────
 interface DgPreviewConfig {
   agentName: string; periode: Periode; comparateurs: Comparateur[]; ecart: string; seuilSante: string; priorites: Priorite[];
-  signaux: boolean; decisions: boolean; sources: Record<SourceKey, boolean>; finance: FinanceSource; recouvrement: RecouvrementSource;
+  signaux: boolean; decisions: boolean; sources: Record<SourceKey, boolean>; finance: FinanceSource; recouvrement: RecouvrementSource; achats: AchatsSource;
   recipients: string[]; recipientsCc: string[]; triggerRules: TriggerRule[];
 }
 
@@ -175,9 +212,11 @@ const DgReport: React.FC<{ c: DgPreviewConfig; highlight: string | null; compact
     c.comparateurs.includes('n1') && { libelle: 'la même période de l’année précédente', court: 'Même période de l’année précédente', dates: plages.n1 },
   ].filter(Boolean) as Array<{ libelle: string; court: string; dates: Plage }>;
   const fin = c.sources.finance ? c.finance.sections : null;
-  const cles = fin ? ([
-    fin.marge && ['Taux de marge', '%'], fin.clients && ['Reste à encaisser', 'dinars'], fin.synthese && ['Position nette', 'dinars'],
-  ].filter(Boolean) as Array<[string, string]>) : [];
+  const ach = c.sources.achats ? c.achats : null;
+  const cles = [
+    fin?.marge && ['Taux de marge', '%'], fin?.clients && ['Reste à encaisser', 'dinars'], fin?.synthese && ['Position nette', 'dinars'],
+    ach?.sections.spend && ['Dépenses de la période', 'dinars'], ach?.sections.debt && ['Dettes fournisseurs en retard', 'dinars'],
+  ].filter(Boolean) as Array<[string, string]>;
   const priorites = PRIORITES.filter((p) => c.priorites.includes(p.value)).map((p) => p.label.toLowerCase());
   const seuil = Number(c.seuilSante) || 50;
   const ecart = Number(c.ecart.replace(',', '.')) || 15;
@@ -189,6 +228,14 @@ const DgReport: React.FC<{ c: DgPreviewConfig; highlight: string | null; compact
   if (fin?.clients && fmtTnd(c.finance.soldeMin)) rules.push(`Finance : client qui doit au moins ${fmtTnd(c.finance.soldeMin)}`);
   if (fin?.fournisseurs && fmtTnd(c.finance.retardMin)) rules.push(`Finance : fournisseur avec au moins ${fmtTnd(c.finance.retardMin)} en retard`);
   if (c.sources.recouvrement && c.recouvrement.urgence) rules.push(`Recouvrement : factures impayées, ${URGENCES.find((u) => u.value === c.recouvrement.urgence)!.label.toLowerCase()}`);
+  if (ach) {
+    const av = (k: AchatsNumKey) => (achatsNumVisible(ach, k) ? ach.nums[k].trim() : '');
+    if (av('delay')) rules.push(`Achats : commande en retard de livraison d’au moins ${av('delay')} jours`);
+    if (av('ontime')) rules.push(`Achats : livraisons à l’heure sous ${av('ontime')} %`);
+    if (av('thprev')) rules.push(`Achats : hausse des dépenses au-delà de ${av('thprev')} %`);
+    if (av('conc')) rules.push(`Achats : un fournisseur au-delà de ${av('conc')} % des dépenses`);
+    if (ach.sections.debt && ach.erpAlert) rules.push('Achats : fournisseurs en alerte de paiement dans le logiciel de gestion');
+  }
   if (c.comparateurs.includes('objectifs')) rules.push('Objectifs de la direction non atteints');
 
   const half = (top: boolean, right: boolean): React.CSSProperties => ({
@@ -553,6 +600,81 @@ const FinancePanel: React.FC<{ value: FinanceSource; agents: any[]; agentsState:
   );
 };
 
+const AchatsPanel: React.FC<{ value: AchatsSource; agents: any[]; agentsState: AgentsState; onClose: () => void; onSave: (v: AchatsSource) => void; onFocusField: (k: string | null) => void }> = ({ value, agents, agentsState, onClose, onSave, onFocusField }) => {
+  const [d, setD] = useState<AchatsSource>(value);
+  const err = achatsErrors(d);
+  const g = (k: string): FocusProps => ({ onFocus: () => onFocusField(`ach:${k}`), onBlur: () => onFocusField(null) });
+  const hover = (k: string) => ({ onMouseEnter: () => onFocusField(`ach:${k}`), onMouseLeave: () => onFocusField(null) });
+  const num = (k: AchatsNumKey, label: string, suffix: string, placeholder?: string) => (achatsNumVisible(d, k)
+    ? <Field id={`dg-ach-${k}`} label={label} value={d.nums[k]} onChange={(v) => setD((p) => ({ ...p, nums: { ...p.nums, [k]: v } }))} err={err[k]} suffix={suffix} placeholder={placeholder} guide={g(k)} />
+    : null);
+  const any = (...k: AchatsNumKey[]) => k.some((x) => achatsNumVisible(d, x));
+  return (
+    <Modal title="Achats & Fournisseurs — réglages pour la Direction Générale" onClose={onClose} onSave={() => onSave(d)} canSave={noError(err)}>
+      <CopyFrom agents={agents} state={agentsState} onPick={(a) => setD(achatsFrom(a))} fixed="période, comparaisons, destinataires, planification, ton, longueur et consigne de la synthèse." />
+      <Card title="Sections du rapport">
+        <div style={{ display: 'grid', gap: '14px' }}>
+          {ACHATS_SECTIONS.map((grp) => (
+            <div key={grp.g} style={{ display: 'grid', gap: '6px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: MUTED }}>{grp.g}</div>
+              {grp.items.map((i) => (
+                <div key={i.k} {...hover(`sec-${i.k}`)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '8px 12px', borderRadius: '8px', background: d.sections[i.k] ? 'rgba(0, 229, 200, 0.06)' : 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', opacity: i.na ? 0.6 : 1 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: 600, color: d.sections[i.k] ? '#FFFFFF' : MUTED }}>{i.t}</div>
+                    <div style={{ fontSize: '11.5px', color: MUTED }}>{i.na ? i.na : i.d}</div>
+                  </div>
+                  {i.na
+                    ? <span aria-label={`${i.t} indisponible`} style={{ width: '38px', height: '22px', borderRadius: '999px', background: 'rgba(255,255,255,0.06)', flexShrink: 0 }} />
+                    : <Switch on={!!d.sections[i.k]} label={i.t} onChange={(v) => setD((p) => ({ ...p, sections: { ...p.sections, [i.k]: v } }))} />}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        {err.sections && <ErrorLine text={err.sections} />}
+      </Card>
+      {any('delay', 'ontime') && (
+        <Card title="Commandes et livraisons">
+          <div style={fieldRow}>
+            {num('delay', 'Signaler une commande en retard à partir de', 'jours')}
+            {num('ontime', 'Alerter si les livraisons à l’heure passent sous', '%')}
+          </div>
+        </Card>
+      )}
+      {any('thprev', 'thyear', 'conc') && (
+        <Card title="Dépenses">
+          <div style={fieldRow}>
+            {num('thprev', 'Hausse par rapport à la période précédente', '%')}
+            {num('thyear', 'Hausse par rapport à l’an dernier', '%')}
+            {num('conc', 'Part maximale d’un seul fournisseur dans les dépenses', '%', 'Laisser vide pour ne pas utiliser')}
+          </div>
+        </Card>
+      )}
+      {d.sections.debt && (
+        <Card title="Dettes fournisseurs">
+          <div {...hover('erpalert')} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', marginBottom: '12px' }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: '#FFFFFF' }}>Reprendre l’alerte de paiement du logiciel de gestion</div>
+            <Switch on={d.erpAlert} onChange={(v) => setD((p) => ({ ...p, erpAlert: v }))} label="Reprendre l’alerte de paiement du logiciel de gestion" />
+          </div>
+          <div style={fieldRow}>{num('thlate', 'Retard de paiement par fournisseur à partir de', 'TND', 'Laisser vide pour ne pas utiliser')}</div>
+        </Card>
+      )}
+      <Card title="Listes du rapport">
+        <div style={fieldRow}>{num('topn', 'Nombre de lignes affichées dans chaque tableau', 'sur 20')}</div>
+      </Card>
+      {any('objspend', 'objlate', 'objontime') && (
+        <Card title="Objectifs (optionnels)" subtitle="Le rapport indique pour chacun s’il est atteint.">
+          <div style={fieldRow}>
+            {num('objspend', 'Dépenses de la période au plus', 'TND', 'Exemple : 900 000')}
+            {num('objlate', 'Dettes en retard de paiement au plus', 'TND', 'Exemple : 50 000')}
+            {num('objontime', 'Livraisons à l’heure au moins', '%', 'Exemple : 95')}
+          </div>
+        </Card>
+      )}
+    </Modal>
+  );
+};
+
 const RecouvrementPanel: React.FC<{ value: RecouvrementSource; agents: any[]; agentsState: AgentsState; onClose: () => void; onSave: (v: RecouvrementSource) => void; onFocusField: (k: string | null) => void }> = ({ value, agents, agentsState, onClose, onSave, onFocusField }) => {
   const [d, setD] = useState<RecouvrementSource>(value);
   const g = (k: string): FocusProps => ({ onFocus: () => onFocusField(`rec:${k}`), onBlur: () => onFocusField(null) });
@@ -616,10 +738,15 @@ const RECAP_CSS = `
   .dg-flow-wrap { container-type: inline-size; }
   .dg-flow { position: relative; display: grid; gap: 16px; padding-left: 38px; }
   .dg-flow::before { content: ""; position: absolute; left: 13px; top: 18px; bottom: 18px; width: 2px; background: linear-gradient(${ACCENT}, rgba(167,139,250,.8), ${GOLD}); opacity: .55; }
+  .dg-flow::after { content: ""; position: absolute; left: 10px; top: 18px; width: 8px; height: 8px; border-radius: 50%; background: #fff; box-shadow: 0 0 12px ${ACCENT}; animation: dgFlowDown 3.6s cubic-bezier(.22,1,.36,1) infinite; z-index: 1; }
+  @keyframes dgFlowDown { 0% { top: 18px; opacity: 0 } 10% { opacity: 1 } 90% { opacity: 1 } 100% { top: calc(100% - 26px); opacity: 0 } }
+  @keyframes dgFlowRight { 0% { left: 14px; opacity: 0 } 10% { opacity: 1 } 90% { opacity: 1 } 100% { left: calc(100% - 22px); opacity: 0 } }
+  @media (prefers-reduced-motion: reduce) { .dg-flow::after { animation: none; opacity: 0; } }
   @container (min-width: 860px) {
     .dg-flow { grid-template-columns: 1.15fr 1fr 1fr; gap: 30px; padding-left: 0; padding-top: 22px; }
     .dg-flow::before { left: 14px; right: 14px; top: 13px; bottom: auto; width: auto; height: 2px; background: linear-gradient(90deg, ${ACCENT}, rgba(167,139,250,.8), ${GOLD}); }
     .dg-fnode { left: 0 !important; top: -22px !important; }
+    .dg-flow::after { top: 10px; left: 14px; animation-name: dgFlowRight; }
   }
   .dg-fcard { position: relative; padding: 16px 18px; border-radius: 15px; background: rgba(18,28,52,.55); border: 1px solid rgba(148,163,184,.18); transition: border-color .3s ease, transform .3s ease; min-width: 0; }
   .dg-fcard:hover { border-color: rgba(0,229,200,.4); transform: translateY(-2px); }
@@ -631,6 +758,7 @@ const RECAP_CSS = `
   .dg-fsrc { padding: 11px 13px; border-radius: 12px; background: rgba(0,0,0,.22); border-left: 3px solid ${ACCENT}; margin-bottom: 10px; }
   .dg-fsrc:last-child { margin-bottom: 0; }
   .dg-fsrc.rec { border-left-color: ${VIOLET}; }
+  .dg-fsrc.ach { border-left-color: ${GOLD}; }
   .dg-fsrc-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 13px; margin-bottom: 6px; color: #FFFFFF; }
   .dg-fl { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
   .dg-fl li { display: grid; grid-template-columns: 16px 1fr; gap: 7px; font-size: 12.8px; color: #A7B4C8; line-height: 1.45; }
@@ -664,6 +792,23 @@ const financeLines = (c: FinanceSource): Line[] => {
     c.sections.tendance && nombre(c.objCa) && [`Objectif : chiffre d’affaires facturé mensuel ≥ ${nombre(c.objCa)} TND`, ''],
     nombre(c.objEncaisser) && [`Objectif : reste à encaisser ≤ ${nombre(c.objEncaisser)} TND`, ''],
     nombre(c.objRetard) && [`Objectif : fournisseurs en retard ≤ ${nombre(c.objRetard)} TND`, ''],
+  ] as Array<Line | false | ''>).filter(Boolean) as Line[];
+};
+const achatsLines = (c: AchatsSource): Line[] => {
+  const n = ACHATS_ALLSEC.filter((i) => c.sections[i.k]).length;
+  const v = (k: AchatsNumKey) => (achatsNumVisible(c, k) ? c.nums[k].trim() : '');
+  return ([
+    [`${n} section${n > 1 ? 's' : ''} du rapport`, ''],
+    v('delay') && [`Commande en retard à partir de ${v('delay')} jours`, ''],
+    v('ontime') && [`Livraisons à l’heure : alerte sous ${v('ontime')} %`, ''],
+    v('thprev') && [`Hausse des dépenses au-delà de ${v('thprev')} % (période précédente) et ${v('thyear')} % (an dernier)`, ''],
+    v('conc') && [`Part d’un fournisseur au plus ${v('conc')} %`, ''],
+    c.sections.debt && (c.erpAlert ? ['Alerte de paiement du logiciel de gestion reprise', ''] : ['Alerte de paiement du logiciel de gestion non reprise', 'off']),
+    v('thlate') && [`Retard de paiement par fournisseur à partir de ${nombre(v('thlate'))} TND`, ''],
+    [`${c.nums.topn.trim()} lignes par tableau`, ''],
+    v('objspend') && [`Objectif : dépenses ≤ ${nombre(v('objspend'))} TND`, ''],
+    v('objlate') && [`Objectif : dettes en retard ≤ ${nombre(v('objlate'))} TND`, ''],
+    v('objontime') && [`Objectif : livraisons à l’heure ≥ ${v('objontime')} %`, ''],
   ] as Array<Line | false | ''>).filter(Boolean) as Line[];
 };
 const recouvrementLines = (c: RecouvrementSource): Line[] => ([
@@ -703,9 +848,10 @@ export const WizardDirectionView: React.FC<{ onCancel: () => void }> = ({ onCanc
 
   // 1 — Sources
   const [agentName, setAgentName] = useState(`${TITRE} - ${Math.random().toString(36).slice(2, 7).toUpperCase()}`);
-  const [sources, setSources] = useState<Record<SourceKey, boolean>>({ finance: true, recouvrement: true });
+  const [sources, setSources] = useState<Record<SourceKey, boolean>>({ finance: true, recouvrement: true, achats: false });
   const [finance, setFinance] = useState<FinanceSource>(defaultFinance);
   const [recouvrement, setRecouvrement] = useState<RecouvrementSource>(defaultRecouvrement);
+  const [achats, setAchats] = useState<AchatsSource>(defaultAchats);
   const [panel, setPanel] = useState<SourceKey | null>(null);
   const [mesAgents, setMesAgents] = useState<any[] | null>(null);
   const [agentsError, setAgentsError] = useState(false);
@@ -714,10 +860,11 @@ export const WizardDirectionView: React.FC<{ onCancel: () => void }> = ({ onCanc
     const t = String(a.templateId ?? a.template_id ?? '').toLowerCase();
     const m = String(a.run_mode ?? '').toLowerCase();
     const rec = a.recovery_config && typeof a.recovery_config === 'object' && Object.keys(a.recovery_config).length > 0;
+    if (k === 'achats') return t === 'achats_supply' || m === 'achats_supply';
     return k === 'finance' ? t === 'finance' || m === 'finance_report' : t === 'recouvrement' || t === 'recovery' || m === 'recouvrement' || m === 'daily_recovery_check' || rec;
   });
   const agentsState: AgentsState = mesAgents === null ? 'loading' : agentsError ? 'error' : 'ok';
-  const configured: Record<SourceKey, boolean> = { finance: noError(financeErrors(finance)), recouvrement: noError(recouvrementErrors(recouvrement)) };
+  const configured: Record<SourceKey, boolean> = { finance: noError(financeErrors(finance)), recouvrement: noError(recouvrementErrors(recouvrement)), achats: noError(achatsErrors(achats)) };
 
   // 2 — Analyse
   const [periode, setPeriode] = useState<Periode>('mois_precedent');
@@ -754,11 +901,12 @@ export const WizardDirectionView: React.FC<{ onCancel: () => void }> = ({ onCanc
   const jour = jourEnvoi(triggerRules);
   const plages = periodeDates(periode, jour);
   const preview: DgPreviewConfig = useMemo(() => ({
-    agentName: agentName.trim(), periode, comparateurs, ecart, seuilSante, priorites, signaux, decisions, sources, finance, recouvrement, recipients, recipientsCc, triggerRules,
-  }), [agentName, periode, comparateurs, ecart, seuilSante, priorites, signaux, decisions, sources, finance, recouvrement, recipients, recipientsCc, triggerRules]);
+    agentName: agentName.trim(), periode, comparateurs, ecart, seuilSante, priorites, signaux, decisions, sources, finance, recouvrement, achats, recipients, recipientsCc, triggerRules,
+  }), [agentName, periode, comparateurs, ecart, seuilSante, priorites, signaux, decisions, sources, finance, recouvrement, achats, recipients, recipientsCc, triggerRules]);
   const guideEntry = !focus ? null
     : focus.startsWith('fin:') ? FINANCE_GUIDE[focus.slice(4)] ?? null
     : focus.startsWith('rec:') ? RECOUVREMENT_GUIDE[focus.slice(4)] ?? null
+    : focus.startsWith('ach:') ? ((e) => (e ? { title: e.t, text: [e.na, e.how, e.rep].filter(Boolean).join(' '), mood: undefined as GuideMood | undefined } : null))(ACHATS_GUIDE[focus.slice(4)])
     : GUIDE[focus] ?? null;
   const highlight = focus ? FOCUS_TO_PART[focus] ?? null : null;
 
@@ -954,10 +1102,10 @@ export const WizardDirectionView: React.FC<{ onCancel: () => void }> = ({ onCanc
                     <div className="dg-fcard">
                       <span className="dg-fnode" style={{ background: ACCENT, boxShadow: '0 0 0 5px rgba(0,229,200,.12)' }}>1</span>
                       <div className="dg-fcard-h"><b>Sources</b><button type="button" className="dg-link" onClick={() => setStep(1)}>Modifier</button></div>
-                      {(['finance', 'recouvrement'] as SourceKey[]).filter((k) => sources[k]).map((k) => (
-                        <div key={k} className={`dg-fsrc ${k === 'recouvrement' ? 'rec' : ''}`}>
+                      {(['finance', 'recouvrement', 'achats'] as SourceKey[]).filter((k) => sources[k]).map((k) => (
+                        <div key={k} className={`dg-fsrc ${k === 'recouvrement' ? 'rec' : k === 'achats' ? 'ach' : ''}`}>
                           <div className="dg-fsrc-h"><span>{SOURCES.find((x) => x.key === k)!.label}</span><button type="button" className="dg-link" onClick={() => setPanel(k)}>⚙ Réglages</button></div>
-                          <FLines lines={!configured[k] ? [['À configurer', 'todo']] : k === 'finance' ? financeLines(finance) : recouvrementLines(recouvrement)} />
+                          <FLines lines={!configured[k] ? [['À configurer', 'todo']] : k === 'finance' ? financeLines(finance) : k === 'achats' ? achatsLines(achats) : recouvrementLines(recouvrement)} />
                         </div>
                       ))}
                       {nbSources === 0 && <FLines lines={[['Aucune source choisie', 'todo']]} />}
@@ -1008,6 +1156,7 @@ export const WizardDirectionView: React.FC<{ onCancel: () => void }> = ({ onCanc
       </div>
 
       {panel === 'finance' && <FinancePanel value={finance} agents={agentsOf('finance')} agentsState={agentsState} onFocusField={setFocus} onClose={() => { setFocus(null); setPanel(null); }} onSave={(v) => { setFinance(v); setFocus(null); setPanel(null); }} />}
+      {panel === 'achats' && <AchatsPanel value={achats} agents={agentsOf('achats')} agentsState={agentsState} onFocusField={setFocus} onClose={() => { setFocus(null); setPanel(null); }} onSave={(v) => { setAchats(v); setFocus(null); setPanel(null); }} />}
       {panel === 'recouvrement' && <RecouvrementPanel value={recouvrement} agents={agentsOf('recouvrement')} agentsState={agentsState} onFocusField={setFocus} onClose={() => { setFocus(null); setPanel(null); }} onSave={(v) => { setRecouvrement(v); setFocus(null); setPanel(null); }} />}
 
       <VMindGuide
