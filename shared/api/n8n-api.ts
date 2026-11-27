@@ -580,6 +580,11 @@ export interface ExploitationAgentPayload {
   trigger_rules?: any[];
   workflow_timezone?: string;
   client_id?: string;
+  data_source?: {
+    mode: 'erp' | 'file' | 'demo';
+    dataset_uuid?: string;
+    file_name?: string;
+  };
 }
 
 export async function getExploitationAdminDefaults(): Promise<{

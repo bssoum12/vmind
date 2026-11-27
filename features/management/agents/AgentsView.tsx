@@ -19,7 +19,8 @@ import { getBrowserTimezone } from '@/shared/utils/timezone';
 import { VMindGuide, VMindGuideArrow, GuideMood } from '@/shared/management/components/VMindGuide';
 import { CyberIcon } from '@/shared/management/components/CyberIcon';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Brain, CheckSquare, ListChecks, SkipForward, Users, Info, ExternalLink, UploadCloud, RefreshCw, LayoutDashboard, FileText, X } from 'lucide-react';
+import { Play, Brain, CheckSquare, ListChecks, SkipForward, Users, Info, ExternalLink, UploadCloud, RefreshCw, LayoutDashboard, FileText, FileSpreadsheet, Sparkles, X } from 'lucide-react';
+import { UpdateDatasetModal } from '@/shared/management/components/UpdateDatasetModal';
 import { ProspectAgentExecutionModal } from './components/ProspectAgentExecutionModal';
 import { SourcingAgentExecutionModal } from './components/SourcingAgentExecutionModal';
 import { ProspectAgentScheduleModal } from './components/ProspectAgentScheduleModal';
@@ -404,6 +405,7 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null); // agent_name being actioned
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
+  const [datasetModalAgent, setDatasetModalAgent] = useState<LiveAgent | null>(null);
 
   const showToast = useCallback((msg: string, type: 'ok' | 'err' | 'success' | 'error' = 'ok') => {
     const normalizedType = type === 'ok' ? 'success' : type === 'err' ? 'error' : type;
@@ -1316,6 +1318,39 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                                   </span>
                                 </span>
                               )}
+                              {(() => {
+                                const ds = agent.config?.data_source || (agent as any).parameters?.data_source;
+                                if (!ds || (ds.mode !== 'file' && ds.mode !== 'demo')) return null;
+                                const isDemo = ds.mode === 'demo';
+                                return (
+                                  <span
+                                    title={isDemo ? 'Alimenté par les données de démonstration' : `Fichier actif : ${ds.file_name || 'Excel / CSV'}`}
+                                    style={{
+                                      fontSize: '11px',
+                                      padding: '2px 8px',
+                                      borderRadius: '4px',
+                                      background: isDemo ? 'rgba(167, 139, 250, 0.14)' : 'rgba(56, 189, 248, 0.12)',
+                                      color: isDemo ? '#C4B5FD' : '#38BDF8',
+                                      border: isDemo
+                                        ? '1px solid rgba(167, 139, 250, 0.32)'
+                                        : '1px solid rgba(56, 189, 248, 0.3)',
+                                      fontWeight: 600,
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      maxWidth: 190,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    {isDemo ? <Sparkles size={11} style={{ flexShrink: 0 }} /> : <FileSpreadsheet size={11} style={{ flexShrink: 0 }} />}
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {isDemo ? 'Mode démo' : (ds.file_name || 'Fichier Excel / CSV')}
+                                    </span>
+                                  </span>
+                                );
+                              })()}
                             </div>
                           </div>
                         </div>
@@ -1400,6 +1435,32 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                             {busy ? '…' : '▶ Run'}
                           </button>
 
+                          {/* Update Dataset (Any file/demo agent, with or without Workspace) */}
+                          {(() => {
+                            const ds = agent.config?.data_source || (agent as any).parameters?.data_source;
+                            if (!ds || (ds.mode !== 'file' && ds.mode !== 'demo')) return null;
+                            return (
+                              <button
+                                className="row-btn"
+                                disabled={busy || agent.is_executing}
+                                onClick={() => setDatasetModalAgent(agent)}
+                                title="Importer ou remplacer le fichier Excel / CSV"
+                                style={{
+                                  color: '#38BDF8',
+                                  borderColor: 'rgba(56, 189, 248, 0.35)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  opacity: agent.is_executing ? 0.5 : 1,
+                                  cursor: agent.is_executing ? 'not-allowed' : 'pointer',
+                                }}
+                              >
+                                <FileSpreadsheet size={13} style={{ flexShrink: 0 }} />
+                                <span>Fichier</span>
+                              </button>
+                            );
+                          })()}
+
                           {/* Stop / Start - Tutorial Step 3 */}
                           {status === 'running' ? (
                             <button
@@ -1415,27 +1476,36 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
                             >
                               {busy ? '…' : '⏸ Stop'}
                             </button>
-                          ) : (
-                            <button
-                              className="row-btn"
-                              disabled={busy || agent.is_executing}
-                              onClick={() => {
-                                if (agent.run_mode === 'prospection' || agent.run_mode === 'sourcing' || agent.run_mode === 'supervisor' || agent.run_mode === 'exploitation') {
-                                  setScheduleModalAgent(agent);
-                                } else {
-                                  handleResume(agent);
+                          ) : (() => {
+                            const ds = agent.config?.data_source || (agent as any).parameters?.data_source;
+                            const isStaticFileMode = ds && (ds.mode === 'file' || ds.mode === 'demo');
+                            return (
+                              <button
+                                className="row-btn"
+                                disabled={busy || agent.is_executing || isStaticFileMode}
+                                onClick={() => {
+                                  if (isStaticFileMode) return;
+                                  if (agent.run_mode === 'prospection' || agent.run_mode === 'sourcing' || agent.run_mode === 'supervisor' || agent.run_mode === 'exploitation') {
+                                    setScheduleModalAgent(agent);
+                                  } else {
+                                    handleResume(agent);
+                                  }
+                                }}
+                                title={
+                                  isStaticFileMode
+                                    ? 'Planification automatique disponible avec un ERP connecté — utilisez « Fichier » ou « ▶ Run »'
+                                    : 'Reprendre'
                                 }
-                              }}
-                              title="Reprendre"
-                              style={{
-                                color: '#00E5A0', borderColor: 'rgba(0,229,160,0.3)', ...getBtnStyle(agent, 3),
-                                opacity: agent.is_executing ? 0.5 : 1,
-                                cursor: agent.is_executing ? 'not-allowed' : 'pointer'
-                              }}
-                            >
-                              {busy ? '…' : '▶ Start'}
-                            </button>
-                          )}
+                                style={{
+                                  color: '#00E5A0', borderColor: 'rgba(0,229,160,0.3)', ...getBtnStyle(agent, 3),
+                                  opacity: agent.is_executing || isStaticFileMode ? 0.4 : 1,
+                                  cursor: agent.is_executing || isStaticFileMode ? 'not-allowed' : 'pointer'
+                                }}
+                              >
+                                {busy ? '…' : '▶ Start'}
+                              </button>
+                            );
+                          })()}
 
                           {/* Config - Tutorial Step 5 */}
                           <button
@@ -1645,6 +1715,29 @@ export function AgentsView({ onNavigate, onConfigure }: AgentsViewProps) {
           onEditSchedule={() => {
             setScheduleModalAgent(null);
             onConfigure('exploitation', scheduleModalAgent, 3);
+          }}
+        />
+      )}
+
+      {/* ── UNIVERSAL UPDATE DATASET MODAL (Any file/demo agent, with or without Workspace) ── */}
+      {datasetModalAgent && (
+        <UpdateDatasetModal
+          isOpen={Boolean(datasetModalAgent)}
+          onClose={() => setDatasetModalAgent(null)}
+          agentUuid={String(datasetModalAgent.uuid || (datasetModalAgent as any).agent_id || '')}
+          agentName={datasetModalAgent.agent_name}
+          domain={String(datasetModalAgent.run_mode || 'exploitation')}
+          currentFileName={
+            (datasetModalAgent.config?.data_source || (datasetModalAgent as any).parameters?.data_source)?.file_name
+          }
+          onUpdated={async (updated) => {
+            showToast(`Fichier « ${updated.file_name} » enregistré pour "${datasetModalAgent.agent_name}".`, 'ok');
+            invalidateAgentsCache();
+            await refresh(true);
+          }}
+          onUpdatedAndRun={async () => {
+            const target = datasetModalAgent;
+            await handleRunNow(target);
           }}
         />
       )}

@@ -26,6 +26,9 @@ const AGENT_PROMPT_KEYS: Record<string, string> = {
   exploitation: 'exploitation_agent_config',
 };
 
+// Templates supporting No-ERP file/demo onboarding (extendable by 1 entry for any future agent)
+const FILE_DATASET_TEMPLATES = new Set<string>(['exploitation']);
+
 
 
 export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, onNavigate, activeCategory, onSelectCategory, onOpenPrompts, isAdmin: isAdminProp }) => {
@@ -37,6 +40,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, onNa
   const { activeConnection } = useConnections();
   const [showErpRequiredModal, setShowErpRequiredModal] = React.useState(false);
   const [blockedAgentName, setBlockedAgentName] = React.useState("Agent de Recouvrement");
+  const [blockedTemplateId, setBlockedTemplateId] = React.useState<string>('');
   const [activeTab, setActiveTab] = React.useState('all');
   const [searchQuery, setSearchQuery] = React.useState('');
   const [highlightedTemplateId, setHighlightedTemplateId] = React.useState<string | null>(null);
@@ -104,6 +108,7 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, onNa
 
     if (requiresErp && (!activeConnection || activeConnection.status !== 'connected')) {
       setBlockedAgentName(targetAgent?.name || 'Agent de Recouvrement');
+      setBlockedTemplateId(templateId);
       setShowErpRequiredModal(true);
       return;
     }
@@ -508,56 +513,129 @@ export const MarketplaceView: React.FC<MarketplaceViewProps> = ({ onDeploy, onNa
             border: '1px solid rgba(0, 229, 200, 0.4)',
             borderRadius: '16px',
             padding: '32px',
-            maxWidth: '480px',
+            maxWidth: FILE_DATASET_TEMPLATES.has(blockedTemplateId) ? '540px' : '480px',
             width: '100%',
             boxShadow: '0 20px 50px rgba(0,0,0,0.6)',
             textAlign: 'center'
           }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔌</div>
-            <h3 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: 800, marginBottom: '10px' }}>
-              Connexion ERP Requise
-            </h3>
-            <p style={{ color: '#8FA3B8', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
-              L&apos;<strong>{blockedAgentName}</strong> nécessite une liaison active avec votre ERP pour accéder aux factures et à la balance âgée.
-              Veuillez connecter votre ERP avant de configurer et déployer cet agent.
-            </p>
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button
-                type="button"
-                onClick={() => setShowErpRequiredModal(false)}
-                style={{
-                  padding: '10px 18px',
-                  borderRadius: '8px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: '#8FA3B8',
-                  cursor: 'pointer',
-                  fontSize: '13px'
-                }}
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowErpRequiredModal(false);
-                  window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'connectors' }));
-                }}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
-                  border: 'none',
-                  color: '#04101E',
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  boxShadow: '0 0 20px rgba(0, 229, 200, 0.4)'
-                }}
-              >
-                Connecter mon ERP
-              </button>
-            </div>
+            {FILE_DATASET_TEMPLATES.has(blockedTemplateId) ? (
+              <>
+                <div style={{ fontSize: '42px', marginBottom: '12px' }}>📊</div>
+                <h3 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: 800, marginBottom: '10px' }}>
+                  Comment souhaitez-vous alimenter cet agent ?
+                </h3>
+                <p style={{ color: '#94A3B8', fontSize: '13.5px', lineHeight: '1.6', marginBottom: '20px' }}>
+                  Aucun ERP n&apos;est connecté pour le moment. Vous pouvez utiliser <strong>{blockedAgentName}</strong> dès maintenant{' '}
+                  <strong style={{ color: '#E2E8F0' }}>sans ERP grâce à vos fichiers Excel / CSV</strong> (ou nos données d&apos;exemple) et les mettre à jour avant chaque analyse — ou connecter votre ERP pour l&apos;automatisation planifiée en direct.
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetId = blockedTemplateId;
+                      setShowErpRequiredModal(false);
+                      setHighlightedTemplateId(null);
+                      onDeploy(targetId, { initial_data_source_mode: 'file' });
+                    }}
+                    style={{
+                      padding: '12px 20px',
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
+                      border: 'none',
+                      color: '#04101E',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      fontSize: '13.5px',
+                      boxShadow: '0 0 20px rgba(0, 229, 200, 0.35)'
+                    }}
+                  >
+                    Continuer sans ERP (Fichier Excel / CSV ou Démo)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowErpRequiredModal(false);
+                      window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'connectors' }));
+                    }}
+                    style={{
+                      padding: '11px 20px',
+                      borderRadius: '10px',
+                      background: 'rgba(0, 229, 200, 0.1)',
+                      border: '1px solid rgba(0, 229, 200, 0.35)',
+                      color: '#00E5C8',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      fontSize: '13px'
+                    }}
+                  >
+                    Connecter mon ERP (planification automatique)
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowErpRequiredModal(false)}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#8FA3B8',
+                    cursor: 'pointer',
+                    fontSize: '12.5px'
+                  }}
+                >
+                  Annuler
+                </button>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔌</div>
+                <h3 style={{ color: '#FFFFFF', fontSize: '20px', fontWeight: 800, marginBottom: '10px' }}>
+                  Connexion ERP Requise
+                </h3>
+                <p style={{ color: '#8FA3B8', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
+                  L&apos;<strong>{blockedAgentName}</strong> nécessite une liaison active avec votre ERP pour accéder aux factures et à la balance âgée.
+                  Veuillez connecter votre ERP avant de configurer et déployer cet agent.
+                </p>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowErpRequiredModal(false)}
+                    style={{
+                      padding: '10px 18px',
+                      borderRadius: '8px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      color: '#8FA3B8',
+                      cursor: 'pointer',
+                      fontSize: '13px'
+                    }}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowErpRequiredModal(false);
+                      window.dispatchEvent(new CustomEvent('switch-assistant-view', { detail: 'connectors' }));
+                    }}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      background: 'linear-gradient(135deg, #00E5C8 0%, #00B4D8 100%)',
+                      border: 'none',
+                      color: '#04101E',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      boxShadow: '0 0 20px rgba(0, 229, 200, 0.4)'
+                    }}
+                  >
+                    Connecter mon ERP
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
